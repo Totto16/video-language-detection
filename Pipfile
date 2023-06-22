@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 lid = {file = "https://github.com/igorsitdikov/lid_kaldi/releases/download/1.0.1/lid-1.0.1-py3-none-linux_x86_64.whl"}
+python-ffmpeg = "*"
+ffprobe-python = "*"
 
 [dev-packages]
 pylint = "*"
@@ -13,8 +15,9 @@ flake8 = "*"
 black = "*"
 
 [scripts]
-check = "python folders.py"
-test = "python test_simple.py test_ru.wav"
+check = "python src/folders.py"
+test = "python src/test_simple.py test_ru.wav"
+lint = "mypy src --strict --ignore-missing-imports"
 
 [requires]
 python_version = "3.11"

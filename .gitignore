@@ -2,6 +2,6 @@
 
 __pycache__
 .mypy_cache
-lid-model/
+models/
 Pipfile.lock
 test_ru.wav

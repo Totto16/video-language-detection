@@ -10,7 +10,7 @@ if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE
     print("Audio file must be WAV format mono PCM.")
     exit(1)
 
-model = Model("lid-model")
+model = Model("models/lid-model")
 rec = KaldiRecognizer(model, wf.getframerate())
 data = wf.readframes(-1)
 rec.AcceptWaveform(data)
