@@ -1,0 +1,7 @@
+/kaldi/
+
+__pycache__
+.mypy_cache
+lid-model/
+Pipfile.lock
+test_ru.wav
