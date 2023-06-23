@@ -280,7 +280,7 @@ class Content:
 
     @staticmethod
     def from_scan(
-        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> Optional["Content"]:
         return None
 
@@ -349,9 +349,9 @@ class Stats:
     mtime: float
 
     @staticmethod
-    def hash_file(file_path: str) -> str:
-        if path.isdir(file_path):
-            raise RuntimeError("CanÄt take checksum of path")
+    def hash_file(file_path: Path) -> str:
+        if file_path.is_dir():
+            raise RuntimeError("Can't take checksum of directory")
 
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as file:
@@ -361,7 +361,7 @@ class Stats:
             return sha256_hash.hexdigest()
 
     @staticmethod
-    def from_file(file_path: str, file_type: ScannedFileType) -> "Stats":
+    def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
         checksum = (
             None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
         )
@@ -382,7 +382,7 @@ class ScannedFile:
 
     @staticmethod
     def from_scan(
-        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
             raise RuntimeError(
@@ -411,17 +411,17 @@ class ScannedFile:
 
 
 def process_folder_recursively(
-    directory: str,
+    directory: Path,
     *,
     callback_function: Optional[
-        Callable[[str, ScannedFileType, list[str]], None]
+        Callable[[Path, ScannedFileType, list[str]], None]
     ] = None,
-    ignore_folder_fn: Optional[Callable[[str, str, list[str]], bool]] = None,
+    ignore_folder_fn: Optional[Callable[[Path, str, list[str]], bool]] = None,
     parent_folders: list[str] = [],
 ) -> None:
     for file in listdir(directory):
-        file_path: str = path.join(directory, file)
-        if path.isdir(file_path):
+        file_path: Path = Path(path.join(directory, file))
+        if file_path.is_dir():
             if ignore_folder_fn is not None:
                 should_ignore = ignore_folder_fn(file_path, file, parent_folders)
                 if should_ignore:
@@ -444,16 +444,16 @@ def process_folder_recursively(
 def main() -> None:
     classifier = Classifier()
 
-    ROOT_FOLDER: str = "/media/totto/Totto_4/Serien"
+    ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
 
-    video_formats = ["mp4", "mkv", "avi"]
+    video_formats: list[str] = ["mp4", "mkv", "avi"]
 
     def process_file(
-        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> None:
-        needs_scan = file_type == ScannedFileType.folder
+        needs_scan: bool = file_type == ScannedFileType.folder
         if file_type == ScannedFileType.file:
-            extension: str = Path(file_path).suffix[1:]
+            extension: str = file_path.suffix[1:]
             if extension not in video_formats:
                 needs_scan = False
 
@@ -475,7 +475,7 @@ def main() -> None:
 
     ignore_files: list[str] = ["metadata"]
 
-    def ignore_folders(file_path: str, file: str, parent_folders: list[str]) -> bool:
+    def ignore_folders(file_path: Path, file: str, parent_folders: list[str]) -> bool:
         if file.startswith("."):
             return True
 
