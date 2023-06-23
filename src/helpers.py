@@ -1,5 +1,5 @@
 from typing import Optional, Callable, TypeVar
-from os import listdir, path
+from os import listdir
 from pathlib import Path
 from content import ScannedFileType
 

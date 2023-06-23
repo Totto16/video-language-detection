@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from os import makedirs, path, remove
-import os
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from ffprobe import FFProbe
@@ -84,12 +83,12 @@ class WAVFile:
 
     def __convert_to_wav(self, options: WAVOptions) -> None:
         temp_dir: Path = Path("/tmp") / "video_lang_detect"
-        if not path.exists(temp_dir):
+        if not temp_dir.exists():
             makedirs(temp_dir)
         self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 
-        if path.exists(self.__tmp_file):
-            remove(self.__tmp_file)
+        if self.__tmp_file.exists():
+            remove(self.__tmp_file.absolute())
 
         ffmpeg_options: dict[str, Any] = {
             "acodec": "pcm_s16le",
@@ -209,7 +208,7 @@ class Classifier:
 
                 # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
                 signal = self.__classifier.load_audio(
-                    wav_file.wav_path(), savedir=self.__save_dir
+                    wav_file.wav_path(), savedir=self.__save_dir.absolute()
                 )
                 prediction = self.__classifier.classify_batch(signal)
 
@@ -245,8 +244,8 @@ class Classifier:
         }
 
     def __del__(self) -> None:
-        if path.exists(self.__save_dir):
-            if path.isfile(self.__save_dir):
-                remove(self.__save_dir)
+        if self.__save_dir.exists():
+            if self.__save_dir.is_file():
+                remove(self.__save_dir.absolute())
             else:
-                shutil.rmtree(self.__save_dir, ignore_errors=True)
+                shutil.rmtree(self.__save_dir.absolute(), ignore_errors=True)
