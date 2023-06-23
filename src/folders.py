@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from os import makedirs, path, remove
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, TypedDict, cast
 from ffprobe import FFProbe
 from ffmpeg import FFmpeg, Progress
 from speechbrain.pretrained import EncoderClassifier
@@ -88,23 +89,27 @@ class WAVFile:
         if path.exists(self.__tmp_file):
             remove(self.__tmp_file)
 
-        options: dict[str, Any] = {
+        ffmpeg_options: dict[str, Any] = {
             "acodec": "pcm_s16le",
             "ar": options["bitrate"],
             "ac": 1,
         }
 
         if options["amount"] is not None:
-            options["to"] = (str(options["amount"]),)
+            ffmpeg_options["to"] = (str(options["amount"]),)
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
-            FFmpeg().option("y").input(self.__file).output(self.__tmp_file, **options)
+            FFmpeg()
+            .option("y")
+            .input(self.__file)
+            .output(self.__tmp_file, **ffmpeg_options)
         )
 
         @ffmpeg.on("progress")  # type: ignore
         def progress_report(progress: Progress) -> None:
-            print(progress)
+            # print(progress)
+            pass
 
         ffmpeg.execute()
 
@@ -131,6 +136,28 @@ class WAVFile:
 class LanguageDict(TypedDict):
     language: str
     score: float
+
+
+@dataclass
+class Language:
+    short: str
+    long: str
+
+    @staticmethod
+    def from_str(input: str) -> Optional["Language"]:
+        arr: list[str] = [a.strip() for a in input.split(":")]
+        if len(arr) != 2:
+            return None
+
+        return Language(arr[0], arr[1])
+
+    @staticmethod
+    def from_str_unsafe(input: str) -> "Language":
+        lan: Optional["Language"] = Language.from_str(input)
+        if lan is None:
+            raise RuntimeError(f"Couldn't get the Language from str {input}")
+
+        return lan
 
 
 class Classifier:
@@ -170,28 +197,33 @@ class Classifier:
         print(f"free     : {humanize.naturalsize(info.free, binary=True)}")
         print(f"used     : {humanize.naturalsize(info.used, binary=True)}")
 
-    def predict(self, wav_file: WAVFile) -> tuple[str, float]:
+    def predict(self, wav_file: WAVFile) -> tuple[Language, float]:
         minutes: list[Optional[int]] = [1, 2, 4, 5, 10, 20, None]
 
         for minute in minutes:
             try:
                 delta = None if minute is None else timedelta(minutes=minute)
-                wav_file.create_wav_file({"bitrate": 16000, "amount": delta})
+                wav_file.create_wav_file({"bitrate": 16000, "amount": delta}, True)
 
+                # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
                 signal = self.__classifier.load_audio(
                     wav_file.wav_path(), savedir=self.__save_dir
                 )
                 prediction = self.__classifier.classify_batch(signal)
 
-                accuracy = prediction[1].exp()
+                accuracy = cast(float, prediction[1].exp().item())
                 # The identified language ISO code is given in prediction[3]
-                language = prediction[3]
+                language = Language.from_str_unsafe(cast(str, prediction[3][0]))
+
                 if accuracy < 0.9:
                     continue
 
                 return (language, accuracy)
-            except torch.cuda.OutOfMemoryError:
-                self.__init_classifier(True)
+            except RuntimeError as exception:
+                if isinstance(exception, torch.cuda.OutOfMemoryError):
+                    self.__init_classifier(True)
+                else:
+                    raise exception
 
         raise RuntimeError("No language with enough accuracy could be found :(")
 
@@ -231,8 +263,6 @@ def main() -> None:
     for file in files:
         file_path = path.join(ROOT_FOLDER, file)
         wav_file = WAVFile(file_path)
-
-        # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
 
         language, accuracy = classifier.predict(wav_file)
         print(language, accuracy)
