@@ -5,6 +5,7 @@ from datetime import timedelta
 from enum import Enum
 import hashlib
 from os import listdir, makedirs, path, remove
+from pathlib import Path
 from typing import Any, Callable, Optional, TypedDict, cast
 from typing_extensions import override
 from ffprobe import FFProbe
@@ -277,6 +278,12 @@ class Content:
     def languages(self) -> list[Language]:
         raise MissingOverrideError()
 
+    @staticmethod
+    def from_scan(
+        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> Optional["Content"]:
+        return None
+
 
 class EpisodeContent(Content):
     __title: Optional[str]
@@ -336,23 +343,71 @@ class SeriesContent(Content):
         return languages
 
 
+@dataclass
+class Stats:
+    checksum: Optional[str]
+    mtime: float
+
+    @staticmethod
+    def hash_file(file_path: str) -> str:
+        if path.isdir(file_path):
+            raise RuntimeError("CanÄt take checksum of path")
+
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as file:
+            # Read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: file.read(4096), b""):
+                sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+
+    @staticmethod
+    def from_file(file_path: str, file_type: ScannedFileType) -> "Stats":
+        checksum = (
+            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
+        )
+
+        mtime = Path(file_path).stat().st_mtime
+
+        return Stats(checksum=checksum, mtime=mtime)
+
+
+@dataclass
 class ScannedFile:
+    collection: Optional[str]
     parents: list[str]
     name: str  # id
     type: ScannedFileType
-    checksum: str
+    stats: Stats
     content: Optional[Content]
 
-    def __init__(self, path: str) -> None:
-        pass
+    @staticmethod
+    def from_scan(
+        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> "ScannedFile":
+        if len(parent_folders) > 3:
+            raise RuntimeError(
+                "No more than 3 parent folders are allowed: [collection] -> series -> season"
+            )
+        collection: Optional[str] = None
+        parents: list[str] = parent_folders
+        if len(parents) == 3:
+            collection = parents[0]
+            parents = parents[1:]
 
-    def __hash_file(self, path: str) -> str:
-        sha256_hash = hashlib.sha256()
-        with open(path, "rb") as f:
-            # Read and update hash string value in blocks of 4K
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-            return sha256_hash.hexdigest()
+        name = path.basename(file_path)
+
+        stats = Stats.from_file(file_path, file_type)
+
+        content = Content.from_scan(file_path, file_type, parent_folders)
+
+        return ScannedFile(
+            collection=collection,
+            parents=parents,
+            name=name,
+            type=file_type,
+            stats=stats,
+            content=content,
+        )
 
 
 def process_folder_recursively(
@@ -391,12 +446,23 @@ def main() -> None:
 
     ROOT_FOLDER: str = "/media/totto/Totto_4/Serien"
 
+    video_formats = ["mp4", "mkv", "avi"]
+
     def process_file(
         file_path: str, file_type: ScannedFileType, parent_folders: list[str]
     ) -> None:
-        print(file_path, file_type, parent_folders)
+        needs_scan = file_type == ScannedFileType.folder
+        if file_type == ScannedFileType.file:
+            extension: str = Path(file_path).suffix[1:]
+            if extension not in video_formats:
+                needs_scan = False
 
-        # TODO create Content Files and save them!
+        if not needs_scan:
+            return
+
+        file: ScannedFile = ScannedFile.from_scan(file_path, file_type, parent_folders)
+        print(file)
+
         if file_type == ScannedFileType.folder:
             return
 
