@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
 from dataclasses import dataclass
+import dataclasses
 from enum import Enum
 import hashlib
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, Callable, TypeVar
 from typing_extensions import override
 import re
 from classifier import Classifier, Language, WAVFile
-from helpers import parse_int_safely
+from os import listdir
+from json import JSONEncoder
 
 
 class ScannedFileType(Enum):
@@ -27,7 +29,15 @@ class MissingOverrideError(RuntimeError):
     pass
 
 
+# GLOBAL
 classifier: Classifier
+
+
+def parse_int_safely(input: str) -> Optional[int]:
+    try:
+        return int(input)
+    except ValueError:
+        return None
 
 
 @dataclass
@@ -49,13 +59,26 @@ class Stats:
 
     @staticmethod
     def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        checksum = (
+        checksum: Optional[str] = (
             None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
         )
 
-        mtime = Path(file_path).stat().st_mtime
+        mtime: float = Path(file_path).stat().st_mtime
 
         return Stats(checksum=checksum, mtime=mtime)
+
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = {
+            "checksum": self.checksum,
+            "mtime": self.mtime,
+        }
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 @dataclass
@@ -82,6 +105,50 @@ class ScannedFile:
             type=file_type,
             stats=stats,
         )
+
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = {
+            "path": str(self.path.absolute()),
+            "parents": self.parents,
+            "type": self.type,
+            "stats": self.stats,
+        }
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+T = TypeVar("T")
+
+
+def process_folder(
+    directory: Path,
+    process_fn: Callable[[Path, ScannedFileType, list[str]], T],
+    *,
+    ignore_fn: Callable[
+        [Path, ScannedFileType, list[str]], bool
+    ] = lambda x, y, z: False,
+    parent_folders: list[str] = [],
+) -> list[T]:
+    results: list[T] = []
+    for file in listdir(directory):
+        file_path: Path = Path(directory) / file
+
+        file_type: ScannedFileType = (
+            ScannedFileType.folder if file_path.is_dir() else ScannedFileType.file
+        )
+        should_ignore: bool = ignore_fn(file_path, file_type, parent_folders)
+        if should_ignore:
+            continue
+
+        result: T = process_fn(file_path, file_type, parent_folders)
+        results.append(result)
+
+    return results
 
 
 class Content:
@@ -168,6 +235,19 @@ class Content:
 
             return CollectionContent(file_path, scanned_file)
 
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = {
+            "scanned_file": self.__scanned_file.as_dict(),
+            "type": self.__type,
+        }
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 @dataclass
 class EpisodeDescription:
@@ -231,6 +311,18 @@ class EpisodeContent(Content):
     def languages(self) -> list[Language]:
         return [self.__language]
 
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = super().as_dict()
+        as_dict["description"] = self.__description
+        as_dict["language"] = self.__language
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 @dataclass
 class SeasonDescription:
@@ -291,6 +383,18 @@ class SeasonContent(Content):
 
         return languages
 
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = super().as_dict()
+        as_dict["description"] = self.__description
+        as_dict["episodes"] = self.__episodes
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 @dataclass
 class SeriesDescription:
@@ -348,19 +452,31 @@ class SeriesContent(Content):
 
         return languages
 
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = super().as_dict()
+        as_dict["description"] = self.__description
+        as_dict["seasons"] = self.__seasons
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 class CollectionContent(Content):
-    __name: str
+    __description: str
     __series: list[SeriesContent]
 
     def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
         super().__init__(ContentType.collection, scanned_file)
-        self.__name = path.name
+        self.__description = path.name
         self.__series = []
 
     @property
     def description(self) -> str:
-        return self.__name
+        return self.__description
 
     @override
     def languages(self) -> list[Language]:
@@ -371,3 +487,33 @@ class CollectionContent(Content):
                     languages.append(language)
 
         return languages
+
+    def as_dict(self) -> dict[str, Any]:
+        as_dict: dict[str, Any] = super().as_dict()
+        as_dict["description"] = self.__description
+        as_dict["series"] = self.__series
+        return as_dict
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+class Encoder(JSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, Content):
+            return o.as_dict()
+        elif isinstance(o, ScannedFile):
+            return o.as_dict()
+        elif isinstance(o, Path):
+            return str(o.absolute())
+        elif isinstance(o, Enum):
+            return str(o.name)
+        elif isinstance(o, Stats):
+            return o.as_dict()
+        elif dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        else:
+            return super().default(o)

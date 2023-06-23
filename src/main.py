@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 
+import json
 from pathlib import Path
 from typing import Optional
 from classifier import Classifier
 
-from content import Content, ScannedFileType
-from helpers import process_folder
+from content import Content, Encoder, ScannedFileType, process_folder
 
 
 classifier = Classifier()
@@ -51,8 +51,9 @@ def main() -> None:
         ROOT_FOLDER, process_fn=process_file, ignore_fn=ignore_fn
     )
 
-    # TODO save to JSON
     print(contents)
+    json_content = json.dumps(contents, cls=Encoder)
+    print(json_content)
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ class WAVFile:
 
     def __get_info(self) -> tuple[FileType, Status]:
         try:
-            metadata = FFProbe(self.__file.absolute)
+            metadata = FFProbe(str(self.__file.absolute()))
             for stream in metadata.streams:
                 if stream.is_video():
                     return (FileType.video, Status.raw)
@@ -88,7 +88,7 @@ class WAVFile:
         self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 
         if self.__tmp_file.exists():
-            remove(self.__tmp_file.absolute())
+            remove(str(self.__tmp_file.absolute()))
 
         ffmpeg_options: dict[str, Any] = {
             "acodec": "pcm_s16le",
@@ -131,7 +131,7 @@ class WAVFile:
 
     def __del__(self) -> None:
         if self.__tmp_file is not None:
-            remove(self.__tmp_file.absolute())
+            remove(str(self.__tmp_file.absolute()))
 
 
 class LanguageDict(TypedDict):
@@ -208,7 +208,7 @@ class Classifier:
 
                 # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
                 signal = self.__classifier.load_audio(
-                    wav_file.wav_path(), savedir=self.__save_dir.absolute()
+                    wav_file.wav_path(), savedir=str(self.__save_dir.absolute())
                 )
                 prediction = self.__classifier.classify_batch(signal)
 
@@ -246,6 +246,6 @@ class Classifier:
     def __del__(self) -> None:
         if self.__save_dir.exists():
             if self.__save_dir.is_file():
-                remove(self.__save_dir.absolute())
+                remove(str(self.__save_dir.absolute()))
             else:
-                shutil.rmtree(self.__save_dir.absolute(), ignore_errors=True)
+                shutil.rmtree(str(self.__save_dir.absolute()), ignore_errors=True)
