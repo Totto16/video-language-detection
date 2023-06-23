@@ -17,6 +17,7 @@ import pynvml
 import humanize
 import shutil
 import hashlib
+import re
 
 
 class FileType(Enum):
@@ -263,6 +264,7 @@ class ContentType(Enum):
     series = "series"
     season = "season"
     episode = "episode"
+    collection = "collection"
 
 
 class MissingOverrideError(RuntimeError):
@@ -282,7 +284,28 @@ class Content:
     def from_scan(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> Optional["Content"]:
-        return None
+        name = file_path.name
+
+        # [collection] -> series -> season -> file_name
+
+        parents: list[str] = [*parent_folders, name]
+
+        top_is_collection: bool = SeriesContent.is_valid_name(parents[0])
+
+        if len(parent_folders) == 4:
+            return EpisodeContent(file_path)
+        elif len(parents) == 3 and not top_is_collection:
+            return EpisodeContent(file_path)
+        elif len(parents) == 3 and top_is_collection:
+            return SeasonContent(file_path)
+        elif len(parents) == 2 and not top_is_collection:
+            return SeasonContent(file_path)
+        elif len(parents) == 2 and top_is_collection:
+            return SeriesContent(file_path)
+        elif len(parents) == 1 and not top_is_collection:
+            return SeriesContent(file_path)
+        else:
+            return CollectionContent(file_path)
 
 
 class EpisodeContent(Content):
@@ -291,12 +314,12 @@ class EpisodeContent(Content):
     __episode: int
     __language: Language
 
-    def __init__(self, basename: str) -> None:
+    def __init__(self, path: Path) -> None:
         super().__init__(ContentType.episode)
         self.__title = None
         self.__season = -1
         self.__episode = -1
-        self.__language = Language("de", "German")
+        self.__language = Language("un", "Unknown")
 
     @override
     def languages(self) -> list[Language]:
@@ -307,7 +330,7 @@ class SeasonContent(Content):
     __season: int
     __episodes: list[EpisodeContent]
 
-    def __init__(self, basename: str) -> None:
+    def __init__(self, path: Path) -> None:
         super().__init__(ContentType.season)
         self.__season = -1
         self.__episodes = []
@@ -323,20 +346,85 @@ class SeasonContent(Content):
         return languages
 
 
+@dataclass
+class SeriesTitle:
+    name: str
+    year: int
+
+
+def parse_int_safely(input: str) -> Optional[int]:
+    try:
+        return int(input)
+    except ValueError:
+        return None
+
+
 class SeriesContent(Content):
-    __title: str
+    __title: SeriesTitle
     __seasons: list[SeasonContent]
 
-    def __init__(self, basename: str) -> None:
+    def __init__(self, path: Path) -> None:
         super().__init__(ContentType.series)
-        self.__title = ""
+        title: Optional[SeriesTitle] = SeriesContent.parse_title(path.name)
+        if title is None:
+            raise RuntimeError(f"Couldn't get SeriesTitle from {path.name}")
+
+        self.__title = title
         self.__seasons = []
+
+    def add_season(self, season: SeasonContent) -> None:
+        self.__seasons.append(season)
+
+    @property
+    def title(self) -> SeriesTitle:
+        return self.__title
+
+    @staticmethod
+    def is_valid_name(name: str) -> bool:
+        return SeriesContent.parse_title(name) is not None
+
+    @staticmethod
+    def parse_title(name: str) -> Optional[SeriesTitle]:
+        match = re.search(r"(.*) \((\d{4})\)", name)
+        if match is None:
+            return None
+
+        groups = match.groups()
+        if len(groups) != 2:
+            return None
+
+        name, _year = groups
+        year = parse_int_safely(_year)
+        if year is None:
+            return None
+
+        return SeriesTitle(name, year)
 
     @override
     def languages(self) -> list[Language]:
         languages: list[Language] = []
         for season in self.__seasons:
             for language in season.languages():
+                if language not in languages:
+                    languages.append(language)
+
+        return languages
+
+
+class CollectionContent(Content):
+    __name: str
+    __series: list[SeriesContent]
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(ContentType.collection)
+        self.__name = path.name
+        self.__series = []
+
+    @override
+    def languages(self) -> list[Language]:
+        languages: list[Language] = []
+        for serie in self.__series:
+            for language in serie.languages():
                 if language not in languages:
                     languages.append(language)
 
@@ -373,7 +461,6 @@ class Stats:
 
 @dataclass
 class ScannedFile:
-    collection: Optional[str]
     parents: list[str]
     name: str  # id
     type: ScannedFileType
@@ -388,11 +475,6 @@ class ScannedFile:
             raise RuntimeError(
                 "No more than 3 parent folders are allowed: [collection] -> series -> season"
             )
-        collection: Optional[str] = None
-        parents: list[str] = parent_folders
-        if len(parents) == 3:
-            collection = parents[0]
-            parents = parents[1:]
 
         name = path.basename(file_path)
 
@@ -401,8 +483,7 @@ class ScannedFile:
         content = Content.from_scan(file_path, file_type, parent_folders)
 
         return ScannedFile(
-            collection=collection,
-            parents=parents,
+            parents=parent_folders,
             name=name,
             type=file_type,
             stats=stats,
