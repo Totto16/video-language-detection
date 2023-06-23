@@ -3,8 +3,10 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from os import makedirs, path, remove
-from typing import Any, Optional, TypedDict, cast
+import hashlib
+from os import listdir, makedirs, path, remove
+from typing import Any, Callable, Optional, TypedDict, cast
+from typing_extensions import override
 from ffprobe import FFProbe
 from ffmpeg import FFmpeg, Progress
 from speechbrain.pretrained import EncoderClassifier
@@ -13,6 +15,7 @@ import gc
 import pynvml
 import humanize
 import shutil
+import hashlib
 
 
 class FileType(Enum):
@@ -215,7 +218,7 @@ class Classifier:
                 # The identified language ISO code is given in prediction[3]
                 language = Language.from_str_unsafe(cast(str, prediction[3][0]))
 
-                if accuracy < 0.9:
+                if accuracy < 0.95:
                     continue
 
                 return (language, accuracy)
@@ -250,22 +253,174 @@ class Classifier:
                 shutil.rmtree(self.__save_dir, ignore_errors=True)
 
 
-def main() -> None:
-    files: list[str] = [
-        "Citadel.S01E03.Infinite.Shadows.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.mkv",
-        "Black.Mirror.S06E01.GERMAN.DL.1080p.WEB.h264-SAUERKRAUT.mkv",
-    ]
+class ScannedFileType(Enum):
+    file = "file"
+    folder = "folder"
 
+
+class ContentType(Enum):
+    series = "series"
+    season = "season"
+    episode = "episode"
+
+
+class MissingOverrideError(RuntimeError):
+    pass
+
+
+class Content:
+    __type: ContentType
+
+    def __init__(self, type: ContentType) -> None:
+        self.__type: ContentType = type
+
+    def languages(self) -> list[Language]:
+        raise MissingOverrideError()
+
+
+class EpisodeContent(Content):
+    __title: Optional[str]
+    __season: int
+    __episode: int
+    __language: Language
+
+    def __init__(self, basename: str) -> None:
+        super().__init__(ContentType.episode)
+        self.__title = None
+        self.__season = -1
+        self.__episode = -1
+        self.__language = Language("de", "German")
+
+    @override
+    def languages(self) -> list[Language]:
+        return [self.__language]
+
+
+class SeasonContent(Content):
+    __season: int
+    __episodes: list[EpisodeContent]
+
+    def __init__(self, basename: str) -> None:
+        super().__init__(ContentType.season)
+        self.__season = -1
+        self.__episodes = []
+
+    @override
+    def languages(self) -> list[Language]:
+        languages: list[Language] = []
+        for episode in self.__episodes:
+            for language in episode.languages():
+                if language not in languages:
+                    languages.append(language)
+
+        return languages
+
+
+class SeriesContent(Content):
+    __title: str
+    __seasons: list[SeasonContent]
+
+    def __init__(self, basename: str) -> None:
+        super().__init__(ContentType.series)
+        self.__title = ""
+        self.__seasons = []
+
+    @override
+    def languages(self) -> list[Language]:
+        languages: list[Language] = []
+        for season in self.__seasons:
+            for language in season.languages():
+                if language not in languages:
+                    languages.append(language)
+
+        return languages
+
+
+class ScannedFile:
+    parents: list[str]
+    name: str  # id
+    type: ScannedFileType
+    checksum: str
+    content: Optional[Content]
+
+    def __init__(self, path: str) -> None:
+        pass
+
+    def __hash_file(self, path: str) -> str:
+        sha256_hash = hashlib.sha256()
+        with open(path, "rb") as f:
+            # Read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+
+
+def process_folder_recursively(
+    directory: str,
+    *,
+    callback_function: Optional[
+        Callable[[str, ScannedFileType, list[str]], None]
+    ] = None,
+    ignore_folder_fn: Optional[Callable[[str, str, list[str]], bool]] = None,
+    parent_folders: list[str] = [],
+) -> None:
+    for file in listdir(directory):
+        file_path: str = path.join(directory, file)
+        if path.isdir(file_path):
+            if ignore_folder_fn is not None:
+                should_ignore = ignore_folder_fn(file_path, file, parent_folders)
+                if should_ignore:
+                    continue
+
+            if callback_function is not None:
+                callback_function(file_path, ScannedFileType.folder, parent_folders)
+
+            process_folder_recursively(
+                file_path,
+                callback_function=callback_function,
+                parent_folders=[*parent_folders, file],
+                ignore_folder_fn=ignore_folder_fn,
+            )
+        else:
+            if callback_function is not None:
+                callback_function(file_path, ScannedFileType.file, parent_folders)
+
+
+def main() -> None:
     classifier = Classifier()
 
-    ROOT_FOLDER: str = "/media/totto/Totto_1"
+    ROOT_FOLDER: str = "/media/totto/Totto_4/Serien"
 
-    for file in files:
-        file_path = path.join(ROOT_FOLDER, file)
+    def process_file(
+        file_path: str, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> None:
+        print(file_path, file_type, parent_folders)
+
+        # TODO create Content Files and save them!
+        if file_type == ScannedFileType.folder:
+            return
+
+        return
+
         wav_file = WAVFile(file_path)
 
         language, accuracy = classifier.predict(wav_file)
         print(language, accuracy)
+
+    ignore_files: list[str] = ["metadata"]
+
+    def ignore_folders(file_path: str, file: str, parent_folders: list[str]) -> bool:
+        if file.startswith("."):
+            return True
+
+        if file in ignore_files:
+            return True
+
+        return False
+
+    process_folder_recursively(
+        ROOT_FOLDER, callback_function=process_file, ignore_folder_fn=ignore_folders
+    )
 
 
 if __name__ == "__main__":
