@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 from classifier import Classifier
 
-from content import Content, Encoder, ScannedFileType, process_folder
+from content import Content, Decoder, Encoder, ScannedFileType, process_folder
 
 
 classifier = Classifier()
@@ -51,9 +51,11 @@ def main() -> None:
         ROOT_FOLDER, process_fn=process_file, ignore_fn=ignore_fn
     )
 
-    print(contents)
+    # print(contents)
     json_content = json.dumps(contents, cls=Encoder)
-    print(json_content)
+    # print(json_content)
+    json_loaded = json.loads(json_content, cls=Decoder)
+    print(json_loaded)
 
 
 if __name__ == "__main__":

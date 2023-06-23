@@ -5,12 +5,12 @@ import dataclasses
 from enum import Enum
 import hashlib
 from pathlib import Path
-from typing import Any, Optional, Callable, TypeVar
+from typing import Any, Optional, Callable, TypeVar, cast
 from typing_extensions import override
 import re
 from classifier import Classifier, Language, WAVFile
 from os import listdir
-from json import JSONEncoder
+from json import JSONDecoder, JSONEncoder
 
 
 class ScannedFileType(Enum):
@@ -73,6 +73,10 @@ class Stats:
             "mtime": self.mtime,
         }
         return as_dict
+
+    @staticmethod
+    def from_dict(dct: dict[str, Any]) -> "Stats":
+        return Stats(checksum=dct.get("checksum"), mtime=dct["mtime"])
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -501,19 +505,45 @@ class CollectionContent(Content):
         return self.__str__()
 
 
+VALUE_KEY: str = "__value__"
+TYPE_KEY: str = "__type__"
+
+
 class Encoder(JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, Content):
-            return o.as_dict()
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict()}
         elif isinstance(o, ScannedFile):
-            return o.as_dict()
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict()}
         elif isinstance(o, Path):
-            return str(o.absolute())
+            return {TYPE_KEY: "Path", VALUE_KEY: str(o.absolute())}
         elif isinstance(o, Enum):
-            return str(o.name)
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.name}
         elif isinstance(o, Stats):
-            return o.as_dict()
+            return {TYPE_KEY: "Stats", VALUE_KEY: o.as_dict()}
         elif dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: dataclasses.asdict(o)}
         else:
             return super().default(o)
+
+
+class Decoder(JSONDecoder):
+    def __init__(self) -> None:
+        def object_hook(dct: dict[str, Any]) -> Any:
+            type: Optional[str] = cast(Optional[str], dct.get(TYPE_KEY))
+            if type is None:
+                return dct
+                # raise TypeError(f"Object has no type key: {dct}")
+
+            value: Any = dct[VALUE_KEY]
+            match type:
+                case "ScannedFileType":
+                    return ScannedFileType(value)
+                case "Stats":
+                    return Stats.from_dict(value)
+                case _:
+                    raise TypeError(
+                        f"Object of type {type} is not JSON de-serializable"
+                    )
+
+        super().__init__(object_hook=object_hook)
