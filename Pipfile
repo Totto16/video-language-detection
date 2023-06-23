@@ -20,8 +20,8 @@ flake8 = "*"
 black = "*"
 
 [scripts]
-check = "python src/folders.py"
-test = "python src/test_simple.py test_ru.wav"
+check = "python src/main.py"
+test = "python tests/test_simple.py tests/test_ru.wav"
 lint = "mypy src --strict --ignore-missing-imports"
 
 [requires]
