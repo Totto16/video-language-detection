@@ -16,7 +16,6 @@ import gc
 import pynvml
 import humanize
 import shutil
-import hashlib
 import re
 
 
@@ -287,53 +286,172 @@ class Content:
         name = file_path.name
 
         # [collection] -> series -> season -> file_name
-
         parents: list[str] = [*parent_folders, name]
 
-        top_is_collection: bool = SeriesContent.is_valid_name(parents[0])
+        top_is_collection: bool = not SeriesContent.is_valid_name(parents[0])
 
         if len(parent_folders) == 4:
+            if file_type == ScannedFileType.folder:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return EpisodeContent(file_path)
         elif len(parents) == 3 and not top_is_collection:
+            if file_type == ScannedFileType.folder:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return EpisodeContent(file_path)
         elif len(parents) == 3 and top_is_collection:
+            if file_type == ScannedFileType.file:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return SeasonContent(file_path)
         elif len(parents) == 2 and not top_is_collection:
+            if file_type == ScannedFileType.file:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return SeasonContent(file_path)
         elif len(parents) == 2 and top_is_collection:
+            if file_type == ScannedFileType.file:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return SeriesContent(file_path)
         elif len(parents) == 1 and not top_is_collection:
+            if file_type == ScannedFileType.file:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return SeriesContent(file_path)
         else:
+            if file_type == ScannedFileType.file:
+                raise RuntimeError(
+                    f"Not expected file type {file_type} with the received nesting!"
+                )
+
             return CollectionContent(file_path)
 
 
+def parse_int_safely(input: str) -> Optional[int]:
+    try:
+        return int(input)
+    except ValueError:
+        return None
+
+
+@dataclass
+class EpisodeDescription:
+    name: str
+    season: int
+    episode: int
+
+
 class EpisodeContent(Content):
-    __title: Optional[str]
-    __season: int
-    __episode: int
+    __description: EpisodeDescription
     __language: Language
 
     def __init__(self, path: Path) -> None:
         super().__init__(ContentType.episode)
-        self.__title = None
-        self.__season = -1
-        self.__episode = -1
+        description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
+            path.name
+        )
+        if description is None:
+            raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
+
+        self.__description = description
         self.__language = Language("un", "Unknown")
+
+    @property
+    def description(self) -> EpisodeDescription:
+        return self.__description
+
+    @staticmethod
+    def is_valid_name(name: str) -> bool:
+        return SeriesContent.parse_description(name) is not None
+
+    @staticmethod
+    def parse_description(name: str) -> Optional[EpisodeDescription]:
+        match = re.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
+        if match is None:
+            return None
+
+        groups = match.groups()
+        if len(groups) != 5:
+            return None
+
+        _episode_num, name, _season, _episode, _extension = groups
+        season = parse_int_safely(_season)
+        if season is None:
+            return None
+
+        episode = parse_int_safely(_episode)
+        if episode is None:
+            return None
+
+        return EpisodeDescription(name, season, episode)
 
     @override
     def languages(self) -> list[Language]:
         return [self.__language]
 
 
+@dataclass
+class SeasonDescription:
+    season: int
+
+
 class SeasonContent(Content):
-    __season: int
+    __description: SeasonDescription
     __episodes: list[EpisodeContent]
 
     def __init__(self, path: Path) -> None:
         super().__init__(ContentType.season)
-        self.__season = -1
+        description: Optional[SeasonDescription] = SeasonContent.parse_description(
+            path.name
+        )
+        if description is None:
+            raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
+
+        self.__description = description
         self.__episodes = []
+
+    @staticmethod
+    def is_valid_name(name: str) -> bool:
+        return SeasonContent.parse_description(name) is not None
+
+    @staticmethod
+    def parse_description(name: str) -> Optional[SeasonDescription]:
+        match = re.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
+        if match is None:
+            return None
+
+        groups = match.groups()
+        if len(groups) != 5:
+            return None
+
+        _episode_num, name, _season, _episode, _extension = groups
+        season = parse_int_safely(_season)
+        if season is None:
+            return None
+
+        episode = parse_int_safely(_episode)
+        if episode is None:
+            return None
+
+        return SeasonDescription(season)
+
+    @property
+    def description(self) -> SeasonDescription:
+        return self.__description
 
     @override
     def languages(self) -> list[Language]:
@@ -347,44 +465,36 @@ class SeasonContent(Content):
 
 
 @dataclass
-class SeriesTitle:
+class SeriesDescription:
     name: str
     year: int
 
 
-def parse_int_safely(input: str) -> Optional[int]:
-    try:
-        return int(input)
-    except ValueError:
-        return None
-
-
 class SeriesContent(Content):
-    __title: SeriesTitle
+    __description: SeriesDescription
     __seasons: list[SeasonContent]
 
     def __init__(self, path: Path) -> None:
         super().__init__(ContentType.series)
-        title: Optional[SeriesTitle] = SeriesContent.parse_title(path.name)
-        if title is None:
-            raise RuntimeError(f"Couldn't get SeriesTitle from {path.name}")
+        description: Optional[SeriesDescription] = SeriesContent.parse_description(
+            path.name
+        )
+        if description is None:
+            raise RuntimeError(f"Couldn't get SeriesDescription from {path}")
 
-        self.__title = title
+        self.__description = description
         self.__seasons = []
 
-    def add_season(self, season: SeasonContent) -> None:
-        self.__seasons.append(season)
-
     @property
-    def title(self) -> SeriesTitle:
-        return self.__title
+    def description(self) -> SeriesDescription:
+        return self.__description
 
     @staticmethod
     def is_valid_name(name: str) -> bool:
-        return SeriesContent.parse_title(name) is not None
+        return SeriesContent.parse_description(name) is not None
 
     @staticmethod
-    def parse_title(name: str) -> Optional[SeriesTitle]:
+    def parse_description(name: str) -> Optional[SeriesDescription]:
         match = re.search(r"(.*) \((\d{4})\)", name)
         if match is None:
             return None
@@ -398,7 +508,7 @@ class SeriesContent(Content):
         if year is None:
             return None
 
-        return SeriesTitle(name, year)
+        return SeriesDescription(name, year)
 
     @override
     def languages(self) -> list[Language]:
@@ -419,6 +529,10 @@ class CollectionContent(Content):
         super().__init__(ContentType.collection)
         self.__name = path.name
         self.__series = []
+
+    @property
+    def description(self) -> str:
+        return self.__name
 
     @override
     def languages(self) -> list[Language]:
