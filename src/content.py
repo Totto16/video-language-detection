@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
-from os import path
 from pathlib import Path
 from typing import Optional
 from typing_extensions import override
 import re
-from classifier import Language
+from classifier import Classifier, Language, WAVFile
+from helpers import parse_int_safely
 
 
 class ScannedFileType(Enum):
@@ -25,6 +25,9 @@ class ContentType(Enum):
 
 class MissingOverrideError(RuntimeError):
     pass
+
+
+classifier: Classifier
 
 
 @dataclass
@@ -57,8 +60,8 @@ class Stats:
 
 @dataclass
 class ScannedFile:
+    path: Path
     parents: list[str]
-    name: str  # id
     type: ScannedFileType
     stats: Stats
 
@@ -71,13 +74,11 @@ class ScannedFile:
                 "No more than 3 parent folders are allowed: [collection] -> series -> season"
             )
 
-        name = path.basename(file_path)
-
-        stats = Stats.from_file(file_path, file_type)
+        stats: Stats = Stats.from_file(file_path, file_type)
 
         return ScannedFile(
+            path=file_path,
             parents=parent_folders,
-            name=name,
             type=file_type,
             stats=stats,
         )
@@ -87,16 +88,29 @@ class Content:
     __scanned_file: ScannedFile
     __type: ContentType
 
-    def __init__(self, type: ContentType) -> None:
-        self.__type: ContentType = type
+    def __init__(self, type: ContentType, scanned_file: ScannedFile) -> None:
+        self.__type = type
+        self.__scanned_file = scanned_file
 
     def languages(self) -> list[Language]:
         raise MissingOverrideError()
+
+    @property
+    def type(self) -> ContentType:
+        return self.__type
+
+    @property
+    def scanned_file(self) -> ScannedFile:
+        return self.__scanned_file
 
     @staticmethod
     def from_scan(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> Optional["Content"]:
+        scanned_file: ScannedFile = ScannedFile.from_scan(
+            file_path, file_type, parent_folders
+        )
+
         name = file_path.name
 
         # [collection] -> series -> season -> file_name
@@ -110,56 +124,49 @@ class Content:
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return EpisodeContent(file_path)
+            return EpisodeContent(file_path, scanned_file)
         elif len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return EpisodeContent(file_path)
+            return EpisodeContent(file_path, scanned_file)
         elif len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeasonContent(file_path)
+            return SeasonContent(file_path, scanned_file)
         elif len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeasonContent(file_path)
+            return SeasonContent(file_path, scanned_file)
         elif len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeriesContent(file_path)
+            return SeriesContent(file_path, scanned_file)
         elif len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeriesContent(file_path)
+            return SeriesContent(file_path, scanned_file)
         else:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return CollectionContent(file_path)
-
-
-def parse_int_safely(input: str) -> Optional[int]:
-    try:
-        return int(input)
-    except ValueError:
-        return None
+            return CollectionContent(file_path, scanned_file)
 
 
 @dataclass
@@ -173,8 +180,8 @@ class EpisodeContent(Content):
     __description: EpisodeDescription
     __language: Language
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(ContentType.episode)
+    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
+        super().__init__(ContentType.episode, scanned_file)
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
             path.name
         )
@@ -182,11 +189,18 @@ class EpisodeContent(Content):
             raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
 
         self.__description = description
-        self.__language = Language("un", "Unknown")
+        self.__language = self.__get_language()
 
     @property
     def description(self) -> EpisodeDescription:
         return self.__description
+
+    def __get_language(self) -> Language:
+        wav_file = WAVFile(self.__scanned_file.path)
+
+        language, accuracy = classifier.predict(wav_file)
+        print(language, accuracy)
+        return language
 
     @staticmethod
     def is_valid_name(name: str) -> bool:
@@ -227,8 +241,8 @@ class SeasonContent(Content):
     __description: SeasonDescription
     __episodes: list[EpisodeContent]
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(ContentType.season)
+    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
+        super().__init__(ContentType.season, scanned_file)
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
             path.name
         )
@@ -288,8 +302,8 @@ class SeriesContent(Content):
     __description: SeriesDescription
     __seasons: list[SeasonContent]
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(ContentType.series)
+    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
+        super().__init__(ContentType.series, scanned_file)
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
             path.name
         )
@@ -339,8 +353,8 @@ class CollectionContent(Content):
     __name: str
     __series: list[SeriesContent]
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(ContentType.collection)
+    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
+        super().__init__(ContentType.collection, scanned_file)
         self.__name = path.name
         self.__series = []
 

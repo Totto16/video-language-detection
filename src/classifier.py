@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from os import makedirs, path, remove
+import os
 from typing import Any, Optional, TypedDict, cast
+from pathlib import Path
 from ffprobe import FFProbe
 from ffmpeg import FFmpeg, Progress
 from speechbrain.pretrained import EncoderClassifier
@@ -32,14 +34,14 @@ class WAVOptions(TypedDict):
 
 
 class WAVFile:
-    __tmp_file: Optional[str]
-    __file: str
+    __tmp_file: Optional[Path]
+    __file: Path
     __type: FileType
     __status: Status
 
-    def __init__(self, file: str) -> None:
+    def __init__(self, file: Path) -> None:
         self.__tmp_file = None
-        if not path.exists(file):
+        if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
         type, status = self.__get_info()
@@ -48,7 +50,7 @@ class WAVFile:
 
     def __get_info(self) -> tuple[FileType, Status]:
         try:
-            metadata = FFProbe(self.__file)
+            metadata = FFProbe(self.__file.absolute)
             for stream in metadata.streams:
                 if stream.is_video():
                     return (FileType.video, Status.raw)
@@ -81,10 +83,10 @@ class WAVFile:
                 raise RuntimeError("UNREACHABLE")
 
     def __convert_to_wav(self, options: WAVOptions) -> None:
-        temp_dir: str = path.join("/tmp", "video_lang_detect")
+        temp_dir: Path = Path("/tmp") / "video_lang_detect"
         if not path.exists(temp_dir):
             makedirs(temp_dir)
-        self.__tmp_file = path.join(temp_dir, path.basename(self.__file) + ".wav")
+        self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 
         if path.exists(self.__tmp_file):
             remove(self.__tmp_file)
@@ -115,7 +117,7 @@ class WAVFile:
 
         self.__status = Status.ready
 
-    def wav_path(self) -> str:
+    def wav_path(self) -> Path:
         match (self.__status, self.__type):
             case (_, FileType.wav):
                 return self.__file
@@ -130,7 +132,7 @@ class WAVFile:
 
     def __del__(self) -> None:
         if self.__tmp_file is not None:
-            remove(self.__tmp_file)
+            remove(self.__tmp_file.absolute())
 
 
 class LanguageDict(TypedDict):
@@ -162,10 +164,10 @@ class Language:
 
 class Classifier:
     __classifier: EncoderClassifier
-    __save_dir: str
+    __save_dir: Path
 
     def __init__(self) -> None:
-        self.__save_dir = path.join(path.dirname(__file__), "tmp")
+        self.__save_dir = Path(path.dirname(__file__)) / "tmp"
 
         self.__init_classifier()
 
