@@ -160,6 +160,10 @@ class Language:
 
         return lan
 
+    @staticmethod
+    def Unknown() -> "Language":
+        return Language("un", "Unknown")
+
 
 class Classifier:
     __classifier: EncoderClassifier
@@ -226,7 +230,7 @@ class Classifier:
                 else:
                     raise exception
 
-        return (Language("un", "Unknown"), 0.0)
+        return (Language.Unknown(), 0.0)
 
     def __get_run_opts(self) -> Optional[dict[str, Any]]:
         if not torch.cuda.is_available():

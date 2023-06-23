@@ -29,10 +29,6 @@ class MissingOverrideError(RuntimeError):
     pass
 
 
-# GLOBAL
-classifier: Classifier
-
-
 def parse_int_safely(input: str) -> Optional[int]:
     try:
         return int(input)
@@ -64,9 +60,9 @@ class Stats:
 
     @staticmethod
     def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        checksum: Optional[str] = (
-            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
-        )
+        checksum: Optional[str] = None
+        # TODO: re-enable this
+        # (None if file_type == ScannedFileType.folder else Stats.hash_file(file_path))
 
         mtime: float = Path(file_path).stat().st_mtime
 
@@ -200,7 +196,9 @@ class Content:
         # [collection] -> series -> season -> file_name
         parents: list[str] = [*parent_folders, name]
 
-        top_is_collection: bool = not SeriesContent.is_valid_name(parents[0])
+        top_is_collection: bool = (
+            len(parents) == 1 and file_path.is_dir()
+        ) and not SeriesContent.is_valid_name(parents[0])
 
         if len(parent_folders) == 4:
             if file_type == ScannedFileType.folder:
@@ -245,6 +243,7 @@ class Content:
 
             return SeriesContent.from_path(file_path, scanned_file)
         else:
+            print(file_path, file_type, parents, top_is_collection)
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
@@ -263,9 +262,17 @@ class Content:
         }
         return as_dict
 
-    @staticmethod
-    def from_dict(dct: ContentDict) -> "Content":
-        raise MissingOverrideError()
+    def scan(
+        self,
+        process_fn: Callable[[Path, ScannedFileType, list[str]], "Content"],
+        *,
+        ignore_fn: Callable[
+            [Path, ScannedFileType, list[str]], bool
+        ] = lambda x, y, z: False,
+        parent_folders: list[str] = [],
+        classifier: Classifier,
+    ) -> None:
+        raise MissingOverrideError
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -303,13 +310,13 @@ class EpisodeContent(Content):
         super().__init__(ContentType.episode, scanned_file)
 
         self.__description = description
-        self.__language = self.__get_language()
+        self.__language = Language.Unknown()
 
     @property
     def description(self) -> EpisodeDescription:
         return self.__description
 
-    def __get_language(self) -> Language:
+    def __get_language(self, classifier: Classifier) -> Language:
         wav_file = WAVFile(self.scanned_file.path)
 
         language, accuracy = classifier.predict(wav_file)
@@ -345,6 +352,22 @@ class EpisodeContent(Content):
     def languages(self) -> list[Language]:
         return [self.__language]
 
+    @override
+    def scan(
+        self,
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        *,
+        ignore_fn: Callable[
+            [Path, ScannedFileType, list[str]], bool
+        ] = lambda x, y, z: False,
+        parent_folders: list[str] = [],
+        classifier: Classifier,
+    ) -> None:
+        print("scan episode")
+        # TODO: uncomment this
+        # self.__language = self.__get_language(classifier)
+
+    @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
             x if json_encoder is None else json_encoder.default(x)
@@ -397,21 +420,20 @@ class SeasonContent(Content):
 
     @staticmethod
     def parse_description(name: str) -> Optional[SeasonDescription]:
-        match = re.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
+        match = re.search(r"Staffel (\d{2})", name)
         if match is None:
-            return None
+            if name == "Specials" or name == "Special":
+                return SeasonDescription(0)
+            else:
+                return None
 
         groups = match.groups()
-        if len(groups) != 5:
+        if len(groups) != 1:
             return None
 
-        _episode_num, name, _season, _episode, _extension = groups
+        (_season,) = groups
         season = parse_int_safely(_season)
         if season is None:
-            return None
-
-        episode = parse_int_safely(_episode)
-        if episode is None:
             return None
 
         return SeasonDescription(season)
@@ -430,6 +452,32 @@ class SeasonContent(Content):
 
         return languages
 
+    @override
+    def scan(
+        self,
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        *,
+        ignore_fn: Callable[
+            [Path, ScannedFileType, list[str]], bool
+        ] = lambda x, y, z: False,
+        parent_folders: list[str] = [],
+        classifier: Classifier,
+    ) -> None:
+        contents: list[Content] = process_folder(
+            self.scanned_file.path,
+            process_fn=process_fn,
+            ignore_fn=ignore_fn,
+            parent_folders=[*parent_folders, self.scanned_file.path.name],
+        )
+        for content in contents:
+            if isinstance(content, EpisodeContent):
+                self.__episodes.append(content)
+            else:
+                raise RuntimeError(
+                    f"No child with class {type(content)} is possible in SeasonContent"
+                )
+
+    @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
             x if json_encoder is None else json_encoder.default(x)
@@ -517,6 +565,32 @@ class SeriesContent(Content):
 
         return languages
 
+    @override
+    def scan(
+        self,
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        *,
+        ignore_fn: Callable[
+            [Path, ScannedFileType, list[str]], bool
+        ] = lambda x, y, z: False,
+        parent_folders: list[str] = [],
+        classifier: Classifier,
+    ) -> None:
+        contents: list[Content] = process_folder(
+            self.scanned_file.path,
+            process_fn=process_fn,
+            ignore_fn=ignore_fn,
+            parent_folders=[*parent_folders, self.scanned_file.path.name],
+        )
+        for content in contents:
+            if isinstance(content, SeasonContent):
+                self.__seasons.append(content)
+            else:
+                raise RuntimeError(
+                    f"No child with class {type(content)} is possible in SeriesContent"
+                )
+
+    @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
             x if json_encoder is None else json_encoder.default(x)
@@ -575,11 +649,37 @@ class CollectionContent(Content):
 
         return languages
 
+    @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = self.__description
         as_dict["series"] = self.__series
         return as_dict
+
+    @override
+    def scan(
+        self,
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        *,
+        ignore_fn: Callable[
+            [Path, ScannedFileType, list[str]], bool
+        ] = lambda x, y, z: False,
+        parent_folders: list[str] = [],
+        classifier: Classifier,
+    ) -> None:
+        contents: list[Content] = process_folder(
+            self.scanned_file.path,
+            process_fn=process_fn,
+            ignore_fn=ignore_fn,
+            parent_folders=[*parent_folders, self.scanned_file.path.name],
+        )
+        for content in contents:
+            if isinstance(content, SeriesContent):
+                self.__series.append(content)
+            else:
+                raise RuntimeError(
+                    f"No child with class {type(content)} is possible in CollectionContent"
+                )
 
     @staticmethod
     def from_dict(dct: CollectionContentDict) -> "CollectionContent":

@@ -9,15 +9,12 @@ from classifier import Classifier
 from content import Content, Decoder, Encoder, ScannedFileType, process_folder
 
 
-classifier = Classifier()
-
-
 def main() -> None:
+    classifier = Classifier()
+
     ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
-
     video_formats: list[str] = ["mp4", "mkv", "avi"]
-
-    ignore_files: list[str] = ["metadata"]
+    ignore_files: list[str] = ["metadata", "extrafanart"]
 
     def ignore_fn(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
@@ -45,10 +42,19 @@ def main() -> None:
         if content is None:
             raise RuntimeError(f"Parse Error: Couldn't parse content from {file_path}")
 
+        content.scan(
+            process_fn=process_file,
+            ignore_fn=ignore_fn,
+            parent_folders=parent_folders,
+            classifier=classifier,
+        )
+
         return content
 
     contents: list[Content] = process_folder(
-        ROOT_FOLDER, process_fn=process_file, ignore_fn=ignore_fn
+        ROOT_FOLDER,
+        process_fn=process_file,
+        ignore_fn=ignore_fn,
     )
 
     json_content: str = json.dumps(contents, cls=Encoder)
