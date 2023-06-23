@@ -3,7 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 from classifier import Classifier
 
 from content import Content, Decoder, Encoder, ScannedFileType, process_folder
@@ -51,10 +51,14 @@ def main() -> None:
         ROOT_FOLDER, process_fn=process_file, ignore_fn=ignore_fn
     )
 
-    # print(contents)
-    json_content = json.dumps(contents, cls=Encoder)
-    # print(json_content)
-    json_loaded = json.loads(json_content, cls=Decoder)
+    json_content: str = json.dumps(contents, cls=Encoder)
+
+    with open("test.json", "w") as file:
+        file.write(json_content)
+
+    json_loaded: list[Content] = cast(
+        list[Content], json.loads(json_content, cls=Decoder)
+    )
     print(json_loaded)
 
 

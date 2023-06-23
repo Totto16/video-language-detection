@@ -5,7 +5,7 @@ import dataclasses
 from enum import Enum
 import hashlib
 from pathlib import Path
-from typing import Any, Optional, Callable, TypeVar, cast
+from typing import Any, Optional, Callable, TypeVar, TypedDict, cast, get_type_hints
 from typing_extensions import override
 import re
 from classifier import Classifier, Language, WAVFile
@@ -38,6 +38,11 @@ def parse_int_safely(input: str) -> Optional[int]:
         return int(input)
     except ValueError:
         return None
+
+
+class StatsDict(TypedDict):
+    checksum: Optional[str]
+    mtime: float
 
 
 @dataclass
@@ -75,7 +80,7 @@ class Stats:
         return as_dict
 
     @staticmethod
-    def from_dict(dct: dict[str, Any]) -> "Stats":
+    def from_dict(dct: StatsDict) -> "Stats":
         return Stats(checksum=dct.get("checksum"), mtime=dct["mtime"])
 
     def __str__(self) -> str:
@@ -110,17 +115,20 @@ class ScannedFile:
             stats=stats,
         )
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        encode: Callable[[Any], Any] = lambda x: (
+            x if json_encoder is None else json_encoder.default(x)
+        )
         as_dict: dict[str, Any] = {
-            "path": str(self.path.absolute()),
+            "path": encode(self.path),
             "parents": self.parents,
-            "type": self.type,
-            "stats": self.stats,
+            "type": encode(self.type),
+            "stats": encode(self.stats),
         }
         return as_dict
 
     def __str__(self) -> str:
-        return str(self.as_dict)
+        return str(self.as_dict())
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -155,9 +163,14 @@ def process_folder(
     return results
 
 
+class ContentDict(TypedDict):
+    type: ContentType
+    scanned_file: ScannedFile
+
+
 class Content:
-    __scanned_file: ScannedFile
     __type: ContentType
+    __scanned_file: ScannedFile
 
     def __init__(self, type: ContentType, scanned_file: ScannedFile) -> None:
         self.__type = type
@@ -195,56 +208,64 @@ class Content:
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return EpisodeContent(file_path, scanned_file)
+            return EpisodeContent.from_path(file_path, scanned_file)
         elif len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return EpisodeContent(file_path, scanned_file)
+            return EpisodeContent.from_path(file_path, scanned_file)
         elif len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeasonContent(file_path, scanned_file)
+            return SeasonContent.from_path(file_path, scanned_file)
         elif len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeasonContent(file_path, scanned_file)
+            return SeasonContent.from_path(file_path, scanned_file)
         elif len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeriesContent(file_path, scanned_file)
+            return SeriesContent.from_path(file_path, scanned_file)
         elif len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return SeriesContent(file_path, scanned_file)
+            return SeriesContent.from_path(file_path, scanned_file)
         else:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
                     f"Not expected file type {file_type} with the received nesting!"
                 )
 
-            return CollectionContent(file_path, scanned_file)
+            return CollectionContent.from_path(file_path, scanned_file)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        encode: Callable[[Any], Any] = lambda x: (
+            x if json_encoder is None else json_encoder.default(x)
+        )
+
         as_dict: dict[str, Any] = {
-            "scanned_file": self.__scanned_file.as_dict(),
-            "type": self.__type,
+            "scanned_file": encode(self.__scanned_file),
+            "type": encode(self.__type),
         }
         return as_dict
+
+    @staticmethod
+    def from_dict(dct: ContentDict) -> "Content":
+        raise MissingOverrideError()
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -264,13 +285,22 @@ class EpisodeContent(Content):
     __description: EpisodeDescription
     __language: Language
 
-    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
-        super().__init__(ContentType.episode, scanned_file)
+    @staticmethod
+    def from_path(path: Path, scanned_file: ScannedFile) -> "EpisodeContent":
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
             path.name
         )
         if description is None:
             raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
+
+        return EpisodeContent(scanned_file, description)
+
+    def __init__(
+        self,
+        scanned_file: ScannedFile,
+        description: EpisodeDescription,
+    ) -> None:
+        super().__init__(ContentType.episode, scanned_file)
 
         self.__description = description
         self.__language = self.__get_language()
@@ -315,10 +345,13 @@ class EpisodeContent(Content):
     def languages(self) -> list[Language]:
         return [self.__language]
 
-    def as_dict(self) -> dict[str, Any]:
-        as_dict: dict[str, Any] = super().as_dict()
-        as_dict["description"] = self.__description
-        as_dict["language"] = self.__language
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        encode: Callable[[Any], Any] = lambda x: (
+            x if json_encoder is None else json_encoder.default(x)
+        )
+        as_dict: dict[str, Any] = super().as_dict(json_encoder)
+        as_dict["description"] = encode(self.__description)
+        as_dict["language"] = encode(self.__language)
         return as_dict
 
     def __str__(self) -> str:
@@ -337,16 +370,26 @@ class SeasonContent(Content):
     __description: SeasonDescription
     __episodes: list[EpisodeContent]
 
-    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
-        super().__init__(ContentType.season, scanned_file)
+    @staticmethod
+    def from_path(path: Path, scanned_file: ScannedFile) -> "SeasonContent":
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
             path.name
         )
         if description is None:
             raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
 
+        return SeasonContent(scanned_file, description, [])
+
+    def __init__(
+        self,
+        scanned_file: ScannedFile,
+        description: SeasonDescription,
+        episodes: list[EpisodeContent],
+    ) -> None:
+        super().__init__(ContentType.season, scanned_file)
+
         self.__description = description
-        self.__episodes = []
+        self.__episodes = episodes
 
     @staticmethod
     def is_valid_name(name: str) -> bool:
@@ -387,10 +430,13 @@ class SeasonContent(Content):
 
         return languages
 
-    def as_dict(self) -> dict[str, Any]:
-        as_dict: dict[str, Any] = super().as_dict()
-        as_dict["description"] = self.__description
-        as_dict["episodes"] = self.__episodes
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        encode: Callable[[Any], Any] = lambda x: (
+            x if json_encoder is None else json_encoder.default(x)
+        )
+        as_dict: dict[str, Any] = super().as_dict(json_encoder)
+        as_dict["description"] = encode(self.__description)
+        as_dict["episodes"] = encode(self.__episodes)
         return as_dict
 
     def __str__(self) -> str:
@@ -406,20 +452,35 @@ class SeriesDescription:
     year: int
 
 
+class SeriesContentDict(ContentDict):
+    description: SeriesDescription
+    seasons: list[SeasonContent]
+
+
 class SeriesContent(Content):
     __description: SeriesDescription
     __seasons: list[SeasonContent]
 
-    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
-        super().__init__(ContentType.series, scanned_file)
+    @staticmethod
+    def from_path(path: Path, scanned_file: ScannedFile) -> "SeriesContent":
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
             path.name
         )
         if description is None:
             raise RuntimeError(f"Couldn't get SeriesDescription from {path}")
 
+        return SeriesContent(scanned_file, description, [])
+
+    def __init__(
+        self,
+        scanned_file: ScannedFile,
+        description: SeriesDescription,
+        seasons: list[SeasonContent],
+    ) -> None:
+        super().__init__(ContentType.series, scanned_file)
+
         self.__description = description
-        self.__seasons = []
+        self.__seasons = seasons
 
     @property
     def description(self) -> SeriesDescription:
@@ -456,11 +517,18 @@ class SeriesContent(Content):
 
         return languages
 
-    def as_dict(self) -> dict[str, Any]:
-        as_dict: dict[str, Any] = super().as_dict()
-        as_dict["description"] = self.__description
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        encode: Callable[[Any], Any] = lambda x: (
+            x if json_encoder is None else json_encoder.default(x)
+        )
+        as_dict: dict[str, Any] = super().as_dict(json_encoder)
+        as_dict["description"] = encode(self.__description)
         as_dict["seasons"] = self.__seasons
         return as_dict
+
+    @staticmethod
+    def from_dict(dct: SeriesContentDict) -> "SeriesContent":
+        return SeriesContent(dct["scanned_file"], dct["description"], dct["seasons"])
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -469,14 +537,29 @@ class SeriesContent(Content):
         return self.__str__()
 
 
+class CollectionContentDict(ContentDict):
+    description: str
+    series: list[SeriesContent]
+
+
 class CollectionContent(Content):
     __description: str
     __series: list[SeriesContent]
 
-    def __init__(self, path: Path, scanned_file: ScannedFile) -> None:
+    @staticmethod
+    def from_path(path: Path, scanned_file: ScannedFile) -> "CollectionContent":
+        return CollectionContent(scanned_file, path.name, [])
+
+    def __init__(
+        self,
+        scanned_file: ScannedFile,
+        description: str,
+        series: list[SeriesContent],
+    ) -> None:
         super().__init__(ContentType.collection, scanned_file)
-        self.__description = path.name
-        self.__series = []
+
+        self.__description = description
+        self.__series = series
 
     @property
     def description(self) -> str:
@@ -492,11 +575,15 @@ class CollectionContent(Content):
 
         return languages
 
-    def as_dict(self) -> dict[str, Any]:
-        as_dict: dict[str, Any] = super().as_dict()
+    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+        as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = self.__description
         as_dict["series"] = self.__series
         return as_dict
+
+    @staticmethod
+    def from_dict(dct: CollectionContentDict) -> "CollectionContent":
+        return CollectionContent(dct["scanned_file"], dct["description"], dct["series"])
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -512,9 +599,9 @@ TYPE_KEY: str = "__type__"
 class Encoder(JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, Content):
-            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict()}
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict(self)}
         elif isinstance(o, ScannedFile):
-            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict()}
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict(self)}
         elif isinstance(o, Path):
             return {TYPE_KEY: "Path", VALUE_KEY: str(o.absolute())}
         elif isinstance(o, Enum):
@@ -529,18 +616,59 @@ class Encoder(JSONEncoder):
 
 class Decoder(JSONDecoder):
     def __init__(self) -> None:
-        def object_hook(dct: dict[str, Any]) -> Any:
+        def object_hook(dct: dict[str, Any] | Any) -> Any:
+            if not isinstance(dct, dict):
+                return dct
+
             type: Optional[str] = cast(Optional[str], dct.get(TYPE_KEY))
             if type is None:
                 return dct
-                # raise TypeError(f"Object has no type key: {dct}")
+
+            def pipe(dct: Any, keys: list[str]) -> dict[str, Any]:
+                result: dict[str, Any] = dict()
+                for key in keys:
+                    result[key] = object_hook(dct[key])
+
+                return result
 
             value: Any = dct[VALUE_KEY]
             match type:
+                # Enums
                 case "ScannedFileType":
                     return ScannedFileType(value)
+                case "ContentType":
+                    return ContentType(value)
+
+                # dataclass
+                case "SeriesDescription":
+                    return SeriesDescription(**value)
+                case "ScannedFile":
+                    return ScannedFile(**value)
+
+                # other classes
                 case "Stats":
-                    return Stats.from_dict(value)
+                    stats_dict: StatsDict = cast(StatsDict, value)
+                    return Stats.from_dict(stats_dict)
+                case "Path":
+                    path_value: str = cast(str, value)
+                    return Path(path_value)
+
+                # Content classes
+                case "SeriesContent":
+                    print("SeriesContent", dct)
+                    series_content_dict: SeriesContentDict = cast(
+                        SeriesContentDict,
+                        pipe(value, list(get_type_hints(SeriesContentDict).keys())),
+                    )
+                    return SeriesContent.from_dict(series_content_dict)
+                case "CollectionContent":
+                    collection_content_dict: CollectionContentDict = cast(
+                        CollectionContentDict,
+                        pipe(value, list(get_type_hints(CollectionContentDict).keys())),
+                    )
+                    return CollectionContent.from_dict(collection_content_dict)
+
+                # error
                 case _:
                     raise TypeError(
                         f"Object of type {type} is not JSON de-serializable"
