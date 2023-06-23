@@ -229,7 +229,7 @@ class Classifier:
                 else:
                     raise exception
 
-        raise RuntimeError("No language with enough accuracy could be found :(")
+        return (Language("un", "Unknown"), 0.0)
 
     def __get_run_opts(self) -> Optional[dict[str, Any]]:
         if not torch.cuda.is_available():
@@ -270,7 +270,66 @@ class MissingOverrideError(RuntimeError):
     pass
 
 
+@dataclass
+class Stats:
+    checksum: Optional[str]
+    mtime: float
+
+    @staticmethod
+    def hash_file(file_path: Path) -> str:
+        if file_path.is_dir():
+            raise RuntimeError("Can't take checksum of directory")
+
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as file:
+            # Read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: file.read(4096), b""):
+                sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+
+    @staticmethod
+    def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
+        checksum = (
+            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
+        )
+
+        mtime = Path(file_path).stat().st_mtime
+
+        return Stats(checksum=checksum, mtime=mtime)
+
+
+
+
+@dataclass
+class ScannedFile:
+    parents: list[str]
+    name: str  # id
+    type: ScannedFileType
+    stats: Stats
+
+    @staticmethod
+    def from_scan(
+        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> "ScannedFile":
+        if len(parent_folders) > 3:
+            raise RuntimeError(
+                "No more than 3 parent folders are allowed: [collection] -> series -> season"
+            )
+
+        name = path.basename(file_path)
+
+        stats = Stats.from_file(file_path, file_type)
+
+        return ScannedFile(
+            parents=parent_folders,
+            name=name,
+            type=file_type,
+            stats=stats,
+        )
+
+
 class Content:
+    __scanned_file: ScannedFile
     __type: ContentType
 
     def __init__(self, type: ContentType) -> None:
@@ -543,66 +602,6 @@ class CollectionContent(Content):
                     languages.append(language)
 
         return languages
-
-
-@dataclass
-class Stats:
-    checksum: Optional[str]
-    mtime: float
-
-    @staticmethod
-    def hash_file(file_path: Path) -> str:
-        if file_path.is_dir():
-            raise RuntimeError("Can't take checksum of directory")
-
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as file:
-            # Read and update hash string value in blocks of 4K
-            for byte_block in iter(lambda: file.read(4096), b""):
-                sha256_hash.update(byte_block)
-            return sha256_hash.hexdigest()
-
-    @staticmethod
-    def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        checksum = (
-            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
-        )
-
-        mtime = Path(file_path).stat().st_mtime
-
-        return Stats(checksum=checksum, mtime=mtime)
-
-
-@dataclass
-class ScannedFile:
-    parents: list[str]
-    name: str  # id
-    type: ScannedFileType
-    stats: Stats
-    content: Optional[Content]
-
-    @staticmethod
-    def from_scan(
-        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
-    ) -> "ScannedFile":
-        if len(parent_folders) > 3:
-            raise RuntimeError(
-                "No more than 3 parent folders are allowed: [collection] -> series -> season"
-            )
-
-        name = path.basename(file_path)
-
-        stats = Stats.from_file(file_path, file_type)
-
-        content = Content.from_scan(file_path, file_type, parent_folders)
-
-        return ScannedFile(
-            parents=parent_folders,
-            name=name,
-            type=file_type,
-            stats=stats,
-            content=content,
-        )
 
 
 def process_folder_recursively(
