@@ -37,16 +37,19 @@ class WAVFile:
         self.__status = status
 
     def __get_info(self) -> tuple[FileType, Status]:
-        metadata = FFProbe(self.__file)
-        for stream in metadata.streams:
-            if stream.is_video():
-                return (FileType.video, Status.raw)
+        try:
+            metadata = FFProbe(self.__file)
+            for stream in metadata.streams:
+                if stream.is_video():
+                    return (FileType.video, Status.raw)
 
-        for stream in metadata.streams:
-            if stream.is_audio() and stream.codec() == "pcm_s16le":
-                return (FileType.wav, Status.ready)
+            for stream in metadata.streams:
+                if stream.is_audio() and stream.codec() == "pcm_s16le":
+                    return (FileType.wav, Status.ready)
 
-        return (FileType.audio, Status.raw)
+            return (FileType.audio, Status.raw)
+        except Exception:
+            return (FileType.video, Status.raw)
 
     def create_wav_file(self) -> bool:
         match (self.__status, self.__type):
@@ -114,6 +117,7 @@ class LanguageDict(TypedDict):
 
 def main() -> None:
     files: list[str] = [
+        "Citadel.S01E03.Infinite.Shadows.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.mkv",
         "Black.Mirror.S06E01.GERMAN.DL.1080p.WEB.h264-SAUERKRAUT.mkv",
     ]
 
