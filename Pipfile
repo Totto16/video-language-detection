@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-lid = {file = "https://github.com/igorsitdikov/lid_kaldi/releases/download/1.0.1/lid-1.0.1-py3-none-linux_x86_64.whl"}
 python-ffmpeg = "*"
 ffprobe-python = "*"
 torchaudio = "*"
@@ -22,7 +21,7 @@ black = "*"
 [scripts]
 check = "python src/main.py"
 test = "python tests/test_simple.py tests/test_ru.wav"
-lint = "mypy src --strict --ignore-missing-imports"
+lint = "mypy src --strict --ignore-imports"
 
 [requires]
 python_version = "3.11"
