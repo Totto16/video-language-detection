@@ -196,7 +196,7 @@ class EpisodeContent(Content):
         return self.__description
 
     def __get_language(self) -> Language:
-        wav_file = WAVFile(self.__scanned_file.path)
+        wav_file = WAVFile(self.scanned_file.path)
 
         language, accuracy = classifier.predict(wav_file)
         print(language, accuracy)
