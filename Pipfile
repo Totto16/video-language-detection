@@ -7,6 +7,11 @@ name = "pypi"
 lid = {file = "https://github.com/igorsitdikov/lid_kaldi/releases/download/1.0.1/lid-1.0.1-py3-none-linux_x86_64.whl"}
 python-ffmpeg = "*"
 ffprobe-python = "*"
+torchaudio = "*"
+speechbrain = "*"
+torchvision = "*"
+pynvml = "*"
+humanize = "*"
 
 [dev-packages]
 pylint = "*"

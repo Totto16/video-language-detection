@@ -5,3 +5,6 @@ __pycache__
 models/
 Pipfile.lock
 test_ru.wav
+model/
+/tmp/
+/src/tmp/
