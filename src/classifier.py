@@ -93,7 +93,7 @@ class Timestamp:
         else:
 
             def round_to_tens(value: int, tens: int) -> int:
-                return round(value / (10**tens))
+                return int(round(value / (10**tens)))
 
             try:
                 ignore_zero: bool = False
