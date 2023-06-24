@@ -21,10 +21,22 @@ class FileType(Enum):
     video = "video"
     audio = "audio"
 
+    def __str__(self) -> str:
+        return f"<FileType: {self.name}>"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class Status(Enum):
     ready = "ready"
     raw = "raw"
+
+    def __str__(self) -> str:
+        return f"<Status: {self.name}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class WAVOptions(TypedDict):
@@ -156,13 +168,19 @@ class Language:
     def from_str_unsafe(input: str) -> "Language":
         lan: Optional["Language"] = Language.from_str(input)
         if lan is None:
-            raise RuntimeError(f"Couldn't get the Language from str {input}")
+            raise RuntimeError(f"Couldn't get the Language from str '{input}'")
 
         return lan
 
     @staticmethod
     def Unknown() -> "Language":
         return Language("un", "Unknown")
+    
+    def __str__(self) -> str:
+        return f"<Language short: {self.short} long: {self.long}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class Classifier:

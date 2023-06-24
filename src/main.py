@@ -20,7 +20,13 @@ def main() -> None:
 
     ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
     video_formats: list[str] = ["mp4", "mkv", "avi"]
-    ignore_files: list[str] = ["metadata", "extrafanart", "theme-music", "Music"]
+    ignore_files: list[str] = [
+        "metadata",
+        "extrafanart",
+        "theme-music",
+        "Music",
+        "Reportagen",
+    ]
     PARSE_ERROR_IS_EXCEPTION: bool = False
 
     def ignore_fn(
@@ -49,7 +55,7 @@ def main() -> None:
         if content is None:
             if PARSE_ERROR_IS_EXCEPTION:
                 raise RuntimeError(
-                    f"Parse Error: Couldn't parse content from {file_path}"
+                    f"Parse Error: Couldn't parse content from '{file_path}'"
                 )
 
             return None
@@ -77,7 +83,6 @@ def main() -> None:
     json_loaded: list[Content] = cast(
         list[Content], json.loads(json_content, cls=Decoder)
     )
-    print(json_loaded)
 
 
 if __name__ == "__main__":

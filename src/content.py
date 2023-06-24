@@ -16,6 +16,12 @@ from json import JSONDecoder, JSONEncoder
 class ScannedFileType(Enum):
     file = "file"
     folder = "folder"
+    
+    def __str__(self) -> str:
+        return f"<ScannedFileType: {self.name}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class ContentType(Enum):
@@ -23,6 +29,12 @@ class ContentType(Enum):
     season = "season"
     episode = "episode"
     collection = "collection"
+
+    def __str__(self) -> str:
+        return f"<ContentType: {self.name}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class MissingOverrideError(RuntimeError):
@@ -317,7 +329,7 @@ class EpisodeContent(Content):
             path.name
         )
         if description is None:
-            raise NameError(f"Couldn't get EpisodeDescription from {path}")
+            raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
 
         return EpisodeContent(scanned_file, description)
 
@@ -438,7 +450,7 @@ class SeasonContent(Content):
             path.name
         )
         if description is None:
-            raise NameError(f"Couldn't get SeasonDescription from {path}")
+            raise NameError(f"Couldn't get SeasonDescription from '{path}'")
 
         return SeasonContent(scanned_file, description, [])
 
@@ -564,7 +576,7 @@ class SeriesContent(Content):
             path.name
         )
         if description is None:
-            raise NameError(f"Couldn't get SeriesDescription from {path}")
+            raise NameError(f"Couldn't get SeriesDescription from '{path}'")
 
         return SeriesContent(scanned_file, description, [])
 
@@ -810,7 +822,6 @@ class Decoder(JSONDecoder):
 
                 # Content classes
                 case "SeriesContent":
-                    print("SeriesContent", dct)
                     series_content_dict: SeriesContentDict = cast(
                         SeriesContentDict,
                         pipe(value, list(get_type_hints(SeriesContentDict).keys())),
