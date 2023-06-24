@@ -5,6 +5,7 @@ import dataclasses
 from enum import Enum
 import hashlib
 from pathlib import Path
+from time import sleep
 from typing import (
     Any,
     Generic,
@@ -25,6 +26,10 @@ from json import JSONDecoder, JSONEncoder
 class ScannedFileType(Enum):
     file = "file"
     folder = "folder"
+
+    @staticmethod
+    def from_path(path: Path) -> "ScannedFileType":
+        return ScannedFileType.folder if path.is_dir() else ScannedFileType.file
 
     def __str__(self) -> str:
         return f"<ScannedFileType: {self.name}>"
@@ -81,9 +86,11 @@ class Stats:
 
     @staticmethod
     def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        checksum: Optional[str] = (
-            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
-        )
+        #TODO re-enable
+        # checksum: Optional[str] = (
+        #     None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
+        # )
+        checksum = None
 
         mtime: float = Path(file_path).stat().st_mtime
 
@@ -152,9 +159,10 @@ class ScannedFile:
 
 
 C = TypeVar("C")
+CT = TypeVar("CT")
 
 
-class Callback(Generic[C]):
+class Callback(Generic[C, CT]):
     def __init__(self) -> None:
         pass
 
@@ -168,50 +176,21 @@ class Callback(Generic[C]):
     ) -> bool:
         return False
 
-    def amount(self, amount: int, name: str, parent_folders: list[str]) -> None:
+    def start(
+        self, amount: int, name: str, parent_folders: list[str], characteristic: CT
+    ) -> None:
         return None
 
-    def progress(self, name: str, parent_folders: list[str]) -> None:
+    def progress(
+        self, name: str, parent_folders: list[str], characteristic: CT
+    ) -> None:
         return None
 
-    def finish(self, name: str, parent_folders: list[str]) -> None:
+    def finish(self, name: str, parent_folders: list[str], characteristic: CT) -> None:
         return None
 
 
-T = TypeVar("T")
-
-
-def process_folder(
-    directory: Path,
-    callback: Callback[T],
-    *,
-    parent_folders: list[str] = [],
-) -> list[T]:
-    temp: list[tuple[Path, ScannedFileType, list[str]]] = []
-    for file in listdir(directory):
-        file_path: Path = Path(directory) / file
-
-        file_type: ScannedFileType = (
-            ScannedFileType.folder if file_path.is_dir() else ScannedFileType.file
-        )
-        should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
-        if should_ignore:
-            continue
-
-        temp.append((file_path, file_type, parent_folders))
-
-    callback.amount(len(temp), directory.name, parent_folders)
-
-    results: list[T] = []
-    for file_path, file_type, parent_folders in temp:
-        result: Optional[T] = callback.process(file_path, file_type, parent_folders)
-        callback.progress(directory.name, parent_folders)
-        if result is not None:
-            results.append(result)
-
-    callback.finish(directory.name, parent_folders)
-
-    return results
+ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
 
 class ContentDict(TypedDict):
@@ -324,7 +303,7 @@ class Content:
 
     def scan(
         self,
-        callback: Callback["Content"],
+        callback: Callback["Content", ContentCharacteristic],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -336,6 +315,45 @@ class Content:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+
+def process_folder(
+    directory: Path,
+    callback: Callback[Content, ContentCharacteristic],
+    *,
+    parent_folders: list[str] = [],
+) -> list[Content]:
+    temp: list[tuple[Path, ScannedFileType, list[str]]] = []
+    for file in listdir(directory):
+        file_path: Path = Path(directory) / file
+
+        file_type: ScannedFileType = ScannedFileType.from_path(file_path)
+        should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
+        if should_ignore:
+            continue
+
+        temp.append((file_path, file_type, parent_folders))
+
+    value: ContentCharacteristic = (None, ScannedFileType.folder)
+    callback.start(len(temp), directory.name, parent_folders, value)
+
+    results: list[Content] = []
+    for file_path, file_type, parent_folders in temp:
+        result: Optional[Content] = callback.process(
+            file_path, file_type, parent_folders
+        )
+        value = (
+            result.type if result is not None else None,
+            ScannedFileType.from_path(file_path),
+        )
+        callback.progress(directory.name, parent_folders, value)
+        if result is not None:
+            results.append(result)
+
+    value = (None, ScannedFileType.folder)
+    callback.finish(directory.name, parent_folders, value)
+
+    return results
 
 
 @dataclass
@@ -425,15 +443,15 @@ class EpisodeContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content],
+        callback: Callback[Content, ContentCharacteristic],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
+        # TODO use callback appropiately
         pass
-        # print("scan episode")
-
-        # TODO: uncomment this
+        # TODO enable this
+        sleep(5)
         # self.__language = self.__get_language(classifier)
 
     @override
@@ -542,7 +560,7 @@ class SeasonContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content],
+        callback: Callback[Content, ContentCharacteristic],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -661,7 +679,7 @@ class SeriesContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content],
+        callback: Callback[Content, ContentCharacteristic],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -748,7 +766,7 @@ class CollectionContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content],
+        callback: Callback[Content, ContentCharacteristic],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,

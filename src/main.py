@@ -4,12 +4,14 @@
 import json
 from pathlib import Path
 from typing import Optional, TypedDict, cast
+from typing_extensions import override
 
 from classifier import Classifier
 from tqdm.auto import tqdm
 from content import (
     Callback,
     Content,
+    ContentCharacteristic,
     Decoder,
     Encoder,
     ScannedFileType,
@@ -50,20 +52,29 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class ContentCallback(Callback[Content]):
+class ContentCallback(Callback[Content, ContentCharacteristic]):
     __options: ContentOptions
     __classifier: Classifier
     __progress_bars: list[ProgressBar]
     __bar_index: int
+    __with_progress_bar: bool
 
-    def __init__(self, options: ContentOptions, classifier: Classifier) -> None:
+    def __init__(
+        self,
+        options: ContentOptions,
+        classifier: Classifier,
+        *,
+        with_progress_bar: bool = True,
+    ) -> None:
         super().__init__()
 
         self.__options = options
         self.__classifier = classifier
         self.__progress_bars = []
         self.__bar_index = 0
+        self.__with_progress_bar = with_progress_bar
 
+    @override
     def ignore(
         self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> bool:
@@ -81,6 +92,7 @@ class ContentCallback(Callback[Content]):
 
         return False
 
+    @override
     def process(
         self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> Optional[Content]:
@@ -103,7 +115,20 @@ class ContentCallback(Callback[Content]):
 
         return content
 
-    def amount(self, amount: int, name: str, parent_folders: list[str]) -> None:
+    @override
+    def start(
+        self,
+        amount: int,
+        name: str,
+        parent_folders: list[str],
+        characteristic: ContentCharacteristic,
+    ) -> None:
+        if not self.__with_progress_bar:
+            print(f"start: {name} - {amount} - {characteristic}")
+            return
+
+        # don't make a bar for episodes!
+
         progress_bar = ProgressBar(amount, name)
         self.__bar_index += 1
         if self.__bar_index >= len(self.__progress_bars):
@@ -111,13 +136,35 @@ class ContentCallback(Callback[Content]):
         else:
             self.__progress_bars[self.__bar_index - 1].reset(amount, name)
 
-    def progress(self, name: str, parent_folders: list[str]) -> None:
+    @override
+    def progress(
+        self,
+        name: str,
+        parent_folders: list[str],
+        characteristic: ContentCharacteristic,
+    ) -> None:
+        if not self.__with_progress_bar:
+            print(f"progress: {name} - {characteristic}")
+            return
+
         if self.__bar_index == 0:
             raise RuntimeError("No Progressbar, on progress callback")
 
         self.__progress_bars[self.__bar_index - 1].advance()
 
-    def finish(self, name: str, parent_folders: list[str]) -> None:
+    @override
+    def finish(
+        self,
+        name: str,
+        parent_folders: list[str],
+        characteristic: ContentCharacteristic,
+    ) -> None:
+        if not self.__with_progress_bar:
+            print(f"finish: {name} - {characteristic}")
+            return
+
+        # remove top only if the names match up!!! (not if it's a single episode!)
+
         if self.__bar_index == 0:
             raise RuntimeError("No Progressbar, on progress finish")
 
@@ -150,6 +197,7 @@ def main() -> None:
             "parse_error_is_exception": parse_error_is_exception,
         },
         classifier,
+        with_progress_bar=False,
     )
 
     contents: list[Content] = process_folder(
@@ -162,9 +210,9 @@ def main() -> None:
     # with open("data.json", "w") as file:
     #     file.write(json_content)
 
-    # json_loaded: list[Content] = cast(
-    #     list[Content], json.loads(json_content, cls=Decoder)
-    # )
+    json_loaded: list[Content] = cast(
+        list[Content], json.loads(json_content, cls=Decoder)
+    )
 
 
 if __name__ == "__main__":

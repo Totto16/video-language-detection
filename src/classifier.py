@@ -175,7 +175,7 @@ class Language:
     @staticmethod
     def Unknown() -> "Language":
         return Language("un", "Unknown")
-    
+
     def __str__(self) -> str:
         return f"<Language short: {self.short} long: {self.long}>"
 
@@ -230,7 +230,8 @@ class Classifier:
 
                 # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
                 signal = self.__classifier.load_audio(
-                    wav_file.wav_path(), savedir=str(self.__save_dir.absolute())
+                    str(wav_file.wav_path().absolute()),
+                    savedir=str(self.__save_dir.absolute()),
                 )
                 prediction = self.__classifier.classify_batch(signal)
 
