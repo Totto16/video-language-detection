@@ -139,7 +139,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             leave=False,
             color=color,
         )
-        self.__progress_bars[name].update(0)
+        self.__progress_bars[name].update(0, force=True)
 
     @override
     def progress(

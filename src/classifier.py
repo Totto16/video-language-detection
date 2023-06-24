@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
+from math import floor
 from os import makedirs, path, remove
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
@@ -55,30 +56,52 @@ class WAVFile:
     __file: Path
     __type: FileType
     __status: Status
+    __runtime: Optional[float]
 
     def __init__(self, file: Path) -> None:
         self.__tmp_file = None
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
-        type, status = self.__get_info()
+        type, status, runtime = self.__get_info()
         self.__type = type
         self.__status = status
+        self.__runtime = runtime
 
-    def __get_info(self) -> tuple[FileType, Status]:
+    def __get_info(self) -> tuple[FileType, Status, Optional[float]]:
         try:
             metadata = FFProbe(str(self.__file.absolute()))
             for stream in metadata.streams:
                 if stream.is_video():
-                    return (FileType.video, Status.raw)
+                    return (
+                        FileType.video,
+                        Status.raw,
+                        stream.duration_seconds() / 60.0,
+                    )
 
             for stream in metadata.streams:
                 if stream.is_audio() and stream.codec() == "pcm_s16le":
-                    return (FileType.wav, Status.ready)
+                    return (
+                        FileType.wav,
+                        Status.ready,
+                        stream.duration_seconds() / 60.0,
+                    )
 
-            return (FileType.audio, Status.raw)
+            for stream in metadata.streams:
+                if stream.is_audio():
+                    return (
+                        FileType.audio,
+                        Status.raw,
+                        stream.duration_seconds() / 60.0,
+                    )
+
+            return (FileType.audio, Status.raw, None)
         except Exception:
-            return (FileType.video, Status.raw)
+            return (FileType.video, Status.raw, None)
+
+    @property
+    def runtime(self) -> Optional[float]:
+        return self.__runtime
 
     def create_wav_file(
         self,
@@ -229,11 +252,45 @@ class Classifier:
     def predict(
         self, wav_file: WAVFile, manager: Optional[Manager] = None
     ) -> tuple[Language, float]:
-        minutes: list[Optional[int]] = [1, 2, 4, 5, 10, 20, None]
+        def get_minutes(runtime: float) -> list[Optional[float]]:
+            index: float = 1.0
+            result: list[Optional[float]] = [index]
+            steps: float = 1.0
+            while True:
+                index += steps
+                if index > runtime:
+                    result.append(None)
+                    break
 
+                result.append(index)
+                steps += 1.0
+
+            return result
+
+        minutes: list[Optional[float]] = (
+            [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, None]
+            if wav_file.runtime is None
+            else get_minutes(wav_file.runtime)
+        )
+
+        bar: Optional[Any] = None
+        if manager is not None:
+            bar = manager.counter(
+                total=len(minutes),
+                desc="detecting language",
+                unit="attempts",
+                leave=False,
+                color="red",
+                all_fields=True,
+            )
+            bar.update(0, force=True)
         for minute in minutes:
             try:
-                delta = None if minute is None else timedelta(minutes=minute)
+                delta = None
+                if minute is not None:
+                    m = floor(minute)
+                    s = floor((minute % 1) * 60)
+                    delta = timedelta(minutes=m, seconds=s)
                 wav_file.create_wav_file({"bitrate": 16000, "amount": delta}, True)
 
                 # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
@@ -247,8 +304,14 @@ class Classifier:
                 # The identified language ISO code is given in prediction[3]
                 language = Language.from_str_unsafe(cast(str, prediction[3][0]))
 
+                if bar is not None:
+                    bar.update()
+
                 if accuracy < 0.95:
                     continue
+
+                if bar is not None:
+                    bar.close(clear=True)
 
                 return (language, accuracy)
             except RuntimeError as exception:
@@ -256,6 +319,9 @@ class Classifier:
                     self.__init_classifier(True)
                 else:
                     raise exception
+
+        if bar is not None:
+            bar.close(clear=True)
 
         return (Language.Unknown(), 0.0)
 

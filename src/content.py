@@ -95,6 +95,7 @@ class Stats:
                 bar_format=CHECKSUM_BAR_FORMAT,
                 color="red",
             )
+            bar.update(0, force=True)
         sha256_hash = sha256()
         with open(str(file_path.absolute()), "rb") as file:
             # Read and update hash string value in blocks of 4K
@@ -518,7 +519,7 @@ class EpisodeContent(Content):
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
         callback.start(
-            (3, 3, 0),
+            (2, 2, 0),
             self.scanned_file.path.name,
             self.scanned_file.parents,
             characteristic,
