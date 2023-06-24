@@ -81,9 +81,9 @@ class Stats:
 
     @staticmethod
     def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        checksum: Optional[str] = None
-        # TODO: re-enable this
-        # (None if file_type == ScannedFileType.folder else Stats.hash_file(file_path))
+        checksum: Optional[str] = (
+            None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
+        )
 
         mtime: float = Path(file_path).stat().st_mtime
 
