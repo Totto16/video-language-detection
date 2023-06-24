@@ -5,7 +5,16 @@ import dataclasses
 from enum import Enum
 import hashlib
 from pathlib import Path
-from typing import Any, Optional, Callable, TypeVar, TypedDict, cast, get_type_hints
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    Callable,
+    TypeVar,
+    TypedDict,
+    cast,
+    get_type_hints,
+)
 from typing_extensions import override
 import re
 from classifier import Classifier, Language, WAVFile
@@ -16,7 +25,7 @@ from json import JSONDecoder, JSONEncoder
 class ScannedFileType(Enum):
     file = "file"
     folder = "folder"
-    
+
     def __str__(self) -> str:
         return f"<ScannedFileType: {self.name}>"
 
@@ -142,32 +151,65 @@ class ScannedFile:
         return self.__str__()
 
 
+C = TypeVar("C")
+
+
+class Callback(Generic[C]):
+    def __init__(self) -> None:
+        pass
+
+    def process(
+        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> Optional[C]:
+        return None
+
+    def ignore(
+        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+    ) -> bool:
+        return False
+
+    def amount(self, amount: int, name: str, parent_folders: list[str]) -> None:
+        return None
+
+    def progress(self, name: str, parent_folders: list[str]) -> None:
+        return None
+
+    def finish(self, name: str, parent_folders: list[str]) -> None:
+        return None
+
+
 T = TypeVar("T")
 
 
 def process_folder(
     directory: Path,
-    process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[T]],
+    callback: Callback[T],
     *,
-    ignore_fn: Callable[
-        [Path, ScannedFileType, list[str]], bool
-    ] = lambda x, y, z: False,
     parent_folders: list[str] = [],
 ) -> list[T]:
-    results: list[T] = []
+    temp: list[tuple[Path, ScannedFileType, list[str]]] = []
     for file in listdir(directory):
         file_path: Path = Path(directory) / file
 
         file_type: ScannedFileType = (
             ScannedFileType.folder if file_path.is_dir() else ScannedFileType.file
         )
-        should_ignore: bool = ignore_fn(file_path, file_type, parent_folders)
+        should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
         if should_ignore:
             continue
 
-        result: Optional[T] = process_fn(file_path, file_type, parent_folders)
+        temp.append((file_path, file_type, parent_folders))
+
+    callback.amount(len(temp), directory.name, parent_folders)
+
+    results: list[T] = []
+    for file_path, file_type, parent_folders in temp:
+        result: Optional[T] = callback.process(file_path, file_type, parent_folders)
+        callback.progress(directory.name, parent_folders)
         if result is not None:
             results.append(result)
+
+    callback.finish(directory.name, parent_folders)
 
     return results
 
@@ -282,11 +324,8 @@ class Content:
 
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional["Content"]],
+        callback: Callback["Content"],
         *,
-        ignore_fn: Callable[
-            [Path, ScannedFileType, list[str]], bool
-        ] = lambda x, y, z: False,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
@@ -386,11 +425,8 @@ class EpisodeContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
+        callback: Callback[Content],
         *,
-        ignore_fn: Callable[
-            [Path, ScannedFileType, list[str]], bool
-        ] = lambda x, y, z: False,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
@@ -506,18 +542,14 @@ class SeasonContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
+        callback: Callback[Content],
         *,
-        ignore_fn: Callable[
-            [Path, ScannedFileType, list[str]], bool
-        ] = lambda x, y, z: False,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
-            process_fn=process_fn,
-            ignore_fn=ignore_fn,
+            callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
         )
         for content in contents:
@@ -629,18 +661,14 @@ class SeriesContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
+        callback: Callback[Content],
         *,
-        ignore_fn: Callable[
-            [Path, ScannedFileType, list[str]], bool
-        ] = lambda x, y, z: False,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
-            process_fn=process_fn,
-            ignore_fn=ignore_fn,
+            callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
         )
         for content in contents:
@@ -720,18 +748,14 @@ class CollectionContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
+        callback: Callback[Content],
         *,
-        ignore_fn: Callable[
-            [Path, ScannedFileType, list[str]], bool
-        ] = lambda x, y, z: False,
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
-            process_fn=process_fn,
-            ignore_fn=ignore_fn,
+            callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
         )
         for content in contents:
