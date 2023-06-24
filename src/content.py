@@ -135,7 +135,7 @@ T = TypeVar("T")
 
 def process_folder(
     directory: Path,
-    process_fn: Callable[[Path, ScannedFileType, list[str]], T],
+    process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[T]],
     *,
     ignore_fn: Callable[
         [Path, ScannedFileType, list[str]], bool
@@ -153,8 +153,9 @@ def process_folder(
         if should_ignore:
             continue
 
-        result: T = process_fn(file_path, file_type, parent_folders)
-        results.append(result)
+        result: Optional[T] = process_fn(file_path, file_type, parent_folders)
+        if result is not None:
+            results.append(result)
 
     return results
 
@@ -200,56 +201,61 @@ class Content:
             (len(parents) == 1 and file_path.is_dir()) or len(parents) != 1
         ) and not SeriesContent.is_valid_name(parents[0])
 
-        if len(parents) == 4:
-            if file_type == ScannedFileType.folder:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting 4 - {file_path}!"
-                )
+        try:
+            if len(parents) == 4:
+                if file_type == ScannedFileType.folder:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting 4 - {file_path}!"
+                    )
 
-            return EpisodeContent.from_path(file_path, scanned_file)
-        elif len(parents) == 3 and not top_is_collection:
-            if file_type == ScannedFileType.folder:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
-                )
+                return EpisodeContent.from_path(file_path, scanned_file)
+            elif len(parents) == 3 and not top_is_collection:
+                if file_type == ScannedFileType.folder:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
+                    )
 
-            return EpisodeContent.from_path(file_path, scanned_file)
-        elif len(parents) == 3 and top_is_collection:
-            if file_type == ScannedFileType.file:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
-                )
+                return EpisodeContent.from_path(file_path, scanned_file)
+            elif len(parents) == 3 and top_is_collection:
+                if file_type == ScannedFileType.file:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
+                    )
 
-            return SeasonContent.from_path(file_path, scanned_file)
-        elif len(parents) == 2 and not top_is_collection:
-            if file_type == ScannedFileType.file:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
-                )
+                return SeasonContent.from_path(file_path, scanned_file)
+            elif len(parents) == 2 and not top_is_collection:
+                if file_type == ScannedFileType.file:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
+                    )
 
-            return SeasonContent.from_path(file_path, scanned_file)
-        elif len(parents) == 2 and top_is_collection:
-            if file_type == ScannedFileType.file:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
-                )
+                return SeasonContent.from_path(file_path, scanned_file)
+            elif len(parents) == 2 and top_is_collection:
+                if file_type == ScannedFileType.file:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
+                    )
 
-            return SeriesContent.from_path(file_path, scanned_file)
-        elif len(parents) == 1 and not top_is_collection:
-            if file_type == ScannedFileType.file:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
-                )
+                return SeriesContent.from_path(file_path, scanned_file)
+            elif len(parents) == 1 and not top_is_collection:
+                if file_type == ScannedFileType.file:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
+                    )
 
-            return SeriesContent.from_path(file_path, scanned_file)
-        elif len(parents) == 1 and top_is_collection:
-            if file_type == ScannedFileType.file:
-                raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
-                )
-            return CollectionContent.from_path(file_path, scanned_file)
-        else:
-            raise RuntimeError("UNREACHABLE")
+                return SeriesContent.from_path(file_path, scanned_file)
+            elif len(parents) == 1 and top_is_collection:
+                if file_type == ScannedFileType.file:
+                    raise RuntimeError(
+                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
+                    )
+                return CollectionContent.from_path(file_path, scanned_file)
+            else:
+                raise RuntimeError("UNREACHABLE")
+
+        except RuntimeError as e:
+            print(e)
+            return None
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
@@ -264,7 +270,7 @@ class Content:
 
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], "Content"],
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional["Content"]],
         *,
         ignore_fn: Callable[
             [Path, ScannedFileType, list[str]], bool
@@ -286,6 +292,14 @@ class EpisodeDescription:
     name: str
     season: int
     episode: int
+
+    def __str__(self) -> str:
+        return (
+            f"<Episode season: {self.season} episode: {self.episode} name: {self.name}>"
+        )
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class EpisodeContent(Content):
@@ -355,7 +369,7 @@ class EpisodeContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
         *,
         ignore_fn: Callable[
             [Path, ScannedFileType, list[str]], bool
@@ -363,7 +377,9 @@ class EpisodeContent(Content):
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
-        print("scan episode")
+        pass
+        # print("scan episode")
+
         # TODO: uncomment this
         # self.__language = self.__get_language(classifier)
 
@@ -387,6 +403,12 @@ class EpisodeContent(Content):
 @dataclass
 class SeasonDescription:
     season: int
+
+    def __str__(self) -> str:
+        return f"<Season season: {self.season}>y"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
@@ -458,7 +480,7 @@ class SeasonContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
         *,
         ignore_fn: Callable[
             [Path, ScannedFileType, list[str]], bool
@@ -501,6 +523,12 @@ class SeasonContent(Content):
 class SeriesDescription:
     name: str
     year: int
+
+    def __str__(self) -> str:
+        return f"<Series name: {self.name} year: {self.year}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class SeriesContentDict(ContentDict):
@@ -571,7 +599,7 @@ class SeriesContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
         *,
         ignore_fn: Callable[
             [Path, ScannedFileType, list[str]], bool
@@ -662,7 +690,7 @@ class CollectionContent(Content):
     @override
     def scan(
         self,
-        process_fn: Callable[[Path, ScannedFileType, list[str]], Content],
+        process_fn: Callable[[Path, ScannedFileType, list[str]], Optional[Content]],
         *,
         ignore_fn: Callable[
             [Path, ScannedFileType, list[str]], bool

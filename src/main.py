@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Optional, cast
 from classifier import Classifier
 
-from content import Content, Decoder, Encoder, ScannedFileType, process_folder
+from content import (
+    CollectionContent,
+    Content,
+    Decoder,
+    Encoder,
+    ScannedFileType,
+    SeriesContent,
+    process_folder,
+)
 
 
 def main() -> None:
@@ -35,12 +43,17 @@ def main() -> None:
 
     def process_file(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
-    ) -> Content:
+    ) -> Optional[Content]:
         content: Optional[Content] = Content.from_scan(
             file_path, file_type, parent_folders
         )
         if content is None:
-            raise RuntimeError(f"Parse Error: Couldn't parse content from {file_path}")
+            return None
+
+        if isinstance(content, SeriesContent):
+            print(f"starting series scan: {content.description}")
+        elif isinstance(content, CollectionContent):
+            print(f"starting collection scan: {content.description}")
 
         content.scan(
             process_fn=process_file,
@@ -48,6 +61,11 @@ def main() -> None:
             parent_folders=parent_folders,
             classifier=classifier,
         )
+
+        if isinstance(content, SeriesContent):
+            print(f"ended series scan: {content.description}")
+        elif isinstance(content, CollectionContent):
+            print(f"ended collection scan: {content.description}")
 
         return content
 
