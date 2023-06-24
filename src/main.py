@@ -7,12 +7,10 @@ from typing import Optional, cast
 from classifier import Classifier
 
 from content import (
-    CollectionContent,
     Content,
     Decoder,
     Encoder,
     ScannedFileType,
-    SeriesContent,
     process_folder,
 )
 
@@ -23,6 +21,7 @@ def main() -> None:
     ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
     video_formats: list[str] = ["mp4", "mkv", "avi"]
     ignore_files: list[str] = ["metadata", "extrafanart", "theme-music", "Music"]
+    PARSE_ERROR_IS_EXCEPTION: bool = False
 
     def ignore_fn(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
@@ -48,12 +47,12 @@ def main() -> None:
             file_path, file_type, parent_folders
         )
         if content is None:
-            return None
+            if PARSE_ERROR_IS_EXCEPTION:
+                raise RuntimeError(
+                    f"Parse Error: Couldn't parse content from {file_path}"
+                )
 
-        if isinstance(content, SeriesContent):
-            print(f"starting series scan: {content.description}")
-        elif isinstance(content, CollectionContent):
-            print(f"starting collection scan: {content.description}")
+            return None
 
         content.scan(
             process_fn=process_file,
@@ -61,11 +60,6 @@ def main() -> None:
             parent_folders=parent_folders,
             classifier=classifier,
         )
-
-        if isinstance(content, SeriesContent):
-            print(f"ended series scan: {content.description}")
-        elif isinstance(content, CollectionContent):
-            print(f"ended collection scan: {content.description}")
 
         return content
 

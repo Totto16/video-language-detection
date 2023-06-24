@@ -302,6 +302,11 @@ class EpisodeDescription:
         return str(self)
 
 
+class EpisodeContentDict(ContentDict):
+    description: EpisodeDescription
+    language: Language
+
+
 class EpisodeContent(Content):
     __description: EpisodeDescription
     __language: Language
@@ -393,6 +398,10 @@ class EpisodeContent(Content):
         as_dict["language"] = encode(self.__language)
         return as_dict
 
+    @staticmethod
+    def from_dict(dct: EpisodeContentDict) -> "EpisodeContent":
+        return EpisodeContent(dct["scanned_file"], dct["description"])
+
     def __str__(self) -> str:
         return str(self.as_dict())
 
@@ -412,6 +421,11 @@ class SeasonDescription:
 
 
 SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
+
+
+class SeasonContentDict(ContentDict):
+    description: SeasonDescription
+    episodes: list[EpisodeContent]
 
 
 class SeasonContent(Content):
@@ -509,8 +523,12 @@ class SeasonContent(Content):
         )
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = encode(self.__description)
-        as_dict["episodes"] = encode(self.__episodes)
+        as_dict["episodes"] = self.__episodes
         return as_dict
+
+    @staticmethod
+    def from_dict(dct: SeasonContentDict) -> "SeasonContent":
+        return SeasonContent(dct["scanned_file"], dct["description"], dct["episodes"])
 
     def __str__(self) -> str:
         return str(self.as_dict())
@@ -775,6 +793,12 @@ class Decoder(JSONDecoder):
                     return SeriesDescription(**value)
                 case "ScannedFile":
                     return ScannedFile(**value)
+                case "SeasonDescription":
+                    return SeasonDescription(**value)
+                case "EpisodeDescription":
+                    return EpisodeDescription(**value)
+                case "Language":
+                    return Language(**value)
 
                 # other classes
                 case "Stats":
@@ -798,6 +822,18 @@ class Decoder(JSONDecoder):
                         pipe(value, list(get_type_hints(CollectionContentDict).keys())),
                     )
                     return CollectionContent.from_dict(collection_content_dict)
+                case "EpisodeContent":
+                    episode_content_dict: EpisodeContentDict = cast(
+                        EpisodeContentDict,
+                        pipe(value, list(get_type_hints(EpisodeContentDict).keys())),
+                    )
+                    return EpisodeContent.from_dict(episode_content_dict)
+                case "SeasonContent":
+                    season_content_dict: SeasonContentDict = cast(
+                        SeasonContentDict,
+                        pipe(value, list(get_type_hints(SeasonContentDict).keys())),
+                    )
+                    return SeasonContent.from_dict(season_content_dict)
 
                 # error
                 case _:
