@@ -23,6 +23,18 @@ from humanize import naturalsize
 from shutil import rmtree
 
 
+WAV_FILE_BAR_FMT = (
+    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:{len_total}.1f}/{total:.1f} "
+    + "[{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
+)
+
+
+def timedelta_from_minutes(minutes: float) -> timedelta:
+    m: int = floor(minutes)
+    s: int = floor((minutes % 1) * 60)
+    return timedelta(minutes=m, seconds=s)
+
+
 class FileType(Enum):
     wav = "wav"
     video = "video"
@@ -106,7 +118,9 @@ class WAVFile:
     def create_wav_file(
         self,
         options: WAVOptions = {"bitrate": 16000, "amount": timedelta(minutes=10)},
+        *,
         force_recreation: bool = False,
+        manager: Optional[Manager] = None,
     ) -> bool:
         match (self.__status, self.__type, force_recreation):
             case (Status.ready, _, False):
@@ -114,18 +128,34 @@ class WAVFile:
             case (_, FileType.wav, _):
                 return False
             case (Status.raw, _, False):
-                self.__convert_to_wav(options)
+                self.__convert_to_wav(options, manager)
                 return True
             case (_, _, True):
-                self.__convert_to_wav(options)
+                self.__convert_to_wav(options, manager)
                 return True
             case _:  # stupid mypy
                 raise RuntimeError("UNREACHABLE")
 
-    def __convert_to_wav(self, options: WAVOptions) -> None:
+    def __convert_to_wav(
+        self, options: WAVOptions, manager: Optional[Manager] = None
+    ) -> None:
+        bar: Optional[Any] = None
+        elapsed_time: timedelta = timedelta(seconds=0)
+        if manager is not None and self.runtime is not None:
+            bar = manager.counter(
+                total=timedelta_from_minutes(self.runtime),
+                desc="generating wav",
+                unit="minutes",
+                leave=False,
+                bar_format=WAV_FILE_BAR_FMT,
+                color="red",
+            )
+            bar.update(0, force=True)
+
         temp_dir: Path = Path("/tmp") / "video_lang_detect"
         if not temp_dir.exists():
             makedirs(temp_dir)
+
         self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 
         if self.__tmp_file.exists():
@@ -135,6 +165,7 @@ class WAVFile:
             "acodec": "pcm_s16le",
             "ar": options["bitrate"],
             "ac": 1,
+            "stats_period": 1,
         }
 
         if options["amount"] is not None:
@@ -148,14 +179,20 @@ class WAVFile:
             .output(self.__tmp_file, **ffmpeg_options)
         )
 
-        @ffmpeg.on("progress")  # type: ignore
         def progress_report(progress: Progress) -> None:
-            # print(progress)
-            pass
+            if bar is not None:
+                delta_time = progress.time - elapsed_time
+                bar.update(delta_time)
 
+            elapsed_time += progress.time
+
+        ffmpeg.on("progress", progress_report)
         ffmpeg.execute()
 
         self.__status = Status.ready
+
+        if bar is not None:
+            bar.close(clear=True)
 
     def wav_path(self) -> Path:
         match (self.__status, self.__type):
@@ -281,17 +318,18 @@ class Classifier:
                 unit="attempts",
                 leave=False,
                 color="red",
-                all_fields=True,
             )
             bar.update(0, force=True)
         for minute in minutes:
             try:
-                delta = None
+                delta: Optional[timedelta] = None
                 if minute is not None:
-                    m = floor(minute)
-                    s = floor((minute % 1) * 60)
-                    delta = timedelta(minutes=m, seconds=s)
-                wav_file.create_wav_file({"bitrate": 16000, "amount": delta}, True)
+                    delta = timedelta_from_minutes(minute)
+                wav_file.create_wav_file(
+                    {"bitrate": 16000, "amount": delta},
+                    force_recreation=True,
+                    manager=manager,
+                )
 
                 # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
                 signal = self.__classifier.load_audio(
