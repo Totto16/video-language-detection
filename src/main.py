@@ -205,8 +205,8 @@ def main() -> None:
 
     json_content: str = json.dumps(contents, cls=Encoder)
 
-    # with open("data.json", "w") as file:
-    #     file.write(json_content)
+    with open("data.json", "w") as file:
+        file.write(json_content)
 
     json_loaded: list[Content] = cast(
         list[Content], json.loads(json_content, cls=Decoder)

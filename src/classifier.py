@@ -447,9 +447,16 @@ class Classifier:
         self.__classifier = classifier
 
     @staticmethod
+    def clear_gpu_cache() -> None:
+        gc.collect()
+        cuda.empty_cache()
+
+    @staticmethod
     def print_gpu_stat() -> None:
         if not cuda.is_available():
             return None
+
+        Classifier.clear_gpu_cache()
 
         nvmlInit()
         h = nvmlDeviceGetHandleByIndex(0)
@@ -460,7 +467,7 @@ class Classifier:
         print(f"used     : {naturalsize(info.used, binary=True)}")
 
     def predict(
-        self, wav_file: WAVFile, manager: Optional[Manager] = None
+        self, wav_file: WAVFile, path: Path, manager: Optional[Manager] = None
     ) -> tuple[Language, float]:
         def get_timestamps(runtime: Optional[Timestamp]) -> list[Optional[Timestamp]]:
             if runtime is None:
@@ -524,10 +531,13 @@ class Classifier:
                     bar.update()
 
                 if accuracy < 0.95:
+                    Classifier.clear_gpu_cache()
                     continue
 
                 if bar is not None:
                     bar.close(clear=True)
+                    
+                Classifier.clear_gpu_cache()
 
                 return (language, accuracy)
             except RuntimeError as exception:
@@ -538,6 +548,10 @@ class Classifier:
 
         if bar is not None:
             bar.close(clear=True)
+            
+        Classifier.clear_gpu_cache()
+
+        print(f"Couldn't get Language of '{path}'")
 
         return (Language.Unknown(), 0.0)
 
@@ -545,8 +559,8 @@ class Classifier:
         if not cuda.is_available():
             return None
 
-        gc.collect()
-        cuda.empty_cache()
+        Classifier.clear_gpu_cache()
+
         return {
             "device": "cuda",
             "data_parallel_count": -1,

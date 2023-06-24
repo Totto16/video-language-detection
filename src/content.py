@@ -469,7 +469,9 @@ class EpisodeContent(Content):
     ) -> Language:
         wav_file = WAVFile(self.scanned_file.path)
 
-        language, accuracy = classifier.predict(wav_file, manager)
+        language, accuracy = classifier.predict(
+            wav_file, self.scanned_file.path, manager
+        )
         return language
 
     @staticmethod
