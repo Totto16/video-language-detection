@@ -197,59 +197,59 @@ class Content:
         parents: list[str] = [*parent_folders, name]
 
         top_is_collection: bool = (
-            len(parents) == 1 and file_path.is_dir()
+            (len(parents) == 1 and file_path.is_dir()) or len(parents) != 1
         ) and not SeriesContent.is_valid_name(parents[0])
 
-        if len(parent_folders) == 4:
+        if len(parents) == 4:
             if file_type == ScannedFileType.folder:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting 4 - {file_path}!"
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file)
         elif len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file)
         elif len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                 )
 
             return SeasonContent.from_path(file_path, scanned_file)
         elif len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                 )
 
             return SeasonContent.from_path(file_path, scanned_file)
         elif len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                 )
 
             return SeriesContent.from_path(file_path, scanned_file)
         elif len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
                 )
 
             return SeriesContent.from_path(file_path, scanned_file)
-        else:
-            print(file_path, file_type, parents, top_is_collection)
+        elif len(parents) == 1 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise RuntimeError(
-                    f"Not expected file type {file_type} with the received nesting!"
+                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
                 )
-
             return CollectionContent.from_path(file_path, scanned_file)
+        else:
+            raise RuntimeError("UNREACHABLE")
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
@@ -298,7 +298,7 @@ class EpisodeContent(Content):
             path.name
         )
         if description is None:
-            raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
+            raise NameError(f"Couldn't get EpisodeDescription from {path}")
 
         return EpisodeContent(scanned_file, description)
 
@@ -389,6 +389,9 @@ class SeasonDescription:
     season: int
 
 
+SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
+
+
 class SeasonContent(Content):
     __description: SeasonDescription
     __episodes: list[EpisodeContent]
@@ -399,7 +402,7 @@ class SeasonContent(Content):
             path.name
         )
         if description is None:
-            raise RuntimeError(f"Couldn't get EpisodeDescription from {path}")
+            raise NameError(f"Couldn't get SeasonDescription from {path}")
 
         return SeasonContent(scanned_file, description, [])
 
@@ -422,7 +425,7 @@ class SeasonContent(Content):
     def parse_description(name: str) -> Optional[SeasonDescription]:
         match = re.search(r"Staffel (\d{2})", name)
         if match is None:
-            if name == "Specials" or name == "Special":
+            if name in SPECIAL_NAMES:
                 return SeasonDescription(0)
             else:
                 return None
@@ -515,7 +518,7 @@ class SeriesContent(Content):
             path.name
         )
         if description is None:
-            raise RuntimeError(f"Couldn't get SeriesDescription from {path}")
+            raise NameError(f"Couldn't get SeriesDescription from {path}")
 
         return SeriesContent(scanned_file, description, [])
 

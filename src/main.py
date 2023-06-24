@@ -14,7 +14,7 @@ def main() -> None:
 
     ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
     video_formats: list[str] = ["mp4", "mkv", "avi"]
-    ignore_files: list[str] = ["metadata", "extrafanart"]
+    ignore_files: list[str] = ["metadata", "extrafanart", "theme-music", "Music"]
 
     def ignore_fn(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
@@ -59,7 +59,7 @@ def main() -> None:
 
     json_content: str = json.dumps(contents, cls=Encoder)
 
-    with open("test.json", "w") as file:
+    with open("data.json", "w") as file:
         file.write(json_content)
 
     json_loaded: list[Content] = cast(
