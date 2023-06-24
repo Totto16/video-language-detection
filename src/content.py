@@ -18,6 +18,8 @@ from typing import (
 )
 from typing_extensions import override
 import re
+
+from enlighten import Manager
 from classifier import Classifier, Language, WAVFile
 from os import listdir
 from json import JSONDecoder, JSONEncoder
@@ -77,22 +79,33 @@ class Stats:
         if file_path.is_dir():
             raise RuntimeError("Can't take checksum of directory")
 
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as file:
+        print(" -- hash file -- ")
+
+        sha256_hash: _Hash = hashlib.sha256()
+        with open(str(file_path.absolute()), "rb") as file:
             # Read and update hash string value in blocks of 4K
             for byte_block in iter(lambda: file.read(4096), b""):
                 sha256_hash.update(byte_block)
             return sha256_hash.hexdigest()
 
     @staticmethod
-    def from_file(file_path: Path, file_type: ScannedFileType) -> "Stats":
-        #TODO re-enable
-        # checksum: Optional[str] = (
-        #     None if file_type == ScannedFileType.folder else Stats.hash_file(file_path)
-        # )
-        checksum = None
-
+    def from_file(
+        file_path: Path,
+        file_type: ScannedFileType,
+        *,
+        generate_checksum: bool = True,
+    ) -> "Stats":
         mtime: float = Path(file_path).stat().st_mtime
+
+        checksum: Optional[str] = (
+            (
+                None
+                if file_type == ScannedFileType.folder
+                else Stats.hash_file(file_path)
+            )
+            if generate_checksum
+            else None
+        )
 
         return Stats(checksum=checksum, mtime=mtime)
 
@@ -123,14 +136,16 @@ class ScannedFile:
 
     @staticmethod
     def from_scan(
-        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        file_path: Path,
+        file_type: ScannedFileType,
+        parent_folders: list[str],
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
             raise RuntimeError(
                 "No more than 3 parent folders are allowed: [collection] -> series -> season"
             )
 
-        stats: Stats = Stats.from_file(file_path, file_type)
+        stats: Stats = Stats.from_file(file_path, file_type, generate_checksum=False)
 
         return ScannedFile(
             path=file_path,
@@ -138,6 +153,9 @@ class ScannedFile:
             type=file_type,
             stats=stats,
         )
+
+    def generate_checksum(self, manager: Manager) -> None:
+        self.__stats = Stats.from_file(self.path, self.type, generate_checksum=True)
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
@@ -177,12 +195,21 @@ class Callback(Generic[C, CT]):
         return False
 
     def start(
-        self, amount: int, name: str, parent_folders: list[str], characteristic: CT
+        self,
+        amount: tuple[int, int, int],
+        name: str,
+        parent_folders: list[str],
+        characteristic: CT,
     ) -> None:
         return None
 
     def progress(
-        self, name: str, parent_folders: list[str], characteristic: CT
+        self,
+        name: str,
+        parent_folders: list[str],
+        characteristic: CT,
+        *,
+        amount: int = 1,
     ) -> None:
         return None
 
@@ -217,12 +244,18 @@ class Content:
     def scanned_file(self) -> ScannedFile:
         return self.__scanned_file
 
+    def generate_checksum(self, manager: Manager) -> None:
+        self.__scanned_file.generate_checksum(manager)
+
     @staticmethod
     def from_scan(
         file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
     ) -> Optional["Content"]:
         scanned_file: ScannedFile = ScannedFile.from_scan(
-            file_path, file_type, parent_folders
+            file_path,
+            file_type,
+            parent_folders,
+            generate_checksum=False,
         )
 
         name = file_path.name
@@ -322,20 +355,27 @@ def process_folder(
     callback: Callback[Content, ContentCharacteristic],
     *,
     parent_folders: list[str] = [],
+    parent_type: Optional[ContentType] = None,
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
+    ignored: int = 0
     for file in listdir(directory):
         file_path: Path = Path(directory) / file
 
         file_type: ScannedFileType = ScannedFileType.from_path(file_path)
         should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
         if should_ignore:
+            ignored += 1
             continue
 
         temp.append((file_path, file_type, parent_folders))
 
-    value: ContentCharacteristic = (None, ScannedFileType.folder)
-    callback.start(len(temp), directory.name, parent_folders, value)
+    value: ContentCharacteristic = (parent_type, ScannedFileType.folder)
+
+    #  total, processing, ignored
+    amount: tuple[int, int, int] = (len(temp) + ignored, len(temp), ignored)
+
+    callback.start(amount, directory.name, parent_folders, value)
 
     results: list[Content] = []
     for file_path, file_type, parent_folders in temp:
@@ -350,7 +390,7 @@ def process_folder(
         if result is not None:
             results.append(result)
 
-    value = (None, ScannedFileType.folder)
+    value = (parent_type, ScannedFileType.folder)
     callback.finish(directory.name, parent_folders, value)
 
     return results
@@ -448,11 +488,31 @@ class EpisodeContent(Content):
         parent_folders: list[str] = [],
         classifier: Classifier,
     ) -> None:
-        # TODO use callback appropiately
-        pass
-        # TODO enable this
-        sleep(5)
+        characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
+
+        callback.start(
+            (2, 2, 0),
+            self.scanned_file.path.name,
+            self.scanned_file.parents,
+            characteristic,
+        )
+
+        self.generate_checksum(callback.get_manager())
+
+        callback.progress(
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+        )
+
         # self.__language = self.__get_language(classifier)
+        sleep(1)
+
+        callback.progress(
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+        )
+
+        callback.finish(
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+        )
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
@@ -569,6 +629,7 @@ class SeasonContent(Content):
             self.scanned_file.path,
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
+            parent_type=self.type,
         )
         for content in contents:
             if isinstance(content, EpisodeContent):
@@ -688,6 +749,7 @@ class SeriesContent(Content):
             self.scanned_file.path,
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
+            parent_type=self.type,
         )
         for content in contents:
             if isinstance(content, SeasonContent):
@@ -775,6 +837,7 @@ class CollectionContent(Content):
             self.scanned_file.path,
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
+            parent_type=self.type,
         )
         for content in contents:
             if isinstance(content, SeriesContent):

@@ -11,6 +11,7 @@ speechbrain = "*"
 torchvision = "*"
 pynvml = "*"
 humanize = "*"
+enlighten = "*"
 
 [dev-packages]
 pylint = "*"

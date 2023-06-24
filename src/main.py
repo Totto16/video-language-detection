@@ -3,47 +3,20 @@
 
 import json
 from pathlib import Path
-from typing import Optional, TypedDict, cast
+from typing import Any, Optional, TypedDict, cast
 from typing_extensions import override
-
+from enlighten import Justify, Manager, get_manager
 from classifier import Classifier
-from tqdm.auto import tqdm
 from content import (
     Callback,
     Content,
     ContentCharacteristic,
+    ContentType,
     Decoder,
     Encoder,
     ScannedFileType,
     process_folder,
 )
-
-
-class ProgressBar:
-    __name: str
-    __bar: tqdm
-
-    def __init__(self, amount: int, name: str) -> None:
-        self.__name = name
-        self.__bar = tqdm(desc=name)
-        self.reset(amount, name)
-
-    def reset(self, amount: int, name: str) -> None:
-        self.__bar.desc = name
-        self.__bar.reset(amount)
-        self.__name = name
-
-    def advance(self) -> None:
-        self.__bar.update()
-
-    def finish(self, name: str) -> None:
-        if name != self.__name:
-            raise RuntimeError("start and finish names don't match up!")
-
-        self.__bar.refresh()
-
-    def close(self) -> None:
-        self.__bar.close()
 
 
 class ContentOptions(TypedDict):
@@ -55,24 +28,33 @@ class ContentOptions(TypedDict):
 class ContentCallback(Callback[Content, ContentCharacteristic]):
     __options: ContentOptions
     __classifier: Classifier
-    __progress_bars: list[ProgressBar]
-    __bar_index: int
-    __with_progress_bar: bool
+    __progress_bars: dict[str, Any]
+    __manager: Manager
+    __status_bar: Any
 
     def __init__(
         self,
         options: ContentOptions,
         classifier: Classifier,
-        *,
-        with_progress_bar: bool = True,
     ) -> None:
         super().__init__()
 
         self.__options = options
         self.__classifier = classifier
-        self.__progress_bars = []
-        self.__bar_index = 0
-        self.__with_progress_bar = with_progress_bar
+        self.__progress_bars = dict()
+        manager = get_manager()
+        if not isinstance(manager, Manager):
+            raise RuntimeError("UNREACHABLE (not runnable in notebooks)")
+
+        self.__manager = manager
+        self.__status_bar = self.__manager.status_bar(
+            status_format="Video Language Detector{fill}Stage: {stage}{fill}{elapsed}",
+            color="bold_underline_bright_white_on_blue",
+            justify=Justify.CENTER,
+            stage="Scanning",
+            autorefresh=True,
+            min_delta=0.5,
+        )
 
     @override
     def ignore(
@@ -118,23 +100,46 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
     @override
     def start(
         self,
-        amount: int,
+        amount: tuple[int, int, int],
         name: str,
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
     ) -> None:
-        if not self.__with_progress_bar:
-            print(f"start: {name} - {amount} - {characteristic}")
-            return
+        content_type, file_type = characteristic
 
         # don't make a bar for episodes!
+        # if file_type == ScannedFileType.file:
+        # return
 
-        progress_bar = ProgressBar(amount, name)
-        self.__bar_index += 1
-        if self.__bar_index >= len(self.__progress_bars):
-            self.__progress_bars.append(progress_bar)
-        else:
-            self.__progress_bars[self.__bar_index - 1].reset(amount, name)
+        value: tuple[str, str] = ("purple", "folders")
+
+        match content_type:
+            case ContentType.collection:
+                value = ("blue", "series")
+            case ContentType.series:
+                value = ("cyan", "seasons")
+            case ContentType.season:
+                value = ("green", "episodes")
+            case ContentType.episode:
+                value = ("yellow", "tasks")
+            case _:
+                pass
+
+        color, unit = value
+
+        total, processing, ignored = amount
+
+        terminal = self.__manager.term
+        bar_format = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
+
+        self.__progress_bars[name] = self.__manager.counter(
+            total=processing,
+            desc=name,
+            unit=unit,
+            leave=False,
+            bar_format=bar_format,
+            color=color,
+        )
 
     @override
     def progress(
@@ -142,15 +147,15 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
         name: str,
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
+        *,
+        amount: int = 1,
     ) -> None:
-        if not self.__with_progress_bar:
-            print(f"progress: {name} - {characteristic}")
-            return
-
-        if self.__bar_index == 0:
+        if self.__progress_bars.get(name) is None:
             raise RuntimeError("No Progressbar, on progress callback")
 
-        self.__progress_bars[self.__bar_index - 1].advance()
+        content_type, file_type = characteristic
+
+        self.__progress_bars[name].update(amount)
 
     @override
     def finish(
@@ -159,21 +164,15 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
     ) -> None:
-        if not self.__with_progress_bar:
-            print(f"finish: {name} - {characteristic}")
-            return
-
-        # remove top only if the names match up!!! (not if it's a single episode!)
-
-        if self.__bar_index == 0:
+        if self.__progress_bars.get(name) is None:
             raise RuntimeError("No Progressbar, on progress finish")
 
-        self.__bar_index -= 1
-        self.__progress_bars[self.__bar_index].finish(name)
+        self.__progress_bars[name].close()
+        del self.__progress_bars[name]
 
     def __del__(self) -> None:
-        for progress_bar in self.__progress_bars:
-            progress_bar.close()
+        self.__status_bar.update(stage="finished")
+        self.__manager.stop()
 
 
 def main() -> None:
@@ -197,7 +196,6 @@ def main() -> None:
             "parse_error_is_exception": parse_error_is_exception,
         },
         classifier,
-        with_progress_bar=False,
     )
 
     contents: list[Content] = process_folder(

@@ -8,6 +8,11 @@ from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from ffprobe import FFProbe
 from ffmpeg import FFmpeg, Progress
+
+import warnings
+
+warnings.filterwarnings("ignore")
+
 from speechbrain.pretrained import EncoderClassifier
 import torch
 import gc
