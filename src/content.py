@@ -253,7 +253,7 @@ class Content:
             else:
                 raise RuntimeError("UNREACHABLE")
 
-        except RuntimeError as e:
+        except Exception as e:
             print(e)
             return None
 
