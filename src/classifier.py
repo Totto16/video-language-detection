@@ -5,6 +5,7 @@ from datetime import timedelta
 from enum import Enum
 from math import floor
 from os import makedirs, path, remove
+from time import sleep
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from enlighten import Manager
@@ -24,15 +25,179 @@ from shutil import rmtree
 
 
 WAV_FILE_BAR_FMT = (
-    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:{len_total}.1f}/{total:.1f} "
+    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} "
     + "[{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
 )
 
 
-def timedelta_from_minutes(minutes: float) -> timedelta:
-    m: int = floor(minutes)
-    s: int = floor((minutes % 1) * 60)
-    return timedelta(minutes=m, seconds=s)
+def parse_int_safely(input: str) -> Optional[int]:
+    try:
+        return int(input)
+    except ValueError:
+        return None
+
+
+class Timestamp:
+    __delta: timedelta
+
+    def __init__(self, delta: timedelta) -> None:
+        self.__delta = delta
+
+    @property
+    def delta(self) -> timedelta:
+        return self.__delta
+
+    @property
+    def minutes(self) -> float:
+        return self.__delta.total_seconds() / 60.0
+
+    @staticmethod
+    def zero() -> "Timestamp":
+        return Timestamp(timedelta(seconds=0))
+
+    @staticmethod
+    def from_minutes(minutes: float) -> "Timestamp":
+        m: int = floor(minutes)
+        s: int = floor((minutes % 1) * 60)
+        return Timestamp(timedelta(minutes=m, seconds=s))
+
+    @staticmethod
+    def from_seconds(seconds: float) -> "Timestamp":
+        return Timestamp.from_minutes(seconds / 60)
+
+    def __str__(self) -> str:
+        return str(self.__delta)
+
+    def __format__(self, spec: str) -> str:
+        """This is responsible for formatting the Timestamp
+
+        Args:
+            spec (str): a formst string, if empty no microseconds will be printed
+                        otherwise you can provide an int from 1-5 inclusive, to determine how much you wan't to round
+                        the microseconds, you can provide a "n" afterwards, to not have ".00". e.g , it ignores 0's with e.g. "2n"
+
+        Examples:
+            f"{timestamp:2}" => "00:01:00.20"
+            f"{timestamp:4}" => "00:01:00.2010"
+
+            f"{timestamp2:2}" => "00:05:00.00"
+            f"{timestamp2:4}" => "00:05:00"
+        """
+
+        delta: timedelta = timedelta(
+            seconds=int(self.delta.total_seconds()), microseconds=0
+        )
+        ms: int = self.delta.microseconds
+
+        if spec == "":
+            return str(delta)
+        else:
+
+            def round_to_tens(value: int, tens: int) -> int:
+                return round(value / (10**tens))
+
+            try:
+                ignore_zero: bool = False
+                if spec.endswith("n"):
+                    ignore_zero = True
+                    spec = spec[:-1]
+
+                if ignore_zero and ms == 0:
+                    return str(delta)
+
+                val = parse_int_safely(spec)
+                if val is None:
+                    raise Exception
+
+                if val > 5 or val <= 0:
+                    raise Exception
+
+                # val is between 1 and 5 inclusive
+                ms = round_to_tens(ms, 5 - val)
+
+                return "{delta}.{ms:0{val}d}".format(delta=str(delta), ms=ms, val=val)
+            except Exception:
+                raise ValueError(
+                    f"Invalid format specifier '{spec}' for object of type 'Timestamp'"
+                )
+
+    def __eq__(self, value: object) -> bool:
+        if isinstance(value, Timestamp):
+            return self.delta == value.delta
+
+        return False
+
+    def __ne__(self, value: object) -> bool:
+        return not self.__eq__(value)
+
+    def __lt__(self, value: object) -> bool:
+        if isinstance(value, Timestamp):
+            return self.delta < value.delta
+        else:
+            raise TypeError(
+                f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __le__(self, value: object) -> bool:
+        if isinstance(value, Timestamp):
+            return self.delta <= value.delta
+        else:
+            raise TypeError(
+                f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __gt__(self, value: object) -> bool:
+        if isinstance(value, Timestamp):
+            return self.delta > value.delta
+        else:
+            raise TypeError(
+                f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __ge__(self, value: object) -> bool:
+        if isinstance(value, Timestamp):
+            return self.delta >= value.delta
+        else:
+            raise TypeError(
+                f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __iadd__(self, value: object) -> "Timestamp":
+        if isinstance(value, Timestamp):
+            self.__delta += value.delta
+            return self
+        elif isinstance(value, timedelta):
+            self.__delta += value
+            return self
+        else:
+            raise TypeError(
+                f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __sub__(self, value: object) -> "Timestamp":
+        if isinstance(value, Timestamp):
+            result: timedelta = self.__delta - value.delta
+            return Timestamp(result)
+        else:
+            raise TypeError(
+                f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __abs__(self) -> "Timestamp":
+        return Timestamp(abs(self.delta))
+
+    def __float__(self) -> float:
+        return self.minutes
+
+    def __truediv__(self, value: object) -> float:
+        if isinstance(value, Timestamp):
+            return self.__delta / value.delta
+        elif isinstance(value, float):
+            return self / Timestamp.from_minutes(value)
+        else:
+            raise TypeError(
+                f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
 
 
 class FileType(Enum):
@@ -60,7 +225,7 @@ class Status(Enum):
 
 class WAVOptions(TypedDict):
     bitrate: int
-    amount: Optional[timedelta]
+    amount: Optional[Timestamp]
 
 
 class WAVFile:
@@ -68,7 +233,7 @@ class WAVFile:
     __file: Path
     __type: FileType
     __status: Status
-    __runtime: Optional[float]
+    __runtime: Optional[Timestamp]
 
     def __init__(self, file: Path) -> None:
         self.__tmp_file = None
@@ -80,7 +245,7 @@ class WAVFile:
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self) -> tuple[FileType, Status, Optional[float]]:
+    def __get_info(self) -> tuple[FileType, Status, Optional[Timestamp]]:
         try:
             metadata = FFProbe(str(self.__file.absolute()))
             for stream in metadata.streams:
@@ -88,7 +253,7 @@ class WAVFile:
                     return (
                         FileType.video,
                         Status.raw,
-                        stream.duration_seconds() / 60.0,
+                        Timestamp.from_seconds(stream.duration_seconds()),
                     )
 
             for stream in metadata.streams:
@@ -96,7 +261,7 @@ class WAVFile:
                     return (
                         FileType.wav,
                         Status.ready,
-                        stream.duration_seconds() / 60.0,
+                        Timestamp.from_seconds(stream.duration_seconds()),
                     )
 
             for stream in metadata.streams:
@@ -104,7 +269,7 @@ class WAVFile:
                     return (
                         FileType.audio,
                         Status.raw,
-                        stream.duration_seconds() / 60.0,
+                        Timestamp.from_seconds(stream.duration_seconds()),
                     )
 
             return (FileType.audio, Status.raw, None)
@@ -112,12 +277,15 @@ class WAVFile:
             return (FileType.video, Status.raw, None)
 
     @property
-    def runtime(self) -> Optional[float]:
+    def runtime(self) -> Optional[Timestamp]:
         return self.__runtime
 
     def create_wav_file(
         self,
-        options: WAVOptions = {"bitrate": 16000, "amount": timedelta(minutes=10)},
+        options: WAVOptions = {
+            "bitrate": 16000,
+            "amount": Timestamp.from_minutes(10.0),
+        },
         *,
         force_recreation: bool = False,
         manager: Optional[Manager] = None,
@@ -140,17 +308,23 @@ class WAVFile:
         self, options: WAVOptions, manager: Optional[Manager] = None
     ) -> None:
         bar: Optional[Any] = None
-        elapsed_time: timedelta = timedelta(seconds=0)
-        if manager is not None and self.runtime is not None:
+        elapsed_time: Timestamp = Timestamp.zero()
+
+        runtime: Optional[Timestamp] = options["amount"]
+        if runtime is None:
+            runtime = self.runtime
+
+        if manager is not None and runtime is not None:
             bar = manager.counter(
-                total=timedelta_from_minutes(self.runtime),
+                total=runtime,
+                count=elapsed_time,
                 desc="generating wav",
                 unit="minutes",
                 leave=False,
                 bar_format=WAV_FILE_BAR_FMT,
                 color="red",
             )
-            bar.update(0, force=True)
+            bar.update(elapsed_time, force=True)
 
         temp_dir: Path = Path("/tmp") / "video_lang_detect"
         if not temp_dir.exists():
@@ -165,11 +339,11 @@ class WAVFile:
             "acodec": "pcm_s16le",
             "ar": options["bitrate"],
             "ac": 1,
-            "stats_period": 1,
+            "stats_period": 0.5,  # in seconds
         }
 
         if options["amount"] is not None:
-            ffmpeg_options["to"] = (str(options["amount"]),)
+            ffmpeg_options["to"] = str(options["amount"])
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
@@ -180,11 +354,12 @@ class WAVFile:
         )
 
         def progress_report(progress: Progress) -> None:
+            nonlocal elapsed_time
             if bar is not None:
-                delta_time = progress.time - elapsed_time
+                delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
                 bar.update(delta_time)
-
-            elapsed_time += progress.time
+                elapsed_time += progress.time
+                sleep(10)
 
         ffmpeg.on("progress", progress_report)
         ffmpeg.execute()
@@ -289,42 +464,47 @@ class Classifier:
     def predict(
         self, wav_file: WAVFile, manager: Optional[Manager] = None
     ) -> tuple[Language, float]:
-        def get_minutes(runtime: float) -> list[Optional[float]]:
+        def get_timestamps(runtime: Optional[Timestamp]) -> list[Optional[Timestamp]]:
+            if runtime is None:
+                return [
+                    Timestamp.from_minutes(x) if x is not None else None
+                    for x in [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, None]
+                ]
+
             index: float = 1.0
             result: list[Optional[float]] = [index]
             steps: float = 1.0
             while True:
                 index += steps
-                if index > runtime:
+                if index > runtime.minutes:
                     result.append(None)
                     break
 
                 result.append(index)
                 steps += 1.0
 
-            return result
+            return [
+                Timestamp.from_minutes(x) if x is not None else None for x in result
+            ]
 
-        minutes: list[Optional[float]] = (
-            [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, None]
-            if wav_file.runtime is None
-            else get_minutes(wav_file.runtime)
-        )
+        timestamps: list[Optional[Timestamp]] = get_timestamps(wav_file.runtime)
 
         bar: Optional[Any] = None
         if manager is not None:
             bar = manager.counter(
-                total=len(minutes),
+                total=len(timestamps),
                 desc="detecting language",
                 unit="attempts",
                 leave=False,
                 color="red",
             )
             bar.update(0, force=True)
-        for minute in minutes:
+        for timestamp in timestamps:
             try:
-                delta: Optional[timedelta] = None
-                if minute is not None:
-                    delta = timedelta_from_minutes(minute)
+                delta: Optional[Timestamp] = None
+                if timestamp is not None:
+                    delta = timestamp
+
                 wav_file.create_wav_file(
                     {"bitrate": 16000, "amount": delta},
                     force_recreation=True,

@@ -19,7 +19,7 @@ from typing_extensions import override
 import re as regex
 
 from enlighten import Manager
-from classifier import Classifier, Language, WAVFile
+from classifier import Classifier, Language, WAVFile, parse_int_safely
 from os import listdir
 from json import JSONDecoder, JSONEncoder
 
@@ -54,13 +54,6 @@ class ContentType(Enum):
 
 class MissingOverrideError(RuntimeError):
     pass
-
-
-def parse_int_safely(input: str) -> Optional[int]:
-    try:
-        return int(input)
-    except ValueError:
-        return None
 
 
 class StatsDict(TypedDict):
@@ -663,7 +656,7 @@ class SeasonContent(Content):
                 self.__episodes.append(content)
             else:
                 raise RuntimeError(
-                    f"No child with class {type(content)} is possible in SeasonContent"
+                    f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
                 )
 
     @override
@@ -783,7 +776,7 @@ class SeriesContent(Content):
                 self.__seasons.append(content)
             else:
                 raise RuntimeError(
-                    f"No child with class {type(content)} is possible in SeriesContent"
+                    f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
                 )
 
     @override
@@ -871,7 +864,7 @@ class CollectionContent(Content):
                 self.__series.append(content)
             else:
                 raise RuntimeError(
-                    f"No child with class {type(content)} is possible in CollectionContent"
+                    f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
                 )
 
     @staticmethod
