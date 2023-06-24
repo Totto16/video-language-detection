@@ -6,19 +6,20 @@ from enum import Enum
 from os import makedirs, path, remove
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
+from enlighten import Manager
 from ffprobe import FFProbe
 from ffmpeg import FFmpeg, Progress
 
-import warnings
+from warnings import filterwarnings
 
-warnings.filterwarnings("ignore")
+filterwarnings("ignore")
 
 from speechbrain.pretrained import EncoderClassifier
-import torch
+from torch import cuda
 import gc
-import pynvml
-import humanize
-import shutil
+from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+from humanize import naturalsize
+from shutil import rmtree
 
 
 class FileType(Enum):
@@ -214,18 +215,20 @@ class Classifier:
 
     @staticmethod
     def print_gpu_stat() -> None:
-        if not torch.cuda.is_available():
+        if not cuda.is_available():
             return None
 
-        pynvml.nvmlInit()
-        h = pynvml.nvmlDeviceGetHandleByIndex(0)
-        info = pynvml.nvmlDeviceGetMemoryInfo(h)
+        nvmlInit()
+        h = nvmlDeviceGetHandleByIndex(0)
+        info = nvmlDeviceGetMemoryInfo(h)
         print("GPU stats:")
-        print(f"total    : {humanize.naturalsize(info.total, binary=True)}")
-        print(f"free     : {humanize.naturalsize(info.free, binary=True)}")
-        print(f"used     : {humanize.naturalsize(info.used, binary=True)}")
+        print(f"total    : {naturalsize(info.total, binary=True)}")
+        print(f"free     : {naturalsize(info.free, binary=True)}")
+        print(f"used     : {naturalsize(info.used, binary=True)}")
 
-    def predict(self, wav_file: WAVFile) -> tuple[Language, float]:
+    def predict(
+        self, wav_file: WAVFile, manager: Optional[Manager] = None
+    ) -> tuple[Language, float]:
         minutes: list[Optional[int]] = [1, 2, 4, 5, 10, 20, None]
 
         for minute in minutes:
@@ -249,7 +252,7 @@ class Classifier:
 
                 return (language, accuracy)
             except RuntimeError as exception:
-                if isinstance(exception, torch.cuda.OutOfMemoryError):
+                if isinstance(exception, cuda.OutOfMemoryError):
                     self.__init_classifier(True)
                 else:
                     raise exception
@@ -257,11 +260,11 @@ class Classifier:
         return (Language.Unknown(), 0.0)
 
     def __get_run_opts(self) -> Optional[dict[str, Any]]:
-        if not torch.cuda.is_available():
+        if not cuda.is_available():
             return None
 
         gc.collect()
-        torch.cuda.empty_cache()
+        cuda.empty_cache()
         return {
             "device": "cuda",
             "data_parallel_count": -1,
@@ -276,4 +279,4 @@ class Classifier:
             if self.__save_dir.is_file():
                 remove(str(self.__save_dir.absolute()))
             else:
-                shutil.rmtree(str(self.__save_dir.absolute()), ignore_errors=True)
+                rmtree(str(self.__save_dir.absolute()), ignore_errors=True)

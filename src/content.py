@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass
-import dataclasses
+from dataclasses import dataclass, is_dataclass
+import dataclasses as dc
 from enum import Enum
-import hashlib
+from hashlib import sha256
 from pathlib import Path
-from time import sleep
 from typing import (
     Any,
     Generic,
@@ -17,7 +16,7 @@ from typing import (
     get_type_hints,
 )
 from typing_extensions import override
-import re
+import re as regex
 
 from enlighten import Manager
 from classifier import Classifier, Language, WAVFile
@@ -69,23 +68,44 @@ class StatsDict(TypedDict):
     mtime: float
 
 
+CHECKSUM_BAR_FORMAT = (
+    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:!.2j}{unit} / {total:!.2j}{unit} "
+    "[{elapsed}<{eta}, {rate:!.2j}{unit}/s]"
+)
+
+
 @dataclass
 class Stats:
     checksum: Optional[str]
     mtime: float
 
     @staticmethod
-    def hash_file(file_path: Path) -> str:
+    def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
         if file_path.is_dir():
             raise RuntimeError("Can't take checksum of directory")
 
-        print(" -- hash file -- ")
-
-        sha256_hash: _Hash = hashlib.sha256()
+        size: float = float(file_path.stat().st_size)
+        bar: Optional[Any] = None
+        if manager is not None:
+            bar = manager.counter(
+                total=size,
+                desc="sha256 checksum",
+                unit="B",
+                leave=False,
+                bar_format=CHECKSUM_BAR_FORMAT,
+                color="red",
+            )
+        sha256_hash = sha256()
         with open(str(file_path.absolute()), "rb") as file:
             # Read and update hash string value in blocks of 4K
             for byte_block in iter(lambda: file.read(4096), b""):
                 sha256_hash.update(byte_block)
+                if bar is not None:
+                    bar.update(float(len(byte_block)))
+
+            if bar is not None:
+                bar.close(clear=True)
+
             return sha256_hash.hexdigest()
 
     @staticmethod
@@ -94,6 +114,7 @@ class Stats:
         file_type: ScannedFileType,
         *,
         generate_checksum: bool = True,
+        manager: Optional[Manager] = None,
     ) -> "Stats":
         mtime: float = Path(file_path).stat().st_mtime
 
@@ -101,7 +122,7 @@ class Stats:
             (
                 None
                 if file_type == ScannedFileType.folder
-                else Stats.hash_file(file_path)
+                else Stats.hash_file(file_path, manager=manager)
             )
             if generate_checksum
             else None
@@ -154,8 +175,10 @@ class ScannedFile:
             stats=stats,
         )
 
-    def generate_checksum(self, manager: Manager) -> None:
-        self.__stats = Stats.from_file(self.path, self.type, generate_checksum=True)
+    def generate_checksum(self, manager: Optional[Manager] = None) -> None:
+        self.__stats = Stats.from_file(
+            self.path, self.type, generate_checksum=True, manager=manager
+        )
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
@@ -178,9 +201,10 @@ class ScannedFile:
 
 C = TypeVar("C")
 CT = TypeVar("CT")
+RT = TypeVar("RT")
 
 
-class Callback(Generic[C, CT]):
+class Callback(Generic[C, CT, RT]):
     def __init__(self) -> None:
         pass
 
@@ -215,6 +239,9 @@ class Callback(Generic[C, CT]):
 
     def finish(self, name: str, parent_folders: list[str], characteristic: CT) -> None:
         return None
+
+    def get_saved(self) -> RT:
+        raise MissingOverrideError
 
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
@@ -255,7 +282,6 @@ class Content:
             file_path,
             file_type,
             parent_folders,
-            generate_checksum=False,
         )
 
         name = file_path.name
@@ -336,7 +362,7 @@ class Content:
 
     def scan(
         self,
-        callback: Callback["Content", ContentCharacteristic],
+        callback: Callback["Content", ContentCharacteristic, Manager],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -352,7 +378,7 @@ class Content:
 
 def process_folder(
     directory: Path,
-    callback: Callback[Content, ContentCharacteristic],
+    callback: Callback[Content, ContentCharacteristic, Manager],
     *,
     parent_folders: list[str] = [],
     parent_type: Optional[ContentType] = None,
@@ -444,11 +470,12 @@ class EpisodeContent(Content):
     def description(self) -> EpisodeDescription:
         return self.__description
 
-    def __get_language(self, classifier: Classifier) -> Language:
+    def __get_language(
+        self, classifier: Classifier, manager: Optional[Manager] = None
+    ) -> Language:
         wav_file = WAVFile(self.scanned_file.path)
 
-        language, accuracy = classifier.predict(wav_file)
-        print(language, accuracy)
+        language, accuracy = classifier.predict(wav_file, manager)
         return language
 
     @staticmethod
@@ -457,7 +484,7 @@ class EpisodeContent(Content):
 
     @staticmethod
     def parse_description(name: str) -> Optional[EpisodeDescription]:
-        match = re.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
+        match = regex.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
         if match is None:
             return None
 
@@ -483,7 +510,7 @@ class EpisodeContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content, ContentCharacteristic],
+        callback: Callback[Content, ContentCharacteristic, Manager],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -491,25 +518,24 @@ class EpisodeContent(Content):
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
         callback.start(
-            (2, 2, 0),
+            (3, 3, 0),
             self.scanned_file.path.name,
             self.scanned_file.parents,
             characteristic,
         )
 
-        self.generate_checksum(callback.get_manager())
+        manager: Manager = callback.get_saved()
 
+        self.generate_checksum(manager)
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
 
-        # self.__language = self.__get_language(classifier)
-        sleep(1)
+        self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
-
         callback.finish(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
@@ -585,7 +611,7 @@ class SeasonContent(Content):
 
     @staticmethod
     def parse_description(name: str) -> Optional[SeasonDescription]:
-        match = re.search(r"Staffel (\d{2})", name)
+        match = regex.search(r"Staffel (\d{2})", name)
         if match is None:
             if name in SPECIAL_NAMES:
                 return SeasonDescription(0)
@@ -620,7 +646,7 @@ class SeasonContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content, ContentCharacteristic],
+        callback: Callback[Content, ContentCharacteristic, Manager],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -712,7 +738,7 @@ class SeriesContent(Content):
 
     @staticmethod
     def parse_description(name: str) -> Optional[SeriesDescription]:
-        match = re.search(r"(.*) \((\d{4})\)", name)
+        match = regex.search(r"(.*) \((\d{4})\)", name)
         if match is None:
             return None
 
@@ -740,7 +766,7 @@ class SeriesContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content, ContentCharacteristic],
+        callback: Callback[Content, ContentCharacteristic, Manager],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -828,7 +854,7 @@ class CollectionContent(Content):
     @override
     def scan(
         self,
-        callback: Callback[Content, ContentCharacteristic],
+        callback: Callback[Content, ContentCharacteristic, Manager],
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -874,8 +900,8 @@ class Encoder(JSONEncoder):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.name}
         elif isinstance(o, Stats):
             return {TYPE_KEY: "Stats", VALUE_KEY: o.as_dict()}
-        elif dataclasses.is_dataclass(o):
-            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: dataclasses.asdict(o)}
+        elif is_dataclass(o):
+            return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: dc.asdict(o)}
         else:
             return super().default(o)
 

@@ -25,7 +25,7 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class ContentCallback(Callback[Content, ContentCharacteristic]):
+class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     __options: ContentOptions
     __classifier: Classifier
     __progress_bars: dict[str, Any]
@@ -55,6 +55,9 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
             autorefresh=True,
             min_delta=0.5,
         )
+
+    def get_saved(self) -> Manager:
+        return self.__manager
 
     @override
     def ignore(
@@ -129,17 +132,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
 
         total, processing, ignored = amount
 
-        terminal = self.__manager.term
-        bar_format = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
-
         self.__progress_bars[name] = self.__manager.counter(
             total=processing,
             desc=name,
             unit=unit,
             leave=False,
-            bar_format=bar_format,
             color=color,
         )
+        self.__progress_bars[name].update(0)
 
     @override
     def progress(
@@ -167,7 +167,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic]):
         if self.__progress_bars.get(name) is None:
             raise RuntimeError("No Progressbar, on progress finish")
 
-        self.__progress_bars[name].close()
+        self.__progress_bars[name].close(clear=True)
         del self.__progress_bars[name]
 
     def __del__(self) -> None:
