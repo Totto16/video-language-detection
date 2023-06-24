@@ -5,7 +5,6 @@ from datetime import timedelta
 from enum import Enum
 from math import floor
 from os import makedirs, path, remove
-from time import sleep
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from enlighten import Manager
@@ -359,7 +358,6 @@ class WAVFile:
                 delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
                 bar.update(delta_time)
                 elapsed_time += progress.time
-                sleep(10)
 
         ffmpeg.on("progress", progress_report)
         ffmpeg.execute()
