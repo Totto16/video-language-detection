@@ -18,6 +18,7 @@ filterwarnings("ignore")
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
 import gc
+import psutil
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 from humanize import naturalsize
 from shutil import rmtree
@@ -67,11 +68,14 @@ class Timestamp:
     def __str__(self) -> str:
         return str(self.__delta)
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __format__(self, spec: str) -> str:
         """This is responsible for formatting the Timestamp
 
         Args:
-            spec (str): a formst string, if empty no microseconds will be printed
+            spec (str): a formst string, if empty or "d" no microseconds will be printed
                         otherwise you can provide an int from 1-5 inclusive, to determine how much you wan't to round
                         the microseconds, you can provide a "n" afterwards, to not have ".00". e.g , it ignores 0's with e.g. "2n"
 
@@ -88,7 +92,7 @@ class Timestamp:
         )
         ms: int = self.delta.microseconds
 
-        if spec == "":
+        if spec == "" or spec == "d":
             return str(delta)
         else:
 
@@ -342,7 +346,8 @@ class WAVFile:
         }
 
         if options["amount"] is not None:
-            ffmpeg_options["to"] = str(options["amount"])
+            if self.runtime is None or self.runtime >= options["amount"]:
+                ffmpeg_options["to"] = str(options["amount"])
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
@@ -420,6 +425,19 @@ class Language:
 
     def __repr__(self) -> str:
         return str(self)
+
+
+def has_enough_memory() -> tuple[bool, float, float]:
+    memory = psutil.virtual_memory()
+    percent = memory.free / memory.total
+
+    swap_memory = psutil.swap_memory()
+    swap_percent = swap_memory.free / swap_memory.total
+
+    if percent <= 0.05 and swap_percent <= 0.10:
+        return (False, percent, swap_percent)
+
+    return (True, percent, swap_percent)
 
 
 class Classifier:
@@ -504,8 +522,17 @@ class Classifier:
                 color="red",
             )
             bar.update(0, force=True)
+
+        accuracy_to_reach: float = 0.95
+        err: str = "after scanning the whole file"
         for timestamp in timestamps:
             try:
+                Classifier.clear_gpu_cache()
+
+                enough_memory, mem, swap = has_enough_memory()
+                if not enough_memory:
+                    raise MemoryError(f"Not enough memory: {mem} - {swap}")
+
                 delta: Optional[Timestamp] = None
                 if timestamp is not None:
                     delta = timestamp
@@ -530,28 +557,36 @@ class Classifier:
                 if bar is not None:
                     bar.update()
 
-                if accuracy < 0.95:
+                if accuracy < accuracy_to_reach:
                     Classifier.clear_gpu_cache()
+                    accuracy_to_reach -= 0.05
+                    if accuracy_to_reach <= 0.55:
+                        raise ValueError("Accuracy to low!")
                     continue
 
                 if bar is not None:
                     bar.close(clear=True)
-                    
+
                 Classifier.clear_gpu_cache()
 
                 return (language, accuracy)
-            except RuntimeError as exception:
+            except Exception as exception:
                 if isinstance(exception, cuda.OutOfMemoryError):
                     self.__init_classifier(True)
+                if isinstance(exception, MemoryError) or isinstance(
+                    exception, ValueError
+                ):
+                    err = str(exception)
+                    break
                 else:
                     raise exception
 
         if bar is not None:
             bar.close(clear=True)
-            
+
         Classifier.clear_gpu_cache()
 
-        print(f"Couldn't get Language of '{path}'")
+        print(f"Couldn't get Language of '{path}': {err}")
 
         return (Language.Unknown(), 0.0)
 

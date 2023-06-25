@@ -76,7 +76,7 @@ class Stats:
     def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
         if file_path.is_dir():
             raise RuntimeError("Can't take checksum of directory")
-
+        return "s"
         size: float = float(file_path.stat().st_size)
         bar: Optional[Any] = None
         if manager is not None:

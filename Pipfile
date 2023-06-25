@@ -12,6 +12,7 @@ torchvision = "*"
 pynvml = "*"
 humanize = "*"
 enlighten = "*"
+psutil = "*"
 
 [dev-packages]
 pylint = "*"
