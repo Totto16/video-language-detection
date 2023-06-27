@@ -32,11 +32,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
-    __save_file: Path
 
-    def __init__(
-        self, options: ContentOptions, classifier: Classifier, save_file: Path
-    ) -> None:
+    def __init__(self, options: ContentOptions, classifier: Classifier) -> None:
         super().__init__()
 
         self.__options = options
@@ -55,7 +52,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             autorefresh=True,
             min_delta=0.5,
         )
-        self.__save_file = save_file
 
     def get_saved(self) -> Manager:
         return self.__manager
@@ -78,7 +74,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
         return False
 
-    @override
     def process(
         self,
         file_path: Path,
@@ -219,7 +214,7 @@ def parse_contents(
     name_parser: NameParser,
 ) -> list[Content]:
     classifier = Classifier()
-    callback = ContentCallback(options, classifier, save_file=save_file)
+    callback = ContentCallback(options, classifier)
 
     contents: list[Content] = (
         load_from_file(save_file)
