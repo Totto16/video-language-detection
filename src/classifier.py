@@ -427,6 +427,9 @@ class Language:
         return str(self)
 
 
+EXPECTED_LANGUAGES: list[str] = ["de", "en", "it"]
+
+
 def has_enough_memory() -> tuple[bool, float, float]:
     memory = psutil.virtual_memory()
     percent = memory.free / memory.total
@@ -523,9 +526,8 @@ class Classifier:
             )
             bar.update(0, force=True)
 
-        accuracy_to_reach: float = 0.95
         err: str = "after scanning the whole file"
-        for timestamp in timestamps:
+        for i, timestamp in enumerate(timestamps):
             try:
                 Classifier.clear_gpu_cache()
 
@@ -553,15 +555,33 @@ class Classifier:
                 accuracy = cast(float, prediction[1].exp().item())
                 # The identified language ISO code is given in prediction[3]
                 language = Language.from_str_unsafe(cast(str, prediction[3][0]))
+                print(langueg, accuracy)
+
+                accuracy_to_reach: float = 0.95 - (0.05 * i)
+                if (
+                    accuracy > accuracy_to_reach
+                    and language.short not in EXPECTED_LANGUAGES
+                ):
+                    if i < 5:
+                        print(
+                            f"unexpected language {language} with accuracy {accuracy}, trying re-scan: {i} for file '{path}'"
+                        )
+                        accuracy = 0.0
+                    else:
+                        raise ValueError(
+                            f"unexpected language {language} with accuracy {accuracy} for file '{path}'"
+                        )
 
                 if bar is not None:
                     bar.update()
 
-                if accuracy < accuracy_to_reach:
+                if accuracy > accuracy_to_reach:
                     Classifier.clear_gpu_cache()
-                    accuracy_to_reach -= 0.05
                     if accuracy_to_reach <= 0.55:
-                        raise ValueError("Accuracy to low!")
+                        raise ValueError(
+                            f"Accuracy to reach to low: {accuracy_to_reach}!"
+                        )
+
                     continue
 
                 if bar is not None:
@@ -573,7 +593,8 @@ class Classifier:
             except Exception as exception:
                 if isinstance(exception, cuda.OutOfMemoryError):
                     self.__init_classifier(True)
-                if isinstance(exception, MemoryError) or isinstance(
+                    continue
+                elif isinstance(exception, MemoryError) or isinstance(
                     exception, ValueError
                 ):
                     err = str(exception)

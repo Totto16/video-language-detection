@@ -212,6 +212,9 @@ def main() -> None:
         list[Content], json.loads(json_content, cls=Decoder)
     )
 
+    # TODO: rescan, fiy all unknown languages, missing checksums and check mtime and checksum if a rescan is necessary!
+    # also rescan folders according to mtime, reuse existing things!
+
 
 if __name__ == "__main__":
     main()

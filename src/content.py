@@ -76,7 +76,6 @@ class Stats:
     def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
         if file_path.is_dir():
             raise RuntimeError("Can't take checksum of directory")
-        return "s"
         size: float = float(file_path.stat().st_size)
         bar: Optional[Any] = None
         if manager is not None:
@@ -170,7 +169,7 @@ class ScannedFile:
         )
 
     def generate_checksum(self, manager: Optional[Manager] = None) -> None:
-        self.__stats = Stats.from_file(
+        self.stats = Stats.from_file(
             self.path, self.type, generate_checksum=True, manager=manager
         )
 
@@ -527,7 +526,7 @@ class EpisodeContent(Content):
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
 
-        self.__language = self.__get_language(classifier, manager)
+        # self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
