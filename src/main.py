@@ -16,6 +16,7 @@ from content import (
     Encoder,
     ScannedFileType,
     process_folder,
+    NameParser,
 )
 
 
@@ -79,7 +80,11 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
     @override
     def process(
-        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        self,
+        file_path: Path,
+        file_type: ScannedFileType,
+        parent_folders: list[str],
+        name_parser: NameParser,
     ) -> Optional[Content]:
         content: Optional[Content] = Content.from_scan(
             file_path, file_type, parent_folders
@@ -96,6 +101,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             callback=self,
             parent_folders=parent_folders,
             classifier=self.__classifier,
+            name_parser=name_parser,
         )
 
         return content
@@ -173,10 +179,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     def __del__(self) -> None:
         self.__status_bar.update(stage="finished")
         self.__manager.stop()
-
-
-class NameParser:
-    pass
 
 
 def load_from_file(file_path: Path) -> list[Content]:

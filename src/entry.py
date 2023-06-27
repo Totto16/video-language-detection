@@ -2,8 +2,8 @@
 
 
 from pathlib import Path
-from content import Content
-from main import NameParser, parse_contents
+from content import Content, NameParser
+from main import parse_contents
 
 
 class CustomNameParser(NameParser):
@@ -30,7 +30,7 @@ def main() -> None:
             "parse_error_is_exception": parse_error_is_exception,
         },
         Path("data.json"),
-        name_parser=NameParser(),
+        name_parser=CustomNameParser(),
     )
 
     print([(content.languages(), content.description) for content in contents])

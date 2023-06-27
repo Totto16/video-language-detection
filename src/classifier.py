@@ -552,10 +552,12 @@ class Classifier:
                 )
                 prediction = self.__classifier.classify_batch(signal)
 
-                accuracy = cast(float, prediction[1].exp().item())
+                accuracy: float = cast(float, prediction[1].exp().item())
                 # The identified language ISO code is given in prediction[3]
-                language = Language.from_str_unsafe(cast(str, prediction[3][0]))
-                print(langueg, accuracy)
+                language: Language = Language.from_str_unsafe(
+                    cast(str, prediction[3][0])
+                )
+                print(language, accuracy)
 
                 accuracy_to_reach: float = 0.95 - (0.05 * i)
                 if (

@@ -23,8 +23,6 @@ from classifier import Classifier, Language, WAVFile, parse_int_safely
 from os import listdir
 from json import JSONDecoder, JSONEncoder
 
-from main import NameParser
-
 
 class ScannedFileType(Enum):
     file = "file"
@@ -204,7 +202,11 @@ class Callback(Generic[C, CT, RT]):
         pass
 
     def process(
-        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        self,
+        file_path: Path,
+        file_type: ScannedFileType,
+        parent_folders: list[str],
+        name_parser: NameParser,
     ) -> Optional[C]:
         return None
 
@@ -237,6 +239,10 @@ class Callback(Generic[C, CT, RT]):
 
     def get_saved(self) -> RT:
         raise MissingOverrideError
+
+
+class NameParser:
+    pass
 
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
@@ -362,6 +368,7 @@ class Content:
     def scan(
         self,
         callback: Callback["Content", ContentCharacteristic, Manager],
+        name_parser: NameParser,
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -406,7 +413,7 @@ def process_folder(
     results: list[Content] = []
     for file_path, file_type, parent_folders in temp:
         result: Optional[Content] = callback.process(
-            file_path, file_type, parent_folders
+            file_path, file_type, parent_folders, name_parser=name_parser
         )
         value = (
             result.type if result is not None else None,
@@ -513,6 +520,7 @@ class EpisodeContent(Content):
     def scan(
         self,
         callback: Callback[Content, ContentCharacteristic, Manager],
+        name_parser: NameParser,
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -649,6 +657,7 @@ class SeasonContent(Content):
     def scan(
         self,
         callback: Callback[Content, ContentCharacteristic, Manager],
+        name_parser: NameParser,
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -658,6 +667,7 @@ class SeasonContent(Content):
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
             parent_type=self.type,
+            name_parser=name_parser,
         )
         for content in contents:
             if isinstance(content, EpisodeContent):
@@ -769,6 +779,7 @@ class SeriesContent(Content):
     def scan(
         self,
         callback: Callback[Content, ContentCharacteristic, Manager],
+        name_parser: NameParser,
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -778,6 +789,7 @@ class SeriesContent(Content):
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
             parent_type=self.type,
+            name_parser=name_parser,
         )
         for content in contents:
             if isinstance(content, SeasonContent):
@@ -857,6 +869,7 @@ class CollectionContent(Content):
     def scan(
         self,
         callback: Callback[Content, ContentCharacteristic, Manager],
+        name_parser: NameParser,
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
@@ -866,6 +879,7 @@ class CollectionContent(Content):
             callback=callback,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
             parent_type=self.type,
+            name_parser=name_parser,
         )
         for content in contents:
             if isinstance(content, SeriesContent):
