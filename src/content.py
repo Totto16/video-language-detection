@@ -16,7 +16,7 @@ from typing import (
     get_type_hints,
 )
 from typing_extensions import override
-import re as regex
+
 
 from enlighten import Manager
 from classifier import Classifier, Language, WAVFile, parse_int_safely
@@ -242,7 +242,19 @@ class Callback(Generic[C, CT, RT]):
 
 
 class NameParser:
-    pass
+    __language: Language
+
+    def __init__(self, language: Language = Language.Unknown()) -> None:
+        self.__language = language
+
+    def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
+        raise MissingOverrideError
+
+    def parse_season_name(self, name: str) -> Optional[tuple[int]]:
+        raise MissingOverrideError
+
+    def parse_series_name(self, name: str) -> Optional[tuple[str, int]]:
+        raise MissingOverrideError
 
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
@@ -281,7 +293,10 @@ class Content:
 
     @staticmethod
     def from_scan(
-        file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        file_path: Path,
+        file_type: ScannedFileType,
+        parent_folders: list[str],
+        name_parser: NameParser,
     ) -> Optional["Content"]:
         scanned_file: ScannedFile = ScannedFile.from_scan(
             file_path,
@@ -296,7 +311,7 @@ class Content:
 
         top_is_collection: bool = (
             (len(parents) == 1 and file_path.is_dir()) or len(parents) != 1
-        ) and not SeriesContent.is_valid_name(parents[0])
+        ) and not SeriesContent.is_valid_name(parents[0], name_parser)
 
         try:
             if len(parents) == 4:
@@ -305,42 +320,42 @@ class Content:
                         f"Not expected file type {file_type} with the received nesting 4 - {file_path}!"
                     )
 
-                return EpisodeContent.from_path(file_path, scanned_file)
+                return EpisodeContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 3 and not top_is_collection:
                 if file_type == ScannedFileType.folder:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                     )
 
-                return EpisodeContent.from_path(file_path, scanned_file)
+                return EpisodeContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 3 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                     )
 
-                return SeasonContent.from_path(file_path, scanned_file)
+                return SeasonContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 2 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                     )
 
-                return SeasonContent.from_path(file_path, scanned_file)
+                return SeasonContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 2 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                     )
 
-                return SeriesContent.from_path(file_path, scanned_file)
+                return SeriesContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 1 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
                     )
 
-                return SeriesContent.from_path(file_path, scanned_file)
+                return SeriesContent.from_path(file_path, scanned_file, name_parser)
             elif len(parents) == 1 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
@@ -454,9 +469,13 @@ class EpisodeContent(Content):
     __language: Language
 
     @staticmethod
-    def from_path(path: Path, scanned_file: ScannedFile) -> "EpisodeContent":
+    def from_path(
+        path: Path,
+        scanned_file: ScannedFile,
+        name_parser: NameParser,
+    ) -> "EpisodeContent":
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
-            path.name
+            path.name, name_parser
         )
         if description is None:
             raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
@@ -488,27 +507,22 @@ class EpisodeContent(Content):
         return language
 
     @staticmethod
-    def is_valid_name(name: str) -> bool:
-        return SeriesContent.parse_description(name) is not None
+    def is_valid_name(
+        name: str,
+        name_parser: NameParser,
+    ) -> bool:
+        return SeriesContent.parse_description(name, name_parser) is not None
 
     @staticmethod
-    def parse_description(name: str) -> Optional[EpisodeDescription]:
-        match = regex.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
-        if match is None:
+    def parse_description(
+        name: str,
+        name_parser: NameParser,
+    ) -> Optional[EpisodeDescription]:
+        result = name_parser.parse_episode_name(name)
+        if result is None:
             return None
 
-        groups = match.groups()
-        if len(groups) != 5:
-            return None
-
-        _episode_num, name, _season, _episode, _extension = groups
-        season = parse_int_safely(_season)
-        if season is None:
-            return None
-
-        episode = parse_int_safely(_episode)
-        if episode is None:
-            return None
+        name, season, episode = result
 
         return EpisodeDescription(name, season, episode)
 
@@ -582,9 +596,6 @@ class SeasonDescription:
         return str(self)
 
 
-SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
-
-
 class SeasonContentDict(ContentDict):
     description: SeasonDescription
     episodes: list[EpisodeContent]
@@ -595,9 +606,13 @@ class SeasonContent(Content):
     __episodes: list[EpisodeContent]
 
     @staticmethod
-    def from_path(path: Path, scanned_file: ScannedFile) -> "SeasonContent":
+    def from_path(
+        path: Path,
+        scanned_file: ScannedFile,
+        name_parser: NameParser,
+    ) -> "SeasonContent":
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
-            path.name
+            path.name, name_parser
         )
         if description is None:
             raise NameError(f"Couldn't get SeasonDescription from '{path}'")
@@ -616,26 +631,22 @@ class SeasonContent(Content):
         self.__episodes = episodes
 
     @staticmethod
-    def is_valid_name(name: str) -> bool:
-        return SeasonContent.parse_description(name) is not None
+    def is_valid_name(
+        name: str,
+        name_parser: NameParser,
+    ) -> bool:
+        return SeasonContent.parse_description(name, name_parser) is not None
 
     @staticmethod
-    def parse_description(name: str) -> Optional[SeasonDescription]:
-        match = regex.search(r"Staffel (\d{2})", name)
-        if match is None:
-            if name in SPECIAL_NAMES:
-                return SeasonDescription(0)
-            else:
-                return None
-
-        groups = match.groups()
-        if len(groups) != 1:
+    def parse_description(
+        name: str,
+        name_parser: NameParser,
+    ) -> Optional[SeasonDescription]:
+        result = name_parser.parse_season_name(name)
+        if result is None:
             return None
 
-        (_season,) = groups
-        season = parse_int_safely(_season)
-        if season is None:
-            return None
+        (season,) = result
 
         return SeasonDescription(season)
 
@@ -720,9 +731,13 @@ class SeriesContent(Content):
     __seasons: list[SeasonContent]
 
     @staticmethod
-    def from_path(path: Path, scanned_file: ScannedFile) -> "SeriesContent":
+    def from_path(
+        path: Path,
+        scanned_file: ScannedFile,
+        name_parser: NameParser,
+    ) -> "SeriesContent":
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
-            path.name
+            path.name, name_parser
         )
         if description is None:
             raise NameError(f"Couldn't get SeriesDescription from '{path}'")
@@ -745,23 +760,22 @@ class SeriesContent(Content):
         return self.__description
 
     @staticmethod
-    def is_valid_name(name: str) -> bool:
-        return SeriesContent.parse_description(name) is not None
+    def is_valid_name(
+        name: str,
+        name_parser: NameParser,
+    ) -> bool:
+        return SeriesContent.parse_description(name, name_parser) is not None
 
     @staticmethod
-    def parse_description(name: str) -> Optional[SeriesDescription]:
-        match = regex.search(r"(.*) \((\d{4})\)", name)
-        if match is None:
+    def parse_description(
+        name: str,
+        name_parser: NameParser,
+    ) -> Optional[SeriesDescription]:
+        result = name_parser.parse_series_name(name)
+        if result is None:
             return None
 
-        groups = match.groups()
-        if len(groups) != 2:
-            return None
-
-        name, _year = groups
-        year = parse_int_safely(_year)
-        if year is None:
-            return None
+        name, year = result
 
         return SeriesDescription(name, year)
 

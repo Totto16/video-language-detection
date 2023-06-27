@@ -87,7 +87,10 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         name_parser: NameParser,
     ) -> Optional[Content]:
         content: Optional[Content] = Content.from_scan(
-            file_path, file_type, parent_folders
+            file_path,
+            file_type,
+            parent_folders,
+            name_parser=name_parser,
         )
         if content is None:
             if self.__options["parse_error_is_exception"]:
