@@ -53,6 +53,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             min_delta=0.5,
         )
 
+    @override
     def get_saved(self) -> Manager:
         return self.__manager
 
@@ -74,35 +75,50 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
         return False
 
+    @override
     def process(
         self,
         file_path: Path,
         file_type: ScannedFileType,
         parent_folders: list[str],
         name_parser: NameParser,
+        *,
+        rescan: Optional[Content] = None,
     ) -> Optional[Content]:
-        content: Optional[Content] = Content.from_scan(
-            file_path,
-            file_type,
-            parent_folders,
-            name_parser=name_parser,
-        )
-        if content is None:
-            if self.__options["parse_error_is_exception"]:
-                raise RuntimeError(
-                    f"Parse Error: Couldn't parse content from '{file_path}'"
-                )
+        if rescan is None:
+            content: Optional[Content] = Content.from_scan(
+                file_path,
+                file_type,
+                parent_folders,
+                name_parser=name_parser,
+            )
+            if content is None:
+                if self.__options["parse_error_is_exception"]:
+                    raise RuntimeError(
+                        f"Parse Error: Couldn't parse content from '{file_path}'"
+                    )
+
+                return None
+
+            content.scan(
+                callback=self,
+                parent_folders=parent_folders,
+                classifier=self.__classifier,
+                name_parser=name_parser,
+            )
+
+            return content
+
+        else:
+            rescan.scan(
+                callback=self,
+                parent_folders=parent_folders,
+                classifier=self.__classifier,
+                name_parser=name_parser,
+                rescan=True,
+            )
 
             return None
-
-        content.scan(
-            callback=self,
-            parent_folders=parent_folders,
-            classifier=self.__classifier,
-            name_parser=name_parser,
-        )
-
-        return content
 
     @override
     def start(
@@ -216,18 +232,19 @@ def parse_contents(
     classifier = Classifier()
     callback = ContentCallback(options, classifier)
 
-    contents: list[Content] = (
-        load_from_file(save_file)
-        if save_file.exists()
-        else (process_folder(root_folder, callback=callback, name_parser=name_parser))
-    )
-    
-    
-    
-    
-    
-    
+    if not save_file.exists():
+        contents: list[Content] = process_folder(
+            root_folder, callback=callback, name_parser=name_parser
+        )
 
-    save_to_file(save_file, contents)
+        save_to_file(save_file, contents)
+
+    else:
+        contents = load_from_file(save_file)
+        new_contents = process_folder(
+            root_folder, callback=callback, name_parser=name_parser, rescan=contents
+        )
+
+        save_to_file(save_file, new_contents)
 
     return contents

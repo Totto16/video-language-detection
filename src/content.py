@@ -248,6 +248,8 @@ class Callback(Generic[C, CT, RT]):
         file_type: ScannedFileType,
         parent_folders: list[str],
         name_parser: NameParser,
+        *,
+        rescan: Optional[C] = None,
     ) -> Optional[C]:
         return None
 
@@ -412,6 +414,7 @@ class Content:
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
+        rescan: bool = False,
     ) -> None:
         raise MissingOverrideError
 
@@ -429,6 +432,7 @@ def process_folder(
     *,
     parent_folders: list[str] = [],
     parent_type: Optional[ContentType] = None,
+    rescan: Optional[list[Content]] = None,
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
     ignored: int = 0
@@ -450,23 +454,58 @@ def process_folder(
 
     callback.start(amount, directory.name, parent_folders, value)
 
-    results: list[Content] = []
-    for file_path, file_type, parent_folders in temp:
-        result: Optional[Content] = callback.process(
-            file_path, file_type, parent_folders, name_parser=name_parser
-        )
-        value = (
-            result.type if result is not None else None,
-            ScannedFileType.from_path(file_path),
-        )
-        callback.progress(directory.name, parent_folders, value)
-        if result is not None:
-            results.append(result)
+    if rescan is None:
+        results: list[Content] = []
+        for file_path, file_type, parent_folders in temp:
+            result: Optional[Content] = callback.process(
+                file_path, file_type, parent_folders, name_parser=name_parser
+            )
+            value = (
+                result.type if result is not None else None,
+                ScannedFileType.from_path(file_path),
+            )
+            callback.progress(directory.name, parent_folders, value)
+            if result is not None:
+                results.append(result)
 
-    value = (parent_type, ScannedFileType.folder)
-    callback.finish(directory.name, parent_folders, value)
+        value = (parent_type, ScannedFileType.folder)
+        callback.finish(directory.name, parent_folders, value)
 
-    return results
+        return results
+
+    else:
+        already_scanned_file_paths: list[Path] = [
+            content.scanned_file.path for content in rescan
+        ]
+
+        for file_path, file_type, parent_folders in temp:
+            is_rescan = (
+                None
+                if file_path not in already_scanned_file_paths
+                else (rescan[already_scanned_file_paths.index(file_path)])
+            )
+
+            result = callback.process(
+                file_path,
+                file_type,
+                parent_folders,
+                name_parser=name_parser,
+                rescan=is_rescan,
+            )
+
+            value = (
+                result.type if result is not None else None,
+                ScannedFileType.from_path(file_path),
+            )
+
+            callback.progress(directory.name, parent_folders, value)
+            if result is not None and is_rescan is None:
+                rescan.append(result)
+
+        value = (parent_type, ScannedFileType.folder)
+        callback.finish(directory.name, parent_folders, value)
+
+        return rescan
 
 
 @dataclass
@@ -727,6 +766,7 @@ class SeasonContent(Content):
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
+        rescan: bool = False,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
@@ -852,6 +892,7 @@ class SeriesContent(Content):
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
+        rescan: bool = False,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
@@ -942,6 +983,7 @@ class CollectionContent(Content):
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
+        rescan: bool = False,
     ) -> None:
         contents: list[Content] = process_folder(
             self.scanned_file.path,
