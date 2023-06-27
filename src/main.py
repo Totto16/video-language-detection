@@ -31,11 +31,10 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
+    __save_file: Path
 
     def __init__(
-        self,
-        options: ContentOptions,
-        classifier: Classifier,
+        self, options: ContentOptions, classifier: Classifier, save_file: Path
     ) -> None:
         super().__init__()
 
@@ -55,6 +54,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             autorefresh=True,
             min_delta=0.5,
         )
+        self.__save_file = save_file
 
     def get_saved(self) -> Manager:
         return self.__manager
@@ -175,46 +175,53 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self.__manager.stop()
 
 
-def main() -> None:
+class NameParser:
+    pass
+
+
+def load_from_file(file_path: Path) -> list[Content]:
+    with open(file_path, "r") as file:
+        suffix: str = file_path.suffix[1:]
+        match suffix:
+            case "json":
+                json_loaded: list[Content] = cast(
+                    list[Content], json.load(file, cls=Decoder)
+                )
+                return json_loaded
+            case _:
+                raise RuntimeError(f"Not loadable from '{suffix}' file!")
+
+
+def save_to_file(file_path: Path, contents: list[Content]) -> None:
+    with open(file_path, "w") as file:
+        suffix: str = file_path.suffix[1:]
+        match suffix:
+            case "json":
+                json_content: str = json.dumps(contents, cls=Encoder)
+                file.write(json_content)
+            case _:
+                raise RuntimeError(f"Not loadable from '{suffix}' file!")
+
+
+# TODO: rescan, fix all unknown languages, missing checksums and check mtime and checksum if a rescan is necessary!
+# also rescan folders according to mtime, reuse existing things!
+
+
+def parse_contents(
+    root_folder: Path,
+    options: ContentOptions,
+    save_file: Path,
+    name_parser: NameParser,
+) -> list[Content]:
     classifier = Classifier()
+    callback = ContentCallback(options, classifier, save_file=save_file)
 
-    ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
-    video_formats: list[str] = ["mp4", "mkv", "avi"]
-    ignore_files: list[str] = [
-        "metadata",
-        "extrafanart",
-        "theme-music",
-        "Music",
-        "Reportagen",
-    ]
-    parse_error_is_exception: bool = False
-
-    callback = ContentCallback(
-        {
-            "ignore_files": ignore_files,
-            "video_formats": video_formats,
-            "parse_error_is_exception": parse_error_is_exception,
-        },
-        classifier,
+    contents: list[Content] = (
+        load_from_file(save_file)
+        if save_file.exists()
+        else (process_folder(root_folder, callback=callback, name_parser=name_parser))
     )
 
-    contents: list[Content] = process_folder(
-        ROOT_FOLDER,
-        callback=callback,
-    )
+    save_to_file(save_file, contents)
 
-    json_content: str = json.dumps(contents, cls=Encoder)
-
-    with open("data.json", "w") as file:
-        file.write(json_content)
-
-    json_loaded: list[Content] = cast(
-        list[Content], json.loads(json_content, cls=Decoder)
-    )
-
-    # TODO: rescan, fiy all unknown languages, missing checksums and check mtime and checksum if a rescan is necessary!
-    # also rescan folders according to mtime, reuse existing things!
-
-
-if __name__ == "__main__":
-    main()
+    return contents

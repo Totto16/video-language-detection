@@ -23,6 +23,8 @@ from classifier import Classifier, Language, WAVFile, parse_int_safely
 from os import listdir
 from json import JSONDecoder, JSONEncoder
 
+from main import NameParser
+
 
 class ScannedFileType(Enum):
     file = "file"
@@ -261,6 +263,10 @@ class Content:
         return self.__type
 
     @property
+    def description(self) -> Any:
+        raise MissingOverrideError
+
+    @property
     def scanned_file(self) -> ScannedFile:
         return self.__scanned_file
 
@@ -372,6 +378,7 @@ class Content:
 def process_folder(
     directory: Path,
     callback: Callback[Content, ContentCharacteristic, Manager],
+    name_parser: NameParser,
     *,
     parent_folders: list[str] = [],
     parent_type: Optional[ContentType] = None,
