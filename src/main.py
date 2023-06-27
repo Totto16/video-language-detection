@@ -221,6 +221,12 @@ def parse_contents(
         if save_file.exists()
         else (process_folder(root_folder, callback=callback, name_parser=name_parser))
     )
+    
+    
+    
+    
+    
+    
 
     save_to_file(save_file, contents)
 

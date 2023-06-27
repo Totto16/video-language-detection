@@ -109,7 +109,7 @@ class Stats:
         generate_checksum: bool = True,
         manager: Optional[Manager] = None,
     ) -> "Stats":
-        mtime: float = Path(file_path).stat().st_mtime
+        mtime: float = file_path.stat().st_mtime
 
         checksum: Optional[str] = (
             (
@@ -122,6 +122,28 @@ class Stats:
         )
 
         return Stats(checksum=checksum, mtime=mtime)
+
+    def is_outdated(
+        self, path: Path, type: ScannedFileType, manager: Optional[Manager] = None
+    ) -> bool:
+        if type == ScannedFileType.file:
+            new_stats = Stats.from_file(
+                path, type, generate_checksum=False, manager=manager
+            )
+            if new_stats.mtime <= self.mtime:
+                return False
+
+            # update the new mtime, since if we aren't outdated (per checksum), the parent caller wan't do it, if we are outdated, he will update it anyway
+            self.mtime = new_stats.mtime
+
+            with_checksum = Stats.from_file(path, type, generate_checksum=True)
+            if with_checksum.checksum == self.checksum:
+                return False
+
+            return True
+
+        else:
+            raise NotImplementedError
 
     def as_dict(self) -> dict[str, Any]:
         as_dict: dict[str, Any] = {
@@ -173,6 +195,9 @@ class ScannedFile:
             self.path, self.type, generate_checksum=True, manager=manager
         )
 
+    def is_outdated(self, manager: Optional[Manager] = None) -> bool:
+        return self.stats.is_outdated(self.path, self.type, manager=manager)
+
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         encode: Callable[[Any], Any] = lambda x: (
             x if json_encoder is None else json_encoder.default(x)
@@ -190,6 +215,22 @@ class ScannedFile:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+
+class NameParser:
+    __language: Language
+
+    def __init__(self, language: Language = Language.Unknown()) -> None:
+        self.__language = language
+
+    def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
+        raise MissingOverrideError
+
+    def parse_season_name(self, name: str) -> Optional[tuple[int]]:
+        raise MissingOverrideError
+
+    def parse_series_name(self, name: str) -> Optional[tuple[str, int]]:
+        raise MissingOverrideError
 
 
 C = TypeVar("C")
@@ -238,22 +279,6 @@ class Callback(Generic[C, CT, RT]):
         return None
 
     def get_saved(self) -> RT:
-        raise MissingOverrideError
-
-
-class NameParser:
-    __language: Language
-
-    def __init__(self, language: Language = Language.Unknown()) -> None:
-        self.__language = language
-
-    def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
-        raise MissingOverrideError
-
-    def parse_season_name(self, name: str) -> Optional[tuple[int]]:
-        raise MissingOverrideError
-
-    def parse_series_name(self, name: str) -> Optional[tuple[str, int]]:
         raise MissingOverrideError
 
 
@@ -499,6 +524,8 @@ class EpisodeContent(Content):
     def __get_language(
         self, classifier: Classifier, manager: Optional[Manager] = None
     ) -> Language:
+        # TODO
+        return Language.Unknown()
         wav_file = WAVFile(self.scanned_file.path)
 
         language, accuracy = classifier.predict(
@@ -538,8 +565,38 @@ class EpisodeContent(Content):
         *,
         parent_folders: list[str] = [],
         classifier: Classifier,
+        rescan: bool = False,
     ) -> None:
+        manager: Manager = callback.get_saved()
+
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
+
+        if rescan:
+            is_outdated: bool = self.scanned_file.is_outdated(manager)
+
+            if not is_outdated:
+                if self.__language == Language.Unknown():
+                    callback.start(
+                        (1, 1, 0),
+                        self.scanned_file.path.name,
+                        self.scanned_file.parents,
+                        characteristic,
+                    )
+
+                    self.__language = self.__get_language(classifier, manager)
+
+                    callback.progress(
+                        self.scanned_file.path.name,
+                        self.scanned_file.parents,
+                        characteristic,
+                    )
+                    callback.finish(
+                        self.scanned_file.path.name,
+                        self.scanned_file.parents,
+                        characteristic,
+                    )
+
+                return
 
         callback.start(
             (2, 2, 0),
@@ -548,14 +605,12 @@ class EpisodeContent(Content):
             characteristic,
         )
 
-        manager: Manager = callback.get_saved()
-
         self.generate_checksum(manager)
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
 
-        # self.__language = self.__get_language(classifier, manager)
+        self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
