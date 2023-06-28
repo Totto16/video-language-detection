@@ -101,7 +101,15 @@ def main() -> None:
         name_parser=CustomNameParser(SPECIAL_NAMES),
     )
 
-    print([(content.languages(), content.description) for content in contents])
+    dct: dict[Language, int] = dict()
+    for content in contents:
+        for language, amount in content.languages().items():
+            if dct.get(language) is None:
+                dct[language] = 0
+
+            dct[language] += amount
+
+    print(dct)
 
 
 if __name__ == "__main__":

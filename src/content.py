@@ -302,7 +302,7 @@ class Content:
         self.__type = type
         self.__scanned_file = scanned_file
 
-    def languages(self) -> list[Language]:
+    def languages(self) -> dict[Language, int]:
         raise MissingOverrideError()
 
     @property
@@ -595,8 +595,10 @@ class EpisodeContent(Content):
         return EpisodeDescription(name, season, episode)
 
     @override
-    def languages(self) -> list[Language]:
-        return [self.__language]
+    def languages(self) -> dict[Language, int]:
+        dct: dict[Language, int] = dict()
+        dct[self.__language] = 1
+        return dct
 
     @override
     def scan(
@@ -751,14 +753,16 @@ class SeasonContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> list[Language]:
-        languages: list[Language] = []
+    def languages(self) -> dict[Language, int]:
+        dct: dict[Language, int] = dict()
         for episode in self.__episodes:
-            for language in episode.languages():
-                if language not in languages:
-                    languages.append(language)
+            for language, amount in episode.languages().items():
+                if dct.get(language) is None:
+                    dct[language] = 0
 
-        return languages
+                dct[language] += amount
+
+        return dct
 
     @override
     def scan(
@@ -895,14 +899,16 @@ class SeriesContent(Content):
         return SeriesDescription(name, year)
 
     @override
-    def languages(self) -> list[Language]:
-        languages: list[Language] = []
+    def languages(self) -> dict[Language, int]:
+        dct: dict[Language, int] = dict()
         for season in self.__seasons:
-            for language in season.languages():
-                if language not in languages:
-                    languages.append(language)
+            for language, amount in season.languages().items():
+                if dct.get(language) is None:
+                    dct[language] = 0
 
-        return languages
+                dct[language] += amount
+
+        return dct
 
     @override
     def scan(
@@ -998,14 +1004,16 @@ class CollectionContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> list[Language]:
-        languages: list[Language] = []
+    def languages(self) -> dict[Language, int]:
+        dct: dict[Language, int] = dict()
         for serie in self.__series:
-            for language in serie.languages():
-                if language not in languages:
-                    languages.append(language)
+            for language, amount in serie.languages().items():
+                if dct.get(language) is None:
+                    dct[language] = 0
 
-        return languages
+                dct[language] += amount
+
+        return dct
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:

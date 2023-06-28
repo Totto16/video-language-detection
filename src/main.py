@@ -219,10 +219,6 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 raise RuntimeError(f"Not loadable from '{suffix}' file!")
 
 
-# TODO: rescan, fix all unknown languages, missing checksums and check mtime and checksum if a rescan is necessary!
-# also rescan folders according to mtime, reuse existing things!
-
-
 def parse_contents(
     root_folder: Path,
     options: ContentOptions,

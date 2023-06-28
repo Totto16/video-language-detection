@@ -426,6 +426,15 @@ class Language:
     def __repr__(self) -> str:
         return str(self)
 
+    def __hash__(self) -> int:
+        return hash((self.short, self.long))
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Language):
+            return self.short == other.short and self.long == other.long
+
+        return False
+
 
 EXPECTED_LANGUAGES: list[str] = ["de", "en", "it"]
 
