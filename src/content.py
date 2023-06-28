@@ -136,14 +136,16 @@ class Stats:
             # update the new mtime, since if we aren't outdated (per checksum), the parent caller wan't do it, if we are outdated, he will update it anyway
             self.mtime = new_stats.mtime
 
-            with_checksum = Stats.from_file(path, type, generate_checksum=True)
+            with_checksum: Stats = Stats.from_file(path, type, generate_checksum=True)
             if with_checksum.checksum == self.checksum:
                 return False
 
             return True
 
         else:
-            raise NotImplementedError
+            raise RuntimeError(
+                "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
+            )
 
     def as_dict(self) -> dict[str, Any]:
         as_dict: dict[str, Any] = {
@@ -768,20 +770,38 @@ class SeasonContent(Content):
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
-        contents: list[Content] = process_folder(
-            self.scanned_file.path,
-            callback=callback,
-            parent_folders=[*parent_folders, self.scanned_file.path.name],
-            parent_type=self.type,
-            name_parser=name_parser,
-        )
-        for content in contents:
-            if isinstance(content, EpisodeContent):
-                self.__episodes.append(content)
-            else:
-                raise RuntimeError(
-                    f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
-                )
+        if not rescan:
+            contents: list[Content] = process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+            )
+            for content in contents:
+                if isinstance(content, EpisodeContent):
+                    self.__episodes.append(content)
+                else:
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                    )
+        else:
+            ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
+            process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+                rescan=cast(list[Content], self.__episodes),
+            )
+
+            # since some are added unchecked, check again now!
+            for content in cast(list[Content], self.__episodes):
+                if not isinstance(content, EpisodeContent):
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                    )
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
@@ -894,20 +914,39 @@ class SeriesContent(Content):
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
-        contents: list[Content] = process_folder(
-            self.scanned_file.path,
-            callback=callback,
-            parent_folders=[*parent_folders, self.scanned_file.path.name],
-            parent_type=self.type,
-            name_parser=name_parser,
-        )
-        for content in contents:
-            if isinstance(content, SeasonContent):
-                self.__seasons.append(content)
-            else:
-                raise RuntimeError(
-                    f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
-                )
+        if not rescan:
+            contents: list[Content] = process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+            )
+            for content in contents:
+                if isinstance(content, SeasonContent):
+                    self.__seasons.append(content)
+                else:
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                    )
+
+        else:
+            ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
+            process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+                rescan=cast(list[Content], self.__seasons),
+            )
+
+            # since some are added unchecked, check again now!
+            for content in cast(list[Content], self.__seasons):
+                if not isinstance(content, SeasonContent):
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                    )
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
@@ -985,20 +1024,39 @@ class CollectionContent(Content):
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
-        contents: list[Content] = process_folder(
-            self.scanned_file.path,
-            callback=callback,
-            parent_folders=[*parent_folders, self.scanned_file.path.name],
-            parent_type=self.type,
-            name_parser=name_parser,
-        )
-        for content in contents:
-            if isinstance(content, SeriesContent):
-                self.__series.append(content)
-            else:
-                raise RuntimeError(
-                    f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
-                )
+        if not rescan:
+            contents: list[Content] = process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+            )
+            for content in contents:
+                if isinstance(content, SeriesContent):
+                    self.__series.append(content)
+                else:
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                    )
+
+        else:
+            ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
+            process_folder(
+                self.scanned_file.path,
+                callback=callback,
+                parent_folders=[*parent_folders, self.scanned_file.path.name],
+                parent_type=self.type,
+                name_parser=name_parser,
+                rescan=cast(list[Content], self.__series),
+            )
+
+            # since some are added unchecked, check again now!
+            for content in cast(list[Content], self.__series):
+                if not isinstance(content, SeriesContent):
+                    raise RuntimeError(
+                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                    )
 
     @staticmethod
     def from_dict(dct: CollectionContentDict) -> "CollectionContent":
