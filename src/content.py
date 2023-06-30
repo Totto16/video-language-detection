@@ -66,6 +66,20 @@ CHECKSUM_BAR_FORMAT = (
     "[{elapsed}<{eta}, {rate:!.2j}{unit}/s]"
 )
 
+LanguageDict = dict[Language, int]
+
+
+def combine_langauge_dicts(inp: list[LanguageDict]) -> LanguageDict:
+    dct: LanguageDict = dict()
+    for input_dict in inp:
+        for language, amount in input_dict.items():
+            if dct.get(language) is None:
+                dct[language] = 0
+
+            dct[language] += amount
+
+    return dct
+
 
 @dataclass
 class Stats:
@@ -302,7 +316,7 @@ class Content:
         self.__type = type
         self.__scanned_file = scanned_file
 
-    def languages(self) -> dict[Language, int]:
+    def languages(self) -> LanguageDict:
         raise MissingOverrideError()
 
     @property
@@ -595,8 +609,8 @@ class EpisodeContent(Content):
         return EpisodeDescription(name, season, episode)
 
     @override
-    def languages(self) -> dict[Language, int]:
-        dct: dict[Language, int] = dict()
+    def languages(self) -> LanguageDict:
+        dct: LanguageDict = dict()
         dct[self.__language] = 1
         return dct
 
@@ -753,16 +767,10 @@ class SeasonContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> dict[Language, int]:
-        dct: dict[Language, int] = dict()
-        for episode in self.__episodes:
-            for language, amount in episode.languages().items():
-                if dct.get(language) is None:
-                    dct[language] = 0
-
-                dct[language] += amount
-
-        return dct
+    def languages(self) -> LanguageDict:
+        return combine_langauge_dicts(
+            [episode.languages() for episode in self.__episodes]
+        )
 
     @override
     def scan(
@@ -899,16 +907,8 @@ class SeriesContent(Content):
         return SeriesDescription(name, year)
 
     @override
-    def languages(self) -> dict[Language, int]:
-        dct: dict[Language, int] = dict()
-        for season in self.__seasons:
-            for language, amount in season.languages().items():
-                if dct.get(language) is None:
-                    dct[language] = 0
-
-                dct[language] += amount
-
-        return dct
+    def languages(self) -> LanguageDict:
+        return combine_langauge_dicts([season.languages() for season in self.__seasons])
 
     @override
     def scan(
@@ -1004,16 +1004,8 @@ class CollectionContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> dict[Language, int]:
-        dct: dict[Language, int] = dict()
-        for serie in self.__series:
-            for language, amount in serie.languages().items():
-                if dct.get(language) is None:
-                    dct[language] = 0
-
-                dct[language] += amount
-
-        return dct
+    def languages(self) -> LanguageDict:
+        return combine_langauge_dicts([series.languages() for series in self.__series])
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
