@@ -167,25 +167,17 @@ class Timestamp:
             )
 
     def __iadd__(self, value: object) -> "Timestamp":
-        if isinstance(value, Timestamp):
-            self.__delta += value.delta
-            return self
-        elif isinstance(value, timedelta):
-            self.__delta += value
-            return self
-        elif isinstance(value, int):
-            self += Timestamp.from_seconds(value)
-            return self
-        else:
-            raise TypeError(
-                f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+        new_value: Timestamp = Timestamp(self.__delta) + value
+        return new_value
 
     def __add__(self, value: object) -> "Timestamp":
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta + value.delta
             return Timestamp(result)
-        if isinstance(value, int):
+        elif isinstance(value, timedelta):
+            result = self.__delta + value
+            return Timestamp(result)
+        elif isinstance(value, int):
             result2: Timestamp = self + Timestamp.from_seconds(value)
             return result2
         else:
@@ -246,6 +238,12 @@ class Status(Enum):
 class Segment:
     start: Optional[Timestamp]
     end: Optional[Timestamp]
+
+    @property
+    def is_valid(self) -> bool:
+        return not (
+            self.start is not None and self.end is not None and self.start > self.end
+        )
 
     def timediff(self, runtime: Timestamp) -> Timestamp:
         if self.start is None and self.end is None:
@@ -347,10 +345,18 @@ class WAVFile:
     ) -> None:
         bar: Optional[Any] = None
 
+        if not options.segment.is_valid:
+            raise RuntimeError(
+                f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}"
+            )
+
         total_time: Timestamp = options.segment.timediff(self.runtime)
         elapsed_time: Timestamp = (
             Timestamp.zero() if options.segment.start is None else options.segment.start
         )
+
+        print("total time, total_time.minutes, options.segment")
+        print(total_time, total_time.minutes, options.segment)
 
         if manager is not None:
             bar = manager.counter(
@@ -402,6 +408,8 @@ class WAVFile:
             nonlocal elapsed_time
             if bar is not None:
                 delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
+                print("progress.time, delta_time, elapsed_time")
+                print(progress.time, delta_time, elapsed_time)
                 bar.update(delta_time)
                 elapsed_time += progress.time
 
@@ -537,10 +545,15 @@ class Prediction:
     def append(self, data: PredictionType) -> None:
         self.__data.append(data)
 
+    def append_other(self, pred: "Prediction") -> None:
+        self.__data.extend(pred.data)
+
     def __iadd__(self, value: object) -> "Prediction":
         if isinstance(value, Prediction):
-            self.__data.extend(value.data)
-            return self
+            new_value = Prediction()
+            new_value.append_other(self)
+            new_value.append_other(value)
+            return new_value
         else:
             raise TypeError(
                 f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
@@ -680,6 +693,7 @@ class Classifier:
                 continue
 
             best = prediction.get_best()
+            print(best)
             if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
                 continue
 
