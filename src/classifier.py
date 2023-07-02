@@ -17,6 +17,7 @@ filterwarnings("ignore")
 
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
+import torch
 import gc
 import psutil
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
@@ -75,7 +76,7 @@ class Timestamp:
         """This is responsible for formatting the Timestamp
 
         Args:
-            spec (str): a formst string, if empty or "d" no microseconds will be printed
+            spec (str): a format string, if empty or "d" no microseconds will be printed
                         otherwise you can provide an int from 1-5 inclusive, to determine how much you wan't to round
                         the microseconds, you can provide a "n" afterwards, to not have ".00". e.g , it ignores 0's with e.g. "2n"
 
@@ -172,9 +173,24 @@ class Timestamp:
         elif isinstance(value, timedelta):
             self.__delta += value
             return self
+        elif isinstance(value, int):
+            self += Timestamp.from_seconds(value)
+            return self
         else:
             raise TypeError(
                 f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            )
+
+    def __add__(self, value: object) -> "Timestamp":
+        if isinstance(value, Timestamp):
+            result: timedelta = self.__delta + value.delta
+            return Timestamp(result)
+        if isinstance(value, int):
+            result2: Timestamp = self + Timestamp.from_seconds(value)
+            return result2
+        else:
+            raise TypeError(
+                f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
             )
 
     def __sub__(self, value: object) -> "Timestamp":
@@ -226,9 +242,28 @@ class Status(Enum):
         return str(self)
 
 
-class WAVOptions(TypedDict):
+@dataclass
+class Segment:
+    start: Optional[Timestamp]
+    end: Optional[Timestamp]
+
+    def timediff(self, runtime: Timestamp) -> Timestamp:
+        if self.start is None and self.end is None:
+            return runtime
+        elif self.start is None and self.end is not None:
+            return self.end
+        elif self.start is not None and self.end is None:
+            return runtime - self.start
+        elif self.start is not None and self.end is not None:
+            return self.end - self.start
+        else:
+            raise RuntimeError("UNREACHABLE")
+
+
+@dataclass
+class WAVOptions:
     bitrate: int
-    amount: Optional[Timestamp]
+    segment: Segment
 
 
 class WAVFile:
@@ -236,7 +271,7 @@ class WAVFile:
     __file: Path
     __type: FileType
     __status: Status
-    __runtime: Optional[Timestamp]
+    __runtime: Timestamp
 
     def __init__(self, file: Path) -> None:
         self.__tmp_file = None
@@ -248,47 +283,47 @@ class WAVFile:
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self) -> tuple[FileType, Status, Optional[Timestamp]]:
-        try:
-            metadata = FFProbe(str(self.__file.absolute()))
-            for stream in metadata.streams:
-                if stream.is_video():
-                    return (
-                        FileType.video,
-                        Status.raw,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
+    def __get_info(self) -> tuple[FileType, Status, Timestamp]:
+        metadata = FFProbe(str(self.__file.absolute()))
+        for stream in metadata.streams:
+            if stream.is_video():
+                return (
+                    FileType.video,
+                    Status.raw,
+                    Timestamp.from_seconds(stream.duration_seconds()),
+                )
 
-            for stream in metadata.streams:
-                if stream.is_audio() and stream.codec() == "pcm_s16le":
-                    return (
-                        FileType.wav,
-                        Status.ready,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
+        for stream in metadata.streams:
+            if stream.is_audio() and stream.codec() == "pcm_s16le":
+                return (
+                    FileType.wav,
+                    Status.ready,
+                    Timestamp.from_seconds(stream.duration_seconds()),
+                )
 
-            for stream in metadata.streams:
-                if stream.is_audio():
-                    return (
-                        FileType.audio,
-                        Status.raw,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
+        for stream in metadata.streams:
+            if stream.is_audio():
+                return (
+                    FileType.audio,
+                    Status.raw,
+                    Timestamp.from_seconds(stream.duration_seconds()),
+                )
 
-            return (FileType.audio, Status.raw, None)
-        except Exception:
-            return (FileType.video, Status.raw, None)
+        raise Exception(f"Unable to get a valid stream from file {self.__file}")
 
     @property
-    def runtime(self) -> Optional[Timestamp]:
+    def runtime(self) -> Timestamp:
         return self.__runtime
 
     def create_wav_file(
         self,
-        options: WAVOptions = {
-            "bitrate": 16000,
-            "amount": Timestamp.from_minutes(10.0),
-        },
+        options: WAVOptions = WAVOptions(
+            bitrate=16000,
+            segment=Segment(
+                start=None,
+                end=Timestamp.from_minutes(10.0),
+            ),
+        ),
         *,
         force_recreation: bool = False,
         manager: Optional[Manager] = None,
@@ -311,15 +346,15 @@ class WAVFile:
         self, options: WAVOptions, manager: Optional[Manager] = None
     ) -> None:
         bar: Optional[Any] = None
-        elapsed_time: Timestamp = Timestamp.zero()
 
-        runtime: Optional[Timestamp] = options["amount"]
-        if runtime is None:
-            runtime = self.runtime
+        total_time: Timestamp = options.segment.timediff(self.runtime)
+        elapsed_time: Timestamp = (
+            Timestamp.zero() if options.segment.start is None else options.segment.start
+        )
 
-        if manager is not None and runtime is not None:
+        if manager is not None:
             bar = manager.counter(
-                total=runtime,
+                total=total_time,
                 count=elapsed_time,
                 desc="generating wav",
                 unit="minutes",
@@ -327,7 +362,7 @@ class WAVFile:
                 bar_format=WAV_FILE_BAR_FMT,
                 color="red",
             )
-            bar.update(elapsed_time, force=True)
+            bar.update(Timestamp.zero(), force=True)
 
         temp_dir: Path = Path("/tmp") / "video_lang_detect"
         if not temp_dir.exists():
@@ -340,20 +375,26 @@ class WAVFile:
 
         ffmpeg_options: dict[str, Any] = {
             "acodec": "pcm_s16le",
-            "ar": options["bitrate"],
+            "ar": options.bitrate,
             "ac": 1,
             "stats_period": 0.5,  # in seconds
         }
 
-        if options["amount"] is not None:
-            if self.runtime is None or self.runtime >= options["amount"]:
-                ffmpeg_options["to"] = str(options["amount"])
+        if options.segment.end is not None:
+            if self.runtime >= options.segment.end:
+                ffmpeg_options["to"] = str(options.segment.end)
+
+        input_options: dict[str, Any] = dict()
+
+        if options.segment.start is not None:
+            if self.runtime >= options.segment.start:
+                input_options["ss"] = str(options.segment.start)
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
             FFmpeg()
             .option("y")
-            .input(self.__file)
+            .input(self.__file, **input_options)
             .output(self.__tmp_file, **ffmpeg_options)
         )
 
@@ -436,9 +477,6 @@ class Language:
         return False
 
 
-EXPECTED_LANGUAGES: list[str] = ["de", "en", "it"]
-
-
 def has_enough_memory() -> tuple[bool, float, float]:
     memory = psutil.virtual_memory()
     percent = memory.free / memory.total
@@ -450,6 +488,63 @@ def has_enough_memory() -> tuple[bool, float, float]:
         return (False, percent, swap_percent)
 
     return (True, percent, swap_percent)
+
+
+SEGMENT_LENGTH_IN_SECONDS: int = 30
+LANGUAGE_ACCURACY_THRESHOLD: float = 0.95
+LANGUAGE_MINIMUM_SCANNED: float = 0.2
+
+
+PredictionType = list[tuple[float, Language]]
+
+
+@dataclass
+class PredictionBest:
+    accuracy: float
+    language: Language
+
+
+class Prediction:
+    __data: list[PredictionType]
+
+    def __init__(self, data: Optional[PredictionType] = None) -> None:
+        self.__data = []
+        if data is not None:
+            self.__data.append(data)
+
+    def get_best(self) -> PredictionBest:
+        prob_dict: dict[Language, float] = dict()
+        for data in self.__data:
+            for acc, language in data:
+                if prob_dict.get(language) is None:
+                    prob_dict[language] = 0.0
+
+                prob_dict[language] += acc
+
+        amount: int = len(self.__data)
+        prob: PredictionType = []
+        for lan, acc in prob_dict.items():
+            prob.append((acc / amount, lan))
+
+        sorted_prob: PredictionType = sorted(prob, key=lambda x: -x[0])
+
+        return PredictionBest(*sorted_prob[0])
+
+    @property
+    def data(self) -> list[PredictionType]:
+        return self.__data
+
+    def append(self, data: PredictionType) -> None:
+        self.__data.append(data)
+
+    def __iadd__(self, value: object) -> "Prediction":
+        if isinstance(value, Prediction):
+            self.__data.extend(value.data)
+            return self
+        else:
+            raise TypeError(
+                f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
+            )
 
 
 class Classifier:
@@ -476,6 +571,49 @@ class Classifier:
 
         self.__classifier = classifier
 
+    def __classify(
+        self, wav_file: WAVFile, segment: Segment, manager: Optional[Manager] = None
+    ) -> Prediction:
+        wav_file.create_wav_file(
+            WAVOptions(bitrate=16000, segment=segment),
+            force_recreation=True,
+            manager=manager,
+        )
+
+        # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
+        wavs: Any = self.__classifier.load_audio(
+            str(wav_file.wav_path().absolute()),
+            savedir=str(self.__save_dir.absolute()),
+        )
+
+        try:
+            Classifier.clear_gpu_cache()
+
+            emb = self.__classifier.encode_batch(wavs, wav_lens=None)
+            out_prob = self.__classifier.mods.classifier(emb).squeeze(1)
+
+            # ATTENTION: unsorted
+            prob: list[tuple[float, Language]] = [
+                (
+                    p,
+                    Language.from_str_unsafe(
+                        self.__classifier.hparams.label_encoder.decode_ndim(index)
+                    ),
+                )
+                for index, p in enumerate(out_prob.exp().tolist()[0])
+            ]
+
+            Classifier.clear_gpu_cache()
+
+            return Prediction(prob)
+
+        except Exception as exception:
+            if isinstance(exception, cuda.OutOfMemoryError):
+                self.__init_classifier(True)
+                return self.__classify(wav_file, segment, manager)
+            else:
+                raise exception
+
     @staticmethod
     def clear_gpu_cache() -> None:
         gc.collect()
@@ -498,36 +636,29 @@ class Classifier:
 
     def predict(
         self, wav_file: WAVFile, path: Path, manager: Optional[Manager] = None
-    ) -> tuple[Language, float]:
-        def get_timestamps(runtime: Optional[Timestamp]) -> list[Optional[Timestamp]]:
-            if runtime is None:
-                return [
-                    Timestamp.from_minutes(x) if x is not None else None
-                    for x in [1.0, 2.0, 4.0, 5.0, 10.0, 20.0, None]
-                ]
+    ) -> tuple[PredictionBest, float]:
+        def get_segments(runtime: Timestamp) -> list[Segment]:
+            result: list[Segment] = []
+            current_timestamp: Timestamp = Timestamp.zero()
 
-            index: float = 1.0
-            result: list[Optional[float]] = [index]
-            steps: float = 1.0
-            while True:
-                index += steps
-                if index > runtime.minutes:
-                    result.append(None)
-                    break
+            while current_timestamp <= runtime:
+                end: Optional[Timestamp] = (
+                    None
+                    if current_timestamp + SEGMENT_LENGTH_IN_SECONDS > runtime
+                    else current_timestamp + SEGMENT_LENGTH_IN_SECONDS
+                )
+                segment: Segment = Segment(current_timestamp, end)
+                result.append(segment)
+                current_timestamp += SEGMENT_LENGTH_IN_SECONDS
 
-                result.append(index)
-                steps += 1.0
+            return result
 
-            return [
-                Timestamp.from_minutes(x) if x is not None else None for x in result
-            ]
-
-        timestamps: list[Optional[Timestamp]] = get_timestamps(wav_file.runtime)
+        segments: list[Segment] = get_segments(wav_file.runtime)
 
         bar: Optional[Any] = None
         if manager is not None:
             bar = manager.counter(
-                total=len(timestamps),
+                total=len(segments),
                 desc="detecting language",
                 unit="attempts",
                 leave=False,
@@ -535,92 +666,34 @@ class Classifier:
             )
             bar.update(0, force=True)
 
-        err: str = "after scanning the whole file"
-        for i, timestamp in enumerate(timestamps):
-            try:
-                Classifier.clear_gpu_cache()
+        prediction: Prediction = Prediction()
+        for i, segment in enumerate(segments):
+            local_prediction = self.__classify(wav_file, segment, manager)
+            prediction += local_prediction
 
-                enough_memory, mem, swap = has_enough_memory()
-                if not enough_memory:
-                    raise MemoryError(f"Not enough memory: {mem} - {swap}")
+            if bar is not None:
+                bar.update()
 
-                delta: Optional[Timestamp] = None
-                if timestamp is not None:
-                    delta = timestamp
+            amount_scanned: float = 0.0
 
-                wav_file.create_wav_file(
-                    {"bitrate": 16000, "amount": delta},
-                    force_recreation=True,
-                    manager=manager,
-                )
+            if amount_scanned < LANGUAGE_MINIMUM_SCANNED:
+                continue
 
-                # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
-                signal = self.__classifier.load_audio(
-                    str(wav_file.wav_path().absolute()),
-                    savedir=str(self.__save_dir.absolute()),
-                )
-                prediction = self.__classifier.classify_batch(signal)
+            best = prediction.get_best()
+            if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
+                continue
 
-                accuracy: float = cast(float, prediction[1].exp().item())
-                # The identified language ISO code is given in prediction[3]
-                language: Language = Language.from_str_unsafe(
-                    cast(str, prediction[3][0])
-                )
-                print(language, accuracy)
+            if bar is not None:
+                bar.close(clear=True)
 
-                accuracy_to_reach: float = 0.95 - (0.05 * i)
-                if (
-                    accuracy > accuracy_to_reach
-                    and language.short not in EXPECTED_LANGUAGES
-                ):
-                    if i < 5:
-                        print(
-                            f"unexpected language {language} with accuracy {accuracy}, trying re-scan: {i} for file '{path}'"
-                        )
-                        accuracy = 0.0
-                    else:
-                        raise ValueError(
-                            f"unexpected language {language} with accuracy {accuracy} for file '{path}'"
-                        )
-
-                if bar is not None:
-                    bar.update()
-
-                if accuracy > accuracy_to_reach:
-                    Classifier.clear_gpu_cache()
-                    if accuracy_to_reach <= 0.55:
-                        raise ValueError(
-                            f"Accuracy to reach to low: {accuracy_to_reach}!"
-                        )
-
-                    continue
-
-                if bar is not None:
-                    bar.close(clear=True)
-
-                Classifier.clear_gpu_cache()
-
-                return (language, accuracy)
-            except Exception as exception:
-                if isinstance(exception, cuda.OutOfMemoryError):
-                    self.__init_classifier(True)
-                    continue
-                elif isinstance(exception, MemoryError) or isinstance(
-                    exception, ValueError
-                ):
-                    err = str(exception)
-                    break
-                else:
-                    raise exception
+            return (best, amount_scanned)
 
         if bar is not None:
             bar.close(clear=True)
 
-        Classifier.clear_gpu_cache()
+        print(f"Couldn't get Language of '{path}'")
 
-        print(f"Couldn't get Language of '{path}': {err}")
-
-        return (Language.Unknown(), 0.0)
+        return (PredictionBest(0.0, Language.Unknown()), 0.0)
 
     def __get_run_opts(self) -> Optional[dict[str, Any]]:
         if not cuda.is_available():

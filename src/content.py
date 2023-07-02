@@ -579,14 +579,15 @@ class EpisodeContent(Content):
     def __get_language(
         self, classifier: Classifier, manager: Optional[Manager] = None
     ) -> Language:
-        # TODO
-        return Language.Unknown()
         wav_file = WAVFile(self.scanned_file.path)
 
-        language, accuracy = classifier.predict(
+        # if "A" not in self.scanned_file.path.name or self.__description.season != 20:
+        #     return Language.Unknown()
+
+        best, scanned_percent = classifier.predict(
             wav_file, self.scanned_file.path, manager
         )
-        return language
+        return best.language
 
     @staticmethod
     def is_valid_name(
