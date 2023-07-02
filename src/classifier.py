@@ -3,9 +3,10 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
+from functools import reduce
 from math import floor
 from os import makedirs, path, remove
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, Optional, TypedDict
 from pathlib import Path
 from enlighten import Manager
 from ffprobe import FFProbe
@@ -17,7 +18,6 @@ filterwarnings("ignore")
 
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
-import torch
 import gc
 import psutil
 from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
@@ -50,7 +50,9 @@ class Timestamp:
 
     @property
     def minutes(self) -> float:
-        return self.__delta.total_seconds() / 60.0
+        return self.__delta.total_seconds() / 60.0 + (
+            self.__delta.microseconds / (60.0 * 10**6)
+        )
 
     @staticmethod
     def zero() -> "Timestamp":
@@ -58,13 +60,11 @@ class Timestamp:
 
     @staticmethod
     def from_minutes(minutes: float) -> "Timestamp":
-        m: int = floor(minutes)
-        s: int = floor((minutes % 1) * 60)
-        return Timestamp(timedelta(minutes=m, seconds=s))
+        return Timestamp(timedelta(minutes=minutes))
 
     @staticmethod
     def from_seconds(seconds: float) -> "Timestamp":
-        return Timestamp.from_minutes(seconds / 60)
+        return Timestamp(timedelta(seconds=seconds))
 
     def __str__(self) -> str:
         return str(self.__delta)
@@ -89,9 +89,9 @@ class Timestamp:
         """
 
         delta: timedelta = timedelta(
-            seconds=int(self.delta.total_seconds()), microseconds=0
+            seconds=int(self.__delta.total_seconds()), microseconds=0
         )
-        ms: int = self.delta.microseconds
+        ms: int = self.__delta.microseconds
 
         if spec == "" or spec == "d":
             return str(delta)
@@ -127,7 +127,7 @@ class Timestamp:
 
     def __eq__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
-            return self.delta == value.delta
+            return self.__delta == value.delta
 
         return False
 
@@ -136,7 +136,7 @@ class Timestamp:
 
     def __lt__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
-            return self.delta < value.delta
+            return self.__delta < value.delta
         else:
             raise TypeError(
                 f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
@@ -144,7 +144,7 @@ class Timestamp:
 
     def __le__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
-            return self.delta <= value.delta
+            return self.__delta <= value.delta
         else:
             raise TypeError(
                 f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
@@ -152,7 +152,7 @@ class Timestamp:
 
     def __gt__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
-            return self.delta > value.delta
+            return self.__delta > value.delta
         else:
             raise TypeError(
                 f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
@@ -160,7 +160,7 @@ class Timestamp:
 
     def __ge__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
-            return self.delta >= value.delta
+            return self.__delta >= value.delta
         else:
             raise TypeError(
                 f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
@@ -177,9 +177,6 @@ class Timestamp:
         elif isinstance(value, timedelta):
             result = self.__delta + value
             return Timestamp(result)
-        elif isinstance(value, int):
-            result2: Timestamp = self + Timestamp.from_seconds(value)
-            return result2
         else:
             raise TypeError(
                 f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
@@ -189,13 +186,16 @@ class Timestamp:
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta - value.delta
             return Timestamp(result)
+        elif isinstance(value, float):
+            result2: Timestamp = self - Timestamp.from_minutes(value)
+            return result2
         else:
             raise TypeError(
                 f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
             )
 
     def __abs__(self) -> "Timestamp":
-        return Timestamp(abs(self.delta))
+        return Timestamp(abs(self.__delta))
 
     def __float__(self) -> float:
         return self.minutes
@@ -351,12 +351,7 @@ class WAVFile:
             )
 
         total_time: Timestamp = options.segment.timediff(self.runtime)
-        elapsed_time: Timestamp = (
-            Timestamp.zero() if options.segment.start is None else options.segment.start
-        )
-
-        print("total time, total_time.minutes, options.segment")
-        print(total_time, total_time.minutes, options.segment)
+        elapsed_time: Timestamp = Timestamp.zero()
 
         if manager is not None:
             bar = manager.counter(
@@ -379,11 +374,18 @@ class WAVFile:
         if self.__tmp_file.exists():
             remove(str(self.__tmp_file.absolute()))
 
-        ffmpeg_options: dict[str, Any] = {
+        ffmpeg_options: dict[str, Any] = dict()
+
+        if options.segment.start is not None:
+            if self.runtime >= options.segment.start:
+                ffmpeg_options["ss"] = str(options.segment.start)
+
+        ffmpeg_options = {
+            **ffmpeg_options,
             "acodec": "pcm_s16le",
             "ar": options.bitrate,
             "ac": 1,
-            "stats_period": 0.5,  # in seconds
+            "stats_period": 0.1,  # in seconds
         }
 
         if options.segment.end is not None:
@@ -392,24 +394,23 @@ class WAVFile:
 
         input_options: dict[str, Any] = dict()
 
-        if options.segment.start is not None:
-            if self.runtime >= options.segment.start:
-                input_options["ss"] = str(options.segment.start)
+        # if options.segment.start is not None:
+        #     if self.runtime >= options.segment.start:
+        #         print("options: ", str(options.segment.start))
+        #         input_options["ss"] = str(options.segment.start)
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
             FFmpeg()
             .option("y")
-            .input(self.__file, **input_options)
-            .output(self.__tmp_file, **ffmpeg_options)
+            .input(str(self.__file.absolute()), input_options)
+            .output(str(self.__tmp_file.absolute()), ffmpeg_options)
         )
 
         def progress_report(progress: Progress) -> None:
             nonlocal elapsed_time
             if bar is not None:
                 delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
-                print("progress.time, delta_time, elapsed_time")
-                print(progress.time, delta_time, elapsed_time)
                 bar.update(delta_time)
                 elapsed_time += progress.time
 
@@ -498,10 +499,10 @@ def has_enough_memory() -> tuple[bool, float, float]:
     return (True, percent, swap_percent)
 
 
-SEGMENT_LENGTH_IN_SECONDS: int = 30
+SEGMENT_LENGTH: Timestamp = Timestamp.from_seconds(30)
 LANGUAGE_ACCURACY_THRESHOLD: float = 0.95
 LANGUAGE_MINIMUM_SCANNED: float = 0.2
-
+LANGUAGE_MINIMUM_AMOUNT: int = 5
 
 PredictionType = list[tuple[float, Language]]
 
@@ -512,6 +513,47 @@ class PredictionBest:
     language: Language
 
 
+# see: https://en.wikipedia.org/wiki/Mean
+class MeanType(Enum):
+    arithmetic = "arithmetic"
+    geometric = "geometric"
+    harmonic = "harmonic"
+    truncated = "truncated"
+
+
+def get_mean(
+    mean_type: MeanType, values: list[float], normalize_percents: bool = False
+) -> float:
+    if normalize_percents:
+        percent_mean: float = get_mean(
+            mean_type, [value * 100.0 for value in values], normalize_percents=False
+        )
+        return percent_mean / 100.0
+
+    match mean_type:
+        case MeanType.arithmetic:
+            sum_value: float = sum(values)
+            return sum_value / len(values)
+        case MeanType.geometric:
+            sum_value = reduce(lambda x, y: x * y, values, 1.0)
+            return sum_value ** (1 / len(values))
+        case MeanType.harmonic:
+            sum_value = sum(1 / value for value in values)
+            return len(values) / sum_value
+        case MeanType.truncated:
+            PERCENTILE = 0.2
+            start: int = floor(len(values) * PERCENTILE)
+            end: int = len(values) - start
+            new_values: list[float] = [
+                value
+                for i, value in enumerate(sorted(values))
+                if i >= start and i < end
+            ]
+            return get_mean(MeanType.arithmetic, new_values, normalize_percents)
+        case _:  # stupid mypy
+            raise RuntimeError("UNREACHABLE")
+
+
 class Prediction:
     __data: list[PredictionType]
 
@@ -520,23 +562,28 @@ class Prediction:
         if data is not None:
             self.__data.append(data)
 
-    def get_best(self) -> PredictionBest:
-        prob_dict: dict[Language, float] = dict()
+    def get_best_list(
+        self, mean_type: MeanType = MeanType.arithmetic
+    ) -> list[PredictionBest]:
+        prob_dict: dict[Language, list[float]] = dict()
         for data in self.__data:
             for acc, language in data:
                 if prob_dict.get(language) is None:
-                    prob_dict[language] = 0.0
+                    prob_dict[language] = []
 
-                prob_dict[language] += acc
+                prob_dict[language].append(acc)
 
-        amount: int = len(self.__data)
         prob: PredictionType = []
-        for lan, acc in prob_dict.items():
-            prob.append((acc / amount, lan))
+        for lan, acc2 in prob_dict.items():
+            prob.append((get_mean(mean_type, acc2), lan))
 
         sorted_prob: PredictionType = sorted(prob, key=lambda x: -x[0])
 
-        return PredictionBest(*sorted_prob[0])
+        return [PredictionBest(*sorted_prob_item) for sorted_prob_item in sorted_prob]
+
+    def get_best(self, mean_type: MeanType = MeanType.arithmetic) -> PredictionBest:
+        best_list: list[PredictionBest] = self.get_best_list(mean_type)
+        return best_list[0]
 
     @property
     def data(self) -> list[PredictionType]:
@@ -657,12 +704,12 @@ class Classifier:
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
-                    if current_timestamp + SEGMENT_LENGTH_IN_SECONDS > runtime
-                    else current_timestamp + SEGMENT_LENGTH_IN_SECONDS
+                    if current_timestamp + SEGMENT_LENGTH > runtime
+                    else current_timestamp + SEGMENT_LENGTH
                 )
                 segment: Segment = Segment(current_timestamp, end)
                 result.append(segment)
-                current_timestamp += SEGMENT_LENGTH_IN_SECONDS
+                current_timestamp += SEGMENT_LENGTH
 
             return result
 
@@ -673,7 +720,7 @@ class Classifier:
             bar = manager.counter(
                 total=len(segments),
                 desc="detecting language",
-                unit="attempts",
+                unit="fragments",
                 leave=False,
                 color="red",
             )
@@ -688,12 +735,26 @@ class Classifier:
                 bar.update()
 
             amount_scanned: float = 0.0
-
-            if amount_scanned < LANGUAGE_MINIMUM_SCANNED:
+            if (
+                amount_scanned < LANGUAGE_MINIMUM_SCANNED
+                and LANGUAGE_MINIMUM_AMOUNT > i
+            ):
                 continue
 
-            best = prediction.get_best()
-            print(best)
+            print(prediction.get_best(MeanType.arithmetic))
+            print(prediction.get_best(MeanType.geometric))
+            print(prediction.get_best(MeanType.harmonic))
+            print(prediction.get_best(MeanType.truncated))
+            print()
+
+            if i >= 19:
+                print(prediction.get_best_list(MeanType.arithmetic)[0:3])
+                print(prediction.get_best_list(MeanType.geometric)[0:3])
+                print(prediction.get_best_list(MeanType.harmonic)[0:3])
+                print(prediction.get_best_list(MeanType.truncated)[0:3])
+                print()
+
+            best: PredictionBest = prediction.get_best()
             if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
                 continue
 
