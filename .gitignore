@@ -1,9 +1,7 @@
-/kaldi/
-
 __pycache__
 .mypy_cache
 Pipfile.lock
 model/
 /src/tmp/
-
+/data/
 /*.json

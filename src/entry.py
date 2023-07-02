@@ -97,7 +97,7 @@ def main() -> None:
             "video_formats": video_formats,
             "parse_error_is_exception": parse_error_is_exception,
         },
-        Path("data.json"),
+        Path("data/data.json"),
         name_parser=CustomNameParser(SPECIAL_NAMES),
     )
 

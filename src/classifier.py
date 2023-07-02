@@ -741,20 +741,7 @@ class Classifier:
             ):
                 continue
 
-            print(prediction.get_best(MeanType.arithmetic))
-            print(prediction.get_best(MeanType.geometric))
-            print(prediction.get_best(MeanType.harmonic))
-            print(prediction.get_best(MeanType.truncated))
-            print()
-
-            if i >= 19:
-                print(prediction.get_best_list(MeanType.arithmetic)[0:3])
-                print(prediction.get_best_list(MeanType.geometric)[0:3])
-                print(prediction.get_best_list(MeanType.harmonic)[0:3])
-                print(prediction.get_best_list(MeanType.truncated)[0:3])
-                print()
-
-            best: PredictionBest = prediction.get_best()
+            best: PredictionBest = prediction.get_best(MeanType.truncated)
             if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
                 continue
 

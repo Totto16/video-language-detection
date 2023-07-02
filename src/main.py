@@ -213,7 +213,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
-                json_content: str = json.dumps(contents, cls=Encoder)
+                json_content: str = json.dumps(contents, indent=4, cls=Encoder)
                 file.write(json_content)
             case _:
                 raise RuntimeError(f"Not loadable from '{suffix}' file!")
