@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 from typing_extensions import override
 from classifier import Language, parse_int_safely
-from content import Content, NameParser
+from content import Content, NameParser, Summary
 from main import parse_contents
 import re as regex
 
@@ -101,8 +101,9 @@ def main() -> None:
         name_parser=CustomNameParser(SPECIAL_NAMES),
     )
 
-    summary = [content.summary() for content in contents]
-    print(summary)
+    summaries = [content.summary() for content in contents]
+    final = Summary.combine_langauge_dicts([summary.languages for summary in summaries])
+    print(final)
 
 
 if __name__ == "__main__":

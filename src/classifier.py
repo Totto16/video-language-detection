@@ -7,6 +7,7 @@ from functools import reduce
 from math import floor
 import math
 from os import makedirs, path, remove
+import sys
 from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from enlighten import Manager
@@ -265,6 +266,10 @@ class WAVOptions:
     segment: Segment
 
 
+class FileMetadataError(ValueError):
+    pass
+
+
 class WAVFile:
     __tmp_file: Optional[Path]
     __file: Path
@@ -277,12 +282,15 @@ class WAVFile:
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
-        type, status, runtime = self.__get_info()
+        info = self.__get_info()
+        if info is None:
+            raise FileMetadataError()
+        type, status, runtime = info
         self.__type = type
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self) -> tuple[FileType, Status, Timestamp]:
+    def __get_info(self) -> Optional[tuple[FileType, Status, Timestamp]]:
         try:
             metadata = FFProbe(str(self.__file.absolute()))
             for stream in metadata.streams:
@@ -309,11 +317,12 @@ class WAVFile:
                         Timestamp.from_seconds(stream.duration_seconds()),
                     )
         except Exception as e:
-            raise Exception(
-                f"Unable to get a valid stream from file '{self.__file}'"
-            ) from e
+            print(e, file=sys.stderr)
 
-        raise Exception(f"Unable to get a valid stream from file '{self.__file}'")
+        print(
+            f"Unable to get a valid stream from file '{self.__file}'", file=sys.stderr
+        )
+        return None
 
     @property
     def runtime(self) -> Timestamp:
@@ -386,6 +395,7 @@ class WAVFile:
             if self.runtime >= options.segment.start:
                 ffmpeg_options["ss"] = str(options.segment.start)
 
+        # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg_options = {
             **ffmpeg_options,
             "acodec": "pcm_s16le",
@@ -400,12 +410,6 @@ class WAVFile:
 
         input_options: dict[str, Any] = dict()
 
-        # if options.segment.start is not None:
-        #     if self.runtime >= options.segment.start:
-        #         print("options: ", str(options.segment.start))
-        #         input_options["ss"] = str(options.segment.start)
-
-        # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg: FFmpeg = (
             FFmpeg()
             .option("y")
@@ -519,7 +523,7 @@ class PredictionBest:
     language: Language
 
     def __str__(self) -> str:
-        return f"<PredictionBest accuracy: {self.accuracy} language: {self.language}>y"
+        return f"<PredictionBest accuracy: {self.accuracy} language: {self.language}>"
 
     def __repr__(self) -> str:
         return str(self)
@@ -597,6 +601,9 @@ class Prediction:
 
     def get_best(self, mean_type: MeanType = MeanType.arithmetic) -> PredictionBest:
         best_list: list[PredictionBest] = self.get_best_list(mean_type)
+        if len(best_list) == 0:
+            return PredictionBest(0.0, Language.Unknown())
+
         return best_list[0]
 
     @property
@@ -647,7 +654,7 @@ class Classifier:
 
     def __classify(
         self, wav_file: WAVFile, segment: Segment, manager: Optional[Manager] = None
-    ) -> Prediction:
+    ) -> Optional[Prediction]:
         wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
             force_recreation=True,
@@ -686,7 +693,8 @@ class Classifier:
                 self.__init_classifier(True)
                 return self.__classify(wav_file, segment, manager)
             else:
-                raise exception
+                print(exception, file=sys.stderr)
+                return None
 
     @staticmethod
     def clear_gpu_cache() -> None:
@@ -743,7 +751,8 @@ class Classifier:
         prediction: Prediction = Prediction()
         for i, segment in enumerate(segments):
             local_prediction = self.__classify(wav_file, segment, manager)
-            prediction += local_prediction
+            if local_prediction is not None:
+                prediction += local_prediction
 
             if bar is not None:
                 bar.update()
@@ -755,8 +764,19 @@ class Classifier:
             ):
                 continue
 
+            # TODO temporary to scan fast scannable first!
+            if i > 10:
+                break
+
             best: PredictionBest = prediction.get_best(MeanType.truncated)
             if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
+                if i + 1 == len(segments):
+                    if best.accuracy < 0.55:
+                        continue
+                else:
+                    continue
+
+            if best.language == Language.Unknown():
                 continue
 
             if bar is not None:
@@ -768,7 +788,7 @@ class Classifier:
             bar.close(clear=True)
 
         best = prediction.get_best(MeanType.truncated)
-        print(f"Couldn't get Language of '{path}': {best}")
+        print(f"Couldn't get Language of '{path}': {best}", file=sys.stderr)
 
         return (PredictionBest(0.0, Language.Unknown()), 0.0)
 

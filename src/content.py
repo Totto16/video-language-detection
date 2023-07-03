@@ -19,7 +19,7 @@ from typing_extensions import override
 
 
 from enlighten import Manager
-from classifier import Classifier, Language, WAVFile
+from classifier import Classifier, FileMetadataError, Language, WAVFile
 from os import listdir
 from json import JSONDecoder, JSONEncoder
 
@@ -549,7 +549,7 @@ class Content:
                 raise RuntimeError("UNREACHABLE")
 
         except Exception as e:
-            print(e)
+            print(e, file=sys.stderr)
             return None
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
@@ -669,8 +669,22 @@ class EpisodeContentDict(ContentDict):
     language: Language
 
 
-GLOBAL_ITER_MAX: int = 100
+GLOBAL_ITER_MAX: int = 200
+SKIP_ITR: int = 60
 itr: int = 0
+
+
+def itr_print_percent() -> None:
+    global itr
+    if itr < SKIP_ITR:
+        return
+
+    if itr >= GLOBAL_ITER_MAX + SKIP_ITR:
+        return
+
+    percent: float = (itr - SKIP_ITR) / GLOBAL_ITER_MAX * 100.0
+
+    print(f"{percent:.02f} %")
 
 
 class EpisodeContent(Content):
@@ -709,12 +723,15 @@ class EpisodeContent(Content):
     def __get_language(
         self, classifier: Classifier, manager: Optional[Manager] = None
     ) -> Language:
-        wav_file = WAVFile(self.scanned_file.path)
+        try:
+            wav_file = WAVFile(self.scanned_file.path)
 
-        best, scanned_percent = classifier.predict(
-            wav_file, self.scanned_file.path, manager
-        )
-        return best.language
+            best, scanned_percent = classifier.predict(
+                wav_file, self.scanned_file.path, manager
+            )
+            return best.language
+        except FileMetadataError:
+            return Language.Unknown()
 
     @staticmethod
     def is_valid_name(
@@ -768,9 +785,11 @@ class EpisodeContent(Content):
 
                     # TODO: re-enable
                     global itr
-                    if itr < GLOBAL_ITER_MAX:
-                        self.__language = self.__get_language(classifier, manager)
+                    if itr < GLOBAL_ITER_MAX + SKIP_ITR:
+                        itr_print_percent()
                         itr = itr + 1
+                        if itr >= SKIP_ITR:
+                            self.__language = self.__get_language(classifier, manager)
 
                     callback.progress(
                         self.scanned_file.path.name,
@@ -798,9 +817,11 @@ class EpisodeContent(Content):
         )
 
         # TODO: re-enable
-        if itr < GLOBAL_ITER_MAX:
-            self.__language = self.__get_language(classifier, manager)
+        if itr < GLOBAL_ITER_MAX + SKIP_ITR:
+            itr_print_percent()
             itr = itr + 1
+            if itr >= SKIP_ITR:
+                self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
