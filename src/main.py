@@ -230,7 +230,7 @@ def parse_contents(
 
     if not save_file.exists():
         contents: list[Content] = process_folder(
-            root_folder, callback=callback, name_parser=name_parser
+            root_folder, callback=callback, name_parser=name_parser, parent_folders=[]
         )
 
         save_to_file(save_file, contents)
@@ -238,7 +238,11 @@ def parse_contents(
     else:
         contents = load_from_file(save_file)
         new_contents = process_folder(
-            root_folder, callback=callback, name_parser=name_parser, rescan=contents
+            root_folder,
+            callback=callback,
+            name_parser=name_parser,
+            rescan=contents,
+            parent_folders=[],
         )
 
         save_to_file(save_file, new_contents)

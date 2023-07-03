@@ -277,11 +277,11 @@ class Stats:
         return Stats(checksum=checksum, mtime=mtime)
 
     def is_outdated(
-        self, path: Path, type: ScannedFileType, manager: Optional[Manager] = None
+        self, path: Path, _type: ScannedFileType, manager: Optional[Manager] = None
     ) -> bool:
-        if type == ScannedFileType.file:
+        if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
-                path, type, generate_checksum=False, manager=manager
+                path, _type, generate_checksum=False, manager=manager
             )
             if new_stats.mtime <= self.mtime:
                 return False
@@ -289,16 +289,15 @@ class Stats:
             # update the new mtime, since if we aren't outdated (per checksum), the parent caller wan't do it, if we are outdated, he will update it anyway
             self.mtime = new_stats.mtime
 
-            with_checksum: Stats = Stats.from_file(path, type, generate_checksum=True)
+            with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)
             if with_checksum.checksum == self.checksum:
                 return False
 
             return True
 
-        else:
-            raise RuntimeError(
-                "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
-            )
+        raise RuntimeError(
+            "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
+        )
 
     def as_dict(self) -> dict[str, Any]:
         as_dict: dict[str, Any] = {
@@ -322,7 +321,7 @@ class Stats:
 class ScannedFile:
     path: Path
     parents: list[str]
-    type: ScannedFileType
+    type: ScannedFileType  # noqa: A003
     stats: Stats
 
     @staticmethod
@@ -375,16 +374,16 @@ class ScannedFile:
 class NameParser:
     __language: Language
 
-    def __init__(self, language: Language = Language.unknown()) -> None:
+    def __init__(self, language: Language = Language.unknown()) -> None:  # noqa: B008
         self.__language = language
 
-    def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
+    def parse_episode_name(self, _name: str) -> Optional[tuple[str, int, int]]:
         raise MissingOverrideError
 
-    def parse_season_name(self, name: str) -> Optional[tuple[int]]:
+    def parse_season_name(self, _name: str) -> Optional[tuple[int]]:
         raise MissingOverrideError
 
-    def parse_series_name(self, name: str) -> Optional[tuple[str, int]]:
+    def parse_series_name(self, _name: str) -> Optional[tuple[str, int]]:
         raise MissingOverrideError
 
 
@@ -399,40 +398,45 @@ class Callback(Generic[C, CT, RT]):
 
     def process(
         self,
-        file_path: Path,
-        file_type: ScannedFileType,
-        parent_folders: list[str],
-        name_parser: NameParser,
+        file_path: Path,  # noqa: ARG002
+        file_type: ScannedFileType,  # noqa: ARG002
+        parent_folders: list[str],  # noqa: ARG002
+        name_parser: NameParser,  # noqa: ARG002
         *,
-        rescan: Optional[C] = None,
+        rescan: Optional[C] = None,  # noqa: ARG002
     ) -> Optional[C]:
         return None
 
     def ignore(
-        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        self, _file_path: Path, _file_type: ScannedFileType, _parent_folders: list[str]
     ) -> bool:
         return False
 
     def start(
         self,
-        amount: tuple[int, int, int],
-        name: str,
-        parent_folders: list[str],
-        characteristic: CT,
+        amount: tuple[int, int, int],  # noqa: ARG002
+        name: str,  # noqa: ARG002
+        parent_folders: list[str],  # noqa: ARG002
+        characteristic: CT,  # noqa: ARG002
     ) -> None:
         return None
 
     def progress(
         self,
-        name: str,
-        parent_folders: list[str],
-        characteristic: CT,
+        name: str,  # noqa: ARG002
+        parent_folders: list[str],  # noqa: ARG002
+        characteristic: CT,  # noqa: ARG002
         *,
-        amount: int = 1,
+        amount: int = 1,  # noqa: ARG002
     ) -> None:
         return None
 
-    def finish(self, name: str, parent_folders: list[str], characteristic: CT) -> None:
+    def finish(
+        self,
+        name: str,  # noqa: ARG002
+        parent_folders: list[str],  # noqa: ARG002
+        characteristic: CT,  # noqa: ARG002
+    ) -> None:
         return None
 
     def get_saved(self) -> RT:
@@ -451,15 +455,15 @@ class Content:
     __type: ContentType
     __scanned_file: ScannedFile
 
-    def __init__(self, type: ContentType, scanned_file: ScannedFile) -> None:
-        self.__type = type
+    def __init__(self, _type: ContentType, scanned_file: ScannedFile) -> None:
+        self.__type = _type
         self.__scanned_file = scanned_file
 
-    def summary(self, detailed: bool = False) -> Summary:
+    def summary(self, _detailed: bool = False) -> Summary:
         raise MissingOverrideError()
 
     @property
-    def type(self) -> ContentType:
+    def type(self) -> ContentType:  # noqa: A003
         return self.__type
 
     @property
@@ -503,49 +507,49 @@ class Content:
                     )
 
                 return EpisodeContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 3 and not top_is_collection:
+            if len(parents) == 3 and not top_is_collection:
                 if file_type == ScannedFileType.folder:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                     )
 
                 return EpisodeContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 3 and top_is_collection:
+            if len(parents) == 3 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
                     )
 
                 return SeasonContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 2 and not top_is_collection:
+            if len(parents) == 2 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                     )
 
                 return SeasonContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 2 and top_is_collection:
+            if len(parents) == 2 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
                     )
 
                 return SeriesContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 1 and not top_is_collection:
+            if len(parents) == 1 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
                     )
 
                 return SeriesContent.from_path(file_path, scanned_file, name_parser)
-            elif len(parents) == 1 and top_is_collection:
+            if len(parents) == 1 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
                         f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
                     )
                 return CollectionContent.from_path(file_path, scanned_file)
-            else:
-                raise RuntimeError("UNREACHABLE")
+
+            raise RuntimeError("UNREACHABLE")
 
         except Exception as e:
             print(e, file=sys.stderr)
@@ -563,12 +567,12 @@ class Content:
 
     def scan(
         self,
-        callback: Callback["Content", ContentCharacteristic, Manager],
-        name_parser: NameParser,
+        callback: Callback["Content", ContentCharacteristic, Manager],  # noqa: ARG002
+        name_parser: NameParser,  # noqa: ARG002
         *,
-        parent_folders: list[str],
-        classifier: Classifier,
-        rescan: bool = False,
+        parent_folders: list[str],  # noqa: ARG002
+        classifier: Classifier,  # noqa: ARG002
+        rescan: bool = False,  # noqa: ARG002
     ) -> None:
         raise MissingOverrideError
 
@@ -584,7 +588,7 @@ def process_folder(
     callback: Callback[Content, ContentCharacteristic, Manager],
     name_parser: NameParser,
     *,
-    parent_folders: list[str] = [],
+    parent_folders: list[str],
     parent_type: Optional[ContentType] = None,
     rescan: Optional[list[Content]] = None,
 ) -> list[Content]:
@@ -655,10 +659,10 @@ def process_folder(
         if result is not None and is_rescan is None:
             rescan.append(result)
 
-        value = (parent_type, ScannedFileType.folder)
-        callback.finish(directory.name, parent_folders, value)
+    value = (parent_type, ScannedFileType.folder)
+    callback.finish(directory.name, parent_folders, value)
 
-        return rescan
+    return rescan
 
 
 class EpisodeContentDict(ContentDict):
@@ -706,7 +710,7 @@ class EpisodeContent(Content):
         self,
         scanned_file: ScannedFile,
         description: EpisodeDescription,
-        language: Language = Language.unknown(),
+        language: Language = Language.unknown(),  # noqa: B008
     ) -> None:
         super().__init__(ContentType.episode, scanned_file)
 

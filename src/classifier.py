@@ -22,7 +22,7 @@ from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
 
-from ffmpeg import FFmpeg, Progress
+from ffmpeg import FFmpeg, Progress  # type: ignore[attr-defined]
 
 filterwarnings("ignore")
 
