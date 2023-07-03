@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 
+import gc
+import math
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from functools import reduce
 from math import floor
-import math
 from os import makedirs, path, remove
-import sys
-from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
-from enlighten import Manager
-from ffprobe import FFProbe
-from ffmpeg import FFmpeg, Progress
-
+from shutil import rmtree
+from typing import Any, Optional, TypedDict
 from warnings import filterwarnings
 
-filterwarnings("ignore")
-
+import psutil
+from enlighten import Manager
+from ffprobe import FFProbe
+from humanize import naturalsize
+from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
-import gc
-import psutil
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
-from humanize import naturalsize
-from shutil import rmtree
 
+from ffmpeg import FFmpeg, Progress
+
+filterwarnings("ignore")
 
 WAV_FILE_BAR_FMT = (
     "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} "

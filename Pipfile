@@ -19,6 +19,7 @@ pylint = "*"
 mypy = "*"
 flake8 = "*"
 black = "*"
+ruff = "*"
 
 [scripts]
 check = "python src/entry.py"

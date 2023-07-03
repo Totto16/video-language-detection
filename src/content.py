@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass, is_dataclass
 import dataclasses as dc
+import sys
+from dataclasses import dataclass, is_dataclass
 from enum import Enum
 from hashlib import sha256
+from json import JSONDecoder, JSONEncoder
+from os import listdir
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     Generic,
     Optional,
-    Callable,
-    TypeVar,
     TypedDict,
+    TypeVar,
     cast,
     get_type_hints,
 )
-from typing_extensions import override
 
-
-from enlighten import Manager
 from classifier import Classifier, FileMetadataError, Language, WAVFile
-from os import listdir
-from json import JSONDecoder, JSONEncoder
+from enlighten import Manager
+from typing_extensions import override
 
 
 class ScannedFileType(Enum):

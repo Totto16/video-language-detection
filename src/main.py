@@ -4,8 +4,7 @@
 import json
 from pathlib import Path
 from typing import Any, Optional, TypedDict, cast
-from typing_extensions import override
-from enlighten import Justify, Manager, get_manager
+
 from classifier import Classifier
 from content import (
     Callback,
@@ -14,10 +13,12 @@ from content import (
     ContentType,
     Decoder,
     Encoder,
+    NameParser,
     ScannedFileType,
     process_folder,
-    NameParser,
 )
+from enlighten import Justify, Manager, get_manager
+from typing_extensions import override
 
 
 class ContentOptions(TypedDict):
@@ -109,16 +110,15 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
             return content
 
-        else:
-            rescan.scan(
-                callback=self,
-                parent_folders=parent_folders,
-                classifier=self.__classifier,
-                name_parser=name_parser,
-                rescan=True,
-            )
+        rescan.scan(
+            callback=self,
+            parent_folders=parent_folders,
+            classifier=self.__classifier,
+            name_parser=name_parser,
+            rescan=True,
+        )
 
-            return None
+        return None
 
     @override
     def start(

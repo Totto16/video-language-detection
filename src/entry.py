@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 
+import re as regex
 from pathlib import Path
 from typing import Optional
-from typing_extensions import override
+
 from classifier import Language, parse_int_safely
 from content import Content, NameParser, Summary
 from main import parse_contents
-import re as regex
+from typing_extensions import override
 
 
 class CustomNameParser(NameParser):
