@@ -11,7 +11,7 @@ from math import floor
 from os import makedirs, path, remove
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, Self, TypedDict
 from warnings import filterwarnings
 
 import psutil
@@ -26,10 +26,7 @@ from ffmpeg import FFmpeg, Progress  # type: ignore[attr-defined]
 
 filterwarnings("ignore")
 
-WAV_FILE_BAR_FMT = (
-    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} "
-    + "[{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
-)
+WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
 
 
 def parse_int_safely(inp: str) -> Optional[int]:
@@ -42,15 +39,15 @@ def parse_int_safely(inp: str) -> Optional[int]:
 class Timestamp:
     __delta: timedelta
 
-    def __init__(self, delta: timedelta) -> None:
+    def __init__(self: Self, delta: timedelta) -> None:
         self.__delta = delta
 
     @property
-    def delta(self) -> timedelta:
+    def delta(self: Self) -> timedelta:
         return self.__delta
 
     @property
-    def minutes(self) -> float:
+    def minutes(self: Self) -> float:
         return self.__delta.total_seconds() / 60.0 + (
             self.__delta.microseconds / (60.0 * 10**6)
         )
@@ -67,13 +64,13 @@ class Timestamp:
     def from_seconds(seconds: float) -> "Timestamp":
         return Timestamp(timedelta(seconds=seconds))
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.__delta)
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
-    def __format__(self, spec: str) -> str:
+    def __format__(self: Self, spec: str) -> str:
         """This is responsible for formatting the Timestamp
 
         Args:
@@ -90,7 +87,8 @@ class Timestamp:
         """
 
         delta: timedelta = timedelta(
-            seconds=int(self.__delta.total_seconds()), microseconds=0
+            seconds=int(self.__delta.total_seconds()),
+            microseconds=0,
         )
         ms: int = self.__delta.microseconds
 
@@ -120,57 +118,57 @@ class Timestamp:
             ms = round_to_tens(ms, 5 - val)
 
             return "{delta}.{ms:0{val}d}".format(delta=str(delta), ms=ms, val=val)
-        except Exception:
+        except Exception:  # noqa: BLE001
             raise ValueError(
-                f"Invalid format specifier '{spec}' for object of type 'Timestamp'"
+                f"Invalid format specifier '{spec}' for object of type 'Timestamp'",
             ) from None
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta == value.delta
 
         return False
 
-    def __ne__(self, value: object) -> bool:
+    def __ne__(self: Self, value: object) -> bool:
         return not self.__eq__(value)
 
-    def __lt__(self, value: object) -> bool:
+    def __lt__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta < value.delta
 
         raise TypeError(
-            f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __le__(self, value: object) -> bool:
+    def __le__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta <= value.delta
 
         raise TypeError(
-            f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __gt__(self, value: object) -> bool:
+    def __gt__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta > value.delta
 
         raise TypeError(
-            f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __ge__(self, value: object) -> bool:
+    def __ge__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta >= value.delta
 
         raise TypeError(
-            f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __iadd__(self, value: object) -> "Timestamp":
+    def __iadd__(self: Self, value: object) -> "Timestamp":
         new_value: Timestamp = Timestamp(self.__delta) + value
         return new_value
 
-    def __add__(self, value: object) -> "Timestamp":
+    def __add__(self: Self, value: object) -> "Timestamp":
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta + value.delta
             return Timestamp(result)
@@ -179,10 +177,10 @@ class Timestamp:
             return Timestamp(result)
 
         raise TypeError(
-            f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __sub__(self, value: object) -> "Timestamp":
+    def __sub__(self: Self, value: object) -> "Timestamp":
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta - value.delta
             return Timestamp(result)
@@ -191,23 +189,23 @@ class Timestamp:
             return result2
 
         raise TypeError(
-            f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __abs__(self) -> "Timestamp":
+    def __abs__(self: Self) -> "Timestamp":
         return Timestamp(abs(self.__delta))
 
-    def __float__(self) -> float:
+    def __float__(self: Self) -> float:
         return self.minutes
 
-    def __truediv__(self, value: object) -> float:
+    def __truediv__(self: Self, value: object) -> float:
         if isinstance(value, Timestamp):
             return self.__delta / value.delta
         if isinstance(value, float):
             return self / Timestamp.from_minutes(value)
 
         raise TypeError(
-            f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+            f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
 
@@ -216,10 +214,10 @@ class FileType(Enum):
     video = "video"
     audio = "audio"
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<FileType: {self.name}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -227,10 +225,10 @@ class Status(Enum):
     ready = "ready"
     raw = "raw"
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<Status: {self.name}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -240,12 +238,12 @@ class Segment:
     end: Optional[Timestamp]
 
     @property
-    def is_valid(self) -> bool:
+    def is_valid(self: Self) -> bool:
         return not (
             self.start is not None and self.end is not None and self.start > self.end
         )
 
-    def timediff(self, runtime: Timestamp) -> Timestamp:
+    def timediff(self: Self, runtime: Timestamp) -> Timestamp:
         if self.start is None and self.end is None:
             return runtime
         if self.start is None and self.end is not None:
@@ -275,20 +273,20 @@ class WAVFile:
     __status: Status
     __runtime: Timestamp
 
-    def __init__(self, file: Path) -> None:
+    def __init__(self: Self, file: Path) -> None:
         self.__tmp_file = None
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
         info = self.__get_info()
         if info is None:
-            raise FileMetadataError()
+            raise FileMetadataError
         _type, status, runtime = info
         self.__type = _type
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self) -> Optional[tuple[FileType, Status, Timestamp]]:
+    def __get_info(self: Self) -> Optional[tuple[FileType, Status, Timestamp]]:
         try:
             metadata = FFProbe(str(self.__file.absolute()))
             for stream in metadata.streams:
@@ -314,20 +312,21 @@ class WAVFile:
                         Status.raw,
                         Timestamp.from_seconds(stream.duration_seconds()),
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(e, file=sys.stderr)
 
         print(
-            f"Unable to get a valid stream from file '{self.__file}'", file=sys.stderr
+            f"Unable to get a valid stream from file '{self.__file}'",
+            file=sys.stderr,
         )
         return None
 
     @property
-    def runtime(self) -> Timestamp:
+    def runtime(self: Self) -> Timestamp:
         return self.__runtime
 
     def create_wav_file(
-        self,
+        self: Self,
         _options: Optional[WAVOptions] = None,
         *,
         force_recreation: bool = False,
@@ -360,13 +359,15 @@ class WAVFile:
                 raise RuntimeError("UNREACHABLE")
 
     def __convert_to_wav(
-        self, options: WAVOptions, manager: Optional[Manager] = None
+        self: Self,
+        options: WAVOptions,
+        manager: Optional[Manager] = None,
     ) -> None:
         bar: Optional[Any] = None
 
         if not options.segment.is_valid:
             raise RuntimeError(
-                f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}"
+                f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}",
             )
 
         total_time: Timestamp = options.segment.timediff(self.runtime)
@@ -384,7 +385,7 @@ class WAVFile:
             )
             bar.update(Timestamp.zero(), force=True)
 
-        temp_dir: Path = Path("/tmp") / "video_lang_detect"
+        temp_dir: Path = Path("/tmp") / "video_lang_detect"  # noqa: S108
         if not temp_dir.exists():
             makedirs(temp_dir)
 
@@ -393,7 +394,7 @@ class WAVFile:
         if self.__tmp_file.exists():
             remove(str(self.__tmp_file.absolute()))
 
-        ffmpeg_options: dict[str, Any] = dict()
+        ffmpeg_options: dict[str, Any] = {}
 
         if options.segment.start is not None:
             if self.runtime >= options.segment.start:
@@ -412,7 +413,7 @@ class WAVFile:
             if self.runtime >= options.segment.end:
                 ffmpeg_options["to"] = str(options.segment.end)
 
-        input_options: dict[str, Any] = dict()
+        input_options: dict[str, Any] = {}
 
         ffmpeg: FFmpeg = (
             FFmpeg()
@@ -436,7 +437,7 @@ class WAVFile:
         if bar is not None:
             bar.close(clear=True)
 
-    def wav_path(self) -> Path:
+    def wav_path(self: Self) -> Path:
         match (self.__status, self.__type):
             case (_, FileType.wav):
                 return self.__file
@@ -449,7 +450,7 @@ class WAVFile:
             case _:  # stupid mypy
                 raise RuntimeError("UNREACHABLE")
 
-    def __del__(self) -> None:
+    def __del__(self: Self) -> None:
         if self.__tmp_file is not None:
             remove(str(self.__tmp_file.absolute()))
 
@@ -484,16 +485,16 @@ class Language:
     def unknown() -> "Language":
         return Language("un", "Unknown")
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<Language short: {self.short} long: {self.long}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
-    def __hash__(self) -> int:
+    def __hash__(self: Self) -> int:
         return hash((self.short, self.long))
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self: Self, other: Any) -> bool:
         if isinstance(other, Language):
             return self.short == other.short and self.long == other.long
 
@@ -526,10 +527,10 @@ class PredictionBest:
     accuracy: float
     language: Language
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<PredictionBest accuracy: {self.accuracy} language: {self.language}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -545,11 +546,15 @@ class MeanType(Enum):
 
 
 def get_mean(
-    mean_type: MeanType, values: list[float], normalize_percents: bool = False
+    mean_type: MeanType,
+    values: list[float],
+    normalize_percents: bool = False,
 ) -> float:
     if normalize_percents:
         percent_mean: float = get_mean(
-            mean_type, [value * 100.0 for value in values], normalize_percents=False
+            mean_type,
+            [value * 100.0 for value in values],
+            normalize_percents=False,
         )
         return percent_mean / 100.0
 
@@ -579,15 +584,16 @@ def get_mean(
 class Prediction:
     __data: list[PredictionType]
 
-    def __init__(self, data: Optional[PredictionType] = None) -> None:
+    def __init__(self: Self, data: Optional[PredictionType] = None) -> None:
         self.__data = []
         if data is not None:
             self.__data.append(data)
 
     def get_best_list(
-        self, mean_type: MeanType = MeanType.arithmetic
+        self: Self,
+        mean_type: MeanType = MeanType.arithmetic,
     ) -> list[PredictionBest]:
-        prob_dict: dict[Language, list[float]] = dict()
+        prob_dict: dict[Language, list[float]] = {}
         for data in self.__data:
             for acc, language in data:
                 if prob_dict.get(language) is None:
@@ -603,7 +609,10 @@ class Prediction:
 
         return [PredictionBest(*sorted_prob_item) for sorted_prob_item in sorted_prob]
 
-    def get_best(self, mean_type: MeanType = MeanType.arithmetic) -> PredictionBest:
+    def get_best(
+        self: Self,
+        mean_type: MeanType = MeanType.arithmetic,
+    ) -> PredictionBest:
         best_list: list[PredictionBest] = self.get_best_list(mean_type)
         if len(best_list) == 0:
             return PredictionBest(0.0, Language.unknown())
@@ -611,16 +620,16 @@ class Prediction:
         return best_list[0]
 
     @property
-    def data(self) -> list[PredictionType]:
+    def data(self: Self) -> list[PredictionType]:
         return self.__data
 
-    def append(self, data: PredictionType) -> None:
+    def append(self: Self, data: PredictionType) -> None:
         self.__data.append(data)
 
-    def append_other(self, pred: "Prediction") -> None:
+    def append_other(self: Self, pred: "Prediction") -> None:
         self.__data.extend(pred.data)
 
-    def __iadd__(self, value: object) -> "Prediction":
+    def __iadd__(self: Self, value: object) -> "Prediction":
         if isinstance(value, Prediction):
             new_value = Prediction()
             new_value.append_other(self)
@@ -628,7 +637,7 @@ class Prediction:
             return new_value
 
         raise TypeError(
-            f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
+            f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'",
         )
 
 
@@ -636,12 +645,12 @@ class Classifier:
     __classifier: EncoderClassifier
     __save_dir: Path
 
-    def __init__(self) -> None:
+    def __init__(self: Self) -> None:
         self.__save_dir = Path(path.dirname(__file__)) / "tmp"
 
         self.__init_classifier()
 
-    def __init_classifier(self, force_cpu: bool = False) -> None:
+    def __init_classifier(self: Self, force_cpu: bool = False) -> None:
         run_opts: Optional[dict[str, Any]] = None
         if not force_cpu:
             run_opts = self.__get_run_opts()
@@ -657,7 +666,10 @@ class Classifier:
         self.__classifier = classifier
 
     def __classify(
-        self, wav_file: WAVFile, segment: Segment, manager: Optional[Manager] = None
+        self: Self,
+        wav_file: WAVFile,
+        segment: Segment,
+        manager: Optional[Manager] = None,
     ) -> Optional[Prediction]:
         wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
@@ -682,7 +694,7 @@ class Classifier:
                 (
                     p,
                     Language.from_str_unsafe(
-                        self.__classifier.hparams.label_encoder.decode_ndim(index)
+                        self.__classifier.hparams.label_encoder.decode_ndim(index),
                     ),
                 )
                 for index, p in enumerate(out_prob.exp().tolist()[0])
@@ -692,12 +704,12 @@ class Classifier:
 
             return Prediction(prob)
 
-        except Exception as exception:
-            if isinstance(exception, cuda.OutOfMemoryError):
+        except Exception as ex:  # noqa: BLE001
+            if isinstance(ex, cuda.OutOfMemoryError):
                 self.__init_classifier(True)
                 return self.__classify(wav_file, segment, manager)
 
-            print(exception, file=sys.stderr)
+            print(ex, file=sys.stderr)
             return None
 
     @staticmethod
@@ -721,7 +733,10 @@ class Classifier:
         print(f"used     : {naturalsize(info.used, binary=True)}")
 
     def predict(
-        self, wav_file: WAVFile, path: Path, manager: Optional[Manager] = None
+        self: Self,
+        wav_file: WAVFile,
+        path: Path,
+        manager: Optional[Manager] = None,
     ) -> tuple[PredictionBest, float]:
         def get_segments(runtime: Timestamp) -> list[Segment]:
             result: list[Segment] = []
@@ -796,7 +811,7 @@ class Classifier:
 
         return (PredictionBest(0.0, Language.unknown()), 0.0)
 
-    def __get_run_opts(self) -> Optional[dict[str, Any]]:
+    def __get_run_opts(self: Self) -> Optional[dict[str, Any]]:
         if not cuda.is_available():
             return None
 
@@ -811,7 +826,7 @@ class Classifier:
             "jit_module_keys": None,
         }
 
-    def __del__(self) -> None:
+    def __del__(self: Self) -> None:
         if self.__save_dir.exists():
             if self.__save_dir.is_file():
                 remove(str(self.__save_dir.absolute()))

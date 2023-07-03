@@ -3,7 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, Optional, Self, TypedDict, cast
 
 from classifier import Classifier
 from content import (
@@ -34,12 +34,12 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     __manager: Manager
     __status_bar: Any
 
-    def __init__(self, options: ContentOptions, classifier: Classifier) -> None:
+    def __init__(self: Self, options: ContentOptions, classifier: Classifier) -> None:
         super().__init__()
 
         self.__options = options
         self.__classifier = classifier
-        self.__progress_bars = dict()
+        self.__progress_bars = {}
         manager = get_manager()
         if not isinstance(manager, Manager):
             raise RuntimeError("UNREACHABLE (not runnable in notebooks)")
@@ -55,12 +55,15 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         )
 
     @override
-    def get_saved(self) -> Manager:
+    def get_saved(self: Self) -> Manager:
         return self.__manager
 
     @override
     def ignore(
-        self, file_path: Path, file_type: ScannedFileType, parent_folders: list[str]
+        self: Self,
+        file_path: Path,
+        file_type: ScannedFileType,
+        parent_folders: list[str],
     ) -> bool:
         name: str = file_path.name
         if file_type == ScannedFileType.folder:
@@ -78,7 +81,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
     @override
     def process(
-        self,
+        self: Self,
         file_path: Path,
         file_type: ScannedFileType,
         parent_folders: list[str],
@@ -96,7 +99,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             if content is None:
                 if self.__options["parse_error_is_exception"]:
                     raise RuntimeError(
-                        f"Parse Error: Couldn't parse content from '{file_path}'"
+                        f"Parse Error: Couldn't parse content from '{file_path}'",
                     )
 
                 return None
@@ -122,7 +125,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
     @override
     def start(
-        self,
+        self: Self,
         amount: tuple[int, int, int],
         name: str,
         parent_folders: list[str],
@@ -163,7 +166,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
     @override
     def progress(
-        self,
+        self: Self,
         name: str,
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
@@ -179,7 +182,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
 
     @override
     def finish(
-        self,
+        self: Self,
         name: str,
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
@@ -190,18 +193,19 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self.__progress_bars[name].close(clear=True)
         del self.__progress_bars[name]
 
-    def __del__(self) -> None:
+    def __del__(self: Self) -> None:
         self.__status_bar.update(stage="finished")
         self.__manager.stop()
 
 
 def load_from_file(file_path: Path) -> list[Content]:
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
                 json_loaded: list[Content] = cast(
-                    list[Content], json.load(file, cls=Decoder)
+                    list[Content],
+                    json.load(file, cls=Decoder),
                 )
                 return json_loaded
             case _:
@@ -230,7 +234,10 @@ def parse_contents(
 
     if not save_file.exists():
         contents: list[Content] = process_folder(
-            root_folder, callback=callback, name_parser=name_parser, parent_folders=[]
+            root_folder,
+            callback=callback,
+            name_parser=name_parser,
+            parent_folders=[],
         )
 
         save_to_file(save_file, contents)

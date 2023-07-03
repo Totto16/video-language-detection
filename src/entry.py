@@ -3,7 +3,7 @@
 
 import re as regex
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Self
 
 from classifier import Language, parse_int_safely
 from content import Content, NameParser, Summary
@@ -14,12 +14,12 @@ from typing_extensions import override
 class CustomNameParser(NameParser):
     __season_special_names: list[str]
 
-    def __init__(self, season_special_names: list[str]) -> None:
+    def __init__(self: Self, season_special_names: list[str]) -> None:
         super().__init__(Language("de", "German"))
         self.__season_special_names = season_special_names
 
     @override
-    def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
+    def parse_episode_name(self: Self, name: str) -> Optional[tuple[str, int, int]]:
         match = regex.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
         if match is None:
             return None
@@ -40,7 +40,7 @@ class CustomNameParser(NameParser):
         return (name, season, episode)
 
     @override
-    def parse_season_name(self, name: str) -> Optional[tuple[int]]:
+    def parse_season_name(self: Self, name: str) -> Optional[tuple[int]]:
         match = regex.search(r"Staffel (\d{2})", name)
         if match is None:
             if name in self.__season_special_names:
@@ -60,7 +60,7 @@ class CustomNameParser(NameParser):
         return (season,)
 
     @override
-    def parse_series_name(self, name: str) -> Optional[tuple[str, int]]:
+    def parse_series_name(self: Self, name: str) -> Optional[tuple[str, int]]:
         match = regex.search(r"(.*) \((\d{4})\)", name)
         if match is None:
             return None

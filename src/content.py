@@ -12,6 +12,7 @@ from typing import (
     Any,
     Generic,
     Optional,
+    Self,
     TypedDict,
     TypeVar,
     cast,
@@ -31,10 +32,10 @@ class ScannedFileType(Enum):
     def from_path(path: Path) -> "ScannedFileType":
         return ScannedFileType.folder if path.is_dir() else ScannedFileType.file
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<ScannedFileType: {self.name}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -44,10 +45,10 @@ class ContentType(Enum):
     episode = "episode"
     collection = "collection"
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<ContentType: {self.name}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -72,12 +73,12 @@ class EpisodeDescription:
     season: int
     episode: int
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return (
             f"<Episode season: {self.season} episode: {self.episode} name: {self.name}>"
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -86,10 +87,10 @@ class SeriesDescription:
     name: str
     year: int
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<Series name: {self.name} year: {self.year}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -97,10 +98,10 @@ class SeriesDescription:
 class SeasonDescription:
     season: int
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<Season season: {self.season}>y"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -111,7 +112,7 @@ IdentifierDescription = (
     | tuple[SeasonDescription, EpisodeDescription]
     | tuple[SeriesDescription, SeasonDescription, EpisodeDescription]
     | tuple[
-        CollectionDescription, SeriesDescription, SeasonDescription, EpisodeDescription
+        CollectionDescription, SeriesDescription, SeasonDescription, EpisodeDescription,
     ]
 )
 
@@ -131,18 +132,18 @@ class Summary:
     __missing: list[IdentifierDescription]
 
     def __init__(
-        self,
+        self: Self,
         languages: list[Language],
         descriptions: list[IdentifierDescription],
         detailed: bool = False,
     ) -> None:
         def get_dict(language: Language) -> LanguageDict:
-            dct: LanguageDict = dict()
+            dct: LanguageDict = {}
             dct[language] = 1
             return dct
 
         self.__languages = Summary.combine_langauge_dicts(
-            [get_dict(language) for language in languages]
+            [get_dict(language) for language in languages],
         )
         self.__duplicates = []
         self.__missing = []
@@ -152,7 +153,7 @@ class Summary:
 
     @staticmethod
     def from_single(
-        language: Language, description: EpisodeDescription, detailed: bool
+        language: Language, description: EpisodeDescription, detailed: bool,
     ) -> "Summary":
         return Summary([language], [(description,)], detailed)
 
@@ -161,40 +162,40 @@ class Summary:
         return Summary([], [], detailed)
 
     def combine_episodes(
-        self, description: SeasonDescription, summary: "Summary"
+        self: Self, description: SeasonDescription, summary: "Summary",
     ) -> None:
         self.__descriptions.extend(
-            [(description, desc[0]) for desc in summary.descriptions if len(desc) == 1]
+            [(description, desc[0]) for desc in summary.descriptions if len(desc) == 1],
         )
         self.__languages = Summary.combine_langauge_dicts(
-            [self.__languages, summary.languages]
+            [self.__languages, summary.languages],
         )
 
     def combine_seasons(
-        self, description: SeriesDescription, summary: "Summary"
+        self: Self, description: SeriesDescription, summary: "Summary",
     ) -> None:
         self.__descriptions.extend(
-            [(description, *desc) for desc in summary.descriptions if len(desc) == 2]
+            [(description, *desc) for desc in summary.descriptions if len(desc) == 2],
         )
 
         self.__languages = Summary.combine_langauge_dicts(
-            [self.__languages, summary.languages]
+            [self.__languages, summary.languages],
         )
 
     def combine_series(
-        self, description: CollectionDescription, summary: "Summary"
+        self: Self, description: CollectionDescription, summary: "Summary",
     ) -> None:
         self.__descriptions.extend(
-            [(description, *desc) for desc in summary.descriptions if len(desc) == 3]
+            [(description, *desc) for desc in summary.descriptions if len(desc) == 3],
         )
 
         self.__languages = Summary.combine_langauge_dicts(
-            [self.__languages, summary.languages]
+            [self.__languages, summary.languages],
         )
 
     @staticmethod
     def combine_langauge_dicts(inp: list[LanguageDict]) -> LanguageDict:
-        dct: LanguageDict = dict()
+        dct: LanguageDict = {}
         for input_dict in inp:
             for language, amount in input_dict.items():
                 if dct.get(language) is None:
@@ -205,18 +206,18 @@ class Summary:
         return dct
 
     @property
-    def descriptions(self) -> list[IdentifierDescription]:
+    def descriptions(self: Self) -> list[IdentifierDescription]:
         return self.__descriptions
 
     @property
-    def languages(self) -> LanguageDict:
+    def languages(self: Self) -> LanguageDict:
         return self.__languages
 
     # TODO
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return f"<Summary languages: {self.__languages}>"
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return str(self)
 
 
@@ -277,11 +278,11 @@ class Stats:
         return Stats(checksum=checksum, mtime=mtime)
 
     def is_outdated(
-        self, path: Path, _type: ScannedFileType, manager: Optional[Manager] = None
+        self: Self, path: Path, _type: ScannedFileType, manager: Optional[Manager] = None,
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
-                path, _type, generate_checksum=False, manager=manager
+                path, _type, generate_checksum=False, manager=manager,
             )
             if new_stats.mtime <= self.mtime:
                 return False
@@ -296,10 +297,10 @@ class Stats:
             return True
 
         raise RuntimeError(
-            "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
+            "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible",
         )
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self: Self) -> dict[str, Any]:
         as_dict: dict[str, Any] = {
             "checksum": self.checksum,
             "mtime": self.mtime,
@@ -310,10 +311,10 @@ class Stats:
     def from_dict(dct: StatsDict) -> "Stats":
         return Stats(checksum=dct.get("checksum"), mtime=dct["mtime"])
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -332,7 +333,7 @@ class ScannedFile:
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
             raise RuntimeError(
-                "No more than 3 parent folders are allowed: [collection] -> series -> season"
+                "No more than 3 parent folders are allowed: [collection] -> series -> season",
             )
 
         stats: Stats = Stats.from_file(file_path, file_type, generate_checksum=False)
@@ -344,15 +345,15 @@ class ScannedFile:
             stats=stats,
         )
 
-    def generate_checksum(self, manager: Optional[Manager] = None) -> None:
+    def generate_checksum(self: Self, manager: Optional[Manager] = None) -> None:
         self.stats = Stats.from_file(
-            self.path, self.type, generate_checksum=True, manager=manager
+            self.path, self.type, generate_checksum=True, manager=manager,
         )
 
-    def is_outdated(self, manager: Optional[Manager] = None) -> bool:
+    def is_outdated(self: Self, manager: Optional[Manager] = None) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -364,26 +365,26 @@ class ScannedFile:
         }
         return as_dict
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
 class NameParser:
     __language: Language
 
-    def __init__(self, language: Language = Language.unknown()) -> None:  # noqa: B008
+    def __init__(self: Self, language: Language = Language.unknown()) -> None:  # noqa: B008
         self.__language = language
 
-    def parse_episode_name(self, _name: str) -> Optional[tuple[str, int, int]]:
+    def parse_episode_name(self: Self, _name: str) -> Optional[tuple[str, int, int]]:
         raise MissingOverrideError
 
-    def parse_season_name(self, _name: str) -> Optional[tuple[int]]:
+    def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]:
         raise MissingOverrideError
 
-    def parse_series_name(self, _name: str) -> Optional[tuple[str, int]]:
+    def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]:
         raise MissingOverrideError
 
 
@@ -393,11 +394,11 @@ RT = TypeVar("RT")
 
 
 class Callback(Generic[C, CT, RT]):
-    def __init__(self) -> None:
+    def __init__(self: Self) -> None:
         pass
 
     def process(
-        self,
+        self: Self,
         file_path: Path,  # noqa: ARG002
         file_type: ScannedFileType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
@@ -408,12 +409,12 @@ class Callback(Generic[C, CT, RT]):
         return None
 
     def ignore(
-        self, _file_path: Path, _file_type: ScannedFileType, _parent_folders: list[str]
+        self: Self, _file_path: Path, _file_type: ScannedFileType, _parent_folders: list[str],
     ) -> bool:
         return False
 
     def start(
-        self,
+        self: Self,
         amount: tuple[int, int, int],  # noqa: ARG002
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
@@ -422,7 +423,7 @@ class Callback(Generic[C, CT, RT]):
         return None
 
     def progress(
-        self,
+        self: Self,
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
@@ -432,14 +433,14 @@ class Callback(Generic[C, CT, RT]):
         return None
 
     def finish(
-        self,
+        self: Self,
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
     ) -> None:
         return None
 
-    def get_saved(self) -> RT:
+    def get_saved(self: Self) -> RT:
         raise MissingOverrideError
 
 
@@ -455,26 +456,26 @@ class Content:
     __type: ContentType
     __scanned_file: ScannedFile
 
-    def __init__(self, _type: ContentType, scanned_file: ScannedFile) -> None:
+    def __init__(self: Self, _type: ContentType, scanned_file: ScannedFile) -> None:
         self.__type = _type
         self.__scanned_file = scanned_file
 
-    def summary(self, _detailed: bool = False) -> Summary:
-        raise MissingOverrideError()
-
-    @property
-    def type(self) -> ContentType:  # noqa: A003
-        return self.__type
-
-    @property
-    def description(self) -> Any:
+    def summary(self: Self, _detailed: bool = False) -> Summary:
         raise MissingOverrideError
 
     @property
-    def scanned_file(self) -> ScannedFile:
+    def type(self: Self) -> ContentType:  # noqa: A003
+        return self.__type
+
+    @property
+    def description(self: Self) -> Any:
+        raise MissingOverrideError
+
+    @property
+    def scanned_file(self: Self) -> ScannedFile:
         return self.__scanned_file
 
-    def generate_checksum(self, manager: Manager) -> None:
+    def generate_checksum(self: Self, manager: Manager) -> None:
         self.__scanned_file.generate_checksum(manager)
 
     @staticmethod
@@ -503,59 +504,59 @@ class Content:
             if len(parents) == 4:
                 if file_type == ScannedFileType.folder:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting 4 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting 4 - {file_path}!",
                     )
 
                 return EpisodeContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 3 and not top_is_collection:
                 if file_type == ScannedFileType.folder:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
                     )
 
                 return EpisodeContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 3 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
                     )
 
                 return SeasonContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 2 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
                     )
 
                 return SeasonContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 2 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
                     )
 
                 return SeriesContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 1 and not top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
                     )
 
                 return SeriesContent.from_path(file_path, scanned_file, name_parser)
             if len(parents) == 1 and top_is_collection:
                 if file_type == ScannedFileType.file:
                     raise RuntimeError(
-                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!"
+                        f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
                     )
                 return CollectionContent.from_path(file_path, scanned_file)
 
             raise RuntimeError("UNREACHABLE")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(e, file=sys.stderr)
             return None
 
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -566,7 +567,7 @@ class Content:
         return as_dict
 
     def scan(
-        self,
+        self: Self,
         callback: Callback["Content", ContentCharacteristic, Manager],  # noqa: ARG002
         name_parser: NameParser,  # noqa: ARG002
         *,
@@ -576,10 +577,10 @@ class Content:
     ) -> None:
         raise MissingOverrideError
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -616,7 +617,7 @@ def process_folder(
         results: list[Content] = []
         for file_path, file_type, parent_folders in temp:
             result: Optional[Content] = callback.process(
-                file_path, file_type, parent_folders, name_parser=name_parser
+                file_path, file_type, parent_folders, name_parser=name_parser,
             )
             value = (
                 result.type if result is not None else None,
@@ -699,7 +700,7 @@ class EpisodeContent(Content):
         name_parser: NameParser,
     ) -> "EpisodeContent":
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
-            path.name, name_parser
+            path.name, name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
@@ -707,7 +708,7 @@ class EpisodeContent(Content):
         return EpisodeContent(scanned_file, description)
 
     def __init__(
-        self,
+        self: Self,
         scanned_file: ScannedFile,
         description: EpisodeDescription,
         language: Language = Language.unknown(),  # noqa: B008
@@ -718,17 +719,17 @@ class EpisodeContent(Content):
         self.__language = language
 
     @property
-    def description(self) -> EpisodeDescription:
+    def description(self: Self) -> EpisodeDescription:
         return self.__description
 
     def __get_language(
-        self, classifier: Classifier, manager: Optional[Manager] = None
+        self: Self, classifier: Classifier, manager: Optional[Manager] = None,
     ) -> Language:
         try:
             wav_file = WAVFile(self.scanned_file.path)
 
             best, scanned_percent = classifier.predict(
-                wav_file, self.scanned_file.path, manager
+                wav_file, self.scanned_file.path, manager,
             )
             return best.language
         except FileMetadataError:
@@ -755,12 +756,12 @@ class EpisodeContent(Content):
         return EpisodeDescription(name, season, episode)
 
     @override
-    def summary(self, detailed: bool = False) -> Summary:
+    def summary(self: Self, detailed: bool = False) -> Summary:
         return Summary.from_single(self.__language, self.__description, detailed)
 
     @override
     def scan(
-        self,
+        self: Self,
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
@@ -814,7 +815,7 @@ class EpisodeContent(Content):
 
         self.generate_checksum(manager)
         callback.progress(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
         )
 
         # TODO: re-enable
@@ -825,14 +826,14 @@ class EpisodeContent(Content):
                 self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
         )
         callback.finish(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic
+            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
         )
 
     @override
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -845,10 +846,10 @@ class EpisodeContent(Content):
     def from_dict(dct: EpisodeContentDict) -> "EpisodeContent":
         return EpisodeContent(dct["scanned_file"], dct["description"], dct["language"])
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -868,7 +869,7 @@ class SeasonContent(Content):
         name_parser: NameParser,
     ) -> "SeasonContent":
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
-            path.name, name_parser
+            path.name, name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get SeasonDescription from '{path}'")
@@ -876,7 +877,7 @@ class SeasonContent(Content):
         return SeasonContent(scanned_file, description, [])
 
     def __init__(
-        self,
+        self: Self,
         scanned_file: ScannedFile,
         description: SeasonDescription,
         episodes: list[EpisodeContent],
@@ -907,11 +908,11 @@ class SeasonContent(Content):
         return SeasonDescription(season)
 
     @property
-    def description(self) -> SeasonDescription:
+    def description(self: Self) -> SeasonDescription:
         return self.__description
 
     @override
-    def summary(self, detailed: bool = False) -> Summary:
+    def summary(self: Self, detailed: bool = False) -> Summary:
         summary: Summary = Summary.empty(detailed)
         for episode in self.__episodes:
             summary.combine_episodes(self.description, episode.summary(detailed))
@@ -920,7 +921,7 @@ class SeasonContent(Content):
 
     @override
     def scan(
-        self,
+        self: Self,
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
@@ -941,7 +942,7 @@ class SeasonContent(Content):
                     self.__episodes.append(content)
                 else:
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent",
                     )
         else:
             ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
@@ -958,11 +959,11 @@ class SeasonContent(Content):
             for content in cast(list[Content], self.__episodes):
                 if not isinstance(content, EpisodeContent):
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent",
                     )
 
     @override
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -975,10 +976,10 @@ class SeasonContent(Content):
     def from_dict(dct: SeasonContentDict) -> "SeasonContent":
         return SeasonContent(dct["scanned_file"], dct["description"], dct["episodes"])
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -998,7 +999,7 @@ class SeriesContent(Content):
         name_parser: NameParser,
     ) -> "SeriesContent":
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
-            path.name, name_parser
+            path.name, name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get SeriesDescription from '{path}'")
@@ -1006,7 +1007,7 @@ class SeriesContent(Content):
         return SeriesContent(scanned_file, description, [])
 
     def __init__(
-        self,
+        self: Self,
         scanned_file: ScannedFile,
         description: SeriesDescription,
         seasons: list[SeasonContent],
@@ -1017,7 +1018,7 @@ class SeriesContent(Content):
         self.__seasons = seasons
 
     @property
-    def description(self) -> SeriesDescription:
+    def description(self: Self) -> SeriesDescription:
         return self.__description
 
     @staticmethod
@@ -1041,7 +1042,7 @@ class SeriesContent(Content):
         return SeriesDescription(name, year)
 
     @override
-    def summary(self, detailed: bool = False) -> Summary:
+    def summary(self: Self, detailed: bool = False) -> Summary:
         summary: Summary = Summary.empty(detailed)
         for season in self.__seasons:
             summary.combine_seasons(self.description, season.summary(detailed))
@@ -1050,7 +1051,7 @@ class SeriesContent(Content):
 
     @override
     def scan(
-        self,
+        self: Self,
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
@@ -1071,7 +1072,7 @@ class SeriesContent(Content):
                     self.__seasons.append(content)
                 else:
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent",
                     )
 
         else:
@@ -1089,11 +1090,11 @@ class SeriesContent(Content):
             for content in cast(list[Content], self.__seasons):
                 if not isinstance(content, SeasonContent):
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent",
                     )
 
     @override
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -1106,10 +1107,10 @@ class SeriesContent(Content):
     def from_dict(dct: SeriesContentDict) -> "SeriesContent":
         return SeriesContent(dct["scanned_file"], dct["description"], dct["seasons"])
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -1127,7 +1128,7 @@ class CollectionContent(Content):
         return CollectionContent(scanned_file, path.name, [])
 
     def __init__(
-        self,
+        self: Self,
         scanned_file: ScannedFile,
         description: CollectionDescription,
         series: list[SeriesContent],
@@ -1138,11 +1139,11 @@ class CollectionContent(Content):
         self.__series = series
 
     @property
-    def description(self) -> str:
+    def description(self: Self) -> str:
         return self.__description
 
     @override
-    def summary(self, detailed: bool = False) -> Summary:
+    def summary(self: Self, detailed: bool = False) -> Summary:
         summary: Summary = Summary.empty(detailed)
         for serie in self.__series:
             summary.combine_series(self.description, serie.summary(detailed))
@@ -1150,7 +1151,7 @@ class CollectionContent(Content):
         return summary
 
     @override
-    def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = self.__description
         as_dict["series"] = self.__series
@@ -1158,7 +1159,7 @@ class CollectionContent(Content):
 
     @override
     def scan(
-        self,
+        self: Self,
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
@@ -1179,7 +1180,7 @@ class CollectionContent(Content):
                     self.__series.append(content)
                 else:
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent",
                     )
 
         else:
@@ -1197,17 +1198,17 @@ class CollectionContent(Content):
             for content in cast(list[Content], self.__series):
                 if not isinstance(content, SeriesContent):
                     raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent",
                     )
 
     @staticmethod
     def from_dict(dct: CollectionContentDict) -> "CollectionContent":
         return CollectionContent(dct["scanned_file"], dct["description"], dct["series"])
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         return str(self.as_dict())
 
-    def __repr__(self) -> str:
+    def __repr__(self: Self) -> str:
         return self.__str__()
 
 
@@ -1216,7 +1217,7 @@ TYPE_KEY: str = "__type__"
 
 
 class Encoder(JSONEncoder):
-    def default(self, o: Any) -> Any:
+    def default(self: Self, o: Any) -> Any:
         if isinstance(o, Content):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict(self)}
         if isinstance(o, ScannedFile):
@@ -1234,7 +1235,7 @@ class Encoder(JSONEncoder):
 
 
 class Decoder(JSONDecoder):
-    def __init__(self) -> None:
+    def __init__(self: Self) -> None:
         def object_hook(dct: dict[str, Any] | Any) -> Any:
             if not isinstance(dct, dict):
                 return dct
@@ -1244,7 +1245,7 @@ class Decoder(JSONDecoder):
                 return dct
 
             def pipe(dct: Any, keys: list[str]) -> dict[str, Any]:
-                result: dict[str, Any] = dict()
+                result: dict[str, Any] = {}
                 for key in keys:
                     result[key] = object_hook(dct[key])
 
@@ -1307,7 +1308,7 @@ class Decoder(JSONDecoder):
                 # error
                 case _:
                     raise TypeError(
-                        f"Object of type {_type} is not JSON de-serializable"
+                        f"Object of type {_type} is not JSON de-serializable",
                     )
 
         super().__init__(object_hook=object_hook)

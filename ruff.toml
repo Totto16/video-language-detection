@@ -1,15 +1,23 @@
 # Enable flake8-bugbear (`B`) rules.
-select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY", "PERF", "RUF"]
+select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY", "PERF", "RUF", "PERF", "Q", "TCH", "RSE", "PYI", "ISC", "C4", "COM", "BLE", "S", "ASYNC", "ANN" ,"YTT", "UP", "N", "I"]
 
 # Never enforce `E501` (line length violations).
 # PLR2004 =>  magic-value-comparison 
 # PLR0913 =>  too-many-arguments
 # PLR0911 =>  too-many-return-statements 
 # PLR0912 =>  too-many-branches 
-ignore = ["E501", "PLR2004", "PLR0913", "PLR0911", "PLR0912"]
+# UP007   =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
+# ANN401  =>  any-type 
+ignore = ["E501", "PLR2004", "PLR0913", "PLR0911", "PLR0912", "UP007", "ANN401"]
 
 # Avoid trying to fix flake8-bugbear (`B`) violations.
 # unfixable = ["B"]
+
+# Same as Black.
+line-length = 100
+
+# Assume Python 3.11.
+target-version = "py311"
 
 # Ignore `E402` (import violations) in all `__init__.py` files
 [per-file-ignores]
