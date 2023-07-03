@@ -283,32 +283,37 @@ class WAVFile:
         self.__runtime = runtime
 
     def __get_info(self) -> tuple[FileType, Status, Timestamp]:
-        metadata = FFProbe(str(self.__file.absolute()))
-        for stream in metadata.streams:
-            if stream.is_video():
-                return (
-                    FileType.video,
-                    Status.raw,
-                    Timestamp.from_seconds(stream.duration_seconds()),
-                )
+        try:
+            metadata = FFProbe(str(self.__file.absolute()))
+            for stream in metadata.streams:
+                if stream.is_video():
+                    return (
+                        FileType.video,
+                        Status.raw,
+                        Timestamp.from_seconds(stream.duration_seconds()),
+                    )
 
-        for stream in metadata.streams:
-            if stream.is_audio() and stream.codec() == "pcm_s16le":
-                return (
-                    FileType.wav,
-                    Status.ready,
-                    Timestamp.from_seconds(stream.duration_seconds()),
-                )
+            for stream in metadata.streams:
+                if stream.is_audio() and stream.codec() == "pcm_s16le":
+                    return (
+                        FileType.wav,
+                        Status.ready,
+                        Timestamp.from_seconds(stream.duration_seconds()),
+                    )
 
-        for stream in metadata.streams:
-            if stream.is_audio():
-                return (
-                    FileType.audio,
-                    Status.raw,
-                    Timestamp.from_seconds(stream.duration_seconds()),
-                )
+            for stream in metadata.streams:
+                if stream.is_audio():
+                    return (
+                        FileType.audio,
+                        Status.raw,
+                        Timestamp.from_seconds(stream.duration_seconds()),
+                    )
+        except Exception as e:
+            raise Exception(
+                f"Unable to get a valid stream from file '{self.__file}'"
+            ) from e
 
-        raise Exception(f"Unable to get a valid stream from file {self.__file}")
+        raise Exception(f"Unable to get a valid stream from file '{self.__file}'")
 
     @property
     def runtime(self) -> Timestamp:
@@ -520,6 +525,9 @@ class PredictionBest:
         return str(self)
 
 
+TRUNCATED_PERCENTILE: float = 0.2
+
+
 # see: https://en.wikipedia.org/wiki/Mean
 class MeanType(Enum):
     arithmetic = "arithmetic"
@@ -548,8 +556,7 @@ def get_mean(
             sum_value = sum(1 / value for value in values)
             return len(values) / sum_value
         case MeanType.truncated:
-            PERCENTILE = 0.2
-            start: int = floor(len(values) * PERCENTILE)
+            start: int = floor(len(values) * TRUNCATED_PERCENTILE)
             end: int = len(values) - start
             new_values: list[float] = [
                 value

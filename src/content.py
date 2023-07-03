@@ -213,9 +213,12 @@ class Summary:
     def languages(self) -> LanguageDict:
         return self.__languages
 
-    #TODO
+    # TODO
     def __str__(self) -> str:
         return f"<Summary languages: {self.__languages}>"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 @dataclass
