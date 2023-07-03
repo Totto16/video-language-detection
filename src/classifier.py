@@ -32,9 +32,9 @@ WAV_FILE_BAR_FMT = (
 )
 
 
-def parse_int_safely(input: str) -> Optional[int]:
+def parse_int_safely(inp: str) -> Optional[int]:
     try:
-        return int(input)
+        return int(inp)
     except ValueError:
         return None
 
@@ -96,35 +96,34 @@ class Timestamp:
 
         if spec == "" or spec == "d":
             return str(delta)
-        else:
 
-            def round_to_tens(value: int, tens: int) -> int:
-                return int(round(value / (10**tens)))
+        def round_to_tens(value: int, tens: int) -> int:
+            return int(round(value / (10**tens)))
 
-            try:
-                ignore_zero: bool = False
-                if spec.endswith("n"):
-                    ignore_zero = True
-                    spec = spec[:-1]
+        try:
+            ignore_zero: bool = False
+            if spec.endswith("n"):
+                ignore_zero = True
+                spec = spec[:-1]
 
-                if ignore_zero and ms == 0:
-                    return str(delta)
+            if ignore_zero and ms == 0:
+                return str(delta)
 
-                val = parse_int_safely(spec)
-                if val is None:
-                    raise Exception
+            val = parse_int_safely(spec)
+            if val is None:
+                raise Exception
 
-                if val > 5 or val <= 0:
-                    raise Exception
+            if val > 5 or val <= 0:
+                raise Exception
 
-                # val is between 1 and 5 inclusive
-                ms = round_to_tens(ms, 5 - val)
+            # val is between 1 and 5 inclusive
+            ms = round_to_tens(ms, 5 - val)
 
-                return "{delta}.{ms:0{val}d}".format(delta=str(delta), ms=ms, val=val)
-            except Exception:
-                raise ValueError(
-                    f"Invalid format specifier '{spec}' for object of type 'Timestamp'"
-                )
+            return "{delta}.{ms:0{val}d}".format(delta=str(delta), ms=ms, val=val)
+        except Exception:
+            raise ValueError(
+                f"Invalid format specifier '{spec}' for object of type 'Timestamp'"
+            ) from None
 
     def __eq__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
@@ -138,34 +137,34 @@ class Timestamp:
     def __lt__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta < value.delta
-        else:
-            raise TypeError(
-                f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __le__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta <= value.delta
-        else:
-            raise TypeError(
-                f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __gt__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta > value.delta
-        else:
-            raise TypeError(
-                f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __ge__(self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta >= value.delta
-        else:
-            raise TypeError(
-                f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __iadd__(self, value: object) -> "Timestamp":
         new_value: Timestamp = Timestamp(self.__delta) + value
@@ -175,25 +174,25 @@ class Timestamp:
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta + value.delta
             return Timestamp(result)
-        elif isinstance(value, timedelta):
+        if isinstance(value, timedelta):
             result = self.__delta + value
             return Timestamp(result)
-        else:
-            raise TypeError(
-                f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __sub__(self, value: object) -> "Timestamp":
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta - value.delta
             return Timestamp(result)
-        elif isinstance(value, float):
+        if isinstance(value, float):
             result2: Timestamp = self - Timestamp.from_minutes(value)
             return result2
-        else:
-            raise TypeError(
-                f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
     def __abs__(self) -> "Timestamp":
         return Timestamp(abs(self.__delta))
@@ -204,12 +203,12 @@ class Timestamp:
     def __truediv__(self, value: object) -> float:
         if isinstance(value, Timestamp):
             return self.__delta / value.delta
-        elif isinstance(value, float):
+        if isinstance(value, float):
             return self / Timestamp.from_minutes(value)
-        else:
-            raise TypeError(
-                f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        )
 
 
 class FileType(Enum):
@@ -249,14 +248,14 @@ class Segment:
     def timediff(self, runtime: Timestamp) -> Timestamp:
         if self.start is None and self.end is None:
             return runtime
-        elif self.start is None and self.end is not None:
+        if self.start is None and self.end is not None:
             return self.end
-        elif self.start is not None and self.end is None:
+        if self.start is not None and self.end is None:
             return runtime - self.start
-        elif self.start is not None and self.end is not None:
+        if self.start is not None and self.end is not None:
             return self.end - self.start
-        else:
-            raise RuntimeError("UNREACHABLE")
+
+        raise RuntimeError("UNREACHABLE")
 
 
 @dataclass
@@ -284,8 +283,8 @@ class WAVFile:
         info = self.__get_info()
         if info is None:
             raise FileMetadataError()
-        type, status, runtime = info
-        self.__type = type
+        _type, status, runtime = info
+        self.__type = _type
         self.__status = status
         self.__runtime = runtime
 
@@ -329,17 +328,23 @@ class WAVFile:
 
     def create_wav_file(
         self,
-        options: WAVOptions = WAVOptions(
-            bitrate=16000,
-            segment=Segment(
-                start=None,
-                end=Timestamp.from_minutes(10.0),
-            ),
-        ),
+        _options: Optional[WAVOptions] = None,
         *,
         force_recreation: bool = False,
         manager: Optional[Manager] = None,
     ) -> bool:
+        options: WAVOptions = (
+            WAVOptions(
+                bitrate=16000,
+                segment=Segment(
+                    start=None,
+                    end=Timestamp.from_minutes(10.0),
+                ),
+            )
+            if _options is None
+            else _options
+        )
+
         match (self.__status, self.__type, force_recreation):
             case (Status.ready, _, False):
                 return False
@@ -460,23 +465,23 @@ class Language:
     long: str
 
     @staticmethod
-    def from_str(input: str) -> Optional["Language"]:
-        arr: list[str] = [a.strip() for a in input.split(":")]
+    def from_str(inp: str) -> Optional["Language"]:
+        arr: list[str] = [a.strip() for a in inp.split(":")]
         if len(arr) != 2:
             return None
 
         return Language(arr[0], arr[1])
 
     @staticmethod
-    def from_str_unsafe(input: str) -> "Language":
-        lan: Optional["Language"] = Language.from_str(input)
+    def from_str_unsafe(inp: str) -> "Language":
+        lan: Optional["Language"] = Language.from_str(inp)
         if lan is None:
-            raise RuntimeError(f"Couldn't get the Language from str '{input}'")
+            raise RuntimeError(f"Couldn't get the Language from str '{inp}'")
 
         return lan
 
     @staticmethod
-    def Unknown() -> "Language":
+    def unknown() -> "Language":
         return Language("un", "Unknown")
 
     def __str__(self) -> str:
@@ -601,7 +606,7 @@ class Prediction:
     def get_best(self, mean_type: MeanType = MeanType.arithmetic) -> PredictionBest:
         best_list: list[PredictionBest] = self.get_best_list(mean_type)
         if len(best_list) == 0:
-            return PredictionBest(0.0, Language.Unknown())
+            return PredictionBest(0.0, Language.unknown())
 
         return best_list[0]
 
@@ -621,10 +626,10 @@ class Prediction:
             new_value.append_other(self)
             new_value.append_other(value)
             return new_value
-        else:
-            raise TypeError(
-                f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
-            )
+
+        raise TypeError(
+            f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
+        )
 
 
 class Classifier:
@@ -691,9 +696,9 @@ class Classifier:
             if isinstance(exception, cuda.OutOfMemoryError):
                 self.__init_classifier(True)
                 return self.__classify(wav_file, segment, manager)
-            else:
-                print(exception, file=sys.stderr)
-                return None
+
+            print(exception, file=sys.stderr)
+            return None
 
     @staticmethod
     def clear_gpu_cache() -> None:
@@ -703,7 +708,7 @@ class Classifier:
     @staticmethod
     def print_gpu_stat() -> None:
         if not cuda.is_available():
-            return None
+            return
 
         Classifier.clear_gpu_cache()
 
@@ -775,7 +780,7 @@ class Classifier:
                 else:
                     continue
 
-            if best.language == Language.Unknown():
+            if best.language == Language.unknown():
                 continue
 
             if bar is not None:
@@ -789,7 +794,7 @@ class Classifier:
         best = prediction.get_best(MeanType.truncated)
         print(f"Couldn't get Language of '{path}': {best}", file=sys.stderr)
 
-        return (PredictionBest(0.0, Language.Unknown()), 0.0)
+        return (PredictionBest(0.0, Language.unknown()), 0.0)
 
     def __get_run_opts(self) -> Optional[dict[str, Any]]:
         if not cuda.is_available():

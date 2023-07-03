@@ -10,7 +10,6 @@ from os import listdir
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Generic,
     Optional,
     TypedDict,
@@ -355,9 +354,9 @@ class ScannedFile:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
-        encode: Callable[[Any], Any] = lambda x: (
-            x if json_encoder is None else json_encoder.default(x)
-        )
+        def encode(x: Any) -> Any:
+            return x if json_encoder is None else json_encoder.default(x)
+
         as_dict: dict[str, Any] = {
             "path": encode(self.path),
             "parents": self.parents,
@@ -376,7 +375,7 @@ class ScannedFile:
 class NameParser:
     __language: Language
 
-    def __init__(self, language: Language = Language.Unknown()) -> None:
+    def __init__(self, language: Language = Language.unknown()) -> None:
         self.__language = language
 
     def parse_episode_name(self, name: str) -> Optional[tuple[str, int, int]]:
@@ -553,9 +552,8 @@ class Content:
             return None
 
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
-        encode: Callable[[Any], Any] = lambda x: (
-            x if json_encoder is None else json_encoder.default(x)
-        )
+        def encode(x: Any) -> Any:
+            return x if json_encoder is None else json_encoder.default(x)
 
         as_dict: dict[str, Any] = {
             "scanned_file": encode(self.__scanned_file),
@@ -568,7 +566,7 @@ class Content:
         callback: Callback["Content", ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
-        parent_folders: list[str] = [],
+        parent_folders: list[str],
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
@@ -629,34 +627,33 @@ def process_folder(
 
         return results
 
-    else:
-        already_scanned_file_paths: list[Path] = [
-            content.scanned_file.path for content in rescan
-        ]
+    already_scanned_file_paths: list[Path] = [
+        content.scanned_file.path for content in rescan
+    ]
 
-        for file_path, file_type, parent_folders in temp:
-            is_rescan = (
-                None
-                if file_path not in already_scanned_file_paths
-                else (rescan[already_scanned_file_paths.index(file_path)])
-            )
+    for file_path, file_type, parent_folders in temp:
+        is_rescan = (
+            None
+            if file_path not in already_scanned_file_paths
+            else (rescan[already_scanned_file_paths.index(file_path)])
+        )
 
-            result = callback.process(
-                file_path,
-                file_type,
-                parent_folders,
-                name_parser=name_parser,
-                rescan=is_rescan,
-            )
+        result = callback.process(
+            file_path,
+            file_type,
+            parent_folders,
+            name_parser=name_parser,
+            rescan=is_rescan,
+        )
 
-            value = (
-                result.type if result is not None else None,
-                ScannedFileType.from_path(file_path),
-            )
+        value = (
+            result.type if result is not None else None,
+            ScannedFileType.from_path(file_path),
+        )
 
-            callback.progress(directory.name, parent_folders, value)
-            if result is not None and is_rescan is None:
-                rescan.append(result)
+        callback.progress(directory.name, parent_folders, value)
+        if result is not None and is_rescan is None:
+            rescan.append(result)
 
         value = (parent_type, ScannedFileType.folder)
         callback.finish(directory.name, parent_folders, value)
@@ -709,7 +706,7 @@ class EpisodeContent(Content):
         self,
         scanned_file: ScannedFile,
         description: EpisodeDescription,
-        language: Language = Language.Unknown(),
+        language: Language = Language.unknown(),
     ) -> None:
         super().__init__(ContentType.episode, scanned_file)
 
@@ -731,7 +728,7 @@ class EpisodeContent(Content):
             )
             return best.language
         except FileMetadataError:
-            return Language.Unknown()
+            return Language.unknown()
 
     @staticmethod
     def is_valid_name(
@@ -763,7 +760,7 @@ class EpisodeContent(Content):
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
-        parent_folders: list[str] = [],
+        parent_folders: list[str],
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
@@ -775,7 +772,7 @@ class EpisodeContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
 
             if not is_outdated:
-                if self.__language == Language.Unknown():
+                if self.__language == Language.unknown():
                     callback.start(
                         (1, 1, 0),
                         self.scanned_file.path.name,
@@ -832,9 +829,9 @@ class EpisodeContent(Content):
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
-        encode: Callable[[Any], Any] = lambda x: (
-            x if json_encoder is None else json_encoder.default(x)
-        )
+        def encode(x: Any) -> Any:
+            return x if json_encoder is None else json_encoder.default(x)
+
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = encode(self.__description)
         as_dict["language"] = encode(self.__language)
@@ -923,7 +920,7 @@ class SeasonContent(Content):
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
-        parent_folders: list[str] = [],
+        parent_folders: list[str],
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
@@ -962,9 +959,9 @@ class SeasonContent(Content):
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
-        encode: Callable[[Any], Any] = lambda x: (
-            x if json_encoder is None else json_encoder.default(x)
-        )
+        def encode(x: Any) -> Any:
+            return x if json_encoder is None else json_encoder.default(x)
+
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = encode(self.__description)
         as_dict["episodes"] = self.__episodes
@@ -1053,7 +1050,7 @@ class SeriesContent(Content):
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
-        parent_folders: list[str] = [],
+        parent_folders: list[str],
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
@@ -1093,9 +1090,9 @@ class SeriesContent(Content):
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
-        encode: Callable[[Any], Any] = lambda x: (
-            x if json_encoder is None else json_encoder.default(x)
-        )
+        def encode(x: Any) -> Any:
+            return x if json_encoder is None else json_encoder.default(x)
+
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = encode(self.__description)
         as_dict["seasons"] = self.__seasons
@@ -1161,7 +1158,7 @@ class CollectionContent(Content):
         callback: Callback[Content, ContentCharacteristic, Manager],
         name_parser: NameParser,
         *,
-        parent_folders: list[str] = [],
+        parent_folders: list[str],
         classifier: Classifier,
         rescan: bool = False,
     ) -> None:
@@ -1218,18 +1215,18 @@ class Encoder(JSONEncoder):
     def default(self, o: Any) -> Any:
         if isinstance(o, Content):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict(self)}
-        elif isinstance(o, ScannedFile):
+        if isinstance(o, ScannedFile):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.as_dict(self)}
-        elif isinstance(o, Path):
+        if isinstance(o, Path):
             return {TYPE_KEY: "Path", VALUE_KEY: str(o.absolute())}
-        elif isinstance(o, Enum):
+        if isinstance(o, Enum):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: o.name}
-        elif isinstance(o, Stats):
+        if isinstance(o, Stats):
             return {TYPE_KEY: "Stats", VALUE_KEY: o.as_dict()}
-        elif is_dataclass(o):
+        if is_dataclass(o):
             return {TYPE_KEY: o.__class__.__name__, VALUE_KEY: dc.asdict(o)}
-        else:
-            return super().default(o)
+
+        return super().default(o)
 
 
 class Decoder(JSONDecoder):
@@ -1238,8 +1235,8 @@ class Decoder(JSONDecoder):
             if not isinstance(dct, dict):
                 return dct
 
-            type: Optional[str] = cast(Optional[str], dct.get(TYPE_KEY))
-            if type is None:
+            _type: Optional[str] = cast(Optional[str], dct.get(TYPE_KEY))
+            if _type is None:
                 return dct
 
             def pipe(dct: Any, keys: list[str]) -> dict[str, Any]:
@@ -1250,7 +1247,7 @@ class Decoder(JSONDecoder):
                 return result
 
             value: Any = dct[VALUE_KEY]
-            match type:
+            match _type:
                 # Enums
                 case "ScannedFileType":
                     return ScannedFileType(value)
@@ -1306,7 +1303,7 @@ class Decoder(JSONDecoder):
                 # error
                 case _:
                     raise TypeError(
-                        f"Object of type {type} is not JSON de-serializable"
+                        f"Object of type {_type} is not JSON de-serializable"
                     )
 
         super().__init__(object_hook=object_hook)

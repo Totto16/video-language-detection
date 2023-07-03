@@ -24,7 +24,7 @@ ruff = "*"
 [scripts]
 check = "python src/entry.py"
 test = "python tests/test_simple.py tests/test_ru.wav"
-lint = "mypy src --strict --ignore-missing-imports"
+lint = "mypy src --strict --ignore-missing-imports && ruff check src"
 
 [requires]
 python_version = "3.11"

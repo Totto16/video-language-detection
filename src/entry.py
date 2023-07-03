@@ -45,8 +45,8 @@ class CustomNameParser(NameParser):
         if match is None:
             if name in self.__season_special_names:
                 return (0,)
-            else:
-                return None
+
+            return None
 
         groups = match.groups()
         if len(groups) != 1:
@@ -77,8 +77,11 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
+SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
+ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
+
+
 def main() -> None:
-    ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
     video_formats: list[str] = ["mp4", "mkv", "avi"]
     ignore_files: list[str] = [
         "metadata",
@@ -88,8 +91,6 @@ def main() -> None:
         "Reportagen",
     ]
     parse_error_is_exception: bool = False
-
-    SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
 
     contents: list[Content] = parse_contents(
         ROOT_FOLDER,

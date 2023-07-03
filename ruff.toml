@@ -2,10 +2,14 @@
 select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "TD", "FIX", "PL", "FLY", "PERF", "RUF"]
 
 # Never enforce `E501` (line length violations).
-ignore = ["E501"]
+# PLR2004 =>  magic-value-comparison 
+# PLR0913 =>  too-many-arguments
+# PLR0911 =>  too-many-return-statements 
+# PLR0912 =>  too-many-branches 
+ignore = ["E501", "PLR2004", "PLR0913", "PLR0911", "PLR0912"]
 
 # Avoid trying to fix flake8-bugbear (`B`) violations.
-unfixable = ["B"]
+# unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files
 [per-file-ignores]
