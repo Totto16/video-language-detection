@@ -1,1 +1,8 @@
-from [here](https://github.com/igorsitdikov/lid_kaldi)
+# TODO
+
+
+
+
+## Customize
+
+Folder, title etc.
