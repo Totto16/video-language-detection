@@ -213,8 +213,9 @@ class Summary:
     def languages(self) -> LanguageDict:
         return self.__languages
 
-    def combine(self, summary: "Summary") -> None:
-        pass
+    #TODO
+    def __str__(self) -> str:
+        return f"<Summary languages: {self.__languages}>"
 
 
 @dataclass
@@ -665,6 +666,10 @@ class EpisodeContentDict(ContentDict):
     language: Language
 
 
+GLOBAL_ITER_MAX: int = 100
+itr: int = 0
+
+
 class EpisodeContent(Content):
     __description: EpisodeDescription
     __language: Language
@@ -687,11 +692,12 @@ class EpisodeContent(Content):
         self,
         scanned_file: ScannedFile,
         description: EpisodeDescription,
+        language: Language = Language.Unknown(),
     ) -> None:
         super().__init__(ContentType.episode, scanned_file)
 
         self.__description = description
-        self.__language = Language.Unknown()
+        self.__language = language
 
     @property
     def description(self) -> EpisodeDescription:
@@ -701,9 +707,6 @@ class EpisodeContent(Content):
         self, classifier: Classifier, manager: Optional[Manager] = None
     ) -> Language:
         wav_file = WAVFile(self.scanned_file.path)
-
-        # if "A" not in self.scanned_file.path.name or self.__description.season != 20:
-        #     return Language.Unknown()
 
         best, scanned_percent = classifier.predict(
             wav_file, self.scanned_file.path, manager
@@ -761,7 +764,10 @@ class EpisodeContent(Content):
                     )
 
                     # TODO: re-enable
-                    # self.__language = self.__get_language(classifier, manager)
+                    global itr
+                    if itr < GLOBAL_ITER_MAX:
+                        self.__language = self.__get_language(classifier, manager)
+                        itr = itr + 1
 
                     callback.progress(
                         self.scanned_file.path.name,
@@ -789,7 +795,9 @@ class EpisodeContent(Content):
         )
 
         # TODO: re-enable
-        # self.__language = self.__get_language(classifier, manager)
+        if itr < GLOBAL_ITER_MAX:
+            self.__language = self.__get_language(classifier, manager)
+            itr = itr + 1
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
@@ -810,7 +818,7 @@ class EpisodeContent(Content):
 
     @staticmethod
     def from_dict(dct: EpisodeContentDict) -> "EpisodeContent":
-        return EpisodeContent(dct["scanned_file"], dct["description"])
+        return EpisodeContent(dct["scanned_file"], dct["description"], dct["language"])
 
     def __str__(self) -> str:
         return str(self.as_dict())

@@ -760,7 +760,8 @@ class Classifier:
         if bar is not None:
             bar.close(clear=True)
 
-        print(f"Couldn't get Language of '{path}'")
+        best = prediction.get_best(MeanType.truncated)
+        print(f"Couldn't get Language of '{path}': {best}")
 
         return (PredictionBest(0.0, Language.Unknown()), 0.0)
 
