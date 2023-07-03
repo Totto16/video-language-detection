@@ -22,7 +22,7 @@ from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
 from torch import cuda
 
-from ffmpeg import FFmpeg, Progress  # type: ignore[attr-defined]
+from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
 
 filterwarnings("ignore")
 
@@ -350,19 +350,21 @@ class WAVFile:
             case (_, FileType.wav, _):
                 return False
             case (Status.raw, _, False):
-                self.__convert_to_wav(options, manager)
-                return True
+                return self.__convert_to_wav(options, manager)
             case (_, _, True):
-                self.__convert_to_wav(options, manager)
-                return True
+                return self.__convert_to_wav(options, manager)
             case _:  # stupid mypy
                 raise RuntimeError("UNREACHABLE")
+
+    @property
+    def status(self: Self) -> Status:
+        return self.__status
 
     def __convert_to_wav(
         self: Self,
         options: WAVOptions,
         manager: Optional[Manager] = None,
-    ) -> None:
+    ) -> bool:
         bar: Optional[Any] = None
 
         if not options.segment.is_valid:
@@ -415,7 +417,7 @@ class WAVFile:
 
         input_options: dict[str, Any] = {}
 
-        ffmpeg: FFmpeg = (
+        ffmpeg_proc: FFmpeg = (
             FFmpeg()
             .option("y")
             .input(str(self.__file.absolute()), input_options)
@@ -429,13 +431,25 @@ class WAVFile:
                 bar.update(delta_time)
                 elapsed_time += progress.time
 
-        ffmpeg.on("progress", progress_report)
-        ffmpeg.execute()
+        def stderr_callback(err: str) -> None:
+            print(err, file=sys.stderr)
+
+        ffmpeg_proc.on("progress", progress_report)
+        ffmpeg_proc.on("stderr", stderr_callback)
+        try:
+            ffmpeg_proc.execute()
+        except FFmpegError as e:
+            print(e, file=sys.stderr)
+            if bar is not None:
+                bar.close(clear=True)
+            return False
 
         self.__status = Status.ready
 
         if bar is not None:
             bar.close(clear=True)
+
+        return True
 
     def wav_path(self: Self) -> Path:
         match (self.__status, self.__type):
@@ -451,7 +465,7 @@ class WAVFile:
                 raise RuntimeError("UNREACHABLE")
 
     def __del__(self: Self) -> None:
-        if self.__tmp_file is not None:
+        if self.__tmp_file is not None and self.__tmp_file.exists():
             remove(str(self.__tmp_file.absolute()))
 
 
@@ -671,11 +685,14 @@ class Classifier:
         segment: Segment,
         manager: Optional[Manager] = None,
     ) -> Optional[Prediction]:
-        wav_file.create_wav_file(
+        result: bool = wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
             force_recreation=True,
             manager=manager,
         )
+
+        if not result and wav_file.status != Status.ready:
+            return None
 
         # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
         wavs: Any = self.__classifier.load_audio(
