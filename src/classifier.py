@@ -5,8 +5,9 @@ from datetime import timedelta
 from enum import Enum
 from functools import reduce
 from math import floor
+import math
 from os import makedirs, path, remove
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, TypedDict, cast
 from pathlib import Path
 from enlighten import Manager
 from ffprobe import FFProbe
@@ -440,7 +441,7 @@ class WAVFile:
             remove(str(self.__tmp_file.absolute()))
 
 
-class LanguageDict(TypedDict):
+class LanguagePercentageDict(TypedDict):
     language: str
     score: float
 
@@ -512,6 +513,12 @@ class PredictionBest:
     accuracy: float
     language: Language
 
+    def __str__(self) -> str:
+        return f"<PredictionBest accuracy: {self.accuracy} language: {self.language}>y"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 # see: https://en.wikipedia.org/wiki/Mean
 class MeanType(Enum):
@@ -536,7 +543,7 @@ def get_mean(
             return sum_value / len(values)
         case MeanType.geometric:
             sum_value = reduce(lambda x, y: x * y, values, 1.0)
-            return sum_value ** (1 / len(values))
+            return math.pow(sum_value, (1 / len(values)))
         case MeanType.harmonic:
             sum_value = sum(1 / value for value in values)
             return len(values) / sum_value

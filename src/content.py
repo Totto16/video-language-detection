@@ -19,7 +19,7 @@ from typing_extensions import override
 
 
 from enlighten import Manager
-from classifier import Classifier, Language, WAVFile, parse_int_safely
+from classifier import Classifier, Language, WAVFile
 from os import listdir
 from json import JSONDecoder, JSONEncoder
 
@@ -66,19 +66,155 @@ CHECKSUM_BAR_FORMAT = (
     "[{elapsed}<{eta}, {rate:!.2j}{unit}/s]"
 )
 
+
+@dataclass
+class EpisodeDescription:
+    name: str
+    season: int
+    episode: int
+
+    def __str__(self) -> str:
+        return (
+            f"<Episode season: {self.season} episode: {self.episode} name: {self.name}>"
+        )
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+@dataclass
+class SeriesDescription:
+    name: str
+    year: int
+
+    def __str__(self) -> str:
+        return f"<Series name: {self.name} year: {self.year}>"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+@dataclass
+class SeasonDescription:
+    season: int
+
+    def __str__(self) -> str:
+        return f"<Season season: {self.season}>y"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+CollectionDescription = str
+
+IdentifierDescription = (
+    tuple[EpisodeDescription]
+    | tuple[SeasonDescription, EpisodeDescription]
+    | tuple[SeriesDescription, SeasonDescription, EpisodeDescription]
+    | tuple[
+        CollectionDescription, SeriesDescription, SeasonDescription, EpisodeDescription
+    ]
+)
+
+
 LanguageDict = dict[Language, int]
 
 
-def combine_langauge_dicts(inp: list[LanguageDict]) -> LanguageDict:
-    dct: LanguageDict = dict()
-    for input_dict in inp:
-        for language, amount in input_dict.items():
-            if dct.get(language) is None:
-                dct[language] = 0
+# TODO
+class Summary:
+    __complete: bool
+    __detailed: bool
 
-            dct[language] += amount
+    __descriptions: list[IdentifierDescription]
 
-    return dct
+    __languages: LanguageDict
+    __duplicates: list[IdentifierDescription]
+    __missing: list[IdentifierDescription]
+
+    def __init__(
+        self,
+        languages: list[Language],
+        descriptions: list[IdentifierDescription],
+        detailed: bool = False,
+    ) -> None:
+        def get_dict(language: Language) -> LanguageDict:
+            dct: LanguageDict = dict()
+            dct[language] = 1
+            return dct
+
+        self.__languages = Summary.combine_langauge_dicts(
+            [get_dict(language) for language in languages]
+        )
+        self.__duplicates = []
+        self.__missing = []
+        self.__complete = False
+        self.__detailed = detailed
+        self.__descriptions = descriptions
+
+    @staticmethod
+    def from_single(
+        language: Language, description: EpisodeDescription, detailed: bool
+    ) -> "Summary":
+        return Summary([language], [(description,)], detailed)
+
+    @staticmethod
+    def empty(detailed: bool) -> "Summary":
+        return Summary([], [], detailed)
+
+    def combine_episodes(
+        self, description: SeasonDescription, summary: "Summary"
+    ) -> None:
+        self.__descriptions.extend(
+            [(description, desc[0]) for desc in summary.descriptions if len(desc) == 1]
+        )
+        self.__languages = Summary.combine_langauge_dicts(
+            [self.__languages, summary.languages]
+        )
+
+    def combine_seasons(
+        self, description: SeriesDescription, summary: "Summary"
+    ) -> None:
+        self.__descriptions.extend(
+            [(description, *desc) for desc in summary.descriptions if len(desc) == 2]
+        )
+
+        self.__languages = Summary.combine_langauge_dicts(
+            [self.__languages, summary.languages]
+        )
+
+    def combine_series(
+        self, description: CollectionDescription, summary: "Summary"
+    ) -> None:
+        self.__descriptions.extend(
+            [(description, *desc) for desc in summary.descriptions if len(desc) == 3]
+        )
+
+        self.__languages = Summary.combine_langauge_dicts(
+            [self.__languages, summary.languages]
+        )
+
+    @staticmethod
+    def combine_langauge_dicts(inp: list[LanguageDict]) -> LanguageDict:
+        dct: LanguageDict = dict()
+        for input_dict in inp:
+            for language, amount in input_dict.items():
+                if dct.get(language) is None:
+                    dct[language] = 0
+
+                dct[language] += amount
+
+        return dct
+
+    @property
+    def descriptions(self) -> list[IdentifierDescription]:
+        return self.__descriptions
+
+    @property
+    def languages(self) -> LanguageDict:
+        return self.__languages
+
+    def combine(self, summary: "Summary") -> None:
+        pass
 
 
 @dataclass
@@ -316,7 +452,7 @@ class Content:
         self.__type = type
         self.__scanned_file = scanned_file
 
-    def languages(self) -> LanguageDict:
+    def summary(self, detailed: bool = False) -> Summary:
         raise MissingOverrideError()
 
     @property
@@ -524,21 +660,6 @@ def process_folder(
         return rescan
 
 
-@dataclass
-class EpisodeDescription:
-    name: str
-    season: int
-    episode: int
-
-    def __str__(self) -> str:
-        return (
-            f"<Episode season: {self.season} episode: {self.episode} name: {self.name}>"
-        )
-
-    def __repr__(self) -> str:
-        return str(self)
-
-
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
@@ -610,10 +731,8 @@ class EpisodeContent(Content):
         return EpisodeDescription(name, season, episode)
 
     @override
-    def languages(self) -> LanguageDict:
-        dct: LanguageDict = dict()
-        dct[self.__language] = 1
-        return dct
+    def summary(self, detailed: bool = False) -> Summary:
+        return Summary.from_single(self.__language, self.__description, detailed)
 
     @override
     def scan(
@@ -641,7 +760,8 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    self.__language = self.__get_language(classifier, manager)
+                    # TODO: re-enable
+                    # self.__language = self.__get_language(classifier, manager)
 
                     callback.progress(
                         self.scanned_file.path.name,
@@ -668,7 +788,8 @@ class EpisodeContent(Content):
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
         )
 
-        self.__language = self.__get_language(classifier, manager)
+        # TODO: re-enable
+        # self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name, self.scanned_file.parents, characteristic
@@ -696,17 +817,6 @@ class EpisodeContent(Content):
 
     def __repr__(self) -> str:
         return self.__str__()
-
-
-@dataclass
-class SeasonDescription:
-    season: int
-
-    def __str__(self) -> str:
-        return f"<Season season: {self.season}>y"
-
-    def __repr__(self) -> str:
-        return str(self)
 
 
 class SeasonContentDict(ContentDict):
@@ -768,10 +878,12 @@ class SeasonContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> LanguageDict:
-        return combine_langauge_dicts(
-            [episode.languages() for episode in self.__episodes]
-        )
+    def summary(self, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed)
+        for episode in self.__episodes:
+            summary.combine_episodes(self.description, episode.summary(detailed))
+
+        return summary
 
     @override
     def scan(
@@ -837,18 +949,6 @@ class SeasonContent(Content):
         return self.__str__()
 
 
-@dataclass
-class SeriesDescription:
-    name: str
-    year: int
-
-    def __str__(self) -> str:
-        return f"<Series name: {self.name} year: {self.year}>"
-
-    def __repr__(self) -> str:
-        return str(self)
-
-
 class SeriesContentDict(ContentDict):
     description: SeriesDescription
     seasons: list[SeasonContent]
@@ -908,8 +1008,12 @@ class SeriesContent(Content):
         return SeriesDescription(name, year)
 
     @override
-    def languages(self) -> LanguageDict:
-        return combine_langauge_dicts([season.languages() for season in self.__seasons])
+    def summary(self, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed)
+        for season in self.__seasons:
+            summary.combine_seasons(self.description, season.summary(detailed))
+
+        return summary
 
     @override
     def scan(
@@ -977,12 +1081,12 @@ class SeriesContent(Content):
 
 
 class CollectionContentDict(ContentDict):
-    description: str
+    description: CollectionDescription
     series: list[SeriesContent]
 
 
 class CollectionContent(Content):
-    __description: str
+    __description: CollectionDescription
     __series: list[SeriesContent]
 
     @staticmethod
@@ -992,7 +1096,7 @@ class CollectionContent(Content):
     def __init__(
         self,
         scanned_file: ScannedFile,
-        description: str,
+        description: CollectionDescription,
         series: list[SeriesContent],
     ) -> None:
         super().__init__(ContentType.collection, scanned_file)
@@ -1005,8 +1109,12 @@ class CollectionContent(Content):
         return self.__description
 
     @override
-    def languages(self) -> LanguageDict:
-        return combine_langauge_dicts([series.languages() for series in self.__series])
+    def summary(self, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed)
+        for serie in self.__series:
+            summary.combine_series(self.description, serie.summary(detailed))
+
+        return summary
 
     @override
     def as_dict(self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
@@ -1118,10 +1226,10 @@ class Decoder(JSONDecoder):
                     return ContentType(value)
 
                 # dataclass
-                case "SeriesDescription":
-                    return SeriesDescription(**value)
                 case "ScannedFile":
                     return ScannedFile(**value)
+                case "SeriesDescription":
+                    return SeriesDescription(**value)
                 case "SeasonDescription":
                     return SeasonDescription(**value)
                 case "EpisodeDescription":
