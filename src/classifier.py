@@ -431,11 +431,7 @@ class WAVFile:
                 bar.update(delta_time)
                 elapsed_time += progress.time
 
-        def stderr_callback(err: str) -> None:
-            print(err, file=sys.stderr)
-
         ffmpeg_proc.on("progress", progress_report)
-        ffmpeg_proc.on("stderr", stderr_callback)
         try:
             ffmpeg_proc.execute()
         except FFmpegError as e:
