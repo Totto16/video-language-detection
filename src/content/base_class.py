@@ -12,6 +12,8 @@ from typing import (
 )
 
 from classifier import Classifier
+from enlighten import Manager
+
 from content.general import (
     Callback,
     ContentType,
@@ -21,7 +23,6 @@ from content.general import (
     ScannedFileType,
     Summary,
 )
-from enlighten import Manager
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 

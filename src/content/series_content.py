@@ -11,7 +11,15 @@ from typing import (
 )
 
 from classifier import Classifier
-from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
+from enlighten import Manager
+from typing_extensions import override
+
+from content.base_class import (
+    Content,
+    ContentCharacteristic,
+    ContentDict,
+    process_folder,
+)
 from content.general import (
     Callback,
     ContentType,
@@ -21,8 +29,6 @@ from content.general import (
     Summary,
 )
 from content.season_content import SeasonContent
-from enlighten import Manager
-from typing_extensions import override
 
 
 class SeriesContentDict(ContentDict):

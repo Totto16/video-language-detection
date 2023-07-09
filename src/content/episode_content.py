@@ -10,6 +10,9 @@ from typing import (
 )
 
 from classifier import Classifier, FileMetadataError, Language, WAVFile
+from enlighten import Manager
+from typing_extensions import override
+
 from content.base_class import Content, ContentCharacteristic, ContentDict
 from content.general import (
     Callback,
@@ -19,8 +22,6 @@ from content.general import (
     ScannedFile,
     Summary,
 )
-from enlighten import Manager
-from typing_extensions import override
 
 
 class EpisodeContentDict(ContentDict):
@@ -30,7 +31,7 @@ class EpisodeContentDict(ContentDict):
 
 # TODO: remove
 GLOBAL_ITER_MAX: int = 200
-SKIP_ITR: int = 330
+SKIP_ITR: int = 530
 itr: int = 0
 
 

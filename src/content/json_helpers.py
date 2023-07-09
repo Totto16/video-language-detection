@@ -14,6 +14,7 @@ from typing import (
 )
 
 from classifier import Language
+
 from content.base_class import Content
 from content.collection_content import CollectionContent, CollectionContentDict
 from content.episode_content import EpisodeContent, EpisodeContentDict
