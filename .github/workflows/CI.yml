@@ -19,7 +19,6 @@ jobs:
                   sudo apt-get install python3.11 --install-recommends
                   pip install pipenv -U --quiet
                   pipenv install --dev
-                  pipenv shell
 
             - uses: sonarsource/sonarqube-scan-action@master
               env:

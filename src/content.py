@@ -112,7 +112,10 @@ IdentifierDescription = (
     | tuple[SeasonDescription, EpisodeDescription]
     | tuple[SeriesDescription, SeasonDescription, EpisodeDescription]
     | tuple[
-        CollectionDescription, SeriesDescription, SeasonDescription, EpisodeDescription,
+        CollectionDescription,
+        SeriesDescription,
+        SeasonDescription,
+        EpisodeDescription,
     ]
 )
 
@@ -153,7 +156,9 @@ class Summary:
 
     @staticmethod
     def from_single(
-        language: Language, description: EpisodeDescription, detailed: bool,
+        language: Language,
+        description: EpisodeDescription,
+        detailed: bool,
     ) -> "Summary":
         return Summary([language], [(description,)], detailed)
 
@@ -162,32 +167,48 @@ class Summary:
         return Summary([], [], detailed)
 
     def combine_episodes(
-        self: Self, description: SeasonDescription, summary: "Summary",
+        self: Self,
+        description: SeasonDescription,
+        summary: "Summary",
     ) -> None:
-        self.__descriptions.extend(
-            [(description, desc[0]) for desc in summary.descriptions if len(desc) == 1],
-        )
+        for desc in summary.descriptions:
+            if isinstance(desc[0], EpisodeDescription):
+                self.__descriptions.append((description, desc[0]))
+
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
         )
 
     def combine_seasons(
-        self: Self, description: SeriesDescription, summary: "Summary",
+        self: Self,
+        description: SeriesDescription,
+        summary: "Summary",
     ) -> None:
-        self.__descriptions.extend(
-            [(description, *desc) for desc in summary.descriptions if len(desc) == 2],
-        )
+        for desc in summary.descriptions:
+            if (
+                len(desc) == 2
+                and isinstance(desc[0], SeasonDescription)
+                and isinstance(desc[1], EpisodeDescription)
+            ):
+                self.__descriptions.append((description, desc[0], desc[1]))
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
         )
 
     def combine_series(
-        self: Self, description: CollectionDescription, summary: "Summary",
+        self: Self,
+        description: CollectionDescription,
+        summary: "Summary",
     ) -> None:
-        self.__descriptions.extend(
-            [(description, *desc) for desc in summary.descriptions if len(desc) == 3],
-        )
+        for desc in summary.descriptions:
+            if (
+                len(desc) == 3
+                and isinstance(desc[0], SeriesDescription)
+                and isinstance(desc[1], SeasonDescription)
+                and isinstance(desc[2], EpisodeDescription)
+            ):
+                self.__descriptions.append((description, desc[0], desc[1], desc[2]))
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
@@ -278,11 +299,17 @@ class Stats:
         return Stats(checksum=checksum, mtime=mtime)
 
     def is_outdated(
-        self: Self, path: Path, _type: ScannedFileType, manager: Optional[Manager] = None,
+        self: Self,
+        path: Path,
+        _type: ScannedFileType,
+        manager: Optional[Manager] = None,
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
-                path, _type, generate_checksum=False, manager=manager,
+                path,
+                _type,
+                generate_checksum=False,
+                manager=manager,
             )
             if new_stats.mtime <= self.mtime:
                 return False
@@ -347,13 +374,18 @@ class ScannedFile:
 
     def generate_checksum(self: Self, manager: Optional[Manager] = None) -> None:
         self.stats = Stats.from_file(
-            self.path, self.type, generate_checksum=True, manager=manager,
+            self.path,
+            self.type,
+            generate_checksum=True,
+            manager=manager,
         )
 
     def is_outdated(self: Self, manager: Optional[Manager] = None) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -375,7 +407,9 @@ class ScannedFile:
 class NameParser:
     __language: Language
 
-    def __init__(self: Self, language: Language = Language.unknown()) -> None:  # noqa: B008
+    def __init__(
+        self: Self, language: Language = Language.unknown(),
+    ) -> None:
         self.__language = language
 
     def parse_episode_name(self: Self, _name: str) -> Optional[tuple[str, int, int]]:
@@ -409,7 +443,10 @@ class Callback(Generic[C, CT, RT]):
         return None
 
     def ignore(
-        self: Self, _file_path: Path, _file_type: ScannedFileType, _parent_folders: list[str],
+        self: Self,
+        _file_path: Path,
+        _file_type: ScannedFileType,
+        _parent_folders: list[str],
     ) -> bool:
         return False
 
@@ -556,7 +593,9 @@ class Content:
             print(e, file=sys.stderr)
             return None
 
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -617,7 +656,10 @@ def process_folder(
         results: list[Content] = []
         for file_path, file_type, parent_folders in temp:
             result: Optional[Content] = callback.process(
-                file_path, file_type, parent_folders, name_parser=name_parser,
+                file_path,
+                file_type,
+                parent_folders,
+                name_parser=name_parser,
             )
             value = (
                 result.type if result is not None else None,
@@ -672,7 +714,7 @@ class EpisodeContentDict(ContentDict):
 
 
 GLOBAL_ITER_MAX: int = 200
-SKIP_ITR: int = 60
+SKIP_ITR: int = 330
 itr: int = 0
 
 
@@ -700,7 +742,8 @@ class EpisodeContent(Content):
         name_parser: NameParser,
     ) -> "EpisodeContent":
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
-            path.name, name_parser,
+            path.name,
+            name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
@@ -723,13 +766,17 @@ class EpisodeContent(Content):
         return self.__description
 
     def __get_language(
-        self: Self, classifier: Classifier, manager: Optional[Manager] = None,
+        self: Self,
+        classifier: Classifier,
+        manager: Optional[Manager] = None,
     ) -> Language:
         try:
             wav_file = WAVFile(self.scanned_file.path)
 
             best, scanned_percent = classifier.predict(
-                wav_file, self.scanned_file.path, manager,
+                wav_file,
+                self.scanned_file.path,
+                manager,
             )
             return best.language
         except FileMetadataError:
@@ -815,7 +862,9 @@ class EpisodeContent(Content):
 
         self.generate_checksum(manager)
         callback.progress(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
+            self.scanned_file.path.name,
+            self.scanned_file.parents,
+            characteristic,
         )
 
         # TODO: re-enable
@@ -826,14 +875,20 @@ class EpisodeContent(Content):
                 self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
+            self.scanned_file.path.name,
+            self.scanned_file.parents,
+            characteristic,
         )
         callback.finish(
-            self.scanned_file.path.name, self.scanned_file.parents, characteristic,
+            self.scanned_file.path.name,
+            self.scanned_file.parents,
+            characteristic,
         )
 
     @override
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -869,7 +924,8 @@ class SeasonContent(Content):
         name_parser: NameParser,
     ) -> "SeasonContent":
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
-            path.name, name_parser,
+            path.name,
+            name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get SeasonDescription from '{path}'")
@@ -963,7 +1019,9 @@ class SeasonContent(Content):
                     )
 
     @override
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -999,7 +1057,8 @@ class SeriesContent(Content):
         name_parser: NameParser,
     ) -> "SeriesContent":
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
-            path.name, name_parser,
+            path.name,
+            name_parser,
         )
         if description is None:
             raise NameError(f"Couldn't get SeriesDescription from '{path}'")
@@ -1094,7 +1153,9 @@ class SeriesContent(Content):
                     )
 
     @override
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
 
@@ -1151,7 +1212,9 @@ class CollectionContent(Content):
         return summary
 
     @override
-    def as_dict(self: Self, json_encoder: Optional[JSONEncoder] = None) -> dict[str, Any]:
+    def as_dict(
+        self: Self, json_encoder: Optional[JSONEncoder] = None,
+    ) -> dict[str, Any]:
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = self.__description
         as_dict["series"] = self.__series
