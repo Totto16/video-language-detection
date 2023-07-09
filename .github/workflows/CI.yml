@@ -20,6 +20,21 @@ jobs:
                   pip install pipenv -U --quiet
                   pipenv install --dev
 
+            - name: Dependency check
+              uses: dependency-check/Dependency-Check_Action@main
+              id: Dependency_check
+              with:
+                  project: "Video Language Detection"
+                  path: "."
+                  format: >
+                      HTML
+                      JSON
+                  out: "reports" # this is the default, no need to specify unless you wish to override it
+                  args: >
+                      --failOnCVSS 7
+                      --enableRetired
+                      --enableExperimental
+
             - uses: sonarsource/sonarqube-scan-action@master
               env:
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
