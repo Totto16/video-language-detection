@@ -15,7 +15,7 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  pip install pipenv -U --quiet
+                  pip install pipenv pyenv -U --quiet
                   pipenv install --dev
                   pipenv shell
 
@@ -38,7 +38,7 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  pip install pipenv -U --quiet
+                  pip install pipenv pyenv -U --quiet
                   pipenv install --dev
 
             - name: run lint
