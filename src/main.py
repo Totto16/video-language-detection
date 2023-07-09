@@ -6,17 +6,9 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, cast
 
 from classifier import Classifier
-from content import (
-    Callback,
-    Content,
-    ContentCharacteristic,
-    ContentType,
-    Decoder,
-    Encoder,
-    NameParser,
-    ScannedFileType,
-    process_folder,
-)
+from content.base_class import Content, ContentCharacteristic, process_folder
+from content.general import Callback, ContentType, NameParser, ScannedFileType
+from content.json_helpers import Decoder, Encoder
 from enlighten import Justify, Manager, get_manager
 from typing_extensions import override
 
@@ -131,13 +123,13 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
     ) -> None:
-        content_type, file_type = characteristic
+        content_type, _ = characteristic
 
         # don't make a bar for episodes!
         # if file_type == ScannedFileType.file:
         # return
 
-        value: tuple[str, str] = ("purple", "folders")
+        value: tuple[str, str]
 
         match content_type:
             case ContentType.collection:
@@ -149,11 +141,11 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             case ContentType.episode:
                 value = ("yellow", "tasks")
             case _:
-                pass
+                value = ("purple", "folders")
 
         color, unit = value
 
-        total, processing, ignored = amount
+        _, processing, _ = amount
 
         self.__progress_bars[name] = self.__manager.counter(
             total=processing,

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Self
 
 from classifier import Language, parse_int_safely
-from content import Content, NameParser, Summary
+from content.general import NameParser, Summary
 from main import parse_contents
 from typing_extensions import override
 
