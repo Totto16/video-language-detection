@@ -5,3 +5,4 @@ model/
 /src/tmp/
 /data/
 /*.json
+/.vscode

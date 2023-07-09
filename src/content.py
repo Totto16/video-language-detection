@@ -173,7 +173,7 @@ class Summary:
     ) -> None:
         for desc in summary.descriptions:
             if isinstance(desc[0], EpisodeDescription):
-                self.__descriptions.append((description, desc[0]))
+                self.__descriptions.append((description, desc[0]))  # noqa: PERF401
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
@@ -190,7 +190,9 @@ class Summary:
                 and isinstance(desc[0], SeasonDescription)
                 and isinstance(desc[1], EpisodeDescription)
             ):
-                self.__descriptions.append((description, desc[0], desc[1]))
+                self.__descriptions.append(  # noqa: PERF401
+                    (description, desc[0], desc[1]),
+                )
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
@@ -208,7 +210,9 @@ class Summary:
                 and isinstance(desc[1], SeasonDescription)
                 and isinstance(desc[2], EpisodeDescription)
             ):
-                self.__descriptions.append((description, desc[0], desc[1], desc[2]))
+                self.__descriptions.append(  # noqa: PERF401
+                    (description, desc[0], desc[1], desc[2]),
+                )
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
@@ -384,7 +388,8 @@ class ScannedFile:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
@@ -408,9 +413,14 @@ class NameParser:
     __language: Language
 
     def __init__(
-        self: Self, language: Language = Language.unknown(),  # noqa: B008
+        self: Self,
+        language: Language = Language.unknown(),  # noqa: B008
     ) -> None:
         self.__language = language
+
+    @property
+    def language(self: Self) -> Language:
+        return self.__language
 
     def parse_episode_name(self: Self, _name: str) -> Optional[tuple[str, int, int]]:
         raise MissingOverrideError
@@ -594,7 +604,8 @@ class Content:
             return None
 
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
@@ -712,14 +723,16 @@ class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
 
+
 # TODO: remove
 GLOBAL_ITER_MAX: int = 200
 SKIP_ITR: int = 330
 itr: int = 0
 
+
 # TODO: remove
 def itr_print_percent() -> None:
-    global itr   # noqa: PLW0602
+    global itr  # noqa: PLW0602
     if itr < SKIP_ITR:
         return
 
@@ -887,7 +900,8 @@ class EpisodeContent(Content):
 
     @override
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
@@ -1020,7 +1034,8 @@ class SeasonContent(Content):
 
     @override
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
@@ -1154,7 +1169,8 @@ class SeriesContent(Content):
 
     @override
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         def encode(x: Any) -> Any:
             return x if json_encoder is None else json_encoder.default(x)
@@ -1213,7 +1229,8 @@ class CollectionContent(Content):
 
     @override
     def as_dict(
-        self: Self, json_encoder: Optional[JSONEncoder] = None,
+        self: Self,
+        json_encoder: Optional[JSONEncoder] = None,
     ) -> dict[str, Any]:
         as_dict: dict[str, Any] = super().as_dict(json_encoder)
         as_dict["description"] = self.__description

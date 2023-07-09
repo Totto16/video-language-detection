@@ -1,5 +1,5 @@
 # Enable flake8-bugbear (`B`) rules.
-select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY", "PERF", "RUF", "PERF", "Q", "TCH", "RSE", "PYI", "ISC", "C4", "COM", "BLE", "S", "ASYNC", "ANN" ,"YTT", "UP", "N", "I"]
+select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY", "RUF", "PERF", "Q", "TCH", "RSE", "PYI", "ISC", "C4", "COM", "BLE", "S", "ASYNC", "ANN" ,"YTT", "UP", "N", "I"]
 
 # Never enforce `E501` (line length violations).
 # PLR2004 =>  magic-value-comparison 
