@@ -154,6 +154,22 @@ class Summary:
         self.__detailed = detailed
         self.__descriptions = descriptions
 
+    @property
+    def complete(self: Self) -> bool:
+        return self.__complete
+
+    @property
+    def detailed(self: Self) -> bool:
+        return self.__detailed
+
+    @property
+    def duplicates(self: Self) -> list[IdentifierDescription]:
+        return self.__duplicates
+
+    @property
+    def missing(self: Self) -> list[IdentifierDescription]:
+        return self.__missing
+
     @staticmethod
     def from_single(
         language: Language,

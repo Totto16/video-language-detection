@@ -176,8 +176,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         if self.__progress_bars.get(name) is None:
             raise RuntimeError("No Progressbar, on progress callback")
 
-        content_type, file_type = characteristic
-
         self.__progress_bars[name].update(amount)
 
     @override

@@ -107,12 +107,12 @@ class Timestamp:
             if ignore_zero and ms == 0:
                 return str(delta)
 
-            val = parse_int_safely(spec)
+            val: Optional[int] = parse_int_safely(spec)
             if val is None:
-                raise Exception
+                raise RuntimeError(f"Couldn't parse int: '{spec}'")
 
             if val > 5 or val <= 0:
-                raise Exception
+                raise RuntimeError(f"{val} is out of allowed range 0 < value <= 5")
 
             # val is between 1 and 5 inclusive
             ms = round_to_tens(ms, 5 - val)

@@ -20,6 +20,7 @@ mypy = "*"
 flake8 = "*"
 black = "*"
 ruff = "*"
+types-psutil = "*"
 
 [scripts]
 check = "python src/entry.py"
