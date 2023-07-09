@@ -408,7 +408,7 @@ class NameParser:
     __language: Language
 
     def __init__(
-        self: Self, language: Language = Language.unknown(),
+        self: Self, language: Language = Language.unknown(),  # noqa: B008
     ) -> None:
         self.__language = language
 
@@ -712,14 +712,14 @@ class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
 
-
+# TODO: remove
 GLOBAL_ITER_MAX: int = 200
 SKIP_ITR: int = 330
 itr: int = 0
 
-
+# TODO: remove
 def itr_print_percent() -> None:
-    global itr
+    global itr   # noqa: PLW0602
     if itr < SKIP_ITR:
         return
 
@@ -832,11 +832,11 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    # TODO: re-enable
-                    global itr
+                    # TODO: remove
+                    global itr  # noqa: PLW0603
                     if itr < GLOBAL_ITER_MAX + SKIP_ITR:
                         itr_print_percent()
-                        itr = itr + 1
+                        itr = itr + 1  # noqa: PLW0603
                         if itr >= SKIP_ITR:
                             self.__language = self.__get_language(classifier, manager)
 
