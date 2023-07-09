@@ -10,11 +10,18 @@ from typing import (
     cast,
 )
 
-from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
 from classifier import Classifier
-from enlighten import Manager
-from content.general import Callback, ContentType, NameParser, ScannedFile, SeriesDescription, Summary
+from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
+from content.general import (
+    Callback,
+    ContentType,
+    NameParser,
+    ScannedFile,
+    SeriesDescription,
+    Summary,
+)
 from content.season_content import SeasonContent
+from enlighten import Manager
 from typing_extensions import override
 
 

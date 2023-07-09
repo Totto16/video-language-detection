@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Self
 
 from classifier import Language, parse_int_safely
+from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
 from main import parse_contents
 from typing_extensions import override

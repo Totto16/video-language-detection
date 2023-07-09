@@ -10,9 +10,8 @@ from typing import (
     cast,
 )
 
-from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
 from classifier import Classifier
-from enlighten import Manager
+from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
 from content.general import (
     Callback,
     CollectionDescription,
@@ -22,6 +21,7 @@ from content.general import (
     Summary,
 )
 from content.series_content import SeriesContent
+from enlighten import Manager
 from typing_extensions import override
 
 

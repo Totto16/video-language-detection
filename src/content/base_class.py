@@ -12,7 +12,6 @@ from typing import (
 )
 
 from classifier import Classifier
-from enlighten import Manager
 from content.general import (
     Callback,
     ContentType,
@@ -22,6 +21,7 @@ from content.general import (
     ScannedFileType,
     Summary,
 )
+from enlighten import Manager
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
@@ -69,6 +69,12 @@ class Content:
             file_type,
             parent_folders,
         )
+        
+        #  TODO remove this dirty hack
+        from content.collection_content import CollectionContent
+        from content.episode_content import EpisodeContent
+        from content.season_content import SeasonContent
+        from content.series_content import SeriesContent
 
         name = file_path.name
 

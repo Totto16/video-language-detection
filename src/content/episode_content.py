@@ -9,10 +9,17 @@ from typing import (
     Self,
 )
 
-from content.base_class import Content, ContentCharacteristic, ContentDict
 from classifier import Classifier, FileMetadataError, Language, WAVFile
+from content.base_class import Content, ContentCharacteristic, ContentDict
+from content.general import (
+    Callback,
+    ContentType,
+    EpisodeDescription,
+    NameParser,
+    ScannedFile,
+    Summary,
+)
 from enlighten import Manager
-from content.general import Callback, ContentType, EpisodeDescription, NameParser, ScannedFile, Summary
 from typing_extensions import override
 
 
