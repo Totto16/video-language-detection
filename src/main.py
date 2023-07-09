@@ -9,10 +9,9 @@ from classifier import Classifier
 from content.base_class import Content, ContentCharacteristic, process_folder
 from content.general import Callback, ContentType, NameParser, ScannedFileType
 from content.json_helpers import Decoder, Encoder
+from content.scan_helpers import content_from_scan
 from enlighten import Justify, Manager, get_manager
 from typing_extensions import override
-
-from content.scan_helpers import content_from_scan
 
 
 class ContentOptions(TypedDict):
