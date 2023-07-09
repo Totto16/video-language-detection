@@ -12,6 +12,8 @@ from content.json_helpers import Decoder, Encoder
 from enlighten import Justify, Manager, get_manager
 from typing_extensions import override
 
+from content.scan_helpers import content_from_scan
+
 
 class ContentOptions(TypedDict):
     ignore_files: list[str]
@@ -82,7 +84,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         rescan: Optional[Content] = None,
     ) -> Optional[Content]:
         if rescan is None:
-            content: Optional[Content] = Content.from_scan(
+            content: Optional[Content] = content_from_scan(
                 file_path,
                 file_type,
                 parent_folders,
