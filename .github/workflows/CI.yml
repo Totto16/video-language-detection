@@ -26,9 +26,9 @@ jobs:
               with:
                   project: "Video Language Detection"
                   path: "."
-                  format: >
-                      HTML
-                      JSON
+                  format: |
+                       HTML
+                       JSON
                   out: "reports" # this is the default, no need to specify unless you wish to override it
                   args: >
                       --failOnCVSS 7
