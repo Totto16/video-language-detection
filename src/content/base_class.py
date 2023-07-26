@@ -99,7 +99,8 @@ def process_folder(
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
     ignored: int = 0
-    for file in listdir(directory):
+    sorted_files: list[str] = sorted(listdir(directory))
+    for file in sorted_files:
         file_path: Path = Path(directory) / file
 
         file_type: ScannedFileType = ScannedFileType.from_path(file_path)
