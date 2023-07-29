@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 python-ffmpeg = "*"
-ffprobe-python = "*"
 torchaudio = "*"
 speechbrain = "*"
 torchvision = "*"

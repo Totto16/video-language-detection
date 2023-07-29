@@ -16,7 +16,7 @@ from warnings import filterwarnings
 
 import psutil
 from enlighten import Manager
-from ffprobe import FFProbe
+from helper.ffprobe import ffprobe
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
@@ -27,6 +27,8 @@ from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
 filterwarnings("ignore")
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
+
+TEMP_MAX_LENGTH = 1
 
 
 def parse_int_safely(inp: str) -> Optional[int]:
@@ -287,38 +289,53 @@ class WAVFile:
         self.__runtime = runtime
 
     def __get_info(self: Self) -> Optional[tuple[FileType, Status, Timestamp]]:
-        try:
-            metadata = FFProbe(str(self.__file.absolute()))
-            for stream in metadata.streams:
-                if stream.is_video():
-                    return (
-                        FileType.video,
-                        Status.raw,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
+        metadata, err = ffprobe(self.__file.absolute())
+        if err is not None or metadata is None:
+            with open("error.log", "a") as f:
+                print(f'"{self.__file}",', file=f)
 
-            for stream in metadata.streams:
-                if stream.is_audio() and stream.codec() == "pcm_s16le":
-                    return (
-                        FileType.wav,
-                        Status.ready,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
+            print(
+                f"Unable to get a valid stream from file '{self.__file}'",
+                file=sys.stderr,
+            )
 
-            for stream in metadata.streams:
-                if stream.is_audio():
-                    return (
-                        FileType.audio,
-                        Status.raw,
-                        Timestamp.from_seconds(stream.duration_seconds()),
-                    )
-        except Exception as e:  # noqa: BLE001
-            print(e, file=sys.stderr)
+            return None
 
-        print(
-            f"Unable to get a valid stream from file '{self.__file}'",
-            file=sys.stderr,
-        )
+        if metadata.is_video():
+            video_streams = metadata.video_streams()
+            # multiple video makes no sense
+            if len(video_streams) > 1:
+                raise RuntimeError("Multiple Video Streams are not supported")
+
+            duration = video_streams[0].duration_seconds()
+            if duration is None:
+                return None
+
+            return (
+                FileType.video,
+                Status.raw,
+                Timestamp.from_seconds(duration),
+            )
+
+        if metadata.is_audio():
+            audio_streams = metadata.audio_streams()
+            # TODO: multiple audio streams can happen and shouldn't be a problem ! also every episode sghould hav an array of streams, with language etc!
+            if len(audio_streams) > 1:
+                return None
+
+            duration = audio_streams[0].duration_seconds()
+            if duration is None:
+                return None
+
+            if audio_streams[0].codec() == "pcm_s16le":
+                return (FileType.wav, Status.ready, Timestamp.from_seconds(duration))
+
+            return (
+                FileType.audio,
+                Status.raw,
+                Timestamp.from_seconds(duration),
+            )
+
         return None
 
     @property
@@ -789,15 +806,21 @@ class Classifier:
             if bar is not None:
                 bar.update()
 
-            amount_scanned: float = 0.0
+            amount_scanned: float = 0.0  # TODO: calculate that
+
+            if TEMP_MAX_LENGTH < LANGUAGE_MINIMUM_AMOUNT:
+                break
+
             if (
-                amount_scanned < LANGUAGE_MINIMUM_SCANNED
-                and LANGUAGE_MINIMUM_AMOUNT > i
+                # amount_scanned < LANGUAGE_MINIMUM_SCANNED
+                #  and
+                LANGUAGE_MINIMUM_AMOUNT
+                > i
             ):
                 continue
 
             # TODO temporary to scan fast scannable first!
-            if i > 10:
+            if i + 1 > TEMP_MAX_LENGTH:
                 break
 
             best: PredictionBest = prediction.get_best(MeanType.truncated)
@@ -815,6 +838,8 @@ class Classifier:
                 bar.close(clear=True)
 
             return (best, amount_scanned)
+
+        # END OF FOR LOOP
 
         if bar is not None:
             bar.close(clear=True)
