@@ -93,8 +93,6 @@ class FFProbeResult:
         """
         return len(self.video_streams()) != 0
 
-        return False
-
     def audio_streams(self: Self) -> list[FFprobeStream]:
         """
         Get all audio streams
