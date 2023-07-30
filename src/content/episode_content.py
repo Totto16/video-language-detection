@@ -154,7 +154,7 @@ class EpisodeContent(Content):
                     global itr  # noqa: PLW0603
                     if itr < GLOBAL_ITER_MAX + SKIP_ITR:
                         itr_print_percent()
-                        itr = itr + 1  # noqa: PLW0603
+                        itr = itr + 1
                         if itr >= SKIP_ITR:
                             self.__language = self.__get_language(classifier, manager)
 

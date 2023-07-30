@@ -94,7 +94,7 @@ class Timestamp:
         )
         ms: int = self.__delta.microseconds
 
-        if spec == "" or spec == "d":
+        if spec in ("", "d"):
             return str(delta)
 
         def round_to_tens(value: int, tens: int) -> int:
@@ -502,7 +502,7 @@ class Language:
 
     @staticmethod
     def from_str_unsafe(inp: str) -> "Language":
-        lan: Optional["Language"] = Language.from_str(inp)
+        lan: Optional[Language] = Language.from_str(inp)
         if lan is None:
             raise RuntimeError(f"Couldn't get the Language from str '{inp}'")
 
