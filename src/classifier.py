@@ -295,7 +295,7 @@ class WAVFile:
                 print(f'"{self.__file}",', file=f)
 
             print(
-                f"Unable to get a valid stream from file '{self.__file}'",
+                f"Unable to get a valid stream from file '{self.__file}':\n{err}",
                 file=sys.stderr,
             )
 

@@ -1,5 +1,7 @@
 import json
+import os
 import pipes
+import platform
 import subprocess
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
@@ -107,7 +109,19 @@ class FFProbeResult:
 
 
 def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
-    commands = [
+    # some things here were copied and modified from the original ffprobe-python repo:
+    # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
+    try:
+        with open(os.devnull, "w") as temp_file:
+            subprocess.check_call(
+                ["ffprobe", "-h"],  # noqa: S607, S603
+                stdout=temp_file,
+                stderr=temp_file,
+            )
+    except FileNotFoundError as err:
+        raise OSError("ffprobe not found.") from err
+
+    commands: list[str] = [
         "ffprobe",
         "-v",
         "quiet",
@@ -118,11 +132,14 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
         pipes.quote(str(file_path.absolute())),
     ]
 
+    if platform.system() != "Windows":
+        commands = [" ".join(commands)]
+
     if not file_path.exists():
         return None, "File doesn't exist"
 
-    result = subprocess.run(commands, capture_output=True)  # noqa: S603
+    result = subprocess.run(commands, capture_output=True, shell=True)  # noqa: S602
     if result.returncode == 0:
         return FFProbeResult(json.loads(result.stdout)), None
 
-    return None, f"FFProbe failed for {file_path}, output: {result.stderr!s}"
+    return None, f"FFProbe failed for {file_path}, output:\n{result.stderr.decode()}"
