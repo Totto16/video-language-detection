@@ -486,9 +486,20 @@ class Callback(Generic[C, CT, RT]):
         self: Self,
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
+        deleted: int,  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
     ) -> None:
         return None
 
     def get_saved(self: Self) -> RT:
         raise MissingOverrideError
+
+
+SF = TypeVar("SF")
+
+
+def safe_index(ls: list[SF], item: SF) -> Optional[int]:
+    try:
+        return ls.index(item)
+    except ValueError:
+        return None

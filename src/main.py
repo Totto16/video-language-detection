@@ -176,6 +176,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self: Self,
         name: str,
         parent_folders: list[str],
+        deleted: int,
         characteristic: ContentCharacteristic,
     ) -> None:
         if self.__progress_bars.get(name) is None:

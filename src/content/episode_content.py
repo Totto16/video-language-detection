@@ -166,6 +166,7 @@ class EpisodeContent(Content):
                     callback.finish(
                         self.scanned_file.path.name,
                         self.scanned_file.parents,
+                        0,
                         characteristic,
                     )
 
@@ -200,6 +201,7 @@ class EpisodeContent(Content):
         callback.finish(
             self.scanned_file.path.name,
             self.scanned_file.parents,
+            0,
             characteristic,
         )
 

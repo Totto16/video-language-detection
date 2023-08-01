@@ -21,6 +21,7 @@ from content.general import (
     ScannedFile,
     ScannedFileType,
     Summary,
+    safe_index,
 )
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
@@ -136,13 +137,14 @@ def process_folder(
                 results.append(result)
 
         value = (parent_type, ScannedFileType.folder)
-        callback.finish(directory.name, parent_folders, value)
+        callback.finish(directory.name, parent_folders, 0, value)
 
         return results
 
     already_scanned_file_paths: list[Path] = [
         content.scanned_file.path for content in rescan
     ]
+    scanned_file_registry: list[bool] = [False for _ in rescan]
 
     for file_path, file_type, parent_folders in temp:
         is_rescan = (
@@ -168,7 +170,30 @@ def process_folder(
         if result is not None and is_rescan is None:
             rescan.append(result)
 
+        if is_rescan is not None:
+            idx = already_scanned_file_paths.index(file_path)
+            scanned_file_registry[idx] = True
+
+    deleted: int = 0
+    for path, was_found in zip(
+        already_scanned_file_paths,
+        scanned_file_registry,
+        strict=True,
+    ):
+        if was_found:
+            continue
+
+        index: Optional[int] = safe_index(
+            [content.scanned_file.path for content in rescan],
+            path,
+        )
+        if index is None:
+            raise RuntimeError(f"Path to delete wasn't founds: {path}")
+
+        del rescan[index]
+        deleted += 1
+
     value = (parent_type, ScannedFileType.folder)
-    callback.finish(directory.name, parent_folders, value)
+    callback.finish(directory.name, parent_folders, deleted, value)
 
     return rescan
