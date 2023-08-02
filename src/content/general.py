@@ -11,7 +11,7 @@ from classifier import Language
 from enlighten import Manager
 
 
-class ScannedFileType(Enum):
+class ScannedFileType(str, Enum):
     file = "file"
     folder = "folder"
 
@@ -26,7 +26,7 @@ class ScannedFileType(Enum):
         return str(self)
 
 
-class ContentType(Enum):
+class ContentType(str, Enum):
     series = "series"
     season = "season"
     episode = "episode"
@@ -48,13 +48,13 @@ class StatsDict(TypedDict):
     mtime: float
 
 
-CHECKSUM_BAR_FORMAT = (
+CHECKSUM_BAR_FORMAT: str = (
     "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:!.2j}{unit} / {total:!.2j}{unit} "
     "[{elapsed}<{eta}, {rate:!.2j}{unit}/s]"
 )
 
 
-@dataclass
+@dataclass(slots=True)
 class EpisodeDescription:
     name: str
     season: int
@@ -69,7 +69,7 @@ class EpisodeDescription:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True)
 class SeriesDescription:
     name: str
     year: int
@@ -81,7 +81,7 @@ class SeriesDescription:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True)
 class SeasonDescription:
     season: int
 
@@ -249,7 +249,7 @@ class Summary:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True)
 class Stats:
     checksum: Optional[str]
     mtime: float
@@ -352,7 +352,7 @@ class Stats:
         return self.__str__()
 
 
-@dataclass
+@dataclass(slots=True)
 class ScannedFile:
     path: Path
     parents: list[str]

@@ -234,9 +234,11 @@ def parse_contents(
 
         save_to_file(save_file, contents)
 
+        return contents
+
     else:
         contents = load_from_file(save_file)
-        new_contents = process_folder(
+        new_contents: list[Content] = process_folder(
             root_folder,
             callback=callback,
             name_parser=name_parser,
@@ -246,4 +248,4 @@ def parse_contents(
 
         save_to_file(save_file, new_contents)
 
-    return contents
+        return new_contents

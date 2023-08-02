@@ -102,10 +102,12 @@ def main() -> None:
         },
         Path("data/data.json"),
         name_parser=CustomNameParser(SPECIAL_NAMES),
+        # TODO: make it possible to define to do a full scan or not (full= with language detection, not full = without)
     )
 
     summaries = [content.summary() for content in contents]
     final = Summary.combine_langauge_dicts([summary.languages for summary in summaries])
+
     print(final)
 
 
