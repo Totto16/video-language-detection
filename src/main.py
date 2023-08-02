@@ -236,16 +236,15 @@ def parse_contents(
 
         return contents
 
-    else:
-        contents = load_from_file(save_file)
-        new_contents: list[Content] = process_folder(
-            root_folder,
-            callback=callback,
-            name_parser=name_parser,
-            rescan=contents,
-            parent_folders=[],
-        )
+    contents = load_from_file(save_file)
+    new_contents: list[Content] = process_folder(
+        root_folder,
+        callback=callback,
+        name_parser=name_parser,
+        rescan=contents,
+        parent_folders=[],
+    )
 
-        save_to_file(save_file, new_contents)
+    save_to_file(save_file, new_contents)
 
-        return new_contents
+    return new_contents
