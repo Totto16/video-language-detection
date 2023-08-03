@@ -2,13 +2,15 @@ image: debian:12
 
 stages: # List of stages for jobs, and their order of execution
     - python_lint
-    #- sonar_check
+    - sonar_check
 
 sonarqube-check:
     image:
         name: sonarsource/sonar-scanner-cli:latest
         entrypoint: [""]
     stage: sonar_check
+    rules:
+    - if: '"$CI_RUNNER_EXECUTABLE_ARCH" == "linux/amd64"'
     needs: []
     variables:
         SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
