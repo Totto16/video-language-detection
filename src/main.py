@@ -4,16 +4,26 @@
 import json
 from os import makedirs
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Optional, Self, TypedDict
 
 from apischema import deserialize, serialize
+from apischema.json_schema import (
+    deserialization_schema,
+    serialization_schema,
+)
 from classifier import Classifier
 from content.base_class import Content, ContentCharacteristic, process_folder
+from content.collection_content import CollectionContent
+from content.episode_content import EpisodeContent
 from content.general import Callback, ContentType, NameParser, ScannedFileType
 from content.scan_helpers import content_from_scan
+from content.season_content import SeasonContent
+from content.series_content import SeriesContent
 from enlighten import Justify, Manager, get_manager
-from helper.schema import AllContent, AllContentSchemas, convert_contents_reverse
 from typing_extensions import override
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class ContentOptions(TypedDict):
@@ -192,6 +202,9 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self.__manager.stop()
 
 
+AllContent = EpisodeContent | SeasonContent | SeriesContent | CollectionContent
+
+
 def load_from_file(file_path: Path) -> list[Content]:
     with open(file_path) as file:
         suffix: str = file_path.suffix[1:]
@@ -199,7 +212,7 @@ def load_from_file(file_path: Path) -> list[Content]:
             case "json":
                 parsed_dict: dict[str, Any] = json.load(file)
                 json_loaded: list[Content] = deserialize(
-                    list[AllContentSchemas],
+                    list[AllContent],
                     parsed_dict,
                 )
                 return json_loaded
@@ -212,7 +225,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
         makedirs(file_path.parent)
 
     with open(
-        file_path.parent / (file_path.stem + "_temp." + file_path.suffix),
+        file_path,
         "w",
     ) as file:
         suffix: str = file_path.suffix[1:]
@@ -220,7 +233,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
             case "json":
                 encoded_dict: dict[str, Any] = serialize(
                     list[AllContent],
-                    convert_contents_reverse(contents),
+                    contents,
                 )
                 json_content: str = json.dumps(encoded_dict, indent=4)
                 file.write(json_content)
@@ -250,15 +263,34 @@ def parse_contents(
         return contents
 
     contents = load_from_file(save_file)
-    new_contents = contents
-    # new_contents: list[Content] = process_folder(
-    #     root_folder,
-    #     callback=callback,
-    #     name_parser=name_parser,
-    #     rescan=contents,
-    #     parent_folders=[],
-    # )
+    new_contents: list[Content] = process_folder(
+        root_folder,
+        callback=callback,
+        name_parser=name_parser,
+        rescan=contents,
+        parent_folders=[],
+    )
 
     save_to_file(save_file, new_contents)
 
-    return cast(list[Content], convert_contents_reverse(new_contents))
+    return new_contents
+
+
+def generate_json_schema(file_path: Path, any_type: Any) -> None:
+    result: Mapping[str, Any] = deserialization_schema(
+        any_type,
+        additional_properties=False,
+        all_refs=True,
+    )
+
+    result2 = serialization_schema(any_type, additional_properties=False, all_refs=True)
+
+    if result != result2:
+        raise RuntimeError("Deserialization and Serialization scheme mismatch")
+
+    if not file_path.parent.exists():
+        makedirs(file_path.parent)
+
+    with open(file_path, "w") as file:
+        json_content: str = json.dumps(result, indent=4)
+        file.write(json_content)

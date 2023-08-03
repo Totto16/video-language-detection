@@ -9,8 +9,7 @@ from typing import Optional, Self
 from classifier import Language, parse_int_safely
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
-from helper.schema import AllContentSchemas, generate_json_schema
-from main import parse_contents
+from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
 
 
@@ -118,7 +117,7 @@ if __name__ == "__main__":
         match sys.argv[1]:
             case "schema":
                 generate_json_schema(
-                    Path("schema/content_list.json"), list[AllContentSchemas],
+                    Path("schema/content_list.json"), list[AllContent],
                 )
                 sys.exit(0)
             case _:
