@@ -9,8 +9,6 @@ sonarqube-check:
         name: sonarsource/sonar-scanner-cli:latest
         entrypoint: [""]
     stage: sonar_check
-    rules:
-    - if: '"$CI_RUNNER_EXECUTABLE_ARCH" == "linux/amd64"'
     needs: []
     variables:
         SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
@@ -23,7 +21,7 @@ sonarqube-check:
         - sonar-scanner
     allow_failure: false
     rules:
-        - if: $CI_COMMIT_BRANCH == 'main'
+        - if: $CI_COMMIT_BRANCH == 'main' && $CI_RUNNER_EXECUTABLE_ARCH == 'linux/amd64'
 
 python-lint-job:
     stage: python_lint
