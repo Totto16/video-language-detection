@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
-from json import JSONEncoder
 from pathlib import Path
 from typing import Any, Generic, Optional, Self, TypedDict, TypeVar
 
@@ -54,7 +53,7 @@ CHECKSUM_BAR_FORMAT: str = (
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class EpisodeDescription:
     name: str
     season: int
@@ -69,7 +68,7 @@ class EpisodeDescription:
         return str(self)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class SeriesDescription:
     name: str
     year: int
@@ -81,7 +80,7 @@ class SeriesDescription:
         return str(self)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class SeasonDescription:
     season: int
 
@@ -249,7 +248,7 @@ class Summary:
         return str(self)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class Stats:
     checksum: Optional[str]
     mtime: float
@@ -334,25 +333,8 @@ class Stats:
             "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible",
         )
 
-    def as_dict(self: Self) -> dict[str, Any]:
-        as_dict: dict[str, Any] = {
-            "checksum": self.checksum,
-            "mtime": self.mtime,
-        }
-        return as_dict
 
-    @staticmethod
-    def from_dict(dct: StatsDict) -> "Stats":
-        return Stats(checksum=dct.get("checksum"), mtime=dct["mtime"])
-
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()
-
-
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class ScannedFile:
     path: Path
     parents: list[str]
@@ -389,27 +371,6 @@ class ScannedFile:
 
     def is_outdated(self: Self, manager: Optional[Manager] = None) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
-
-    def as_dict(
-        self: Self,
-        json_encoder: Optional[JSONEncoder] = None,
-    ) -> dict[str, Any]:
-        def encode(x: Any) -> Any:
-            return x if json_encoder is None else json_encoder.default(x)
-
-        as_dict: dict[str, Any] = {
-            "path": encode(self.path),
-            "parents": self.parents,
-            "type": encode(self.type),
-            "stats": encode(self.stats),
-        }
-        return as_dict
-
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()
 
 
 class NameParser:

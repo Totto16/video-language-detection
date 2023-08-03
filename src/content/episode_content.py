@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 
-from json import JSONEncoder
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
-    Any,
     Optional,
     Self,
 )
 
+from apischema import alias
 from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
 from typing_extensions import override
@@ -49,9 +49,10 @@ def itr_print_percent() -> None:
     print(f"{percent:.02f} %")
 
 
+@dataclass(slots=True, repr=True)
 class EpisodeContent(Content):
-    __description: EpisodeDescription
-    __language: Language
+    __description: EpisodeDescription = field(metadata=alias("description"))
+    __language: Language = field(metadata=alias("language"))
 
     @staticmethod
     def from_path(
@@ -66,25 +67,16 @@ class EpisodeContent(Content):
         if description is None:
             raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
 
-        return EpisodeContent(scanned_file, description)
-
-    def __init__(
-        self: Self,
-        scanned_file: ScannedFile,
-        description: EpisodeDescription,
-        language: Language = Language.unknown(),  # noqa: B008
-    ) -> None:
-        super().__init__(ContentType.episode, scanned_file)
-
-        self.__description = description
-        self.__language = language
+        return EpisodeContent(
+            ContentType.episode, scanned_file, description, Language.unknown(),
+        )
 
     @property
     def description(self: Self) -> EpisodeDescription:
         return self.__description
-    
+
     @property
-    def language(self: Self)->Language:
+    def language(self: Self) -> Language:
         return self.__language
 
     def __get_language(
@@ -208,26 +200,3 @@ class EpisodeContent(Content):
             0,
             characteristic,
         )
-
-    @override
-    def as_dict(
-        self: Self,
-        json_encoder: Optional[JSONEncoder] = None,
-    ) -> dict[str, Any]:
-        def encode(x: Any) -> Any:
-            return x if json_encoder is None else json_encoder.default(x)
-
-        as_dict: dict[str, Any] = super().as_dict(json_encoder)
-        as_dict["description"] = encode(self.__description)
-        as_dict["language"] = encode(self.__language)
-        return as_dict
-
-    @staticmethod
-    def from_dict(dct: EpisodeContentDict) -> "EpisodeContent":
-        return EpisodeContent(dct["scanned_file"], dct["description"], dct["language"])
-
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()

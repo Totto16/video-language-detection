@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-from json import JSONEncoder
+from dataclasses import dataclass, field
 from os import listdir
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
+from apischema import alias
 from classifier import Classifier
 from enlighten import Manager
 
@@ -29,13 +30,11 @@ class ContentDict(TypedDict):
 
 
 
+@dataclass(slots=True, repr=True)
 class Content:
-    __type: ContentType
-    __scanned_file: ScannedFile
+    __type: ContentType = field(metadata=alias("type"))
+    __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
 
-    def __init__(self: Self, _type: ContentType, scanned_file: ScannedFile) -> None:
-        self.__type = _type
-        self.__scanned_file = scanned_file
 
     def summary(self: Self, _detailed: bool = False) -> Summary:
         raise MissingOverrideError
@@ -55,19 +54,6 @@ class Content:
     def generate_checksum(self: Self, manager: Manager) -> None:
         self.__scanned_file.generate_checksum(manager)
 
-    def as_dict(
-        self: Self,
-        json_encoder: Optional[JSONEncoder] = None,
-    ) -> dict[str, Any]:
-        def encode(x: Any) -> Any:
-            return x if json_encoder is None else json_encoder.default(x)
-
-        as_dict: dict[str, Any] = {
-            "scanned_file": encode(self.__scanned_file),
-            "type": encode(self.__type),
-        }
-        return as_dict
-
     def scan(
         self: Self,
         callback: Callback["Content", ContentCharacteristic, Manager],  # noqa: ARG002
@@ -79,11 +65,6 @@ class Content:
     ) -> None:
         raise MissingOverrideError
 
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()
 
 
 def process_folder(

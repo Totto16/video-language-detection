@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 
 
-from json import JSONEncoder
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
-    Any,
-    Optional,
     Self,
     cast,
 )
 
+from apischema import alias
 from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
@@ -36,30 +35,19 @@ class CollectionContentDict(ContentDict):
     series: list[SeriesContent]
 
 
-
+@dataclass(slots=True, repr=True)
 class CollectionContent(Content):
-    __description: CollectionDescription
-    __series: list[SeriesContent]
+    __description: CollectionDescription = field(metadata=alias("description"))
+    __series: list[SeriesContent] = field(metadata=alias("series"))
 
     @staticmethod
     def from_path(path: Path, scanned_file: ScannedFile) -> "CollectionContent":
-        return CollectionContent(scanned_file, path.name, [])
-
-    def __init__(
-        self: Self,
-        scanned_file: ScannedFile,
-        description: CollectionDescription,
-        series: list[SeriesContent],
-    ) -> None:
-        super().__init__(ContentType.collection, scanned_file)
-
-        self.__description = description
-        self.__series = series
+        return CollectionContent(ContentType.collection, scanned_file, path.name, [])
 
     @property
     def description(self: Self) -> str:
         return self.__description
-    
+
     @property
     def series(self: Self) -> list[SeriesContent]:
         return self.__series
@@ -71,16 +59,6 @@ class CollectionContent(Content):
             summary.combine_series(self.description, serie.summary(detailed))
 
         return summary
-
-    @override
-    def as_dict(
-        self: Self,
-        json_encoder: Optional[JSONEncoder] = None,
-    ) -> dict[str, Any]:
-        as_dict: dict[str, Any] = super().as_dict(json_encoder)
-        as_dict["description"] = self.__description
-        as_dict["series"] = self.__series
-        return as_dict
 
     @override
     def scan(
@@ -125,13 +103,3 @@ class CollectionContent(Content):
                     raise RuntimeError(
                         f"No child with class '{content.__class__.__name__}' is possible in CollectionContent",
                     )
-
-    @staticmethod
-    def from_dict(dct: CollectionContentDict) -> "CollectionContent":
-        return CollectionContent(dct["scanned_file"], dct["description"], dct["series"])
-
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()

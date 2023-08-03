@@ -48,31 +48,31 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
         file.write(json_content)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class ContentSchema:
     type_: ContentType = field(metadata=alias("type"))
     scanned_file: ScannedFile
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class EpisodeContentSchema(ContentSchema):
     description: EpisodeDescription
     language: Language
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class SeasonContentSchema(ContentSchema):
     description: SeasonDescription
     episodes: list[EpisodeContentSchema]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class SeriesContentSchema(ContentSchema):
     description: SeriesDescription
     seasons: list[SeasonContentSchema]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, repr=True)
 class CollectionContentSchema(ContentSchema):
     description: CollectionDescription
     series: list[SeriesContentSchema]
@@ -131,3 +131,53 @@ def convert_contents(
         raise RuntimeError(f"Not recognized class {type(ct)}")
 
     return cast(list[AllContentSchemas], list(map(convert_one, inp)))
+
+
+AllContent = EpisodeContent | SeasonContent | SeriesContent | CollectionContent
+
+
+def convert_contents_reverse(
+    inp: list[AllContentSchemas],
+) -> list[AllContent]:
+    def convert_one(ct: ContentSchema) -> Content:
+        if isinstance(ct, CollectionContentSchema):
+            series = cast(list[SeriesContent], list(map(convert_one, ct.series)))
+            return CollectionContent(
+                ContentType.collection,
+                ct.scanned_file,
+                ct.description,
+                series,
+            )
+        if isinstance(ct, SeriesContentSchema):
+            seasons = cast(
+                list[SeasonContent],
+                list(map(convert_one, ct.seasons)),
+            )
+            return SeriesContent(
+                ContentType.series,
+                ct.scanned_file,
+                ct.description,
+                seasons,
+            )
+        if isinstance(ct, SeasonContentSchema):
+            episodes = cast(
+                list[EpisodeContent],
+                list(map(convert_one, ct.episodes)),
+            )
+            return SeasonContent(
+                ContentType.season,
+                ct.scanned_file,
+                ct.description,
+                episodes,
+            )
+        if isinstance(ct, EpisodeContentSchema):
+            return EpisodeContent(
+                ContentType.episode,
+                ct.scanned_file,
+                ct.description,
+                ct.language,
+            )
+
+        raise RuntimeError(f"Not recognized class {type(ct)}")
+
+    return cast(list[AllContent], list(map(convert_one, inp)))

@@ -8,16 +8,11 @@ from typing import Any, Optional, Self, TypedDict, cast
 
 from apischema import deserialize, serialize
 from classifier import Classifier
-from content.base_class import (
-    Content,
-    ContentCharacteristic,
-    process_folder,
-)
+from content.base_class import Content, ContentCharacteristic, process_folder
 from content.general import Callback, ContentType, NameParser, ScannedFileType
-from content.json_helpers import Decoder, Encoder
 from content.scan_helpers import content_from_scan
 from enlighten import Justify, Manager, get_manager
-from helper.schema import AllContentSchemas, convert_contents
+from helper.schema import AllContent, AllContentSchemas, convert_contents_reverse
 from typing_extensions import override
 
 
@@ -202,9 +197,10 @@ def load_from_file(file_path: Path) -> list[Content]:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
-                json_loaded: list[Content] = cast(
-                    list[Content],
-                    json.load(file, cls=Decoder),
+                parsed_dict: dict[str, Any] = json.load(file)
+                json_loaded: list[Content] = deserialize(
+                    list[AllContentSchemas],
+                    parsed_dict,
                 )
                 return json_loaded
             case _:
@@ -216,17 +212,18 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
         makedirs(file_path.parent)
 
     with open(
-        file_path.parent / (file_path.stem + "_temp." + file_path.suffix), "w",
+        file_path.parent / (file_path.stem + "_temp." + file_path.suffix),
+        "w",
     ) as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
-                ct = convert_contents(contents)
-                half_serialized = serialize(list[AllContentSchemas], ct)
-                json_content: str = json.dumps(half_serialized, indent=4, cls=Encoder)
+                encoded_dict: dict[str, Any] = serialize(
+                    list[AllContent],
+                    convert_contents_reverse(contents),
+                )
+                json_content: str = json.dumps(encoded_dict, indent=4)
                 file.write(json_content)
-                s = deserialize(list[AllContentSchemas], json.loads(json_content))
-                print(s)
             case _:
                 raise RuntimeError(f"Not loadable from '{suffix}' file!")
 
@@ -264,4 +261,4 @@ def parse_contents(
 
     save_to_file(save_file, new_contents)
 
-    return new_contents
+    return cast(list[Content], convert_contents_reverse(new_contents))

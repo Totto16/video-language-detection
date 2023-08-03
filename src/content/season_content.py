@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 
-from json import JSONEncoder
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
-    Any,
     Optional,
     Self,
     cast,
 )
 
+from apischema import alias
 from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
@@ -36,10 +36,10 @@ class SeasonContentDict(ContentDict):
     episodes: list[EpisodeContent]
 
 
-
+@dataclass(slots=True, repr=True)
 class SeasonContent(Content):
-    __description: SeasonDescription
-    __episodes: list[EpisodeContent]
+    __description: SeasonDescription = field(metadata=alias("description"))
+    __episodes: list[EpisodeContent] = field(metadata=alias("episodes"))
 
     @staticmethod
     def from_path(
@@ -54,18 +54,7 @@ class SeasonContent(Content):
         if description is None:
             raise NameError(f"Couldn't get SeasonDescription from '{path}'")
 
-        return SeasonContent(scanned_file, description, [])
-
-    def __init__(
-        self: Self,
-        scanned_file: ScannedFile,
-        description: SeasonDescription,
-        episodes: list[EpisodeContent],
-    ) -> None:
-        super().__init__(ContentType.season, scanned_file)
-
-        self.__description = description
-        self.__episodes = episodes
+        return SeasonContent(ContentType.series, scanned_file, description, [])
 
     @staticmethod
     def is_valid_name(
@@ -90,7 +79,7 @@ class SeasonContent(Content):
     @property
     def description(self: Self) -> SeasonDescription:
         return self.__description
-    
+
     @property
     def episodes(self: Self) -> list[EpisodeContent]:
         return self.__episodes
@@ -145,26 +134,3 @@ class SeasonContent(Content):
                     raise RuntimeError(
                         f"No child with class '{content.__class__.__name__}' is possible in SeasonContent",
                     )
-
-    @override
-    def as_dict(
-        self: Self,
-        json_encoder: Optional[JSONEncoder] = None,
-    ) -> dict[str, Any]:
-        def encode(x: Any) -> Any:
-            return x if json_encoder is None else json_encoder.default(x)
-
-        as_dict: dict[str, Any] = super().as_dict(json_encoder)
-        as_dict["description"] = encode(self.__description)
-        as_dict["episodes"] = self.__episodes
-        return as_dict
-
-    @staticmethod
-    def from_dict(dct: SeasonContentDict) -> "SeasonContent":
-        return SeasonContent(dct["scanned_file"], dct["description"], dct["episodes"])
-
-    def __str__(self: Self) -> str:
-        return str(self.as_dict())
-
-    def __repr__(self: Self) -> str:
-        return self.__str__()
