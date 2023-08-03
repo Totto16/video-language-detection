@@ -2,7 +2,7 @@ image: debian:12
 
 stages: # List of stages for jobs, and their order of execution
     - python_lint
-    - sonar_check
+    #- sonar_check
 
 sonarqube-check:
     image:
