@@ -1,0 +1,290 @@
+{
+    "type": "array",
+    "items": {
+        "anyOf": [
+            {
+                "$ref": "#/$defs/Content"
+            },
+            {
+                "$ref": "#/$defs/EpisodeContent"
+            },
+            {
+                "$ref": "#/$defs/SeasonContent"
+            },
+            {
+                "$ref": "#/$defs/SeriesContent"
+            },
+            {
+                "$ref": "#/$defs/CollectionContent"
+            }
+        ]
+    },
+    "$defs": {
+        "Content": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "series",
+                        "season",
+                        "episode",
+                        "collection"
+                    ]
+                },
+                "scanned_file": {
+                    "$ref": "#/$defs/ScannedFile"
+                }
+            },
+            "required": [
+                "type",
+                "scanned_file"
+            ],
+            "additionalProperties": false
+        },
+        "ScannedFile": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "parents": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "file",
+                        "folder"
+                    ]
+                },
+                "stats": {
+                    "$ref": "#/$defs/Stats"
+                }
+            },
+            "required": [
+                "path",
+                "parents",
+                "type",
+                "stats"
+            ],
+            "additionalProperties": false
+        },
+        "Stats": {
+            "type": "object",
+            "properties": {
+                "checksum": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "mtime": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "checksum",
+                "mtime"
+            ],
+            "additionalProperties": false
+        },
+        "EpisodeContent": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "series",
+                        "season",
+                        "episode",
+                        "collection"
+                    ]
+                },
+                "scanned_file": {
+                    "$ref": "#/$defs/ScannedFile"
+                },
+                "description": {
+                    "$ref": "#/$defs/EpisodeDescription"
+                },
+                "language": {
+                    "$ref": "#/$defs/Language"
+                }
+            },
+            "required": [
+                "type",
+                "scanned_file",
+                "description",
+                "language"
+            ],
+            "additionalProperties": false
+        },
+        "EpisodeDescription": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "season": {
+                    "type": "integer"
+                },
+                "episode": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "name",
+                "season",
+                "episode"
+            ],
+            "additionalProperties": false
+        },
+        "Language": {
+            "type": "object",
+            "properties": {
+                "short": {
+                    "type": "string"
+                },
+                "long": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "short",
+                "long"
+            ],
+            "additionalProperties": false
+        },
+        "SeasonContent": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "series",
+                        "season",
+                        "episode",
+                        "collection"
+                    ]
+                },
+                "scanned_file": {
+                    "$ref": "#/$defs/ScannedFile"
+                },
+                "description": {
+                    "$ref": "#/$defs/SeasonDescription"
+                },
+                "episodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/EpisodeContent"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "scanned_file",
+                "description",
+                "episodes"
+            ],
+            "additionalProperties": false
+        },
+        "SeasonDescription": {
+            "type": "object",
+            "properties": {
+                "season": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "season"
+            ],
+            "additionalProperties": false
+        },
+        "SeriesContent": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "series",
+                        "season",
+                        "episode",
+                        "collection"
+                    ]
+                },
+                "scanned_file": {
+                    "$ref": "#/$defs/ScannedFile"
+                },
+                "description": {
+                    "$ref": "#/$defs/SeriesDescription"
+                },
+                "seasons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/SeasonContent"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "scanned_file",
+                "description",
+                "seasons"
+            ],
+            "additionalProperties": false
+        },
+        "SeriesDescription": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "name",
+                "year"
+            ],
+            "additionalProperties": false
+        },
+        "CollectionContent": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "series",
+                        "season",
+                        "episode",
+                        "collection"
+                    ]
+                },
+                "scanned_file": {
+                    "$ref": "#/$defs/ScannedFile"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/SeriesContent"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "scanned_file",
+                "description",
+                "series"
+            ],
+            "additionalProperties": false
+        }
+    },
+    "$schema": "http://json-schema.org/draft/2020-12/schema#"
+}

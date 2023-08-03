@@ -12,6 +12,7 @@ pynvml = "*"
 humanize = "*"
 enlighten = "*"
 psutil = "*"
+apischema = "*"
 
 [dev-packages]
 pylint = "*"
@@ -27,6 +28,8 @@ test = "python tests/test_simple.py tests/test_ru.wav"
 lint = "bash -c 'pipenv run mypy; pipenv run ruff'"
 mypy = "mypy src/ --strict --ignore-missing-imports"
 ruff = "ruff check src/"
+ruff-fix = "ruff check src/ --fix"
+schema = "python src/entry.py schema"
 
 [requires]
 python_version = "3.11"

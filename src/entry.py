@@ -2,12 +2,14 @@
 
 
 import re as regex
+import sys
 from pathlib import Path
 from typing import Optional, Self
 
 from classifier import Language, parse_int_safely
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
+from helper.schema import AllContentSchemas, generate_json_schema
 from main import parse_contents
 from typing_extensions import override
 
@@ -112,4 +114,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        match sys.argv[1]:
+            case "schema":
+                generate_json_schema(
+                    Path("schema/content_list.json"), list[AllContentSchemas],
+                )
+                sys.exit(0)
+            case _:
+                pass
     main()

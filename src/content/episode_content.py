@@ -82,6 +82,10 @@ class EpisodeContent(Content):
     @property
     def description(self: Self) -> EpisodeDescription:
         return self.__description
+    
+    @property
+    def language(self: Self)->Language:
+        return self.__language
 
     def __get_language(
         self: Self,

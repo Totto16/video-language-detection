@@ -14,7 +14,12 @@ from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
 
-from content.base_class import Content, ContentCharacteristic, ContentDict, process_folder
+from content.base_class import (
+    Content,
+    ContentCharacteristic,
+    ContentDict,
+    process_folder,
+)
 from content.general import (
     Callback,
     CollectionDescription,
@@ -29,6 +34,7 @@ from content.series_content import SeriesContent
 class CollectionContentDict(ContentDict):
     description: CollectionDescription
     series: list[SeriesContent]
+
 
 
 class CollectionContent(Content):
@@ -53,6 +59,10 @@ class CollectionContent(Content):
     @property
     def description(self: Self) -> str:
         return self.__description
+    
+    @property
+    def series(self: Self) -> list[SeriesContent]:
+        return self.__series
 
     @override
     def summary(self: Self, detailed: bool = False) -> Summary:

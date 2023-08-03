@@ -36,6 +36,8 @@ class SeriesContentDict(ContentDict):
     seasons: list[SeasonContent]
 
 
+
+
 class SeriesContent(Content):
     __description: SeriesDescription
     __seasons: list[SeasonContent]
@@ -69,6 +71,10 @@ class SeriesContent(Content):
     @property
     def description(self: Self) -> SeriesDescription:
         return self.__description
+    
+    @property
+    def seasons(self: Self) -> list[SeasonContent]:
+        return self.__seasons
 
     @staticmethod
     def is_valid_name(

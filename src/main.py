@@ -2,15 +2,22 @@
 
 
 import json
+from os import makedirs
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, cast
 
+from apischema import deserialize, serialize
 from classifier import Classifier
-from content.base_class import Content, ContentCharacteristic, process_folder
+from content.base_class import (
+    Content,
+    ContentCharacteristic,
+    process_folder,
+)
 from content.general import Callback, ContentType, NameParser, ScannedFileType
 from content.json_helpers import Decoder, Encoder
 from content.scan_helpers import content_from_scan
 from enlighten import Justify, Manager, get_manager
+from helper.schema import AllContentSchemas, convert_contents
 from typing_extensions import override
 
 
@@ -205,12 +212,21 @@ def load_from_file(file_path: Path) -> list[Content]:
 
 
 def save_to_file(file_path: Path, contents: list[Content]) -> None:
-    with open(file_path, "w") as file:
+    if not file_path.parent.exists():
+        makedirs(file_path.parent)
+
+    with open(
+        file_path.parent / (file_path.stem + "_temp." + file_path.suffix), "w",
+    ) as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
-                json_content: str = json.dumps(contents, indent=4, cls=Encoder)
+                ct = convert_contents(contents)
+                half_serialized = serialize(list[AllContentSchemas], ct)
+                json_content: str = json.dumps(half_serialized, indent=4, cls=Encoder)
                 file.write(json_content)
+                s = deserialize(list[AllContentSchemas], json.loads(json_content))
+                print(s)
             case _:
                 raise RuntimeError(f"Not loadable from '{suffix}' file!")
 
@@ -237,13 +253,14 @@ def parse_contents(
         return contents
 
     contents = load_from_file(save_file)
-    new_contents: list[Content] = process_folder(
-        root_folder,
-        callback=callback,
-        name_parser=name_parser,
-        rescan=contents,
-        parent_folders=[],
-    )
+    new_contents = contents
+    # new_contents: list[Content] = process_folder(
+    #     root_folder,
+    #     callback=callback,
+    #     name_parser=name_parser,
+    #     rescan=contents,
+    #     parent_folders=[],
+    # )
 
     save_to_file(save_file, new_contents)
 

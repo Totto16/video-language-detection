@@ -3,12 +3,7 @@
 from json import JSONEncoder
 from os import listdir
 from pathlib import Path
-from typing import (
-    Any,
-    Optional,
-    Self,
-    TypedDict,
-)
+from typing import Any, Optional, Self, TypedDict
 
 from classifier import Classifier
 from enlighten import Manager
@@ -30,6 +25,8 @@ ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 class ContentDict(TypedDict):
     type: ContentType
     scanned_file: ScannedFile
+
+
 
 
 class Content:

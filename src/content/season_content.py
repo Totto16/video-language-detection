@@ -36,6 +36,7 @@ class SeasonContentDict(ContentDict):
     episodes: list[EpisodeContent]
 
 
+
 class SeasonContent(Content):
     __description: SeasonDescription
     __episodes: list[EpisodeContent]
@@ -89,6 +90,10 @@ class SeasonContent(Content):
     @property
     def description(self: Self) -> SeasonDescription:
         return self.__description
+    
+    @property
+    def episodes(self: Self) -> list[EpisodeContent]:
+        return self.__episodes
 
     @override
     def summary(self: Self, detailed: bool = False) -> Summary:
