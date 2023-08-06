@@ -56,7 +56,7 @@ class SeasonContent(Content):
         if description is None:
             raise NameError(f"Couldn't get SeasonDescription from '{path}'")
 
-        return SeasonContent(ContentType.series, scanned_file, description, [])
+        return SeasonContent(ContentType.season, scanned_file, description, [])
 
     @staticmethod
     def is_valid_name(

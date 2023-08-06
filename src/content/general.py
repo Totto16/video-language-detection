@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Generic, Optional, Self, TypedDict, TypeVar
 
 from apischema import schema
-
 from classifier import Language
 from enlighten import Manager
 
@@ -342,7 +341,7 @@ class ScannedFile:
         metadata=schema(
             title="file path",
             description="The file path of the scanned file / folder",
-        )
+        ),
     )
     parents: list[str] = field(
         metadata=schema(
@@ -353,7 +352,7 @@ class ScannedFile:
             unique=True,
         ),
     )
-    type: ScannedFileType = field(
+    type: ScannedFileType = field(  # noqa: A003
         metadata=schema(
             title="file type",
             description="The type of the file: folder or file",
