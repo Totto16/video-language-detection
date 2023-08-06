@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
+    Literal,
     Optional,
     Self,
 )
@@ -51,6 +52,7 @@ def itr_print_percent() -> None:
 
 @dataclass(slots=True, repr=True)
 class EpisodeContent(Content):
+    __type: Literal[ContentType.episode] = field(metadata=alias("type"))
     __description: EpisodeDescription = field(metadata=alias("description"))
     __language: Language = field(metadata=alias("language"))
 
@@ -68,7 +70,10 @@ class EpisodeContent(Content):
             raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
 
         return EpisodeContent(
-            ContentType.episode, scanned_file, description, Language.unknown(),
+            ContentType.episode,
+            scanned_file,
+            description,
+            Language.unknown(),
         )
 
     @property

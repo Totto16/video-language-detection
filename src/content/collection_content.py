@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
+    Literal,
     Self,
     cast,
 )
@@ -37,6 +38,7 @@ class CollectionContentDict(ContentDict):
 
 @dataclass(slots=True, repr=True)
 class CollectionContent(Content):
+    __type: Literal[ContentType.collection] = field(metadata=alias("type"))
     __description: CollectionDescription = field(metadata=alias("description"))
     __series: list[SeriesContent] = field(metadata=alias("series"))
 

@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
+    Literal,
     Optional,
     Self,
     cast,
@@ -38,6 +39,7 @@ class SeriesContentDict(ContentDict):
 
 @dataclass(slots=True, repr=True)
 class SeriesContent(Content):
+    __type: Literal[ContentType.series] = field(metadata=alias("type"))
     __description: SeriesDescription = field(metadata=alias("description"))
     __seasons: list[SeasonContent] = field(metadata=alias("seasons"))
 

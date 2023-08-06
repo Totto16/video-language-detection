@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
+    Literal,
     Optional,
     Self,
     cast,
@@ -38,6 +39,7 @@ class SeasonContentDict(ContentDict):
 
 @dataclass(slots=True, repr=True)
 class SeasonContent(Content):
+    __type: Literal[ContentType.season] = field(metadata=alias("type")) # TODO: submit upstream path, to allow this: (to not add "type" in the required field twice)
     __description: SeasonDescription = field(metadata=alias("description"))
     __episodes: list[EpisodeContent] = field(metadata=alias("episodes"))
 

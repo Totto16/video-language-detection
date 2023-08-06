@@ -22,12 +22,7 @@
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "series",
-                        "season",
-                        "episode",
-                        "collection"
-                    ]
+                    "const": "episode"
                 },
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
@@ -51,23 +46,34 @@
             "type": "object",
             "properties": {
                 "path": {
-                    "type": "string"
+                    "type": "string",
+                    "title": "file path",
+                    "description": "The file path of the scanned file / folder"
                 },
                 "parents": {
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "minItems": 0,
+                    "maxItems": 3,
+                    "uniqueItems": true,
+                    "title": "parent folders",
+                    "description": "The parent folders of this scanned file / folder"
                 },
                 "type": {
                     "type": "string",
                     "enum": [
                         "file",
                         "folder"
-                    ]
+                    ],
+                    "title": "file type",
+                    "description": "The type of the file: folder or file"
                 },
                 "stats": {
-                    "$ref": "#/$defs/Stats"
+                    "$ref": "#/$defs/Stats",
+                    "title": "file stats",
+                    "description": "The stats of this file"
                 }
             },
             "required": [
@@ -104,10 +110,12 @@
                     "type": "string"
                 },
                 "season": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "episode": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                 }
             },
             "required": [
@@ -138,12 +146,7 @@
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "series",
-                        "season",
-                        "episode",
-                        "collection"
-                    ]
+                    "const": "season"
                 },
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
@@ -170,7 +173,8 @@
             "type": "object",
             "properties": {
                 "season": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0
                 }
             },
             "required": [
@@ -183,12 +187,7 @@
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "series",
-                        "season",
-                        "episode",
-                        "collection"
-                    ]
+                    "const": "series"
                 },
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
@@ -218,7 +217,8 @@
                     "type": "string"
                 },
                 "year": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1900
                 }
             },
             "required": [
@@ -232,12 +232,7 @@
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "series",
-                        "season",
-                        "episode",
-                        "collection"
-                    ]
+                    "const": "collection"
                 },
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"

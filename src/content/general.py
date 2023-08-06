@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Generic, Optional, Self, TypedDict, TypeVar
+
+from apischema import schema
 
 from classifier import Language
 from enlighten import Manager
@@ -56,8 +58,8 @@ CHECKSUM_BAR_FORMAT: str = (
 @dataclass(slots=True, repr=True)
 class EpisodeDescription:
     name: str
-    season: int
-    episode: int
+    season: int = field(metadata=schema(min=0))
+    episode: int = field(metadata=schema(min=1))
 
     def __str__(self: Self) -> str:
         return (
@@ -71,7 +73,7 @@ class EpisodeDescription:
 @dataclass(slots=True, repr=True)
 class SeriesDescription:
     name: str
-    year: int
+    year: int = field(metadata=schema(min=1900))
 
     def __str__(self: Self) -> str:
         return f"<Series name: {self.name} year: {self.year}>"
@@ -82,7 +84,7 @@ class SeriesDescription:
 
 @dataclass(slots=True, repr=True)
 class SeasonDescription:
-    season: int
+    season: int = field(metadata=schema(min=0))
 
     def __str__(self: Self) -> str:
         return f"<Season season: {self.season}>y"
@@ -336,10 +338,33 @@ class Stats:
 
 @dataclass(slots=True, repr=True)
 class ScannedFile:
-    path: Path
-    parents: list[str]
-    type: ScannedFileType  # noqa: A003
-    stats: Stats
+    path: Path = field(
+        metadata=schema(
+            title="file path",
+            description="The file path of the scanned file / folder",
+        )
+    )
+    parents: list[str] = field(
+        metadata=schema(
+            title="parent folders",
+            description="The parent folders of this scanned file / folder",
+            min_items=0,
+            max_items=3,
+            unique=True,
+        ),
+    )
+    type: ScannedFileType = field(
+        metadata=schema(
+            title="file type",
+            description="The type of the file: folder or file",
+        ),
+    )
+    stats: Stats = field(
+        metadata=schema(
+            title="file stats",
+            description="The stats of this file",
+        ),
+    )
 
     @staticmethod
     def from_scan(
