@@ -10,7 +10,7 @@ from typing import (
     cast,
 )
 
-from apischema import alias
+from apischema import alias, schema
 from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
@@ -29,6 +29,7 @@ from content.general import (
     ScannedFile,
     SeasonDescription,
     Summary,
+    deduplicate_required,
 )
 
 
@@ -37,6 +38,7 @@ class SeasonContentDict(ContentDict):
     episodes: list[EpisodeContent]
 
 
+@schema(extra=deduplicate_required)
 @dataclass(slots=True, repr=True)
 class SeasonContent(Content):
     __type: Literal[ContentType.season] = field(metadata=alias("type")) # TODO: submit upstream path, to allow this: (to not add "type" in the required field twice)

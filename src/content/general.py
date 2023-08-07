@@ -488,3 +488,12 @@ def safe_index(ls: list[SF], item: SF) -> Optional[int]:
         return ls.index(item)
     except ValueError:
         return None
+
+
+def deduplicate_required(schema: dict[str, Any]) -> None:
+    if schema.get("required") is not None and isinstance(schema["required"], list):
+        result: list[Any] = []
+        for element in schema["required"]:
+            if element not in result:
+                result.append(element)
+        schema["required"] = result

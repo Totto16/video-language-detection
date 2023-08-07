@@ -9,7 +9,7 @@ from typing import (
     cast,
 )
 
-from apischema import alias
+from apischema import alias, schema
 from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
@@ -27,6 +27,7 @@ from content.general import (
     NameParser,
     ScannedFile,
     Summary,
+    deduplicate_required,
 )
 from content.series_content import SeriesContent
 
@@ -36,6 +37,7 @@ class CollectionContentDict(ContentDict):
     series: list[SeriesContent]
 
 
+@schema(extra=deduplicate_required)
 @dataclass(slots=True, repr=True)
 class CollectionContent(Content):
     __type: Literal[ContentType.collection] = field(metadata=alias("type"))

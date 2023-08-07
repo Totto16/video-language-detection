@@ -4,9 +4,9 @@
 import json
 from os import makedirs
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Self, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
-from apischema import deserialize, serialize
+from apischema import deserialize, schema, serialize
 from apischema.json_schema import (
     deserialization_schema,
     serialization_schema,
@@ -202,7 +202,20 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self.__manager.stop()
 
 
-AllContent = EpisodeContent | SeasonContent | SeriesContent | CollectionContent
+# from: https://wyfo.github.io/apischema/0.18/json_schema/
+# schema extra can be callable to modify the schema in place
+def to_one_of(schema: dict[str, Any]) -> None:
+    if "anyOf" in schema:
+        schema["oneOf"] = schema.pop("anyOf")
+
+
+OneOf = schema(extra=to_one_of)
+
+
+AllContent = Annotated[
+    EpisodeContent | SeasonContent | SeriesContent | CollectionContent,
+    OneOf,
+]
 
 
 def load_from_file(file_path: Path) -> list[Content]:

@@ -28,13 +28,10 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
-
-
 @dataclass(slots=True, repr=True)
 class Content:
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
-
 
     def summary(self: Self, _detailed: bool = False) -> Summary:
         raise MissingOverrideError
@@ -64,7 +61,6 @@ class Content:
         rescan: bool = False,  # noqa: ARG002
     ) -> None:
         raise MissingOverrideError
-
 
 
 def process_folder(

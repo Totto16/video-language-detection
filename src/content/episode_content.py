@@ -9,7 +9,7 @@ from typing import (
     Self,
 )
 
-from apischema import alias
+from apischema import alias, schema
 from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
 from typing_extensions import override
@@ -22,6 +22,7 @@ from content.general import (
     NameParser,
     ScannedFile,
     Summary,
+    deduplicate_required,
 )
 
 
@@ -50,6 +51,7 @@ def itr_print_percent() -> None:
     print(f"{percent:.02f} %")
 
 
+@schema(extra=deduplicate_required)
 @dataclass(slots=True, repr=True)
 class EpisodeContent(Content):
     __type: Literal[ContentType.episode] = field(metadata=alias("type"))
