@@ -68,9 +68,28 @@ class FFprobeStream:
 
         return None
 
+    def __repr__(self: Self) -> str:
+        return json.dumps(self.__stream)
+
+
+class FormatInfo:
+    __raw: dict[str, Any]
+
+    def __init__(self: Self, raw: dict[str, Any]) -> None:
+        self.__raw = raw
+
+    def duration_seconds(self: Self) -> Optional[float]:
+        """
+        Returns the runtime duration of the file as a floating point number of seconds.
+        Returns None if the information is not present
+        """
+        val: Optional[Any] = self.__raw.get("duration", None)
+        return parse_float_safely(val) if isinstance(val, str) else None
+
 
 class FFProbeRawResult(TypedDict):
     streams: list[FFprobeRawStream]
+    format: dict[str, Any]
 
 
 class FFProbeResult:
@@ -82,6 +101,10 @@ class FFProbeResult:
     @property
     def streams(self: Self) -> list[FFprobeStream]:
         return [FFprobeStream(stream) for stream in self.__raw["streams"]]
+
+    @property
+    def file_info(self: Self) -> FormatInfo:
+        return FormatInfo(self.__raw["format"])
 
     def video_streams(self: Self) -> list[FFprobeStream]:
         """

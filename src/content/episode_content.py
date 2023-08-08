@@ -100,7 +100,8 @@ class EpisodeContent(Content):
                 manager,
             )
             return best.language
-        except FileMetadataError:
+        except FileMetadataError as err:
+            print(err)
             return Language.unknown()
 
     @staticmethod

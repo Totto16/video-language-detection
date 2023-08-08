@@ -280,26 +280,33 @@ class WAVFile:
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
-        info = self.__get_info()
+        info, err = self.__get_info()
         if info is None:
-            raise FileMetadataError
+            raise FileMetadataError(err)
         _type, status, runtime = info
         self.__type = _type
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self: Self) -> Optional[tuple[FileType, Status, Timestamp]]:
+    def __get_info(
+        self: Self,
+    ) -> tuple[Optional[tuple[FileType, Status, Timestamp]], str]:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
             with open("error.log", "a") as f:
                 print(f'"{self.__file}",', file=f)
 
+            err_msg: str = (
+                f"Unable to get a valid stream from file '{self.__file}':\n{err}"
+            )
             print(
-                f"Unable to get a valid stream from file '{self.__file}':\n{err}",
+                err_msg,
                 file=sys.stderr,
             )
 
-            return None
+            return None, err_msg
+
+        file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
         if metadata.is_video():
             video_streams = metadata.video_streams()
@@ -309,34 +316,44 @@ class WAVFile:
 
             duration = video_streams[0].duration_seconds()
             if duration is None:
-                return None
+                if file_duration is None:
+                    return None, "No video duration was found"
+
+                duration = file_duration
 
             return (
                 FileType.video,
                 Status.raw,
                 Timestamp.from_seconds(duration),
-            )
+            ), ""
 
         if metadata.is_audio():
             audio_streams = metadata.audio_streams()
-            # TODO: multiple audio streams can happen and shouldn't be a problem ! also every episode sghould hav an array of streams, with language etc!
+            # TODO: multiple audio streams can happen and shouldn't be a problem ! also every episode should hav an array of streams, with language etc!
             if len(audio_streams) > 1:
-                return None
+                return None, "multiple audio streams are not supported atm"
 
             duration = audio_streams[0].duration_seconds()
             if duration is None:
-                return None
+                if file_duration is None:
+                    return None, "No audio duration was found"
+
+                duration = file_duration
 
             if audio_streams[0].codec() == "pcm_s16le":
-                return (FileType.wav, Status.ready, Timestamp.from_seconds(duration))
+                return (
+                    FileType.wav,
+                    Status.ready,
+                    Timestamp.from_seconds(duration),
+                ), ""
 
             return (
                 FileType.audio,
                 Status.raw,
                 Timestamp.from_seconds(duration),
-            )
+            ), ""
 
-        return None
+        return None, "Unknown media type, not video or audio"
 
     @property
     def runtime(self: Self) -> Timestamp:
