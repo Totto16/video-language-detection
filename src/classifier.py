@@ -254,7 +254,8 @@ class Segment:
         if self.start is not None and self.end is not None:
             return self.end - self.start
 
-        raise RuntimeError("UNREACHABLE")
+        msg = "UNREACHABLE"
+        raise RuntimeError(msg)
 
 
 @dataclass
@@ -388,7 +389,8 @@ class WAVFile:
             case (_, _, True):
                 return self.__convert_to_wav(options, manager)
             case _:  # stupid mypy
-                raise RuntimeError("UNREACHABLE")
+                msg = "UNREACHABLE"
+                raise RuntimeError(msg)
 
     @property
     def status(self: Self) -> Status:
@@ -491,7 +493,8 @@ class WAVFile:
                     raise RuntimeError(msg)
                 return self.__tmp_file
             case _:  # stupid mypy
-                raise RuntimeError("UNREACHABLE")
+                msg = "UNREACHABLE"
+                raise RuntimeError(msg)
 
     def __del__(self: Self) -> None:
         if self.__tmp_file is not None and self.__tmp_file.exists():
@@ -627,7 +630,8 @@ def get_mean(
                 normalize_percents=normalize_percents,
             )
         case _:  # stupid mypy
-            raise RuntimeError("UNREACHABLE")
+            msg = "UNREACHABLE"
+            raise RuntimeError(msg)
 
 
 class Prediction:
