@@ -19,7 +19,7 @@ from content.general import (
     NameParser,
     ScannedFile,
     Summary,
-    deduplicate_required,
+    narrow_type,
 )
 
 
@@ -48,10 +48,9 @@ def itr_print_percent() -> None:
     print(f"{percent:.02f} %")
 
 
-@schema(extra=deduplicate_required)
+@schema(extra=narrow_type(("type", Literal[ContentType.episode])))
 @dataclass(slots=True, repr=True)
 class EpisodeContent(Content):
-    __type: Literal[ContentType.episode] = field(metadata=alias("type"))
     __description: EpisodeDescription = field(metadata=alias("description"))
     __language: Language = field(metadata=alias("language"))
 

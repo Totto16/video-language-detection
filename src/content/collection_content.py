@@ -24,7 +24,7 @@ from content.general import (
     NameParser,
     ScannedFile,
     Summary,
-    deduplicate_required,
+    narrow_type,
 )
 from content.series_content import SeriesContent
 
@@ -34,10 +34,9 @@ class CollectionContentDict(ContentDict):
     series: list[SeriesContent]
 
 
-@schema(extra=deduplicate_required)
+@schema(extra=narrow_type(("type", Literal[ContentType.collection])))
 @dataclass(slots=True, repr=True)
 class CollectionContent(Content):
-    __type: Literal[ContentType.collection] = field(metadata=alias("type"))
     __description: CollectionDescription = field(metadata=alias("description"))
     __series: list[SeriesContent] = field(metadata=alias("series"))
 

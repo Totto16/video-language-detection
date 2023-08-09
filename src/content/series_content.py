@@ -25,7 +25,7 @@ from content.general import (
     ScannedFile,
     SeriesDescription,
     Summary,
-    deduplicate_required,
+    narrow_type,
 )
 from content.season_content import SeasonContent
 
@@ -35,10 +35,11 @@ class SeriesContentDict(ContentDict):
     seasons: list[SeasonContent]
 
 
-@schema(extra=deduplicate_required)
+
+
+@schema(extra=narrow_type(("type", Literal[ContentType.series])))
 @dataclass(slots=True, repr=True)
 class SeriesContent(Content):
-    __type: Literal[ContentType.series] = field(metadata=alias("type"))
     __description: SeriesDescription = field(metadata=alias("description"))
     __seasons: list[SeasonContent] = field(metadata=alias("seasons"))
 

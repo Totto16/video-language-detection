@@ -1,10 +1,23 @@
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Generic, Optional, Self, TypedDict, TypeVar
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    Self,
+    TypedDict,
+    TypeVar,
+    cast,
+)
 
 from apischema import schema
+from apischema.json_schema import (
+    deserialization_schema,
+    serialization_schema,
+)
 from classifier import Language
 from enlighten import Manager
 
@@ -489,10 +502,46 @@ def safe_index(ls: list[SF], item: SF) -> Optional[int]:
         return None
 
 
-def deduplicate_required(schema: dict[str, Any]) -> None:
-    if schema.get("required") is not None and isinstance(schema["required"], list):
-        result: list[Any] = []
-        for element in schema["required"]:
-            if element not in result:
-                result.append(element)
-        schema["required"] = result
+def get_schema(
+    any_type: Any,
+    *,
+    additional_properties: Optional[bool] = None,
+    all_refs: Optional[bool] = None,
+) -> MutableMapping[str, Any]:
+    result: Mapping[str, Any] = deserialization_schema(
+        any_type,
+        additional_properties=additional_properties,
+        all_refs=all_refs,
+    )
+
+    result2 = serialization_schema(
+        any_type,
+        additional_properties=additional_properties,
+        all_refs=all_refs,
+    )
+
+    if result != result2:
+        msg = "Deserialization and Serialization scheme mismatch"
+        raise RuntimeError(msg)
+
+    return cast(MutableMapping[str, Any], result)
+
+
+def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
+    name, type_desc = replace
+
+    def narrow_schema(schema: dict[str, Any]) -> None:
+        if schema.get("properties") is not None and isinstance(
+            schema["properties"],
+            dict,
+        ):
+            resulting_type: MutableMapping[str, Any] = get_schema(type_desc)
+            del resulting_type["$schema"]
+
+            if cast(dict[str, Any], schema["properties"]).get(name) is None:
+                msg = f"Narrowing type failed, type is not present. key '{name}'"
+                raise RuntimeError(msg)
+
+            schema["properties"][name] = resulting_type
+
+    return narrow_schema

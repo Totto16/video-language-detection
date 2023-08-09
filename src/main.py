@@ -3,15 +3,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
 from apischema import deserialize, schema, serialize
-from apischema.json_schema import (
-    deserialization_schema,
-    serialization_schema,
-)
 from classifier import Classifier
 from content.base_class import Content, ContentCharacteristic, process_folder
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
-from content.general import Callback, ContentType, NameParser, ScannedFileType
+from content.general import (
+    Callback,
+    ContentType,
+    NameParser,
+    ScannedFileType,
+    get_schema,
+)
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
@@ -285,17 +287,11 @@ def parse_contents(
 
 
 def generate_json_schema(file_path: Path, any_type: Any) -> None:
-    result: Mapping[str, Any] = deserialization_schema(
+    result: Mapping[str, Any] = get_schema(
         any_type,
         additional_properties=False,
         all_refs=True,
     )
-
-    result2 = serialization_schema(any_type, additional_properties=False, all_refs=True)
-
-    if result != result2:
-        msg = "Deserialization and Serialization scheme mismatch"
-        raise RuntimeError(msg)
 
     if not file_path.parent.exists():
         Path(file_path).parent.mkdir(parents=True)
