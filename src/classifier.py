@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import gc
 import math
 import sys

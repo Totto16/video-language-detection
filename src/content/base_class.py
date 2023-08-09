@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from dataclasses import dataclass, field
 from os import listdir
 from pathlib import Path
@@ -7,8 +5,6 @@ from typing import Any, Optional, Self, TypedDict
 
 from apischema import alias
 from classifier import Classifier
-from enlighten import Manager
-
 from content.general import (
     Callback,
     ContentType,
@@ -19,6 +15,7 @@ from content.general import (
     Summary,
     safe_index,
 )
+from enlighten import Manager
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
