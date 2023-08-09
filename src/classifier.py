@@ -119,7 +119,11 @@ class Timestamp:
             # val is between 1 and 5 inclusive
             ms = round_to_tens(ms, 5 - val)
 
-            return "{delta}.{ms:0{val}d}".format(delta=str(delta), ms=ms, val=val)
+            return "{delta}.{ms:0{val}d}".format(  # noqa: PLE1300
+                delta=str(delta),
+                ms=ms,
+                val=val,
+            )
         except Exception:  # noqa: BLE001
             raise ValueError(
                 f"Invalid format specifier '{spec}' for object of type 'Timestamp'",
@@ -166,21 +170,22 @@ class Timestamp:
             f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
 
-    def __iadd__(self: Self, value: object) -> "Timestamp":
-        new_value: Timestamp = Timestamp(self.__delta) + value
-        return new_value
-
-    def __add__(self: Self, value: object) -> "Timestamp":
+    def __iadd__(self: Self, value: object) -> Self:
         if isinstance(value, Timestamp):
-            result: timedelta = self.__delta + value.delta
-            return Timestamp(result)
+            self.__delta += value.delta
+            return self
         if isinstance(value, timedelta):
-            result = self.__delta + value
-            return Timestamp(result)
+            self.__delta += value
+            return self
 
         raise TypeError(
-            f"'+' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
+            f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
         )
+
+    def __add__(self: Self, value: object) -> "Timestamp":
+        new_value: Timestamp = Timestamp(self.__delta)
+        new_value += value
+        return new_value
 
     def __sub__(self: Self, value: object) -> "Timestamp":
         if isinstance(value, Timestamp):
@@ -538,7 +543,7 @@ class Language:
     def __hash__(self: Self) -> int:
         return hash((self.short, self.long))
 
-    def __eq__(self: Self, other: Any) -> bool:
+    def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Language):
             return self.short == other.short and self.long == other.long
 
@@ -673,16 +678,20 @@ class Prediction:
     def append_other(self: Self, pred: "Prediction") -> None:
         self.__data.extend(pred.data)
 
-    def __iadd__(self: Self, value: object) -> "Prediction":
+    def __iadd__(self: Self, value: object) -> Self:
         if isinstance(value, Prediction):
-            new_value = Prediction()
-            new_value.append_other(self)
-            new_value.append_other(value)
-            return new_value
+            self.append_other(value)
+            return self
 
         raise TypeError(
             f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'",
         )
+
+    def __add__(self: Self, value: object) -> "Prediction":
+        new_value = Prediction()
+        new_value += self
+        new_value += value
+        return new_value
 
 
 class Classifier:
@@ -797,7 +806,8 @@ class Classifier:
                 )
                 segment: Segment = Segment(current_timestamp, end)
                 result.append(segment)
-                current_timestamp += SEGMENT_LENGTH
+                # ATTENTION: don't use +=, since that doesn't create a new object!
+                current_timestamp = current_timestamp + SEGMENT_LENGTH
 
             return result
 
