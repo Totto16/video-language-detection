@@ -6,7 +6,6 @@ select = [
     "B",
     "BLE",
     "C4",
-    "C90",
     "COM",
     "DTZ",
     "E",
