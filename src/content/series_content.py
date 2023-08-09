@@ -56,7 +56,8 @@ class SeriesContent(Content):
             name_parser,
         )
         if description is None:
-            raise NameError(f"Couldn't get SeriesDescription from '{path}'")
+            msg = f"Couldn't get SeriesDescription from '{path}'"
+            raise NameError(msg)
 
         return SeriesContent(ContentType.series, scanned_file, description, [])
 
@@ -118,9 +119,8 @@ class SeriesContent(Content):
                 if isinstance(content, SeasonContent):
                     self.__seasons.append(content)
                 else:
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                    raise TypeError(msg)
 
         else:
             ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
@@ -136,6 +136,5 @@ class SeriesContent(Content):
             # since some are added unchecked, check again now!
             for content in cast(list[Content], self.__seasons):
                 if not isinstance(content, SeasonContent):
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeriesContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                    raise TypeError(msg)

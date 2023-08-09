@@ -86,9 +86,8 @@ class CollectionContent(Content):
                 if isinstance(content, SeriesContent):
                     self.__series.append(content)
                 else:
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                    raise TypeError(msg)
 
         else:
             ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
@@ -104,6 +103,5 @@ class CollectionContent(Content):
             # since some are added unchecked, check again now!
             for content in cast(list[Content], self.__series):
                 if not isinstance(content, SeriesContent):
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in CollectionContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in CollectionContent"
+                    raise TypeError(msg)

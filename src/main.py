@@ -47,7 +47,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         self.__progress_bars = {}
         manager = get_manager()
         if not isinstance(manager, Manager):
-            raise RuntimeError("UNREACHABLE (not runnable in notebooks)")
+            msg = "UNREACHABLE (not runnable in notebooks)"
+            raise TypeError(msg)
 
         self.__manager = manager
         self.__status_bar = self.__manager.status_bar(
@@ -103,9 +104,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             )
             if content is None:
                 if self.__options["parse_error_is_exception"]:
-                    raise RuntimeError(
-                        f"Parse Error: Couldn't parse content from '{file_path}'",
-                    )
+                    msg = (f"Parse Error: Couldn't parse content from '{file_path}'",)
+                    raise RuntimeError(msg)
 
                 return None
 
@@ -175,7 +175,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         amount: int = 1,
     ) -> None:
         if self.__progress_bars.get(name) is None:
-            raise RuntimeError("No Progressbar, on progress callback")
+            msg = "No Progressbar, on progress callback"
+            raise RuntimeError(msg)
 
         self.__progress_bars[name].update(amount)
 
@@ -188,7 +189,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         characteristic: ContentCharacteristic,
     ) -> None:
         if self.__progress_bars.get(name) is None:
-            raise RuntimeError("No Progressbar, on progress finish")
+            msg = "No Progressbar, on progress finish"
+            raise RuntimeError(msg)
 
         self.__progress_bars[name].close(clear=True)
         del self.__progress_bars[name]
@@ -226,7 +228,8 @@ def load_from_file(file_path: Path) -> list[Content]:
                 )
                 return json_loaded
             case _:
-                raise RuntimeError(f"Not loadable from '{suffix}' file!")
+                msg = f"Not loadable from '{suffix}' file!"
+                raise RuntimeError(msg)
 
 
 def save_to_file(file_path: Path, contents: list[Content]) -> None:
@@ -247,7 +250,8 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 json_content: str = json.dumps(encoded_dict, indent=4)
                 file.write(json_content)
             case _:
-                raise RuntimeError(f"Not loadable from '{suffix}' file!")
+                msg = f"Not loadable from '{suffix}' file!"
+                raise RuntimeError(msg)
 
 
 def parse_contents(
@@ -295,7 +299,8 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
     result2 = serialization_schema(any_type, additional_properties=False, all_refs=True)
 
     if result != result2:
-        raise RuntimeError("Deserialization and Serialization scheme mismatch")
+        msg = "Deserialization and Serialization scheme mismatch"
+        raise RuntimeError(msg)
 
     if not file_path.parent.exists():
         makedirs(file_path.parent)

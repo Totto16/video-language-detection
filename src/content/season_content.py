@@ -58,7 +58,8 @@ class SeasonContent(Content):
             name_parser,
         )
         if description is None:
-            raise NameError(f"Couldn't get SeasonDescription from '{path}'")
+            msg = f"Couldn't get SeasonDescription from '{path}'"
+            raise NameError(msg)
 
         return SeasonContent(ContentType.season, scanned_file, description, [])
 
@@ -95,7 +96,8 @@ class SeasonContent(Content):
         summary: Summary = Summary.empty(detailed=detailed)
         for episode in self.__episodes:
             summary.combine_episodes(
-                self.description, episode.summary(detailed=detailed),
+                self.description,
+                episode.summary(detailed=detailed),
             )
 
         return summary
@@ -122,9 +124,8 @@ class SeasonContent(Content):
                 if isinstance(content, EpisodeContent):
                     self.__episodes.append(content)
                 else:
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                    raise TypeError(msg)
         else:
             ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
             process_folder(
@@ -139,6 +140,5 @@ class SeasonContent(Content):
             # since some are added unchecked, check again now!
             for content in cast(list[Content], self.__episodes):
                 if not isinstance(content, EpisodeContent):
-                    raise RuntimeError(
-                        f"No child with class '{content.__class__.__name__}' is possible in SeasonContent",
-                    )
+                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                    raise TypeError(msg)

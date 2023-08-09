@@ -162,7 +162,8 @@ def process_folder(
             path,
         )
         if index is None:
-            raise RuntimeError(f"Path to delete wasn't founds: {path}")
+            msg = f"Path to delete wasn't founds: {path}"
+            raise RuntimeError(msg)
 
         del rescan[index]
         deleted += 1

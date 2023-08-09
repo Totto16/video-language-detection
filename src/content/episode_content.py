@@ -69,7 +69,8 @@ class EpisodeContent(Content):
             name_parser,
         )
         if description is None:
-            raise NameError(f"Couldn't get EpisodeDescription from '{path}'")
+            msg = f"Couldn't get EpisodeDescription from '{path}'"
+            raise NameError(msg)
 
         return EpisodeContent(
             ContentType.episode,
@@ -99,10 +100,12 @@ class EpisodeContent(Content):
                 self.scanned_file.path,
                 manager,
             )
-            return best.language
         except FileMetadataError as err:
             print(err)
             return Language.unknown()
+        else:
+            # python is funky xD, leaking variables a s desired pattern xD
+            return best.language
 
     @staticmethod
     def is_valid_name(
@@ -127,7 +130,9 @@ class EpisodeContent(Content):
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
         return Summary.from_single(
-            self.__language, self.__description, detailed=detailed,
+            self.__language,
+            self.__description,
+            detailed=detailed,
         )
 
     @override

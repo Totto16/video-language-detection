@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 from typing import (
+    Never,
     Optional,
 )
 
@@ -39,58 +40,62 @@ def content_from_scan(
         (len(parents) == 1 and file_path.is_dir()) or len(parents) != 1
     ) and not SeriesContent.is_valid_name(parents[0], name_parser)
 
+    def raise_inner(msg: str) -> Never:
+        raise RuntimeError(msg)
+
     try:
         if len(parents) == 4:
             if file_type == ScannedFileType.folder:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting 4 - {file_path}!",
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
                 )
 
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
                 )
 
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
                 )
 
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
                 )
 
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and top_is_collection:
             if file_type == ScannedFileType.file:
-                raise RuntimeError(
+                raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
                 )
+
             return CollectionContent.from_path(file_path, scanned_file)
 
-        raise RuntimeError("UNREACHABLE")
+        raise_inner("UNREACHABLE")
 
-    except Exception as e:  # noqa: BLE001
+    except RuntimeError as e:
         print(e, file=sys.stderr)
         return None

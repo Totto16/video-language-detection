@@ -259,7 +259,8 @@ class Stats:
     @staticmethod
     def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
         if file_path.is_dir():
-            raise RuntimeError("Can't take checksum of directory")
+            msg = "Can't take checksum of directory"
+            raise RuntimeError(msg)
         size: float = float(file_path.stat().st_size)
         bar: Optional[Any] = None
         if manager is not None:
@@ -332,9 +333,8 @@ class Stats:
 
             return True
 
-        raise RuntimeError(
-            "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible",
-        )
+        msg = "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
+        raise RuntimeError(msg)
 
 
 @dataclass(slots=True, repr=True)
@@ -374,9 +374,8 @@ class ScannedFile:
         parent_folders: list[str],
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
-            raise RuntimeError(
-                "No more than 3 parent folders are allowed: [collection] -> series -> season",
-            )
+            msg = "No more than 3 parent folders are allowed: [collection] -> series -> season"
+            raise RuntimeError(msg)
 
         stats: Stats = Stats.from_file(file_path, file_type, generate_checksum=False)
 

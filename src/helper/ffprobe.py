@@ -142,7 +142,8 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
                 stderr=temp_file,
             )
     except FileNotFoundError as err:
-        raise OSError("ffprobe not found.") from err
+        msg = "ffprobe not found."
+        raise OSError(msg) from err
 
     commands: list[str] = [
         "ffprobe",

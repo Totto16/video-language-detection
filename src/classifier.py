@@ -11,7 +11,7 @@ from math import floor
 from os import makedirs, path, remove
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, Self, TypedDict
+from typing import Any, Never, Optional, Self, TypedDict
 from warnings import filterwarnings
 
 import psutil
@@ -100,34 +100,35 @@ class Timestamp:
         def round_to_tens(value: int, tens: int) -> int:
             return int(round(value / (10**tens)))
 
-        try:
-            ignore_zero: bool = False
-            if spec.endswith("n"):
-                ignore_zero = True
-                spec = spec[:-1]
+        def emit_error(reason: str) -> Never:
+            msg = f"Invalid format specifier '{spec}' for object of type 'Timestamp': reason {reason}"
+            raise ValueError(msg)
 
-            if ignore_zero and ms == 0:
-                return str(delta)
+        ignore_zero: bool = False
+        if spec.endswith("n"):
+            ignore_zero = True
+            spec = spec[:-1]
 
-            val: Optional[int] = parse_int_safely(spec)
-            if val is None:
-                raise RuntimeError(f"Couldn't parse int: '{spec}'")
+        if ignore_zero and ms == 0:
+            return str(delta)
 
-            if val > 5 or val <= 0:
-                raise RuntimeError(f"{val} is out of allowed range 0 < value <= 5")
+        val: Optional[int] = parse_int_safely(spec)
+        if val is None:
+            msg = f"Couldn't parse int: '{spec}'"
+            emit_error(msg)
 
-            # val is between 1 and 5 inclusive
-            ms = round_to_tens(ms, 5 - val)
+        if val > 5 or val <= 0:
+            msg = f"{val} is out of allowed range 0 < value <= 5"
+            emit_error(msg)
 
-            return "{delta}.{ms:0{val}d}".format(  # noqa: PLE1300
-                delta=str(delta),
-                ms=ms,
-                val=val,
-            )
-        except Exception:  # noqa: BLE001
-            raise ValueError(
-                f"Invalid format specifier '{spec}' for object of type 'Timestamp'",
-            ) from None
+        # val is between 1 and 5 inclusive
+        ms = round_to_tens(ms, 5 - val)
+
+        return "{delta}.{ms:0{val}d}".format(  # noqa: PLE1300
+            delta=str(delta),
+            ms=ms,
+            val=val,
+        )
 
     def __eq__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
@@ -142,33 +143,29 @@ class Timestamp:
         if isinstance(value, Timestamp):
             return self.__delta < value.delta
 
-        raise TypeError(
-            f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'<' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __le__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta <= value.delta
 
-        raise TypeError(
-            f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'<=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __gt__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta > value.delta
 
-        raise TypeError(
-            f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'>' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __ge__(self: Self, value: object) -> bool:
         if isinstance(value, Timestamp):
             return self.__delta >= value.delta
 
-        raise TypeError(
-            f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'>=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __iadd__(self: Self, value: object) -> Self:
         if isinstance(value, Timestamp):
@@ -178,9 +175,8 @@ class Timestamp:
             self.__delta += value
             return self
 
-        raise TypeError(
-            f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __add__(self: Self, value: object) -> "Timestamp":
         new_value: Timestamp = Timestamp(self.__delta)
@@ -195,9 +191,8 @@ class Timestamp:
             result2: Timestamp = self - Timestamp.from_minutes(value)
             return result2
 
-        raise TypeError(
-            f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __abs__(self: Self) -> "Timestamp":
         return Timestamp(abs(self.__delta))
@@ -211,9 +206,8 @@ class Timestamp:
         if isinstance(value, float):
             return self / Timestamp.from_minutes(value)
 
-        raise TypeError(
-            f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'",
-        )
+        msg = f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
 
 class FileType(Enum):
@@ -317,7 +311,8 @@ class WAVFile:
             video_streams = metadata.video_streams()
             # multiple video makes no sense
             if len(video_streams) > 1:
-                raise RuntimeError("Multiple Video Streams are not supported")
+                msg = "Multiple Video Streams are not supported"
+                raise RuntimeError(msg)
 
             duration = video_streams[0].duration_seconds()
             if duration is None:
@@ -407,9 +402,8 @@ class WAVFile:
         bar: Optional[Any] = None
 
         if not options.segment.is_valid:
-            raise RuntimeError(
-                f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}",
-            )
+            msg = f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}"
+            raise RuntimeError(msg)
 
         total_time: Timestamp = options.segment.timediff(self.runtime)
         elapsed_time: Timestamp = Timestamp.zero()
@@ -489,10 +483,12 @@ class WAVFile:
             case (_, FileType.wav):
                 return self.__file
             case (Status.raw, _):
-                raise RuntimeError("Not converted")
+                msg = "Not converted"
+                raise RuntimeError(msg)
             case (Status.ready, _):
                 if self.__tmp_file is None:
-                    raise RuntimeError("Not converted correctly, temp file is missing")
+                    msg = "Not converted correctly, temp file is missing"
+                    raise RuntimeError(msg)
                 return self.__tmp_file
             case _:  # stupid mypy
                 raise RuntimeError("UNREACHABLE")
@@ -524,7 +520,8 @@ class Language:
     def from_str_unsafe(inp: str) -> "Language":
         lan: Optional[Language] = Language.from_str(inp)
         if lan is None:
-            raise RuntimeError(f"Couldn't get the Language from str '{inp}'")
+            msg = f"Couldn't get the Language from str '{inp}'"
+            raise RuntimeError(msg)
 
         return lan
 
@@ -686,9 +683,8 @@ class Prediction:
             self.append_other(value)
             return self
 
-        raise TypeError(
-            f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'",
-        )
+        msg = f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
 
     def __add__(self: Self, value: object) -> "Prediction":
         new_value = Prediction()
@@ -717,7 +713,8 @@ class Classifier:
             run_opts=run_opts,
         )
         if classifier is None:
-            raise RuntimeError("Couldn't initialize Classifier")
+            msg = "Couldn't initialize Classifier"
+            raise RuntimeError(msg)
 
         self.__classifier = classifier
 
@@ -763,7 +760,7 @@ class Classifier:
 
             return Prediction(prob)
 
-        except Exception as ex:  # noqa: BLE001
+        except RuntimeError as ex:
             if isinstance(ex, cuda.OutOfMemoryError):
                 self.__init_classifier(force_cpu=True)
                 return self.__classify(wav_file, segment, manager)
