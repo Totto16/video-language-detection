@@ -135,7 +135,7 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     # some things here were copied and modified from the original ffprobe-python repo:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
     try:
-        with open(os.devnull, "w") as temp_file:
+        with Path(os.devnull).open(mode="w") as temp_file:
             subprocess.check_call(
                 ["ffprobe", "-h"],  # noqa: S607, S603
                 stdout=temp_file,

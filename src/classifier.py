@@ -8,7 +8,6 @@ from datetime import timedelta
 from enum import Enum
 from functools import reduce
 from math import floor
-from os import makedirs, path, remove
 from pathlib import Path
 from shutil import rmtree
 from typing import Any, Never, Optional, Self, TypedDict
@@ -293,7 +292,7 @@ class WAVFile:
     ) -> tuple[Optional[tuple[FileType, Status, Timestamp]], str]:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
-            with open("error.log", "a") as f:
+            with Path("error.log").open(mode="a") as f:
                 print(f'"{self.__file}",', file=f)
 
             err_msg: str = (
@@ -424,12 +423,12 @@ class WAVFile:
 
         temp_dir: Path = Path("/tmp") / "video_lang_detect"  # noqa: S108
         if not temp_dir.exists():
-            makedirs(temp_dir)
+           temp_dir.mkdir(parents=True)
 
         self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 
         if self.__tmp_file.exists():
-            remove(str(self.__tmp_file.absolute()))
+            self.__tmp_file.unlink(missing_ok=True)
 
         ffmpeg_options: dict[str, Any] = {}
 
@@ -498,7 +497,7 @@ class WAVFile:
 
     def __del__(self: Self) -> None:
         if self.__tmp_file is not None and self.__tmp_file.exists():
-            remove(str(self.__tmp_file.absolute()))
+            self.__tmp_file.unlink(missing_ok=True)
 
 
 class LanguagePercentageDict(TypedDict):
@@ -702,7 +701,7 @@ class Classifier:
     __save_dir: Path
 
     def __init__(self: Self) -> None:
-        self.__save_dir = Path(path.dirname(__file__)) / "tmp"
+        self.__save_dir = Path(__file__).parent / "tmp"
 
         self.__init_classifier()
 
@@ -898,6 +897,6 @@ class Classifier:
     def __del__(self: Self) -> None:
         if self.__save_dir.exists():
             if self.__save_dir.is_file():
-                remove(str(self.__save_dir.absolute()))
+                self.__save_dir.rmdir()
             else:
                 rmtree(str(self.__save_dir.absolute()), ignore_errors=True)

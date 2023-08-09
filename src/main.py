@@ -2,7 +2,6 @@
 
 
 import json
-from os import makedirs
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
@@ -217,7 +216,7 @@ AllContent = Annotated[
 
 
 def load_from_file(file_path: Path) -> list[Content]:
-    with open(file_path) as file:
+    with file_path.open(mode="r") as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
@@ -234,11 +233,10 @@ def load_from_file(file_path: Path) -> list[Content]:
 
 def save_to_file(file_path: Path, contents: list[Content]) -> None:
     if not file_path.parent.exists():
-        makedirs(file_path.parent)
+        file_path.parent.mkdir(parents=True)
 
-    with open(
-        file_path,
-        "w",
+    with file_path.open(
+        mode="w",
     ) as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
@@ -303,8 +301,8 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
         raise RuntimeError(msg)
 
     if not file_path.parent.exists():
-        makedirs(file_path.parent)
+        Path(file_path).parent.mkdir(parents=True)
 
-    with open(file_path, "w") as file:
+    with file_path.open(mode="w") as file:
         json_content: str = json.dumps(result, indent=4)
         file.write(json_content)

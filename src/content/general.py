@@ -274,7 +274,7 @@ class Stats:
             )
             bar.update(0, force=True)
         sha256_hash = sha256()
-        with open(str(file_path.absolute()), "rb") as file:
+        with file_path.open(mode="rb") as file:
             # Read and update hash string value in blocks of 4K
             for byte_block in iter(lambda: file.read(4096), b""):
                 sha256_hash.update(byte_block)
