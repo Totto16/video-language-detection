@@ -40,15 +40,13 @@ select = [
     "EM",
     "EXE",
     "FA",
-    "TID",  # maybe disable,
+    "TID",
     "INT",
-    "TD",
-    "FIX",
+    #"TD", # todo activate
+    #"FIX",  # todo activate
     "ERA",
     "PGH",
     "TRY",
-
-
 ]
 
 
