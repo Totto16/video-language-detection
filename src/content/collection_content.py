@@ -8,6 +8,9 @@ from typing import (
 
 from apischema import alias, schema
 from classifier import Classifier
+from enlighten import Manager
+from typing_extensions import override
+
 from content.base_class import (
     Content,
     ContentCharacteristic,
@@ -24,8 +27,6 @@ from content.general import (
     deduplicate_required,
 )
 from content.series_content import SeriesContent
-from enlighten import Manager
-from typing_extensions import override
 
 
 class CollectionContentDict(ContentDict):

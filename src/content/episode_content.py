@@ -8,6 +8,9 @@ from typing import (
 
 from apischema import alias, schema
 from classifier import Classifier, FileMetadataError, Language, WAVFile
+from enlighten import Manager
+from typing_extensions import override
+
 from content.base_class import Content, ContentCharacteristic, ContentDict
 from content.general import (
     Callback,
@@ -18,8 +21,6 @@ from content.general import (
     Summary,
     deduplicate_required,
 )
-from enlighten import Manager
-from typing_extensions import override
 
 
 class EpisodeContentDict(ContentDict):

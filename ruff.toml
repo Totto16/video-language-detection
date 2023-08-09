@@ -67,6 +67,11 @@ line-length = 100
 # Target Python version is 3.11.
 target-version = "py311"
 
-# Ignore `E402` (import violations) in all `__init__.py` files
 [per-file-ignores]
+# Ignore `E402` (import violations) in all `__init__.py` files
 "__init__.py" = ["E402"]
+
+# ignore "INP001" (implicit namespace package) for all files in src/
+"classifier.py" = ["INP001"]
+"entry.py" = ["INP001"]
+"main.py" = ["INP001"]
