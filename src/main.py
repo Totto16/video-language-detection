@@ -138,10 +138,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
     ) -> None:
         content_type, _ = characteristic
 
-        # don't make a bar for episodes!
-        # if file_type == ScannedFileType.file:
-        # return
-
         value: tuple[str, str]
 
         match content_type:

@@ -625,7 +625,9 @@ def get_mean(
                 if i >= start and i < end
             ]
             return get_mean(
-                MeanType.arithmetic, new_values, normalize_percents=normalize_percents,
+                MeanType.arithmetic,
+                new_values,
+                normalize_percents=normalize_percents,
             )
         case _:  # stupid mypy
             raise RuntimeError("UNREACHABLE")
@@ -746,7 +748,7 @@ class Classifier:
             emb = self.__classifier.encode_batch(wavs, wav_lens=None)
             out_prob = self.__classifier.mods.classifier(emb).squeeze(1)
 
-            # ATTENTION: unsorted
+            # NOTE:  ATTENTION - unsorted list
             prob: list[tuple[float, Language]] = [
                 (
                     p,
