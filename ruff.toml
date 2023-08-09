@@ -1,5 +1,57 @@
-# Enable flake8-bugbear (`B`) rules.
-select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY", "RUF", "PERF", "Q", "TCH", "RSE", "PYI", "ISC", "C4", "COM", "BLE", "S", "ASYNC", "ANN" ,"YTT", "UP", "N", "I"]
+select = [
+    "A",
+    "ANN",
+    "ARG",
+    "ASYNC",
+    "B",
+    "BLE",
+    "C4",
+    "C90",
+    "COM",
+    "DTZ",
+    "E",
+    "F",
+    "FBT",
+    "FLY",
+    "PTH",
+    "I",
+    "ICN",
+    "ISC",
+    "N",
+    "PERF",
+    "PL",
+    "PYI",
+    "Q",
+    "RET",
+    # "T20", # todo activate
+    "RSE",
+    "RUF",
+    "S",
+    "SIM",
+    "SLF",
+    "PT",
+    "SLOT",
+    "TCH",
+    "UP",
+    "YTT",
+    "T10",
+    "PIE",
+    "INP",
+    "G",
+    "EM",
+    "EXE",
+    "FA",
+    "TID",  # maybe disable,
+    "INT",
+    "TD",
+    "FIX",
+    "ERA",
+    "PGH",
+    "TRY",
+
+
+]
+
 
 # Never enforce `E501` (line length violations).
 # PLR2004 =>  magic-value-comparison 
@@ -10,13 +62,10 @@ select = ["E", "F", "B", "N", "A", "DTZ", "ICN", "SLF", "RET", "ARG", "PL", "FLY
 # ANN401  =>  any-type 
 ignore = ["E501", "PLR2004", "PLR0913", "PLR0911", "PLR0912", "UP007", "ANN401"]
 
-# Avoid trying to fix flake8-bugbear (`B`) violations.
-# unfixable = ["B"]
-
-# Same as Black.
+# 88 (standard) is to small
 line-length = 100
 
-# Assume Python 3.11.
+# Target Python version is 3.11.
 target-version = "py311"
 
 # Ignore `E402` (import violations) in all `__init__.py` files

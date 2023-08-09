@@ -28,6 +28,7 @@ test = "python tests/test_simple.py tests/test_ru.wav"
 lint = "bash -c 'pipenv run mypy; pipenv run ruff'"
 mypy = "mypy src/ --strict --ignore-missing-imports"
 ruff = "ruff check src/"
+ruff-ci = "ruff check src/ --format=github"
 ruff-fix = "ruff check src/ --fix"
 schema = "python src/entry.py schema"
 

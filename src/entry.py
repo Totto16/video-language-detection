@@ -117,9 +117,14 @@ if __name__ == "__main__":
         match sys.argv[1]:
             case "schema":
                 generate_json_schema(
-                    Path("schema/content_list.json"), list[AllContent],
+                    Path("schema/content_list.json"),
+                    list[AllContent],
                 )
                 sys.exit(0)
             case _:
                 pass
     main()
+
+
+# TODO: use logging instead of print() in some scenarios, let the command line arguments decide teh loglevel used
+# TODO: use gettext to be able to translate strings (use default locale or fallback (en))

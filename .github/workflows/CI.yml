@@ -58,4 +58,6 @@ jobs:
                   pipenv install --dev
 
             - name: run lint
-              run: pipenv run lint
+              run: |
+                  pipenv run mypy
+                  pipenv run ruff-ci
