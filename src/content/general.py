@@ -125,6 +125,7 @@ class Summary:
         self: Self,
         languages: list[Language],
         descriptions: list[IdentifierDescription],
+        *,
         detailed: bool = False,
     ) -> None:
         def get_dict(language: Language) -> LanguageDict:
@@ -161,13 +162,14 @@ class Summary:
     def from_single(
         language: Language,
         description: EpisodeDescription,
+        *,
         detailed: bool,
     ) -> "Summary":
-        return Summary([language], [(description,)], detailed)
+        return Summary([language], [(description,)], detailed=detailed)
 
     @staticmethod
-    def empty(detailed: bool) -> "Summary":
-        return Summary([], [], detailed)
+    def empty(*, detailed: bool) -> "Summary":
+        return Summary([], [], detailed=detailed)
 
     def combine_episodes(
         self: Self,

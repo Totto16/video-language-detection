@@ -41,7 +41,9 @@ class SeasonContentDict(ContentDict):
 @schema(extra=deduplicate_required)
 @dataclass(slots=True, repr=True)
 class SeasonContent(Content):
-    __type: Literal[ContentType.season] = field(metadata=alias("type")) # TODO: submit upstream path, to allow this: (to not add "type" in the required field twice)
+    __type: Literal[ContentType.season] = field(
+        metadata=alias("type"),
+    )  # TODO: submit upstream path, to allow this: (to not add "type" in the required field twice)
     __description: SeasonDescription = field(metadata=alias("description"))
     __episodes: list[EpisodeContent] = field(metadata=alias("episodes"))
 
@@ -89,10 +91,12 @@ class SeasonContent(Content):
         return self.__episodes
 
     @override
-    def summary(self: Self, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed)
+    def summary(self: Self, *, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed=detailed)
         for episode in self.__episodes:
-            summary.combine_episodes(self.description, episode.summary(detailed))
+            summary.combine_episodes(
+                self.description, episode.summary(detailed=detailed),
+            )
 
         return summary
 

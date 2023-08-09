@@ -89,10 +89,10 @@ class SeriesContent(Content):
         return SeriesDescription(name, year)
 
     @override
-    def summary(self: Self, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed)
+    def summary(self: Self, *, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed=detailed)
         for season in self.__seasons:
-            summary.combine_seasons(self.description, season.summary(detailed))
+            summary.combine_seasons(self.description, season.summary(detailed=detailed))
 
         return summary
 

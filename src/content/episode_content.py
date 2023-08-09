@@ -125,8 +125,10 @@ class EpisodeContent(Content):
         return EpisodeDescription(name, season, episode)
 
     @override
-    def summary(self: Self, detailed: bool = False) -> Summary:
-        return Summary.from_single(self.__language, self.__description, detailed)
+    def summary(self: Self, *, detailed: bool = False) -> Summary:
+        return Summary.from_single(
+            self.__language, self.__description, detailed=detailed,
+        )
 
     @override
     def scan(

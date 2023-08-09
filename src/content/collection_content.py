@@ -57,10 +57,10 @@ class CollectionContent(Content):
         return self.__series
 
     @override
-    def summary(self: Self, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed)
+    def summary(self: Self, *, detailed: bool = False) -> Summary:
+        summary: Summary = Summary.empty(detailed=detailed)
         for serie in self.__series:
-            summary.combine_series(self.description, serie.summary(detailed))
+            summary.combine_series(self.description, serie.summary(detailed=detailed))
 
         return summary
 

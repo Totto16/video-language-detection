@@ -33,7 +33,7 @@ class Content:
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
 
-    def summary(self: Self, _detailed: bool = False) -> Summary:
+    def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
         raise MissingOverrideError
 
     @property

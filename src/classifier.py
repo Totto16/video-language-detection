@@ -437,9 +437,8 @@ class WAVFile:
 
         ffmpeg_options: dict[str, Any] = {}
 
-        if options.segment.start is not None:
-            if self.runtime >= options.segment.start:
-                ffmpeg_options["ss"] = str(options.segment.start)
+        if options.segment.start is not None and self.runtime >= options.segment.start:
+            ffmpeg_options["ss"] = str(options.segment.start)
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
         ffmpeg_options = {
@@ -450,9 +449,8 @@ class WAVFile:
             "stats_period": 0.1,  # in seconds
         }
 
-        if options.segment.end is not None:
-            if self.runtime >= options.segment.end:
-                ffmpeg_options["to"] = str(options.segment.end)
+        if options.segment.end is not None and self.runtime >= options.segment.end:
+            ffmpeg_options["to"] = str(options.segment.end)
 
         input_options: dict[str, Any] = {}
 
@@ -597,6 +595,7 @@ class MeanType(Enum):
 def get_mean(
     mean_type: MeanType,
     values: list[float],
+    *,
     normalize_percents: bool = False,
 ) -> float:
     if normalize_percents:
@@ -625,7 +624,9 @@ def get_mean(
                 for i, value in enumerate(sorted(values))
                 if i >= start and i < end
             ]
-            return get_mean(MeanType.arithmetic, new_values, normalize_percents)
+            return get_mean(
+                MeanType.arithmetic, new_values, normalize_percents=normalize_percents,
+            )
         case _:  # stupid mypy
             raise RuntimeError("UNREACHABLE")
 
@@ -703,7 +704,7 @@ class Classifier:
 
         self.__init_classifier()
 
-    def __init_classifier(self: Self, force_cpu: bool = False) -> None:
+    def __init_classifier(self: Self, *, force_cpu: bool = False) -> None:
         run_opts: Optional[dict[str, Any]] = None
         if not force_cpu:
             run_opts = self.__get_run_opts()
@@ -762,7 +763,7 @@ class Classifier:
 
         except Exception as ex:  # noqa: BLE001
             if isinstance(ex, cuda.OutOfMemoryError):
-                self.__init_classifier(True)
+                self.__init_classifier(force_cpu=True)
                 return self.__classify(wav_file, segment, manager)
 
             print(ex, file=sys.stderr)
@@ -841,8 +842,8 @@ class Classifier:
             if (
                 # amount_scanned < LANGUAGE_MINIMUM_SCANNED
                 #  and
-                LANGUAGE_MINIMUM_AMOUNT
-                > i
+                i
+                < LANGUAGE_MINIMUM_AMOUNT
             ):
                 continue
 
