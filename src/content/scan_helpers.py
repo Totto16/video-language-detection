@@ -94,6 +94,6 @@ def content_from_scan(
 
         raise_inner("UNREACHABLE")
 
-    except RuntimeError as e:
+    except Exception as e:  # noqa: BLE001
         print(e, file=sys.stderr)
         return None
