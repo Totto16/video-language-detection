@@ -1,6 +1,6 @@
 import pytest
 
-from timestamp import parse_int_safely
+from helper.timestamp import parse_int_safely
 
 
 def test_int_parsing() -> None:

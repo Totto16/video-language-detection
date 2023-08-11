@@ -6,9 +6,10 @@ import sys
 from pathlib import Path
 from typing import Optional, Self
 
-from classifier import Language, parse_int_safely
+from classifier import Language
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
+from helper.timestamp import parse_int_safely
 from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
 
