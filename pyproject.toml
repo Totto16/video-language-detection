@@ -1,3 +1,10 @@
+
+[tool.pytest.ini_options]
+enable_assertion_pass_hook = true
+pythonpath = "src"
+testpaths = ["tests"]
+
+[tool.ruff]
 select = [
     "A",
     "ANN",
@@ -65,11 +72,17 @@ line-length = 100
 # Target Python version is 3.11.
 target-version = "py311"
 
-[per-file-ignores]
-# Ignore `E402` (import violations) in all `__init__.py` files
-"__init__.py" = ["E402"]
+per-file-ignores = { "__init__.py" = [ # Ignore `E402` (import violations) in all `__init__.py` files
+    "E402",
+], "classifier.py" = [ # ignore "INP001" (implicit namespace package) for all files in src/
+    "INP001",
+], "entry.py" = [
+    "INP001",
+], "main.py" = [
+    "INP001",
+] }
 
-# ignore "INP001" (implicit namespace package) for all files in src/
-"classifier.py" = ["INP001"]
-"entry.py" = ["INP001"]
-"main.py" = ["INP001"]
+
+[tool.coverage.run]
+relative_files = true
+source = ["tests/"]
