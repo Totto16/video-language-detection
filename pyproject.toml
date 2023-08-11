@@ -74,12 +74,12 @@ target-version = "py311"
 
 per-file-ignores = { "__init__.py" = [ # Ignore `E402` (import violations) in all `__init__.py` files
     "E402",
-], "classifier.py" = [ # ignore "INP001" (implicit namespace package) for all files in src/
-    "INP001",
-], "entry.py" = [
-    "INP001",
-], "main.py" = [
-    "INP001",
+], "src/*.py" = [
+    "INP001", # ignore "INP001" (implicit namespace package) for all (direct) files in src/
+], "tests/*.py" = [
+    "INP001", # ignore "INP001" (implicit namespace package) for all (direct) files in tests/
+], "tests/**/*.py" = [
+    "S101", # ignore "S101" (no asserts) for all files in tests/
 ] }
 
 
