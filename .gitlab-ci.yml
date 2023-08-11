@@ -2,14 +2,36 @@ image: debian:12
 
 stages: # List of stages for jobs, and their order of execution
     - python_lint
+    - python_test
     - sonar_check
+
+python-lint-job:
+    stage: python_lint
+    allow_failure: false
+    image: python:3.11-bookworm
+    script:
+        - pip install pipenv -U --quiet
+        - pipenv install --dev
+        - pipenv run lint
+
+python-test-job:
+    stage: python_test
+    needs:
+        - python-lint-job
+    allow_failure: false
+    image: python:3.11-bookworm
+    script:
+        - pip install pipenv -U --quiet
+        - pipenv install --dev
+        - pipenv run test
 
 sonarqube-check:
     image:
         name: sonarsource/sonar-scanner-cli:latest
         entrypoint: [""]
     stage: sonar_check
-    needs: []
+    needs:
+        - python-test-job
     variables:
         SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
         GIT_DEPTH: "0" # Tells git to fetch all the branches of the project, required by the analysis task
@@ -18,18 +40,10 @@ sonarqube-check:
         paths:
             - .sonar/cache
     script:
+        - pip install pipenv -U --quiet
+        - pipenv install --dev
+        - pipenv run coverage
         - sonar-scanner
     allow_failure: false
     rules:
         - if: $CI_COMMIT_BRANCH == 'main' && $CI_RUNNER_EXECUTABLE_ARCH == 'linux/amd64'
-
-python-lint-job:
-    stage: python_lint
-    needs: []
-    allow_failure: false
-    image: python:3.11-bookworm
-
-    script:
-        - pip install pipenv -U --quiet
-        - pipenv install --dev
-        - pipenv run lint
