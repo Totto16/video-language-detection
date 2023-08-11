@@ -6,3 +6,4 @@ model/
 /data/
 /*.json
 /.vscode
+/.coverage

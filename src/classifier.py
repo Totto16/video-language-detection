@@ -8,7 +8,7 @@ from functools import reduce
 from math import floor
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Never, Optional, Self, TypedDict
+from typing import Any, Optional, Self, TypedDict
 from warnings import filterwarnings
 
 import psutil
@@ -17,9 +17,10 @@ from helper.ffprobe import ffprobe
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
+from timestamp import Timestamp  # type: ignore[attr-defined]
 from torch import cuda
 
-from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
+from ffmpeg import FFmpeg, FFmpegError, Progress
 
 filterwarnings("ignore")
 
@@ -421,7 +422,7 @@ class WAVFile:
 
         temp_dir: Path = Path("/tmp") / "video_lang_detect"  # noqa: S108
         if not temp_dir.exists():
-           temp_dir.mkdir(parents=True)
+            temp_dir.mkdir(parents=True)
 
         self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
 

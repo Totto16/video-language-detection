@@ -21,16 +21,20 @@ flake8 = "*"
 black = "*"
 ruff = "*"
 types-psutil = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-assertcount = "*"
 
 [scripts]
 check = "python src/entry.py"
-test = "python tests/test_simple.py tests/test_ru.wav"
 lint = "bash -c 'pipenv run mypy; pipenv run ruff'"
 mypy = "mypy src/ --strict --ignore-missing-imports"
 ruff = "ruff check src/"
 ruff-ci = "ruff check src/ --format=github"
 ruff-fix = "ruff check src/ --fix"
 schema = "python src/entry.py schema"
+test = "pytest tests/"
+coverage = "bash -c 'coverage run -m pytest tests/ && coverage xml'"
 
 [requires]
 python_version = "3.11"
