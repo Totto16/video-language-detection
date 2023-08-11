@@ -1,12 +1,11 @@
 image: debian:12
 
 stages: # List of stages for jobs, and their order of execution
-    - python_lint
-    - python_test
+    - python_checks
     - sonar_check
 
 python-lint-job:
-    stage: python_lint
+    stage: python_checks
     allow_failure: false
     image: python:3.11-bookworm
     script:
@@ -15,9 +14,7 @@ python-lint-job:
         - pipenv run lint
 
 python-test-job:
-    stage: python_test
-    needs:
-        - python-lint-job
+    stage: python_checks
     allow_failure: false
     image: python:3.11-bookworm
     script:
@@ -31,6 +28,7 @@ sonarqube-check:
         entrypoint: [""]
     stage: sonar_check
     needs:
+        - python-lint-job
         - python-test-job
     variables:
         SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache

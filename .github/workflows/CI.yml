@@ -28,8 +28,6 @@ jobs:
     tests:
         name: Test with pytest
         runs-on: ubuntu-latest
-        needs:
-            - mypy_lint
         steps:
             - uses: actions/checkout@v3
               with:
@@ -49,6 +47,7 @@ jobs:
         name: SonarQube Checks
         runs-on: ubuntu-latest
         needs:
+            - mypy_lint
             - tests
         steps:
             - uses: actions/checkout@v3
@@ -60,6 +59,8 @@ jobs:
                   sudo apt-get install python3.11 --install-recommends
                   pip install pipenv -U --quiet
                   pipenv install --dev
+            - name: run coverage report
+              run: |
                   pipenv run coverage
 
             - name: Dependency check
