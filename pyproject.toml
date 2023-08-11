@@ -85,4 +85,4 @@ per-file-ignores = { "__init__.py" = [ # Ignore `E402` (import violations) in al
 
 [tool.coverage.run]
 relative_files = true
-source = ["tests/"]
+source = ["src/"]

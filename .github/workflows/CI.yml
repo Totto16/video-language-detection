@@ -9,14 +9,14 @@ jobs:
     mypy_lint:
         name: Lint with Mypy
         runs-on: ubuntu-latest
+        container:
+            image: python:3.11-bookworm
         steps:
             - uses: actions/checkout@v3
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends
                   pip install pipenv -U --quiet
                   pipenv install --dev
 
@@ -28,14 +28,14 @@ jobs:
     tests:
         name: Test with pytest
         runs-on: ubuntu-latest
+        container:
+            image: python:3.11-bookworm
         steps:
             - uses: actions/checkout@v3
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends
                   pip install pipenv -U --quiet
                   pipenv install --dev
 
@@ -46,6 +46,8 @@ jobs:
     sonarqube_checks:
         name: SonarQube Checks
         runs-on: ubuntu-latest
+        container:
+            image: python:3.11-bookworm
         needs:
             - mypy_lint
             - tests
@@ -55,8 +57,6 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends
                   pip install pipenv -U --quiet
                   pipenv install --dev
             - name: run coverage report
