@@ -24,6 +24,7 @@ types-psutil = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-assertcount = "*"
+pytest-subtests = "*"
 
 [scripts]
 check = "python src/entry.py"
