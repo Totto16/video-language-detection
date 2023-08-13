@@ -446,7 +446,6 @@ class Callback(Generic[C, CT, RT]):
         file_path: Path,  # noqa: ARG002
         file_type: ScannedFileType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
-        name_parser: NameParser,  # noqa: ARG002
         *,
         rescan: Optional[C] = None,  # noqa: ARG002
     ) -> Optional[C]:

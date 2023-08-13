@@ -7,11 +7,10 @@ from typing import (
 )
 
 from apischema import alias, schema
-from classifier import Classifier
-from enlighten import Manager
 from typing_extensions import override
 
 from content.base_class import (
+    CallbackTuple,
     Content,
     ContentCharacteristic,
     ContentDict,
@@ -21,7 +20,6 @@ from content.general import (
     Callback,
     CollectionDescription,
     ContentType,
-    NameParser,
     ScannedFile,
     Summary,
     narrow_type,
@@ -63,11 +61,9 @@ class CollectionContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, Manager],
-        name_parser: NameParser,
+        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
         parent_folders: list[str],
-        classifier: Classifier,
         rescan: bool = False,
     ) -> None:
         if not rescan:
@@ -76,7 +72,6 @@ class CollectionContent(Content):
                 callback=callback,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
-                name_parser=name_parser,
             )
             for content in contents:
                 if isinstance(content, SeriesContent):
@@ -92,7 +87,6 @@ class CollectionContent(Content):
                 callback=callback,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
-                name_parser=name_parser,
                 rescan=cast(list[Content], self.__series),
             )
 

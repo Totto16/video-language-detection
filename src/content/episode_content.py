@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import (
     Literal,
@@ -11,7 +12,12 @@ from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
 from typing_extensions import override
 
-from content.base_class import Content, ContentCharacteristic, ContentDict
+from content.base_class import (
+    CallbackTuple,
+    Content,
+    ContentCharacteristic,
+    ContentDict,
+)
 from content.general import (
     Callback,
     ContentType,
@@ -134,14 +140,12 @@ class EpisodeContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, Manager],
-        name_parser: NameParser,
+        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
         parent_folders: list[str],
-        classifier: Classifier,
         rescan: bool = False,
     ) -> None:
-        manager: Manager = callback.get_saved()
+        manager, classifier = callback.get_saved()
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 

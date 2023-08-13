@@ -4,7 +4,12 @@ from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
 from apischema import deserialize, schema, serialize
 from classifier import Classifier
-from content.base_class import Content, ContentCharacteristic, process_folder
+from content.base_class import (
+    CallbackTuple,
+    Content,
+    ContentCharacteristic,
+    process_folder,
+)
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
 from content.general import (
@@ -30,18 +35,25 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
+class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __classifier: Classifier
+    __name_parser: NameParser
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
 
-    def __init__(self: Self, options: ContentOptions, classifier: Classifier) -> None:
+    def __init__(
+        self: Self,
+        options: ContentOptions,
+        classifier: Classifier,
+        name_parser: NameParser,
+    ) -> None:
         super().__init__()
 
         self.__options = options
         self.__classifier = classifier
+        self.__name_parser = name_parser
         self.__progress_bars = {}
         manager = get_manager()
         if not isinstance(manager, Manager):
@@ -59,8 +71,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         )
 
     @override
-    def get_saved(self: Self) -> Manager:
-        return self.__manager
+    def get_saved(self: Self) -> CallbackTuple:
+        return (self.__manager, self.__classifier)
 
     @override
     def ignore(
@@ -89,7 +101,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         file_path: Path,
         file_type: ScannedFileType,
         parent_folders: list[str],
-        name_parser: NameParser,
         *,
         rescan: Optional[Content] = None,
     ) -> Optional[Content]:
@@ -98,7 +109,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
                 file_path,
                 file_type,
                 parent_folders,
-                name_parser=name_parser,
+                name_parser=self.__name_parser,
             )
             if content is None:
                 if self.__options["parse_error_is_exception"]:
@@ -110,8 +121,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
             content.scan(
                 callback=self,
                 parent_folders=parent_folders,
-                classifier=self.__classifier,
-                name_parser=name_parser,
             )
 
             return content
@@ -119,8 +128,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, Manager]):
         rescan.scan(
             callback=self,
             parent_folders=parent_folders,
-            classifier=self.__classifier,
-            name_parser=name_parser,
             rescan=True,
         )
 
@@ -258,13 +265,12 @@ def parse_contents(
     name_parser: NameParser,
 ) -> list[Content]:
     classifier = Classifier()
-    callback = ContentCallback(options, classifier)
+    callback = ContentCallback(options, classifier, name_parser)
 
     if not save_file.exists():
         contents: list[Content] = process_folder(
             root_folder,
             callback=callback,
-            name_parser=name_parser,
             parent_folders=[],
         )
 
@@ -276,7 +282,6 @@ def parse_contents(
     new_contents: list[Content] = process_folder(
         root_folder,
         callback=callback,
-        name_parser=name_parser,
         rescan=contents,
         parent_folders=[],
     )

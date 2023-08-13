@@ -8,7 +8,6 @@ from typing import (
 )
 
 from apischema import alias, schema
-from classifier import Classifier
 from enlighten import Manager
 from typing_extensions import override
 
@@ -99,10 +98,8 @@ class SeriesContent(Content):
     def scan(
         self: Self,
         callback: Callback[Content, ContentCharacteristic, Manager],
-        name_parser: NameParser,
         *,
         parent_folders: list[str],
-        classifier: Classifier,
         rescan: bool = False,
     ) -> None:
         if not rescan:
@@ -111,7 +108,6 @@ class SeriesContent(Content):
                 callback=callback,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
-                name_parser=name_parser,
             )
             for content in contents:
                 if isinstance(content, SeasonContent):
@@ -127,7 +123,6 @@ class SeriesContent(Content):
                 callback=callback,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
-                name_parser=name_parser,
                 rescan=cast(list[Content], self.__seasons),
             )
 

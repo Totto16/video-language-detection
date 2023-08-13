@@ -125,7 +125,7 @@ if __name__ == "__main__":
                     )
                     sys.exit(0)
                 case _:
-                    # pass to say, i don#t care about other cases
+                    # pass to say, i don't care about other cases
                     pass
         main()
     except KeyboardInterrupt:

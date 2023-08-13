@@ -11,7 +11,6 @@ from content.general import (
     Callback,
     ContentType,
     MissingOverrideError,
-    NameParser,
     ScannedFile,
     ScannedFileType,
     Summary,
@@ -24,6 +23,10 @@ ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 class ContentDict(TypedDict):
     type: ContentType
     scanned_file: ScannedFile
+
+
+# TODO
+CallbackTuple = tuple[Manager, Classifier]
 
 
 @dataclass(slots=True, repr=True)
@@ -51,11 +54,11 @@ class Content:
 
     def scan(
         self: Self,
-        callback: Callback["Content", ContentCharacteristic, Manager],  # noqa: ARG002
-        name_parser: NameParser,  # noqa: ARG002
+        callback: Callback[  # noqa: ARG002
+            "Content", ContentCharacteristic, CallbackTuple,
+        ],
         *,
         parent_folders: list[str],  # noqa: ARG002
-        classifier: Classifier,  # noqa: ARG002
         rescan: bool = False,  # noqa: ARG002
     ) -> None:
         raise MissingOverrideError
@@ -63,8 +66,7 @@ class Content:
 
 def process_folder(
     directory: Path,
-    callback: Callback[Content, ContentCharacteristic, Manager],
-    name_parser: NameParser,
+    callback: Callback[Content, ContentCharacteristic, CallbackTuple],
     *,
     parent_folders: list[str],
     parent_type: Optional[ContentType] = None,
@@ -95,10 +97,7 @@ def process_folder(
         results: list[Content] = []
         for file_path, file_type, parent_folders in temp:
             result: Optional[Content] = callback.process(
-                file_path,
-                file_type,
-                parent_folders,
-                name_parser=name_parser,
+                file_path, file_type, parent_folders,
             )
             value = (
                 result.type if result is not None else None,
@@ -129,7 +128,6 @@ def process_folder(
             file_path,
             file_type,
             parent_folders,
-            name_parser=name_parser,
             rescan=is_rescan,
         )
 
