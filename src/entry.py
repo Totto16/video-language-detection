@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-import os
+import atexit
 import re as regex
 import sys
 from pathlib import Path
@@ -129,7 +129,11 @@ if __name__ == "__main__":
                     pass
         main()
     except KeyboardInterrupt:
-        print("Ctrl+C pressed")
+
+        def exit_handler() -> None:
+            print("Ctrl + C pressed")
+
+        atexit.register(exit_handler)
 
 
 # TODO: use logging instead of print() in some scenarios, let the command line arguments decide teh loglevel used
