@@ -114,16 +114,6 @@ def main() -> None:
     print(final)
 
 
-def clear_screen() -> None:
-    # for windows
-    if os.name == "nt":  # noqa: SIM108
-        _ = os.system("cls")  # noqa: S605, S607
-
-    # for mac and linux
-    else:
-        _ = os.system("clear")  # noqa: S605, S607
-
-
 if __name__ == "__main__":
     try:
         if len(sys.argv) > 1:
