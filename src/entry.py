@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 
+import os
 import re as regex
 import sys
 from pathlib import Path
@@ -113,18 +114,32 @@ def main() -> None:
     print(final)
 
 
+def clear_screen() -> None:
+    # for windows
+    if os.name == "nt":  # noqa: SIM108
+        _ = os.system("cls")  # noqa: S605, S607
+
+    # for mac and linux
+    else:
+        _ = os.system("clear")  # noqa: S605, S607
+
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        match sys.argv[1]:
-            case "schema":
-                generate_json_schema(
-                    Path("schema/content_list.json"),
-                    list[AllContent],
-                )
-                sys.exit(0)
-            case _:
-                pass
-    main()
+    try:
+        if len(sys.argv) > 1:
+            match sys.argv[1]:
+                case "schema":
+                    generate_json_schema(
+                        Path("schema/content_list.json"),
+                        list[AllContent],
+                    )
+                    sys.exit(0)
+                case _:
+                    # pass to say, i don#t care about other cases
+                    pass
+        main()
+    except KeyboardInterrupt:
+        print("Ctrl+C pressed")
 
 
 # TODO: use logging instead of print() in some scenarios, let the command line arguments decide teh loglevel used
