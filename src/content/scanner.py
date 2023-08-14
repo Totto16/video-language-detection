@@ -121,6 +121,7 @@ class PartialLanguageScanner(LanguageScanner):
             self.__start_position < (self.__current_position + self.__scan_amount)
         ):
             self.__current_position += 1
+            return True
 
         self.__current_position += 1
         return False

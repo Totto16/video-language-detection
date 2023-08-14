@@ -132,6 +132,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
 
         def exit_handler() -> None:
+            print()
             print("Ctrl + C pressed")
 
         atexit.register(exit_handler)
