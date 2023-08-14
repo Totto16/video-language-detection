@@ -546,7 +546,8 @@ class Classifier:
         }
 
     def __parse_options(
-        self: Self, **options: Unpack[ClassifierOptions],
+        self: Self,
+        **options: Unpack[ClassifierOptions],
     ) -> ClassifierOptionsTotal:
         total_options: ClassifierOptionsTotal = self.__defaults
 
@@ -648,8 +649,8 @@ class Classifier:
         path: Path,
         manager: Optional[Manager] = None,
     ) -> tuple[PredictionBest, float]:
-        def get_segments(runtime: Timestamp) -> list[Segment]:
-            result: list[Segment] = []
+        def get_segments(runtime: Timestamp) -> list[tuple[Segment, Timestamp]]:
+            result: list[tuple[Segment, Timestamp]] = []
             current_timestamp: Timestamp = Timestamp.zero()
 
             while current_timestamp <= runtime:
@@ -659,7 +660,7 @@ class Classifier:
                     else current_timestamp + self.__options["segment_length"]
                 )
                 segment: Segment = Segment(current_timestamp, end)
-                result.append(segment)
+                result.append((segment, end if end is not None else runtime))
                 # ATTENTION: don't use +=, since that doesn't create a new object!
                 current_timestamp = current_timestamp + self.__options["segment_length"]
 
@@ -671,7 +672,9 @@ class Classifier:
             and self.__options["scan_until"] < self.__options["minimum_scanned"]
         )
 
-        segments: list[Segment] = [] if scan_nothing else get_segments(wav_file.runtime)
+        segments: list[tuple[Segment, Timestamp]] = (
+            [] if scan_nothing else get_segments(wav_file.runtime)
+        )
 
         bar: Optional[Any] = None
         if manager is not None:
@@ -685,7 +688,7 @@ class Classifier:
             bar.update(0, force=True)
 
         prediction: Prediction = Prediction()
-        for i, segment in enumerate(segments):
+        for i, (segment, scanned_length) in enumerate(segments):
             local_prediction = self.__classify(wav_file, segment, manager)
             if local_prediction is not None:
                 prediction += local_prediction
@@ -693,12 +696,11 @@ class Classifier:
             if bar is not None:
                 bar.update()
 
-            amount_scanned: float = 0.0  # TODO: calculate that
+            amount_scanned: float = scanned_length / wav_file.runtime
 
             if amount_scanned < self.__options["minimum_scanned"]:
                 continue
 
-            # TODO temporary to scan fast scannable first!
             if (
                 self.__options["scan_until"] is not None
                 and amount_scanned >= self.__options["scan_until"]
