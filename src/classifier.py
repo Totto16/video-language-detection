@@ -7,7 +7,7 @@ from functools import reduce
 from math import floor
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, Self, TypedDict
+from typing import Any, Optional, Self, TypedDict, Unpack
 from warnings import filterwarnings
 
 import psutil
@@ -24,8 +24,6 @@ from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
 filterwarnings("ignore")
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
-
-TEMP_MAX_LENGTH = 1
 
 
 class FileType(Enum):
@@ -379,11 +377,6 @@ def has_enough_memory() -> tuple[bool, float, float]:
     return (True, percent, swap_percent)
 
 
-SEGMENT_LENGTH: Timestamp = Timestamp.from_seconds(30)
-LANGUAGE_ACCURACY_THRESHOLD: float = 0.95
-LANGUAGE_MINIMUM_SCANNED: float = 0.2
-LANGUAGE_MINIMUM_AMOUNT: int = 5
-
 PredictionType = list[tuple[float, Language]]
 
 
@@ -515,16 +508,55 @@ class Prediction:
         return new_value
 
 
+# TODO: is there a better way?
+class ClassifierOptions(TypedDict, total=False):
+    segment_length: Timestamp
+    accuracy_threshold: float
+    final_accuracy_threshold: float
+    minimum_scanned: float
+    scan_until: Optional[float]
+
+
+class ClassifierOptionsTotal(TypedDict, total=True):
+    segment_length: Timestamp
+    accuracy_threshold: float
+    final_accuracy_threshold: float
+    minimum_scanned: float
+    scan_until: Optional[float]
+
+
 class Classifier:
-    __classifier: EncoderClassifier
     __save_dir: Path
+    __options: ClassifierOptionsTotal
+    __classifier: EncoderClassifier
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, **options: Unpack[ClassifierOptions]) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
+        self.__options = self.__parse_options(**options)
+        self.__classifier = self.__init_classifier()
 
-        self.__init_classifier()
+    @property
+    def __defaults(self: Self) -> ClassifierOptionsTotal:
+        return {
+            "segment_length": Timestamp.from_seconds(30),
+            "accuracy_threshold": 0.95,
+            "final_accuracy_threshold": 0.55,
+            "minimum_scanned": 0.2,
+            "scan_until": None,
+        }
 
-    def __init_classifier(self: Self, *, force_cpu: bool = False) -> None:
+    def __parse_options(
+        self: Self, **options: Unpack[ClassifierOptions],
+    ) -> ClassifierOptionsTotal:
+        total_options: ClassifierOptionsTotal = self.__defaults
+
+        ##
+        # TODO: parse options and validate e.g percentages
+        #
+
+        return total_options
+
+    def __init_classifier(self: Self, *, force_cpu: bool = False) -> EncoderClassifier:
         run_opts: Optional[dict[str, Any]] = None
         if not force_cpu:
             run_opts = self.__get_run_opts()
@@ -538,7 +570,7 @@ class Classifier:
             msg = "Couldn't initialize Classifier"
             raise RuntimeError(msg)
 
-        self.__classifier = classifier
+        return classifier
 
     def __classify(
         self: Self,
@@ -623,17 +655,23 @@ class Classifier:
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
-                    if current_timestamp + SEGMENT_LENGTH > runtime
-                    else current_timestamp + SEGMENT_LENGTH
+                    if current_timestamp + self.__options["segment_length"] > runtime
+                    else current_timestamp + self.__options["segment_length"]
                 )
                 segment: Segment = Segment(current_timestamp, end)
                 result.append(segment)
                 # ATTENTION: don't use +=, since that doesn't create a new object!
-                current_timestamp = current_timestamp + SEGMENT_LENGTH
+                current_timestamp = current_timestamp + self.__options["segment_length"]
 
             return result
 
-        segments: list[Segment] = get_segments(wav_file.runtime)
+        # This guards for cases, where scanning is useless, e.g. when you want 20 % to be scanned, for a valid result, but scan until 10 %
+        scan_nothing = (
+            self.__options["scan_until"] is not None
+            and self.__options["scan_until"] < self.__options["minimum_scanned"]
+        )
+
+        segments: list[Segment] = [] if scan_nothing else get_segments(wav_file.runtime)
 
         bar: Optional[Any] = None
         if manager is not None:
@@ -657,25 +695,20 @@ class Classifier:
 
             amount_scanned: float = 0.0  # TODO: calculate that
 
-            if TEMP_MAX_LENGTH < LANGUAGE_MINIMUM_AMOUNT:
-                break
-
-            if (
-                # amount_scanned < LANGUAGE_MINIMUM_SCANNED
-                #  and
-                i
-                < LANGUAGE_MINIMUM_AMOUNT
-            ):
+            if amount_scanned < self.__options["minimum_scanned"]:
                 continue
 
             # TODO temporary to scan fast scannable first!
-            if i + 1 > TEMP_MAX_LENGTH:
+            if (
+                self.__options["scan_until"] is not None
+                and amount_scanned >= self.__options["scan_until"]
+            ):
                 break
 
             best: PredictionBest = prediction.get_best(MeanType.truncated)
-            if best.accuracy < LANGUAGE_ACCURACY_THRESHOLD:
+            if best.accuracy < self.__options["accuracy_threshold"]:
                 if i + 1 == len(segments):
-                    if best.accuracy < 0.55:
+                    if best.accuracy < self.__options["final_accuracy_threshold"]:
                         continue
                 else:
                     continue

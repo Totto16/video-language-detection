@@ -29,7 +29,7 @@ pytest-subtests = "*"
 [scripts]
 check = "python src/entry.py"
 lint = "bash -c 'pipenv run mypy; pipenv run ruff'"
-mypy = "mypy src/ tests/ --strict --ignore-missing-imports"
+mypy = "mypy src/ tests/ --strict --ignore-missing-imports --enable-incomplete-feature=Unpack "
 ruff = "ruff check src/ tests/"
 ruff-ci = "ruff check src/ tests/ --format=github"
 ruff-fix = "ruff check src/ tests/ --fix"

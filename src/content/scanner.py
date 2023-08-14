@@ -48,6 +48,7 @@ class NoLanguageScanner(StaticLanguageScanner):
         super().__init__(classifier, value=True)
 
 
+# TODO: is there a better way?
 class PartialScannerDict(TypedDict, total=False):
     start_position: int
     scan_amount: int
@@ -56,6 +57,7 @@ class PartialScannerDict(TypedDict, total=False):
 class PartialScannerDictTotal(TypedDict, total=True):
     start_position: int
     scan_amount: int
+    #TODO: print progress option
 
 
 INI_SETTINGS_SECTION_KEY = "settings"
