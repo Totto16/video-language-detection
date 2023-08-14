@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import (
     Literal,
@@ -17,6 +16,7 @@ from content.base_class import (
     Content,
     ContentCharacteristic,
     ContentDict,
+    ScanType,
 )
 from content.general import (
     Callback,
@@ -32,26 +32,6 @@ from content.general import (
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
-
-
-# TODO: remove
-GLOBAL_ITER_MAX: int = 200
-SKIP_ITR: int = 530
-itr: int = 0
-
-
-# TODO: remove
-def itr_print_percent() -> None:
-    global itr  # noqa: PLW0602
-    if itr < SKIP_ITR:
-        return
-
-    if itr >= GLOBAL_ITER_MAX + SKIP_ITR:
-        return
-
-    percent: float = (itr - SKIP_ITR) / GLOBAL_ITER_MAX * 100.0
-
-    print(f"{percent:.02f} %")
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))
@@ -145,7 +125,7 @@ class EpisodeContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        manager, classifier = callback.get_saved()
+        manager, classifier, scanner = callback.get_saved()
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
@@ -161,13 +141,8 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    # TODO: remove
-                    global itr  # noqa: PLW0603
-                    if itr < GLOBAL_ITER_MAX + SKIP_ITR:
-                        itr_print_percent()
-                        itr = itr + 1
-                        if itr >= SKIP_ITR:
-                            self.__language = self.__get_language(classifier, manager)
+                    if scanner.should_scan(self.__description, ScanType.rescan):
+                        self.__language = self.__get_language(classifier, manager)
 
                     callback.progress(
                         self.scanned_file.path.name,
@@ -197,12 +172,8 @@ class EpisodeContent(Content):
             characteristic,
         )
 
-        # TODO: re-enable
-        if itr < GLOBAL_ITER_MAX + SKIP_ITR:
-            itr_print_percent()
-            itr = itr + 1
-            if itr >= SKIP_ITR:
-                self.__language = self.__get_language(classifier, manager)
+        if scanner.should_scan(self.__description, ScanType.first_scan):
+            self.__language = self.__get_language(classifier, manager)
 
         callback.progress(
             self.scanned_file.path.name,

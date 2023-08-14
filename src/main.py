@@ -8,6 +8,7 @@ from content.base_class import (
     CallbackTuple,
     Content,
     ContentCharacteristic,
+    LanguageScanner,
     process_folder,
 )
 from content.collection_content import CollectionContent
@@ -39,6 +40,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __classifier: Classifier
     __name_parser: NameParser
+    __scanner: LanguageScanner
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
@@ -48,12 +50,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         options: ContentOptions,
         classifier: Classifier,
         name_parser: NameParser,
+        scanner: LanguageScanner,
     ) -> None:
         super().__init__()
 
         self.__options = options
         self.__classifier = classifier
         self.__name_parser = name_parser
+        self.__scanner = scanner
         self.__progress_bars = {}
         manager = get_manager()
         if not isinstance(manager, Manager):
@@ -72,7 +76,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
     @override
     def get_saved(self: Self) -> CallbackTuple:
-        return (self.__manager, self.__classifier)
+        return (self.__manager, self.__classifier, self.__scanner)
 
     @override
     def ignore(
@@ -233,7 +237,7 @@ def load_from_file(file_path: Path) -> list[Content]:
                 )
                 return json_loaded
             case _:
-                msg = f"Not loadable from '{suffix}' file!"
+                msg = f"Data not loadable from '{suffix}' file!"
                 raise RuntimeError(msg)
 
 
@@ -254,7 +258,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 json_content: str = json.dumps(encoded_dict, indent=4)
                 file.write(json_content)
             case _:
-                msg = f"Not loadable from '{suffix}' file!"
+                msg = f"Data not saveable from '{suffix}' file!"
                 raise RuntimeError(msg)
 
 
@@ -263,9 +267,10 @@ def parse_contents(
     options: ContentOptions,
     save_file: Path,
     name_parser: NameParser,
+    scanner: LanguageScanner,
 ) -> list[Content]:
     classifier = Classifier()
-    callback = ContentCallback(options, classifier, name_parser)
+    callback = ContentCallback(options, classifier, name_parser, scanner)
 
     if not save_file.exists():
         contents: list[Content] = process_folder(

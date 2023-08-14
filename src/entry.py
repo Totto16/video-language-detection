@@ -10,6 +10,7 @@ from typing import Optional, Self
 from classifier import Language
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
+from content.scanner import PartialLanguageScanner
 from helper.timestamp import parse_int_safely
 from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
@@ -105,7 +106,7 @@ def main() -> None:
         },
         Path("data/data.json"),
         name_parser=CustomNameParser(SPECIAL_NAMES),
-        # TODO: make it possible to define to do a full scan or not (full= with language detection, not full = without)
+        scanner=PartialLanguageScanner(Path("./config.ini")),
     )
 
     summaries = [content.summary() for content in contents]

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from os import listdir
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
@@ -10,6 +11,7 @@ from enlighten import Manager
 from content.general import (
     Callback,
     ContentType,
+    EpisodeDescription,
     MissingOverrideError,
     ScannedFile,
     ScannedFileType,
@@ -25,8 +27,21 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
-# TODO
-CallbackTuple = tuple[Manager, Classifier]
+class ScanType(Enum):
+    first_scan = "first_scan"
+    rescan = "rescan"
+
+
+class LanguageScanner:
+    def should_scan(
+        self: Self,
+        description: EpisodeDescription,  # noqa: ARG002
+        scan_type: ScanType,  # noqa: ARG002
+    ) -> bool:
+        raise MissingOverrideError
+
+
+CallbackTuple = tuple[Manager, Classifier, LanguageScanner]
 
 
 @dataclass(slots=True, repr=True)
@@ -55,7 +70,9 @@ class Content:
     def scan(
         self: Self,
         callback: Callback[  # noqa: ARG002
-            "Content", ContentCharacteristic, CallbackTuple,
+            "Content",
+            ContentCharacteristic,
+            CallbackTuple,
         ],
         *,
         parent_folders: list[str],  # noqa: ARG002
@@ -97,7 +114,9 @@ def process_folder(
         results: list[Content] = []
         for file_path, file_type, parent_folders in temp:
             result: Optional[Content] = callback.process(
-                file_path, file_type, parent_folders,
+                file_path,
+                file_type,
+                parent_folders,
             )
             value = (
                 result.type if result is not None else None,

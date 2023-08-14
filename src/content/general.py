@@ -22,7 +22,7 @@ from classifier import Language
 from enlighten import Manager
 
 
-class ScannedFileType(str, Enum):
+class ScannedFileType(Enum):
     file = "file"
     folder = "folder"
 
