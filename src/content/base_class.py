@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
 from apischema import alias
-from classifier import Classifier
+from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
 
 from content.general import (
@@ -33,6 +33,14 @@ class ScanType(Enum):
 
 
 class LanguageScanner:
+    __classifier: Classifier
+
+    def __init__(
+        self: Self,
+        classifier: Classifier,
+    ) -> None:
+        self.__classifier = classifier
+
     def should_scan(
         self: Self,
         description: EpisodeDescription,  # noqa: ARG002
@@ -40,8 +48,29 @@ class LanguageScanner:
     ) -> bool:
         raise MissingOverrideError
 
+    def get_language(
+        self: Self,
+        scanned_file: ScannedFile,
+        *,
+        manager: Optional[Manager] = None,
+    ) -> Language:
+        try:
+            wav_file = WAVFile(scanned_file.path)
 
-CallbackTuple = tuple[Manager, Classifier, LanguageScanner]
+            best, _ = self.__classifier.predict(
+                wav_file,
+                scanned_file.path,
+                manager,
+            )
+        except FileMetadataError as err:
+            print(err)
+            return Language.unknown()
+        else:
+            # python is funky xD, leaking variables as desired pattern xD
+            return best.language
+
+
+CallbackTuple = tuple[Manager, LanguageScanner]
 
 
 @dataclass(slots=True, repr=True)

@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from pathlib import Path
 from typing import Optional, Self, TypedDict
 
+from classifier import Classifier
 from helper.timestamp import parse_int_safely
 from typing_extensions import override
 
@@ -13,8 +14,13 @@ from content.general import EpisodeDescription
 class StaticLanguageScanner(LanguageScanner):
     __value: bool
 
-    def __init__(self: Self,*, value: bool) -> None:
-        super().__init__()
+    def __init__(
+        self: Self,
+        classifier: Classifier,
+        *,
+        value: bool,
+    ) -> None:
+        super().__init__(classifier)
         self.__value = value
 
     @override
@@ -29,15 +35,17 @@ class StaticLanguageScanner(LanguageScanner):
 class FullLanguageScanner(StaticLanguageScanner):
     def __init__(
         self: Self,
+        classifier: Classifier,
     ) -> None:
-        super().__init__(value=True)
+        super().__init__(classifier, value=True)
 
 
 class NoLanguageScanner(StaticLanguageScanner):
     def __init__(
         self: Self,
+        classifier: Classifier,
     ) -> None:
-        super().__init__(value=True)
+        super().__init__(classifier, value=True)
 
 
 class PartialScannerDict(TypedDict, total=False):
@@ -62,8 +70,13 @@ class PartialLanguageScanner(LanguageScanner):
     def __defaults(self: Self) -> PartialScannerDictTotal:
         return {"start_position": 0, "scan_amount": 100}
 
-    def __init__(self: Self, config_file: Path = Path("./config.ini")) -> None:
-        super().__init__()
+    def __init__(
+        self: Self,
+        classifier: Classifier,
+        *,
+        config_file: Path = Path("./config.ini"),
+    ) -> None:
+        super().__init__(classifier)
         loaded_dict: Optional[PartialScannerDict] = None
 
         if config_file.exists():

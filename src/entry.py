@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Self
 
-from classifier import Language
+from classifier import Classifier, Language
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
@@ -106,7 +106,7 @@ def main() -> None:
         },
         Path("data/data.json"),
         name_parser=CustomNameParser(SPECIAL_NAMES),
-        scanner=PartialLanguageScanner(Path("./config.ini")),
+        scanner=PartialLanguageScanner(Classifier(), config_file=Path("./config.ini")),
     )
 
     summaries = [content.summary() for content in contents]

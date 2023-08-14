@@ -7,8 +7,7 @@ from typing import (
 )
 
 from apischema import alias, schema
-from classifier import Classifier, FileMetadataError, Language, WAVFile
-from enlighten import Manager
+from classifier import Language
 from typing_extensions import override
 
 from content.base_class import (
@@ -69,26 +68,6 @@ class EpisodeContent(Content):
     def language(self: Self) -> Language:
         return self.__language
 
-    def __get_language(
-        self: Self,
-        classifier: Classifier,
-        manager: Optional[Manager] = None,
-    ) -> Language:
-        try:
-            wav_file = WAVFile(self.scanned_file.path)
-
-            best, _ = classifier.predict(
-                wav_file,
-                self.scanned_file.path,
-                manager,
-            )
-        except FileMetadataError as err:
-            print(err)
-            return Language.unknown()
-        else:
-            # python is funky xD, leaking variables a s desired pattern xD
-            return best.language
-
     @staticmethod
     def is_valid_name(
         name: str,
@@ -125,7 +104,7 @@ class EpisodeContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        manager, classifier, scanner = callback.get_saved()
+        manager, scanner = callback.get_saved()
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
@@ -142,7 +121,10 @@ class EpisodeContent(Content):
                     )
 
                     if scanner.should_scan(self.__description, ScanType.rescan):
-                        self.__language = self.__get_language(classifier, manager)
+                        self.__language = scanner.get_language(
+                            self.scanned_file,
+                            manager=manager,
+                        )
 
                     callback.progress(
                         self.scanned_file.path.name,
@@ -173,7 +155,10 @@ class EpisodeContent(Content):
         )
 
         if scanner.should_scan(self.__description, ScanType.first_scan):
-            self.__language = self.__get_language(classifier, manager)
+            self.__language = scanner.get_language(
+                self.scanned_file,
+                manager=manager,
+            )
 
         callback.progress(
             self.scanned_file.path.name,

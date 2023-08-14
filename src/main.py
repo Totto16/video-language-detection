@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
 from apischema import deserialize, schema, serialize
-from classifier import Classifier
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -38,7 +37,6 @@ class ContentOptions(TypedDict):
 
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
-    __classifier: Classifier
     __name_parser: NameParser
     __scanner: LanguageScanner
     __progress_bars: dict[str, Any]
@@ -48,14 +46,12 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     def __init__(
         self: Self,
         options: ContentOptions,
-        classifier: Classifier,
         name_parser: NameParser,
         scanner: LanguageScanner,
     ) -> None:
         super().__init__()
 
         self.__options = options
-        self.__classifier = classifier
         self.__name_parser = name_parser
         self.__scanner = scanner
         self.__progress_bars = {}
@@ -76,7 +72,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
     @override
     def get_saved(self: Self) -> CallbackTuple:
-        return (self.__manager, self.__classifier, self.__scanner)
+        return (self.__manager, self.__scanner)
 
     @override
     def ignore(
@@ -269,8 +265,7 @@ def parse_contents(
     name_parser: NameParser,
     scanner: LanguageScanner,
 ) -> list[Content]:
-    classifier = Classifier()
-    callback = ContentCallback(options, classifier, name_parser, scanner)
+    callback = ContentCallback(options, name_parser, scanner)
 
     if not save_file.exists():
         contents: list[Content] = process_folder(
