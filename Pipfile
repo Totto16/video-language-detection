@@ -27,6 +27,7 @@ pytest-assertcount = "*"
 pytest-subtests = "*"
 types-requests = "*"
 requests = "*"
+chardet = "*"
 
 [scripts]
 check = "python src/entry.py"
