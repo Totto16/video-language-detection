@@ -25,6 +25,7 @@ pytest = "*"
 pytest-cov = "*"
 pytest-assertcount = "*"
 pytest-subtests = "*"
+types-requests = "*"
 
 [scripts]
 check = "python src/entry.py"

@@ -1,11 +1,12 @@
+import tempfile
+from collections.abc import Generator
 from math import isnan
 from pathlib import Path
-import tempfile
-from typing import Generator
+
 import pytest
 import requests
-from pytest_subtests import SubTests
 from helper.ffprobe import ffprobe, parse_float_safely
+from pytest_subtests import SubTests
 
 
 @pytest.fixture(scope="module")
@@ -17,7 +18,7 @@ def temp_mp4_files() -> Generator[list[Path], None, None]:
     ]
     results: list[Path] = []
     for url in video_urls:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         f = tempfile.NamedTemporaryFile(delete=False)
         f.write(response.content)
         results.append(Path(f.file.name))
@@ -45,10 +46,11 @@ def test_float_parsing_correct(subtests: SubTests) -> None:
     ]
     for float_num in raw_ints:
         with subtests.test():
-            assert parse_float_safely(float_num) == float(
+            parsed_float = parse_float_safely(float_num)
+            assert parsed_float == float(
                 float_num,
             ) or (
-                isnan(parse_float_safely(float_num))
+                parsed_float is not None and isnan(parsed_float)
             ), f"{float_num} is parsable as float"
 
 
@@ -82,7 +84,7 @@ def test_raw_int_parse(subtests: SubTests) -> None:
 
 
 def test_ffprobe_with_intact_videos(
-    subtests: SubTests, temp_mp4_files: list[Path]
+    subtests: SubTests, temp_mp4_files: list[Path],
 ) -> None:
     for video in temp_mp4_files:
         with subtests.test("video get's parsed correctly"):
