@@ -1,7 +1,7 @@
 import json
 import os
-import pipes
 import platform
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
@@ -153,7 +153,7 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
         "json",
         "-show_format",
         "-show_streams",
-        pipes.quote(str(file_path.absolute())),
+        shlex.quote(str(file_path.absolute())),
     ]
 
     if platform.system() != "Windows":
