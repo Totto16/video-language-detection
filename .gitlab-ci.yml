@@ -42,6 +42,8 @@ sonarqube-check:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
+        - apt-get update
+        - apt-get install ffmpeg ffprobe -y
         - pipenv run coverage
         - sonar-scanner
     allow_failure: false
