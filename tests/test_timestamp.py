@@ -177,13 +177,13 @@ def test_timedelta_format(subtests: SubTests) -> None:
     ts2 = Timestamp(timedelta(seconds=60.00000))
     with subtests.test("normal format"):
         assert f"{ts:d}" == "0:01:00", "format works as expected"
-        
+
         assert f"{ts:0}" == "0:01:00", "format works as expected"
         assert f"{ts2:0n}" == "0:01:00", "format works as expected"
-        
+
         assert f"{ts:1}" == "0:01:00.1", "format works as expected"
         assert f"{ts2:1n}" == "0:01:00", "format works as expected"
-        
+
         assert f"{ts:2}" == "0:01:00.10", "format works as expected"
         assert f"{ts:3}" == "0:01:00.102", "format works as expected"
         assert f"{ts:4}" == "0:01:00.1025", "format works as expected"
@@ -202,9 +202,9 @@ def test_timedelta_format(subtests: SubTests) -> None:
         match=r"^Invalid format specifier 'h' for object of type 'Timestamp': reason Couldn't parse int: 'h'$",
     ):
         f"{ts:h}"
-        
+
     with subtests.test("wrong format options"), pytest.raises(
         ValueError,
         match=r"^Invalid format specifier '7' for object of type 'Timestamp': reason 7 is out of allowed range 0 <= value <= 5$",
     ):
-        assert f"{ts:7}"
+        f"{ts:7}"
