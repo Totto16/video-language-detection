@@ -51,7 +51,7 @@ select = [
     "TRY",
     "UP",
     "YTT",
-    # "T20", # todo activate
+    # "T20", # todo activate (logging)
     #"FIX",  # todo activate
     #"TD", # todo activate
 ]

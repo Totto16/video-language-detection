@@ -1,6 +1,5 @@
 import os
 import tempfile
-from collections.abc import Generator
 from math import isnan
 from pathlib import Path
 
@@ -11,7 +10,7 @@ from pytest_subtests import SubTests
 
 
 @pytest.fixture(scope="module")
-def temp_mp4_files() -> Generator[list[Path], None, None]:
+def temp_mp4_files() -> list[Path]:
     ## from: https://test-videos.co.uk/bigbuckbunny/mp4-h264
     video_urls = [
         "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
@@ -24,10 +23,7 @@ def temp_mp4_files() -> Generator[list[Path], None, None]:
         f.write(response.content)
         results.append(Path(f.file.name))
 
-    yield results
-
-    for res in results:
-        res.unlink(missing_ok=True)
+    return results
 
 
 def test_float_parsing_correct(subtests: SubTests) -> None:
@@ -116,6 +112,8 @@ def test_ffprobe_with_intact_videos(
 
             assert len(result.audio_streams()) == 0, "correct amount of audio streams"
             assert result.is_audio() is False, "result is no audio"
+
+        video.unlink(missing_ok=True)
 
 
 def test_ffprobe_errors() -> None:
