@@ -58,11 +58,9 @@ jobs:
             - name: prepare environment
               run: |
                   sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends
+                  sudo apt-get install python3.11 --install-recommends ffmpeg -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
-                  apt-get update
-                  apt-get install ffmpeg -y
             - name: run coverage report
               run: |
                   pipenv run coverage

@@ -42,8 +42,9 @@ sonarqube-check:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
-        - apt-get update
-        - apt-get install ffmpeg -y
+        # TODO:check if this is even debian / ubuntu or alpine and install ffprobe
+        - sudo apt-get update
+        - sudo apt-get install ffmpeg -y
         - pipenv run coverage
         - sonar-scanner
     allow_failure: false
