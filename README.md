@@ -12,6 +12,6 @@ Folder, title etc.
 
 ```ini
 [settings]
-scan_amount= 100
+scan_amount = 100
 start_position = 0
 ```

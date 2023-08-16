@@ -48,7 +48,7 @@ class Timestamp:
 
         Args:
             spec (str): a format string, if empty or "d" no microseconds will be printed
-                        otherwise you can provide an int from 1-5 inclusive, to determine how much you wan't to round
+                        otherwise you can provide an int from 0-5 inclusive, to determine how much you wan't to round
                         the microseconds, you can provide a "n" afterwards, to not have ".00". e.g , it ignores 0's with e.g. "2n"
 
         Examples:
@@ -65,7 +65,7 @@ class Timestamp:
         )
         ms: int = self.__delta.microseconds
 
-        if spec in ("", "d"):
+        if spec in ("", "d", "0n", "0"):
             return str(delta)
 
         def round_to_tens(value: int, tens: int) -> int:
@@ -88,12 +88,11 @@ class Timestamp:
             msg = f"Couldn't parse int: '{spec}'"
             emit_error(msg)
 
-        if val > 5 or val <= 0:
-            msg = f"{val} is out of allowed range 0 < value <= 5"
+        if val > 5 or val < 0:
+            msg = f"{val} is out of allowed range 0 <= value <= 5"
             emit_error(msg)
-
         # val is between 1 and 5 inclusive
-        ms = round_to_tens(ms, 5 - val)
+        ms = round_to_tens(ms, 6 - val)
 
         return "{delta}.{ms:0{val}d}".format(  # noqa: PLE1300
             delta=str(delta),
