@@ -131,7 +131,7 @@ def test_ffprobe_errors() -> None:
         OSError,
         match=r"^ffprobe not found\.$",
     ):
-        ffprobe(Path("/tmp/test"))
+        ffprobe(Path("/dev/null"))
 
     os.environ["PATH"] = path
 
