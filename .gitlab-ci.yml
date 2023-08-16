@@ -20,6 +20,8 @@ python-test-job:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
+        - apt-get update
+        - apt-get install ffmpeg ffprobe -y
         - pipenv run test
 
 sonarqube-check:
