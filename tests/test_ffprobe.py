@@ -1,3 +1,4 @@
+import os
 import tempfile
 from collections.abc import Generator
 from math import isnan
@@ -84,7 +85,8 @@ def test_raw_int_parse(subtests: SubTests) -> None:
 
 
 def test_ffprobe_with_intact_videos(
-    subtests: SubTests, temp_mp4_files: list[Path],
+    subtests: SubTests,
+    temp_mp4_files: list[Path],
 ) -> None:
     for video in temp_mp4_files:
         with subtests.test("video get's parsed correctly"):
@@ -121,4 +123,15 @@ def test_ffprobe_errors() -> None:
         None,
         "File doesn't exist",
     ), "file doesn't exist"
-    
+
+    path = os.environ["PATH"]
+    os.environ["PATH"] = ""
+
+    with pytest.raises(
+        OSError,
+        match=r"^ffprobe not found\.$",
+    ):
+        ffprobe(Path("/tmp/test"))
+
+    os.environ["PATH"] = path
+
