@@ -5,66 +5,25 @@ pythonpath = "src"
 testpaths = ["tests"]
 
 [tool.ruff]
-select = [
-    "A",
-    "ANN",
-    "ARG",
-    "ASYNC",
-    "B",
-    "BLE",
-    "C4",
-    "COM",
-    "DTZ",
-    "E",
-    "EM",
-    "ERA",
-    "EXE",
-    "F",
-    "FA",
-    "FBT",
-    "FLY",
-    "G",
-    "I",
-    "ICN",
-    "INP",
-    "INT",
-    "ISC",
-    "N",
-    "PERF",
-    "PGH",
-    "PIE",
-    "PL",
-    "PT",
-    "PTH",
-    "PYI",
-    "Q",
-    "RET",
-    "RSE",
-    "RUF",
-    "S",
-    "SIM",
-    "SLF",
-    "SLOT",
-    "T10",
-    "TCH",
-    "TID",
-    "TRY",
-    "UP",
-    "YTT",
-    "T20",
-    #"FIX",  # todo activate
-    #"TD", # todo activate
+select = ["ALL"]
+
+
+# Never Enforce:
+
+
+ignore = [
+    "E501",    # E501       =>  line length violations
+    "PLR2004", # PLR2004    =>  magic-value-comparison 
+    "PLR0913", # PLR0913    =>  too-many-arguments
+    "PLR0911", # PLR0911    =>  too-many-return-statements
+    "PLR0912", # PLR0912    =>  too-many-branches 
+    "UP007",   # UP007      =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
+    "ANN401",  # ANN401     =>  any-type 
+    "D",       # pydocstyle => I don't use doc strings atm. 
+    "C90",     # mccabe     => complexity isn't of concern tam.
+    "FIX",     # todo activate
+    "TD",      # todo activate,
 ]
-
-
-# Never enforce `E501` (line length violations).
-# PLR2004 =>  magic-value-comparison 
-# PLR0913 =>  too-many-arguments
-# PLR0911 =>  too-many-return-statements 
-# PLR0912 =>  too-many-branches 
-# UP007   =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
-# ANN401  =>  any-type 
-ignore = ["E501", "PLR2004", "PLR0913", "PLR0911", "PLR0912", "UP007", "ANN401"]
 
 # 88 (standard) is to small
 line-length = 100
@@ -72,8 +31,8 @@ line-length = 100
 # Target Python version is 3.11.
 target-version = "py311"
 
-per-file-ignores = { "__init__.py" = [ # Ignore `E402` (import violations) in all `__init__.py` files
-    "E402",
+per-file-ignores = { "__init__.py" = [
+    "E402", # Ignore `E402` (import violations) in all `__init__.py` files
 ], "src/*.py" = [
     "INP001", # ignore "INP001" (implicit namespace package) for all (direct) files in src/
 ], "tests/*.py" = [
