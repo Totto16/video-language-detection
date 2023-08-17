@@ -7,6 +7,7 @@ from typing import Any, Optional, Self, TypedDict
 from apischema import alias
 from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
+from helper.log import get_logger
 
 from content.general import (
     Callback,
@@ -62,8 +63,8 @@ class LanguageScanner:
                 scanned_file.path,
                 manager,
             )
-        except FileMetadataError as err:
-            print(err)
+        except FileMetadataError:
+            get_logger().exception("Get Language")
             return Language.unknown()
         else:
             # python is funky xD, leaking variables as desired pattern xD

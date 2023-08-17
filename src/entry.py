@@ -4,6 +4,7 @@
 import atexit
 import re as regex
 import sys
+from logging import DEBUG, Logger
 from pathlib import Path
 from typing import Optional, Self
 
@@ -11,6 +12,7 @@ from classifier import Classifier, Language
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
+from helper.log import get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
@@ -112,10 +114,12 @@ def main() -> None:
     summaries = [content.summary() for content in contents]
     final = Summary.combine_langauge_dicts([summary.languages for summary in summaries])
 
-    print(final)
+    get_logger().info(final)
 
 
 if __name__ == "__main__":
+    # TODO use argparse to get loglevel and action
+    logger: Logger = setup_custom_logger(DEBUG)
     try:
         if len(sys.argv) > 1:
             match sys.argv[1]:
@@ -132,11 +136,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
 
         def exit_handler() -> None:
-            print()
-            print("Ctrl + C pressed")
+            logger.info("Ctrl + C pressed")
 
         atexit.register(exit_handler)
 
-
-# TODO: use logging instead of print() in some scenarios, let the command line arguments decide teh loglevel used
 # TODO: use gettext to be able to translate strings (use default locale or fallback (en))

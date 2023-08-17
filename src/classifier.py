@@ -1,9 +1,9 @@
 import gc
 import math
-import sys
 from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
+from logging import Logger
 from math import floor
 from pathlib import Path
 from shutil import rmtree
@@ -13,6 +13,7 @@ from warnings import filterwarnings
 import psutil
 from enlighten import Manager
 from helper.ffprobe import ffprobe
+from helper.log import get_logger
 from helper.timestamp import Timestamp
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
@@ -24,6 +25,9 @@ from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
 filterwarnings("ignore")
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
+
+
+logger: Logger = get_logger()
 
 
 class FileType(Enum):
@@ -115,10 +119,7 @@ class WAVFile:
             err_msg: str = (
                 f"Unable to get a valid stream from file '{self.__file}':\n{err}"
             )
-            print(
-                err_msg,
-                file=sys.stderr,
-            )
+            logger.error(err_msg)
 
             return None, err_msg
 
@@ -283,8 +284,8 @@ class WAVFile:
         ffmpeg_proc.on("progress", progress_report)
         try:
             ffmpeg_proc.execute()
-        except FFmpegError as e:
-            print(e, file=sys.stderr)
+        except FFmpegError:
+            logger.exception("FFmpeg exception")
             if bar is not None:
                 bar.close(clear=True)
             return False
@@ -556,19 +557,24 @@ class Classifier:
         total_options: ClassifierOptionsTotal = self.__defaults
 
         total_options["segment_length"] = options.get(
-            "segment_length", self.__defaults["segment_length"],
+            "segment_length",
+            self.__defaults["segment_length"],
         )
         total_options["accuracy_threshold"] = options.get(
-            "accuracy_threshold", self.__defaults["accuracy_threshold"],
+            "accuracy_threshold",
+            self.__defaults["accuracy_threshold"],
         )
         total_options["final_accuracy_threshold"] = options.get(
-            "final_accuracy_threshold", self.__defaults["final_accuracy_threshold"],
+            "final_accuracy_threshold",
+            self.__defaults["final_accuracy_threshold"],
         )
         total_options["minimum_scanned"] = options.get(
-            "minimum_scanned", self.__defaults["minimum_scanned"],
+            "minimum_scanned",
+            self.__defaults["minimum_scanned"],
         )
         total_options["scan_until"] = options.get(
-            "scan_until", self.__defaults["scan_until"],
+            "scan_until",
+            self.__defaults["scan_until"],
         )
 
         if not is_percentage(total_options["accuracy_threshold"]):
@@ -654,7 +660,7 @@ class Classifier:
                 self.__init_classifier(force_cpu=True)
                 return self.__classify(wav_file, segment, manager)
 
-            print(ex, file=sys.stderr)
+            logger.exception("Classify file")
             return None
 
     @staticmethod
@@ -672,10 +678,10 @@ class Classifier:
         nvmlInit()
         h = nvmlDeviceGetHandleByIndex(0)
         info = nvmlDeviceGetMemoryInfo(h)
-        print("GPU stats:")
-        print(f"total    : {naturalsize(info.total, binary=True)}")
-        print(f"free     : {naturalsize(info.free, binary=True)}")
-        print(f"used     : {naturalsize(info.used, binary=True)}")
+        logger.info("GPU stats:")
+        logger.info("total : %s", naturalsize(info.total, binary=True))
+        logger.info("free : %s", naturalsize(info.free, binary=True))
+        logger.info("used : %s", naturalsize(info.used, binary=True))
 
     def predict(
         self: Self,
@@ -763,7 +769,10 @@ class Classifier:
             bar.close(clear=True)
 
         best = prediction.get_best(MeanType.truncated)
-        print(f"Couldn't get Language of '{path}': {best}", file=sys.stderr)
+        logger.error(
+            "Couldn't get Language of '%(path)s': %(best)s",
+            extra={"path": path, "best": best},
+        )
 
         return (PredictionBest(0.0, Language.unknown()), 0.0)
 

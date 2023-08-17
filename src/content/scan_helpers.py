@@ -1,9 +1,10 @@
-import sys
 from pathlib import Path
 from typing import (
     Never,
     Optional,
 )
+
+from helper.log import get_logger
 
 from content.base_class import Content
 from content.collection_content import CollectionContent
@@ -94,6 +95,6 @@ def content_from_scan(
 
         raise_inner("UNREACHABLE")
 
-    except Exception as e:  # noqa: BLE001
-        print(e, file=sys.stderr)
+    except Exception:  # noqa: BLE001
+        get_logger().exception("Content scan")
         return None
