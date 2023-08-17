@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
 
+import argparse
 import atexit
 import re as regex
 import sys
-from logging import DEBUG, Logger
+from logging import Logger
 from pathlib import Path
-from typing import Optional, Self
+from typing import Literal, Optional, Self, cast
 
 from classifier import Classifier, Language
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
-from helper.log import get_logger, setup_custom_logger
+from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
@@ -117,26 +118,82 @@ def main() -> None:
     get_logger().info(final)
 
 
+SubCommand = Literal["run", "schema"]
+
+
+class ParsedArgNamespace:
+    level: LogLevel
+    subcommand: SubCommand
+
+
+class RunCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["run"]
+
+
+class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["schema"]
+    schema_file: str
+
+
+AllParsedNameSpaces = RunCommandParsedArgNamespace | SchemaCommandParsedArgNamespace
+
 if __name__ == "__main__":
-    # TODO use argparse to get loglevel and action
-    logger: Logger = setup_custom_logger(DEBUG)
+    parser = argparse.ArgumentParser(
+        prog="video-language-detection",
+        description="Detect video languages",
+    )
+
+    loglevel_choices: list[LogLevel] = [
+        LogLevel.CRITICAL,
+        LogLevel.ERROR,
+        LogLevel.WARNING,
+        LogLevel.INFO,
+        LogLevel.DEBUG,
+        LogLevel.NOTSET,
+    ]
+    loglevel_default: LogLevel = LogLevel.DEBUG
+    parser.add_argument(
+        "-l",
+        "--level",
+        choices=loglevel_choices,
+        default=loglevel_default,
+        dest="level",
+    )
+
+    subparsers = parser.add_subparsers(required=False)
+    parser.set_defaults(subcommand="run")
+
+    run_parser = subparsers.add_parser("run")
+    run_parser.set_defaults(subcommand="run")
+
+    schema_parser = subparsers.add_parser("schema")
+    schema_parser.set_defaults(subcommand="schema")
+    schema_parser.add_argument(
+        "-s",
+        "--schema",
+        dest="schema_file",
+        default="schema/content_list.json",
+    )
+
+    args = cast(AllParsedNameSpaces, parser.parse_args())
+    logger: Logger = setup_custom_logger(args.level)
     try:
-        if len(sys.argv) > 1:
-            match sys.argv[1]:
-                case "schema":
-                    generate_json_schema(
-                        Path("schema/content_list.json"),
-                        list[AllContent],
-                    )
-                    sys.exit(0)
-                case _:
-                    # pass to say, i don't care about other cases
-                    pass
-        main()
+        match args.subcommand:
+            case "schema":
+                args = cast(SchemaCommandParsedArgNamespace, args)
+                generate_json_schema(
+                    Path(args.schema_file),
+                    list[AllContent],
+                )
+                sys.exit(0)
+            case "run":
+                main()
+
     except KeyboardInterrupt:
 
         def exit_handler() -> None:
-            logger.info("Ctrl + C pressed")
+            print()  # noqa: T201
+            print("Ctrl + C pressed")  # noqa: T201
 
         atexit.register(exit_handler)
 

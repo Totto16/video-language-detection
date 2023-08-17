@@ -62,11 +62,7 @@
                     "description": "The parent folders of this scanned file / folder"
                 },
                 "type": {
-                    "type": "string",
-                    "enum": [
-                        "file",
-                        "folder"
-                    ],
+                    "$ref": "#/$defs/ScannedFileType",
                     "title": "file type",
                     "description": "The type of the file: folder or file"
                 },
@@ -83,6 +79,13 @@
                 "stats"
             ],
             "additionalProperties": false
+        },
+        "ScannedFileType": {
+            "type": "string",
+            "enum": [
+                "file",
+                "folder"
+            ]
         },
         "Stats": {
             "type": "object",
