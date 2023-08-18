@@ -94,7 +94,7 @@ class Timestamp:
         # val is between 1 and 5 inclusive
         ms = round_to_tens(ms, 6 - val)
 
-        return "{delta}.{ms:0{val}d}".format(  # noqa: PLE1300
+        return "{delta}.{ms:0{val}d}".format(
             delta=str(delta),
             ms=ms,
             val=val,

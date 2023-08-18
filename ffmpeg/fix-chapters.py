@@ -30,7 +30,7 @@ def main() -> None:
                 str(output),
             ]
 
-            subprocess.call(launch_args)
+            subprocess.call(launch_args)  # noqa: S603
 
             temp_result = (
                 Path(__file__).parent
