@@ -120,9 +120,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             )
             if content is None:
                 if self.__options["parse_error_is_exception"]:
-                    msg = (
-                        _("Parse Error: Couldn't parse content from")
-                        + f"'{file_path}'",
+                    msg = _("Parse Error: Couldn't parse content from '{file}'").format(
+                        file=file_path,
                     )
                     raise RuntimeError(msg)
 
