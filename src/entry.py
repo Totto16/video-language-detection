@@ -15,6 +15,7 @@ from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
 from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
+from helper.translation import get_translator
 from main import AllContent, generate_json_schema, parse_contents
 from typing_extensions import override
 
@@ -137,10 +138,12 @@ class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
 
 AllParsedNameSpaces = RunCommandParsedArgNamespace | SchemaCommandParsedArgNamespace
 
+_ = get_translator()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="video-language-detection",
-        description="Detect video languages",
+        description=_("Detect video languages"),
     )
 
     loglevel_choices: list[LogLevel] = [
@@ -193,8 +196,6 @@ if __name__ == "__main__":
 
         def exit_handler() -> None:
             print()  # noqa: T201
-            print("Ctrl + C pressed")  # noqa: T201
+            print(_("Ctrl + C pressed"))  # noqa: T201
 
         atexit.register(exit_handler)
-
-# TODO: use gettext to be able to translate strings (use default locale or fallback (en))

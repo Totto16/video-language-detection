@@ -1,0 +1,85 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR ORGANIZATION
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: 2.1.0\n"
+"POT-Creation-Date: 2023-08-22 21:44+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: pygettext.py 1.5\n"
+
+
+#: src/entry.py:146
+msgid "Detect video languages"
+msgstr "Video Sprachen erkennen"
+
+#: src/entry.py:199
+msgid "Ctrl + C pressed"
+msgstr "Strg + C gedrückt"
+
+#: src/main.py:65
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr "UNERREICHBAR (nicht ausführbar in notebooks)"
+
+#: src/main.py:70
+msgid "Video Language Detector"
+msgstr "Video Sprachen Erkennener"
+
+#: src/main.py:72
+msgid "Stage"
+msgstr "Stufe"
+
+#: src/main.py:76
+msgid "Scanning"
+msgstr "Scannen"
+
+#: src/main.py:125
+msgid "Parse Error: Couldn't parse content from"
+msgstr "Parse Fehler: Konnte content nicht von {file} parsen"
+
+#: src/main.py:161
+msgid "series"
+msgstr "Serien"
+
+#: src/main.py:163
+msgid "seasons"
+msgstr "Staffeln"
+
+#: src/main.py:165
+msgid "episodes"
+msgstr "Episoden"
+
+#: src/main.py:167
+msgid "tasks"
+msgstr "Aufgaben"
+
+#: src/main.py:169
+msgid "folders"
+msgstr "Ordner"
+
+#: src/main.py:194
+msgid "No Progressbar, on progress callback"
+msgstr "Keine Statusleiste, in 'progress callback'"
+
+#: src/main.py:208
+msgid "No Progressbar, on progress finish"
+msgstr "Keine Statusleiste, in 'progress finish'"
+
+#: src/main.py:215
+msgid "finished"
+msgstr "Fertig"
+
+#: src/main.py:247
+msgid "Data not loadable from '{suffix}' file!"
+msgstr "Daten von '{suffix}' Dateien nicht ladbar!"
+
+#: src/main.py:268
+msgid "Data not saveable from '{suffix}' file!"
+msgstr "Daten nicht speicherbar nach '{suffix}' Dateien!"
+

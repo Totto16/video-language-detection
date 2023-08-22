@@ -23,10 +23,14 @@ from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from enlighten import Justify, Manager, get_manager
+from helper.translation import get_translator
 from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+
+_ = get_translator()
 
 
 class ContentOptions(TypedDict):
@@ -57,15 +61,18 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__progress_bars = {}
         manager = get_manager()
         if not isinstance(manager, Manager):
-            msg = "UNREACHABLE (not runnable in notebooks)"
+            msg = _("UNREACHABLE (not runnable in notebooks)")
             raise TypeError(msg)
 
         self.__manager = manager
         self.__status_bar = self.__manager.status_bar(
-            status_format="Video Language Detector{fill}Stage: {stage}{fill}{elapsed}",
+            status_format=_("Video Language Detector")
+            + "{fill}"
+            + _("Stage")
+            + ": {stage}{fill}{elapsed}",
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
-            stage="Scanning",
+            stage=_("Scanning"),
             autorefresh=True,
             min_delta=0.5,
         )
@@ -113,7 +120,10 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             )
             if content is None:
                 if self.__options["parse_error_is_exception"]:
-                    msg = (f"Parse Error: Couldn't parse content from '{file_path}'",)
+                    msg = (
+                        _("Parse Error: Couldn't parse content from")
+                        + f"'{file_path}'",
+                    )
                     raise RuntimeError(msg)
 
                 return None
@@ -141,25 +151,25 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
     ) -> None:
-        content_type, _ = characteristic
+        content_type, _i = characteristic
 
         value: tuple[str, str]
 
         match content_type:
             case ContentType.collection:
-                value = ("blue", "series")
+                value = ("blue", _("series"))
             case ContentType.series:
-                value = ("cyan", "seasons")
+                value = ("cyan", _("seasons"))
             case ContentType.season:
-                value = ("green", "episodes")
+                value = ("green", _("episodes"))
             case ContentType.episode:
-                value = ("yellow", "tasks")
+                value = ("yellow", _("tasks"))
             case _:
-                value = ("purple", "folders")
+                value = ("purple", _("folders"))
 
         color, unit = value
 
-        _, processing, _ = amount
+        _1, processing, _2 = amount
 
         self.__progress_bars[name] = self.__manager.counter(
             total=processing,
@@ -180,7 +190,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         amount: int = 1,
     ) -> None:
         if self.__progress_bars.get(name) is None:
-            msg = "No Progressbar, on progress callback"
+            msg = _("No Progressbar, on progress callback")
             raise RuntimeError(msg)
 
         self.__progress_bars[name].update(amount)
@@ -194,14 +204,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         characteristic: ContentCharacteristic,
     ) -> None:
         if self.__progress_bars.get(name) is None:
-            msg = "No Progressbar, on progress finish"
+            msg = _("No Progressbar, on progress finish")
             raise RuntimeError(msg)
 
         self.__progress_bars[name].close(clear=True)
         del self.__progress_bars[name]
 
     def __del__(self: Self) -> None:
-        self.__status_bar.update(stage="finished")
+        self.__status_bar.update(stage=_("finished"))
         self.__manager.stop()
 
 
@@ -233,7 +243,7 @@ def load_from_file(file_path: Path) -> list[Content]:
                 )
                 return json_loaded
             case _:
-                msg = f"Data not loadable from '{suffix}' file!"
+                msg = _("Data not loadable from '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
 
 
@@ -254,7 +264,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 json_content: str = json.dumps(encoded_dict, indent=4)
                 file.write(json_content)
             case _:
-                msg = f"Data not saveable from '{suffix}' file!"
+                msg = _("Data not saveable from '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
 
 
