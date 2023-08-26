@@ -1,16 +1,12 @@
-from pathlib import Path
-import subprocess
 import shutil
-
-LIST_TO_PROCESS: list[str] = [
-    ## insert here
-]
+import subprocess
+from pathlib import Path
 
 
-def main() -> None:
-    for to_process in LIST_TO_PROCESS:
+def fix_chapters(to_process: list[str]) -> None:
+    for file in to_process:
         try:
-            input_file = Path(to_process)
+            input_file = Path(file)
 
             output: Path = input_file.parent / (
                 input_file.stem + "_output" + input_file.suffix
@@ -42,7 +38,3 @@ def main() -> None:
             shutil.move(output, input_file)
         except Exception:  # noqa: S110, BLE001
             pass
-
-
-if __name__ == "__main__":
-    main()
