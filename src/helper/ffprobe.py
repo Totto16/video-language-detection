@@ -162,11 +162,10 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     if not file_path.exists():
         return None, "File doesn't exist"
 
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510
         commands,
         capture_output=True,
         shell=True,  # noqa: S602
-        check=True,
     )
     if result.returncode == 0:
         return FFProbeResult(json.loads(result.stdout)), None

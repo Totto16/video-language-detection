@@ -26,6 +26,38 @@ def temp_mp4_files() -> list[Path]:
     return results
 
 
+@pytest.fixture(scope="module")
+def dummy_files() -> list[tuple[Path, bool]]:
+    content_description = [
+        (
+            ".srt",
+            """1
+00:00:00,498 --> 00:00:02,827
+- Here's what I love most
+about food and diet.
+
+2
+00:00:02,827 --> 00:00:06,383
+We all eat several times a day,
+and we're totally in charge
+
+3
+00:00:06,383 --> 00:00:09,427
+of what goes on our plate
+and what stays off.""",
+            True,
+        ),
+        (".txt", "", False),
+    ]
+    results: list[tuple[Path, bool]] = []
+    for suffix, content, res in content_description:
+        f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        f.write(bytes(content, encoding="utf-8"))
+        results.append((Path(f.file.name), res))
+
+    return results
+
+
 def test_float_parsing_correct(subtests: SubTests) -> None:
     raw_ints: list[str] = [
         "1",
@@ -133,3 +165,19 @@ def test_ffprobe_errors() -> None:
 
     os.environ["PATH"] = path
 
+
+def test_ffprobe_errors_with_files(
+    subtests: SubTests, dummy_files: list[tuple[Path, bool]],
+) -> None:
+    with subtests.test("dummy wrong file fails "):
+        for file, should_pass in dummy_files:
+            result, _err = ffprobe(file)
+            assert (result is not None) == should_pass, "pass status is correct"
+            if should_pass:
+                assert (
+                    result is not None
+                ), "pass status is correct"  # only for type checking!
+                for stream in result.streams:
+                    assert (
+                        stream.duration_seconds() is None
+                    ), "dummy files have no duration"
