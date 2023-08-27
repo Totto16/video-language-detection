@@ -41,9 +41,7 @@ if __name__ == "__main__":
         dest="files",
     )
 
-    subparsers: argparse._SubParsersAction[  # noqa: SLF001
-        argparse.ArgumentParser
-    ] = parser.add_subparsers(required=False)
+    subparsers = parser.add_subparsers(required=True)
     parser.set_defaults(subcommand="run")
 
     scan_parser = subparsers.add_parser("scan")
@@ -56,6 +54,7 @@ if __name__ == "__main__":
     try:
         files = args.files
         if len(files) == 0:
+            print("No path given, using CWD")  # noqa: T201
             files = [str(Path.cwd().absolute())]
 
         match args.subcommand:

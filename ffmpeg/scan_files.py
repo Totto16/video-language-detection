@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from ffmpeg.helper import get_files_to_scan
+from scan_helper import get_files_to_scan
 
 
 def scan_files(args: list[str]) -> list[Optional[str]]:
