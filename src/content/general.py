@@ -189,7 +189,7 @@ class Summary:
     ) -> None:
         for desc in summary.descriptions:
             if isinstance(desc[0], EpisodeDescription):
-                self.__descriptions.append((description, desc[0]))  # noqa: PERF401
+                self.__descriptions.append((description, desc[0]))
 
         self.__languages = Summary.combine_langauge_dicts(
             [self.__languages, summary.languages],
@@ -206,7 +206,7 @@ class Summary:
                 and isinstance(desc[0], SeasonDescription)
                 and isinstance(desc[1], EpisodeDescription)
             ):
-                self.__descriptions.append(  # noqa: PERF401
+                self.__descriptions.append(
                     (description, desc[0], desc[1]),
                 )
 
@@ -226,7 +226,7 @@ class Summary:
                 and isinstance(desc[1], SeasonDescription)
                 and isinstance(desc[2], EpisodeDescription)
             ):
-                self.__descriptions.append(  # noqa: PERF401
+                self.__descriptions.append(
                     (description, desc[0], desc[1], desc[2]),
                 )
 

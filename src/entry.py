@@ -161,6 +161,7 @@ if __name__ == "__main__":
         choices=loglevel_choices,
         default=loglevel_default,
         dest="level",
+        type=lambda s: LogLevel.from_str(s) or cast(LogLevel, s.lower()),
     )
 
     subparsers = parser.add_subparsers(required=False)
