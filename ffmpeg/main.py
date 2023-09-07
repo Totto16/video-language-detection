@@ -36,11 +36,6 @@ if __name__ == "__main__":
         description="Scan Video Files",
     )
 
-    parser.add_argument(
-        nargs="*",
-        dest="files",
-    )
-
     subparsers = parser.add_subparsers(required=True)
     parser.set_defaults(subcommand="run")
 
@@ -50,9 +45,15 @@ if __name__ == "__main__":
     fix_chapter_parser = subparsers.add_parser("fix-chapter")
     fix_chapter_parser.set_defaults(subcommand="fix-chapter")
 
+    for sub_parser in [scan_parser, fix_chapter_parser]:
+        sub_parser.add_argument(
+            nargs="*",
+            dest="files",
+        )
+
     args = cast(AllParsedNameSpaces, parser.parse_args())
     try:
-        files = args.files
+        files: list[str] = args.files
         if len(files) == 0:
             print("No path given, using CWD")  # noqa: T201
             files = [str(Path.cwd().absolute())]
