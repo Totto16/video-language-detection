@@ -9,8 +9,6 @@ select = ["ALL"]
 
 
 # Never Enforce:
-
-
 ignore = [
     "E501",    # E501       =>  line length violations
     "PLR2004", # PLR2004    =>  magic-value-comparison 
