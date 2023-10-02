@@ -18,7 +18,7 @@ ignore = [
     "UP007",   # UP007      =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
     "ANN401",  # ANN401     =>  any-type 
     "D",       # pydocstyle => I don't use doc strings atm. 
-    "C90",     # mccabe     => complexity isn't of concern tam.
+    "C90",     # mccabe     => complexity isn't of concern atm.
     "FIX",     # todo activate
     "TD",      # todo activate,
 ]
@@ -26,8 +26,8 @@ ignore = [
 # 88 (standard) is to small
 line-length = 100
 
-# Target Python version is 3.11.
-target-version = "py311"
+# Target Python version is 3.12.
+target-version = "py312"
 
 per-file-ignores = { "__init__.py" = [
     "E402", # Ignore `E402` (import violations) in all `__init__.py` files
