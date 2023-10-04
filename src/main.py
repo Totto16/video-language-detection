@@ -260,8 +260,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                     list[AllContent],
                     contents,
                 )
-                json_content: str = json.dumps(encoded_dict, indent=4)
-                file.write(json_content)
+                json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
             case _:
                 msg = _("Data not saveable from '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
@@ -311,5 +310,4 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
         Path(file_path).parent.mkdir(parents=True)
 
     with file_path.open(mode="w") as file:
-        json_content: str = json.dumps(result, indent=4)
-        file.write(json_content)
+        json.dump(result, file, indent=4, ensure_ascii=False)
