@@ -15,6 +15,7 @@ enlighten = "*"
 psutil = "*"
 apischema = "*"
 pysoundfile = "*"
+wxpython = "*"
 
 [dev-packages]
 pylint = "*"
@@ -30,6 +31,7 @@ pytest-subtests = "*"
 types-requests = "*"
 requests = "*"
 chardet = "*"
+types-wxpython = "*"
 
 [scripts]
 check = "python src/entry.py"
@@ -39,6 +41,7 @@ ruff = "ruff check src/ tests/ ffmpeg_helper/"
 ruff-ci = "ruff check src/ tests/ ffmpeg_helper/ --output-format"
 ruff-fix = "ruff check src/ tests/ ffmpeg_helper/ --fix"
 schema = "python src/entry.py schema"
+gui = "python src/entry.py gui"
 test = "pytest tests/"
 coverage = "bash -c 'coverage run -m pytest tests/ && coverage xml'"
 extract_translation = "pygettext3 -d video_language_detect -o locales/video_language_detect.pot src/"

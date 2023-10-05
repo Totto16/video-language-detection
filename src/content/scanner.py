@@ -1,7 +1,7 @@
 import json
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Optional, Self, TypedDict, override
+from typing import Literal, Optional, Self, TypedDict, override, cast
 
 from classifier import Classifier
 from content.base_class import LanguageScanner, ScanType
@@ -47,67 +47,96 @@ class NoLanguageScanner(StaticLanguageScanner):
 
 
 # TODO: is there a better way?
-class PartialScannerDict(TypedDict, total=False):
+class ConfigScannerDict(TypedDict, total=False):
     start_position: int
     scan_amount: int
 
 
-class PartialScannerDictTotal(TypedDict, total=True):
+class ConfigScannerDictTotal(TypedDict, total=True):
     start_position: int
     scan_amount: int
-    #TODO: print progress option
+    # TODO: print progress option
 
 
 INI_SETTINGS_SECTION_KEY = "settings"
 
 
-class PartialLanguageScanner(LanguageScanner):
+class ConfigLanguageScannerConfigFile(TypedDict):
+    type: Literal["file"]
+    file: Path
+
+
+class ConfigLanguageScannerConfigLiteral(TypedDict):
+    type: Literal["literal"]
+    config: ConfigScannerDict
+
+
+ConfigLanguageScannerConfig = (
+    ConfigLanguageScannerConfigFile | ConfigLanguageScannerConfigLiteral
+)
+
+
+class ConfigLanguageScanner(LanguageScanner):
     __start_position: int
     __scan_amount: int
     __current_position: int
 
     @property
-    def __defaults(self: Self) -> PartialScannerDictTotal:
+    def __defaults(self: Self) -> ConfigScannerDictTotal:
         return {"start_position": 0, "scan_amount": 100}
 
     def __init__(
         self: Self,
         classifier: Classifier,
         *,
-        config_file: Path = Path("./config.ini"),
+        config: Optional[ConfigLanguageScannerConfig] = None,
     ) -> None:
         super().__init__(classifier)
-        loaded_dict: Optional[PartialScannerDict] = None
+        loaded_dict: Optional[ConfigScannerDict] = None
 
-        if config_file.exists():
-            with config_file.open(mode="r") as file:
-                suffix: str = config_file.suffix[1:]
-                match suffix:
-                    case "json":
-                        loaded_dict = json.load(file)
-                    case "ini":
-                        config = ConfigParser()
-                        config.read(config_file)
-                        if INI_SETTINGS_SECTION_KEY in config:
-                            temp_dict = dict(config.items(INI_SETTINGS_SECTION_KEY))
+        if config is None:
+            config = {"type": "file", "file": Path("./config.ini")}
 
-                            loaded_dict = {}
-                            if temp_dict.get("start_position") is not None:
-                                int_result = parse_int_safely(
-                                    temp_dict["start_position"],
-                                )
-                                if int_result is not None:
-                                    loaded_dict["start_position"] = int_result
-                            if temp_dict.get("scan_amount") is not None:
-                                int_result = parse_int_safely(
-                                    temp_dict["scan_amount"],
-                                )
-                                if int_result is not None:
-                                    loaded_dict["scan_amount"] = int_result
+        match config["type"]:
+            case "file":
+                config_file = cast(ConfigLanguageScannerConfigFile, config)["file"]
+                if config_file.exists():
+                    with config_file.open(mode="r") as file:
+                        suffix: str = config_file.suffix[1:]
+                        match suffix:
+                            case "json":
+                                loaded_dict = json.load(file)
+                            case "ini":
+                                parsed_config = ConfigParser()
+                                parsed_config.read(config_file)
+                                if INI_SETTINGS_SECTION_KEY in parsed_config:
+                                    temp_dict = dict(
+                                        parsed_config.items(INI_SETTINGS_SECTION_KEY),
+                                    )
 
-                    case _:
-                        msg = f"Config not loadable from '{suffix}' file!"
-                        raise RuntimeError(msg)
+                                    loaded_dict = {}
+                                    if (
+                                        temp_dict.get("start_position", None)
+                                        is not None
+                                    ):
+                                        int_result = parse_int_safely(
+                                            temp_dict["start_position"],
+                                        )
+                                        if int_result is not None:
+                                            loaded_dict["start_position"] = int_result
+                                    if temp_dict.get("scan_amount", None) is not None:
+                                        int_result = parse_int_safely(
+                                            temp_dict["scan_amount"],
+                                        )
+                                        if int_result is not None:
+                                            loaded_dict["scan_amount"] = int_result
+
+                            case _:
+                                msg = f"Config not loadable from '{suffix}' file!"
+                                raise RuntimeError(msg)
+
+            case "literal":
+                loaded_dict = cast(ConfigLanguageScannerConfigLiteral, config)["config"]
 
         if loaded_dict is not None:
             self.__start_position = loaded_dict.get(

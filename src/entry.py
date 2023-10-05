@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     from content.base_class import Content
 
 from content.general import NameParser, Summary
-from content.scanner import PartialLanguageScanner
+from content.scanner import ConfigLanguageScanner
+from gui.main import launch
+from helper.log import LogLevel, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import AllContent, generate_json_schema, parse_contents
@@ -112,7 +114,10 @@ def main() -> None:
         },
         Path("data/data.json"),
         name_parser=CustomNameParser(SPECIAL_NAMES),
-        scanner=PartialLanguageScanner(Classifier(), config_file=Path("./config.ini")),
+        scanner=ConfigLanguageScanner(
+            Classifier(),
+            config={"type": "file", "file": Path("./config.ini")},
+        ),
     )
 
     summaries = [content.summary() for content in contents]
@@ -121,7 +126,7 @@ def main() -> None:
     logger.info(final)
 
 
-SubCommand = Literal["run", "schema"]
+SubCommand = Literal["run", "schema", "gui"]
 
 
 class ParsedArgNamespace:
@@ -138,7 +143,16 @@ class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
     schema_file: str
 
 
-AllParsedNameSpaces = RunCommandParsedArgNamespace | SchemaCommandParsedArgNamespace
+class GuiCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["gui"]
+    settings_folder: str
+
+
+AllParsedNameSpaces = (
+    RunCommandParsedArgNamespace
+    | SchemaCommandParsedArgNamespace
+    | GuiCommandParsedArgNamespace
+)
 
 _ = get_translator()
 
@@ -181,6 +195,15 @@ if __name__ == "__main__":
         default="schema/content_list.json",
     )
 
+    gui_parser = subparsers.add_parser("gui")
+    gui_parser.set_defaults(subcommand="gui")
+    gui_parser.add_argument(
+        "-f",
+        "--folder",
+        dest="settings_folder",
+        default=".",
+    )
+
     args = cast(AllParsedNameSpaces, parser.parse_args())
     logger: Logger = setup_custom_logger(args.level)
 
@@ -191,6 +214,11 @@ if __name__ == "__main__":
                     Path(args.schema_file),  # type: ignore[union-attr]
                     list[AllContent],
                 )
+                sys.exit(0)
+            case "gui":
+                args = cast(GuiCommandParsedArgNamespace, args)
+                settings_folder = Path(args.settings_folder)
+                launch(settings_folder)
                 sys.exit(0)
             case "run":
                 main()
