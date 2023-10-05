@@ -62,8 +62,8 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
-                  sudo apt-get update
-                  sudo apt-get install python3-wxgtk4.0 libgtk-3-dev ffmpeg -y
+                  apt-get update
+                  apt-get install python3-wxgtk4.0 libgtk-3-dev ffmpeg -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
             - name: run coverage report
