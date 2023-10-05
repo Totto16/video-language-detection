@@ -8,7 +8,7 @@ on:
 
 jobs:
     mypy_lint:
-        name: Lint with Mypy
+        name: Lint files
         runs-on: ubuntu-latest
         container:
             image: python:3.11-bookworm
@@ -19,6 +19,8 @@ jobs:
             - name: prepare environment
               run: |
                   pip install pipenv -U --quiet
+                  apt-get update
+                  apt-get install python3-wxgtk4.0 -y
                   pipenv install --dev
 
             - name: run lint
@@ -27,7 +29,7 @@ jobs:
                   pipenv run ruff-ci
 
     tests:
-        name: Test with pytest
+        name: Run tests
         runs-on: ubuntu-latest
         container:
             image: python:3.11-bookworm
@@ -38,9 +40,9 @@ jobs:
             - name: prepare environment
               run: |
                   pip install pipenv -U --quiet
-                  pipenv install --dev
                   apt-get update
-                  apt-get install ffmpeg -y
+                  apt-get install python3-wxgtk4.0 ffmpeg -y
+                  pipenv install --dev
 
             - name: run tests
               run: |
@@ -59,7 +61,7 @@ jobs:
             - name: prepare environment
               run: |
                   sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends ffmpeg -y
+                  sudo apt-get install python3.11 python3-wxgtk4.0 --install-recommends ffmpeg -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
             - name: run coverage report
