@@ -10,6 +10,8 @@ python-lint-job:
     image: python:3.11-bookworm
     script:
         - pip install pipenv -U --quiet
+        - apt-get update
+        - apt-get install wxpython4.0 -y
         - pipenv install --dev
         - pipenv run lint
 
@@ -19,9 +21,9 @@ python-test-job:
     image: python:3.11-bookworm
     script:
         - pip install pipenv -U --quiet
-        - pipenv install --dev
         - apt-get update
-        - apt-get install ffmpeg -y
+        - apt-get install wxpython4.0 ffmpeg -y
+        - pipenv install --dev
         - pipenv run test
 
 sonarqube-check:
@@ -41,10 +43,10 @@ sonarqube-check:
             - .sonar/cache
     script:
         - pip install pipenv -U --quiet
-        - pipenv install --dev
         # TODO:check if this is even debian / ubuntu or alpine and install ffprobe
-        - sudo apt-get update
-        - sudo apt-get install ffmpeg -y
+        - apt-get update
+        - apt-get install wxpython4.0 ffmpeg -y
+        - pipenv install --dev
         - pipenv run coverage
         - sonar-scanner
     allow_failure: false
