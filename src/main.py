@@ -308,7 +308,10 @@ def generate_schema(
     emit_type: Optional[EmitType] = None,
 ) -> None:
     result: Mapping[str, Any] = get_schema(
-        any_type, additional_properties=False, all_refs=True, emit_type=emit_type
+        any_type,
+        additional_properties=False,
+        all_refs=True,
+        emit_type=emit_type,
     )
 
     if not file_path.parent.exists():
