@@ -71,7 +71,7 @@ class Config:
         return ParsedConfig(
             general=GeneralConfigParsed(target_file=Path("data.json")),
             parser=ParserConfigParsed(
-                root_folder=Path("/tmp/"),  # noqa: S108
+                root_folder=Path.cwd(),
                 special=[],
                 video_formats=["mp4"],
                 ignore_files=[],
