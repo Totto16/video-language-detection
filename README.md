@@ -36,3 +36,10 @@ scanner:
         scan_amount: 100
         start_position: 0
 ```
+
+
+## Current version 
+
+```yaml
+2.2.0
+```
