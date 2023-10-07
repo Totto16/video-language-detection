@@ -10,14 +10,17 @@ from pathlib import Path
 from typing import Literal, Optional, Self, cast
 
 from classifier import Classifier, Language
+from config import Config, ParsedConfig
 from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
-from content.scanner import ConfigLanguageScanner
+from content.scanner import (
+    get_scanner_from_config,
+)
 from gui.main import launch
 from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
-from main import AllContent, generate_json_schema, parse_contents
+from main import generate_schemas, parse_contents
 from typing_extensions import override
 
 
@@ -87,34 +90,19 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
-SPECIAL_NAMES: list[str] = ["Extras", "Specials", "Special"]
-ROOT_FOLDER: Path = Path("/media/totto/Totto_4/Serien")
-
-
-def main() -> None:
-    video_formats: list[str] = ["mp4", "mkv", "avi"]
-    ignore_files: list[str] = [
-        "metadata",
-        "extrafanart",
-        "theme-music",
-        "Music",
-        "Reportagen",
-    ]
-    parse_error_is_exception: bool = False
+def main(config: ParsedConfig) -> None:
+    scanner = get_scanner_from_config(config.scanner, Classifier())
 
     contents: list[Content] = parse_contents(
-        ROOT_FOLDER,
+        config.parser.root_folder,
         {
-            "ignore_files": ignore_files,
-            "video_formats": video_formats,
-            "parse_error_is_exception": parse_error_is_exception,
+            "ignore_files": config.parser.ignore_files,
+            "video_formats": config.parser.video_formats,
+            "parse_error_is_exception": config.parser.exception_on_error,
         },
-        Path("data/data.json"),
-        name_parser=CustomNameParser(SPECIAL_NAMES),
-        scanner=ConfigLanguageScanner(
-            Classifier(),
-            config={"type": "file", "file": Path("./config.ini")},
-        ),
+        config.general.target_file,
+        name_parser=CustomNameParser(config.parser.special),
+        scanner=scanner,
     )
 
     summaries = [content.summary() for content in contents]
@@ -133,16 +121,17 @@ class ParsedArgNamespace:
 
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["run"]
+    config: str
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["schema"]
-    schema_file: str
+    schema_folder: str
 
 
 class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["gui"]
-    settings_folder: str
+    config: str
 
 
 AllParsedNameSpaces = (
@@ -177,28 +166,30 @@ if __name__ == "__main__":
         type=lambda s: LogLevel.from_str(s) or cast(LogLevel, s.lower()),
     )
 
-    subparsers = parser.add_subparsers(required=False)
-    parser.set_defaults(subcommand="run")
+    subparsers = parser.add_subparsers(required=True, dest="subcommand")
 
     run_parser = subparsers.add_parser("run")
-    run_parser.set_defaults(subcommand="run")
+    run_parser.add_argument(
+        "-c",
+        "--config",
+        dest="config",
+        default="config.yaml",
+    )
 
     schema_parser = subparsers.add_parser("schema")
-    schema_parser.set_defaults(subcommand="schema")
     schema_parser.add_argument(
         "-s",
-        "--schema",
-        dest="schema_file",
-        default="schema/content_list.json",
+        "--schema_folder",
+        dest="schema_folder",
+        default="schema/",
     )
 
     gui_parser = subparsers.add_parser("gui")
-    gui_parser.set_defaults(subcommand="gui")
     gui_parser.add_argument(
-        "-f",
-        "--folder",
-        dest="settings_folder",
-        default=".",
+        "-c",
+        "--config",
+        dest="config",
+        default="config.yaml",
     )
 
     args = cast(AllParsedNameSpaces, parser.parse_args())
@@ -206,19 +197,21 @@ if __name__ == "__main__":
     try:
         match args.subcommand:
             case "schema":
-                args = cast(SchemaCommandParsedArgNamespace, args)
-                generate_json_schema(
-                    Path(args.schema_file),
-                    list[AllContent],
-                )
+                args_schema = cast(SchemaCommandParsedArgNamespace, args)
+                generate_schemas(Path(args_schema.schema_folder))
                 sys.exit(0)
             case "gui":
-                args = cast(GuiCommandParsedArgNamespace, args)
-                settings_folder = Path(args.settings_folder)
-                launch(settings_folder)
+                args_gui = cast(GuiCommandParsedArgNamespace, args)
+                config = Path(args_gui.config)
+                launch(config)
                 sys.exit(0)
             case "run":
-                main()
+                args_run = cast(
+                    RunCommandParsedArgNamespace,
+                    args,
+                )
+                parsed_config = Config.load(Path(args_run.config))
+                main(parsed_config)
 
     except KeyboardInterrupt:
 

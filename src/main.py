@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
 
 from apischema import deserialize, schema, serialize
+from config import Config
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -15,6 +16,7 @@ from content.episode_content import EpisodeContent
 from content.general import (
     Callback,
     ContentType,
+    EmitType,
     NameParser,
     ScannedFileType,
     get_schema,
@@ -299,11 +301,14 @@ def parse_contents(
     return new_contents
 
 
-def generate_json_schema(file_path: Path, any_type: Any) -> None:
+def generate_schema(
+    file_path: Path,
+    any_type: Any,
+    *,
+    emit_type: Optional[EmitType] = None,
+) -> None:
     result: Mapping[str, Any] = get_schema(
-        any_type,
-        additional_properties=False,
-        all_refs=True,
+        any_type, additional_properties=False, all_refs=True, emit_type=emit_type
     )
 
     if not file_path.parent.exists():
@@ -311,3 +316,8 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
 
     with file_path.open(mode="w") as file:
         json.dump(result, file, indent=4, ensure_ascii=False)
+
+
+def generate_schemas(folder: Path) -> None:
+    generate_schema(folder / "content_list_schema.json", list[AllContent])
+    generate_schema(folder / "config_schema.json", Config, emit_type="deserialize")
