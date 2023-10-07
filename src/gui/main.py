@@ -4,7 +4,7 @@ import wx
 
 
 ## TODO: this is just an exampel gui application atm
-def launch(_settings_folder: Path) -> None:
+def launch(_config: Path) -> None:
     app = wx.App()
     window = wx.Frame(None, title="wxPython Frame", size=(300, 200))
     panel = wx.Panel(window)
