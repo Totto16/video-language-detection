@@ -37,7 +37,7 @@ class LogLevel(Enum):
                 return logging.DEBUG
             case LogLevel.NOTSET:
                 return logging.NOTSET
-            case _:
+            case _:  # mypy is stupid in match statements :(
                 msg = "UNREACHABLE!"
                 raise RuntimeError(msg)
 
