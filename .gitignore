@@ -1,6 +1,5 @@
 __pycache__
 .mypy_cache
-Pipfile.lock
 model/
 /src/tmp/
 /data/
@@ -9,3 +8,4 @@ model/
 /.coverage
 /coverage.xml
 /config.ini
+/config.yaml

@@ -5,11 +5,9 @@ from hashlib import sha256
 from pathlib import Path
 from typing import (
     Any,
-    Generic,
     Optional,
     Self,
     TypedDict,
-    TypeVar,
     cast,
 )
 
@@ -432,12 +430,7 @@ class NameParser:
         raise MissingOverrideError
 
 
-C = TypeVar("C")
-CT = TypeVar("CT")
-RT = TypeVar("RT")
-
-
-class Callback(Generic[C, CT, RT]):
+class Callback[C, CT, RT]:
     def __init__(self: Self) -> None:
         pass
 
@@ -491,10 +484,7 @@ class Callback(Generic[C, CT, RT]):
         raise MissingOverrideError
 
 
-SF = TypeVar("SF")
-
-
-def safe_index(ls: list[SF], item: SF) -> Optional[int]:
+def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:
     try:
         return ls.index(item)
     except ValueError:

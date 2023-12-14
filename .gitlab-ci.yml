@@ -7,7 +7,7 @@ stages: # List of stages for jobs, and their order of execution
 python-lint-job:
     stage: python_checks
     allow_failure: false
-    image: python:3.11-bookworm
+    image: python:3.12-bookworm
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
@@ -16,7 +16,7 @@ python-lint-job:
 python-test-job:
     stage: python_checks
     allow_failure: false
-    image: python:3.11-bookworm
+    image: python:3.12-bookworm
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
@@ -42,7 +42,6 @@ sonarqube-check:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
-        # TODO:check if this is even debian / ubuntu or alpine and install ffprobe
         - sudo apt-get update
         - sudo apt-get install ffmpeg -y
         - pipenv run coverage
