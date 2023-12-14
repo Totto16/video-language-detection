@@ -6,16 +6,16 @@ from name.basics.tsv with (
         header true,
         quote E'\b'
     );
-COPY public.title_akas
-from title.akas.tsv with (
+COPY public.title_basics
+from title.basics.tsv with (
         format 'csv',
         delimiter E'\t',
         null '\N',
         header true,
         quote E'\b'
     );
-COPY public.title_basics
-from title.basics.tsv with (
+COPY public.title_akas
+from title.akas.tsv with (
         format 'csv',
         delimiter E'\t',
         null '\N',
