@@ -8,7 +8,7 @@ on:
 
 jobs:
     mypy_lint:
-        name: Lint with Mypy
+        name: Lint with Mypy and Ruff
         runs-on: ubuntu-latest
         container:
             image: python:3.12-bookworm
@@ -19,7 +19,7 @@ jobs:
             - name: install wheel build dependencies
               run: |
                   apt-get update
-                  apt-get install cmake
+                  apt-get install cmake -y
             - name: prepare environment
               run: |
                   pip install pipenv -U --quiet
