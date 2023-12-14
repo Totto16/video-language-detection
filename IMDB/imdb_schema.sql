@@ -3,32 +3,49 @@
 -- taken from https://www.imdb.com/INTerfaces/
 --
 
--- create the table name_basics
-CREATE TABLE IF NOT EXISTS public.name_basics (
-	nconst TEXT NOT NULL,
-	primaryName TEXT NOT NULL,
-	birthYear INT NOT NULL,
-	deathYear INT,
-	primaryProfession TEXT NOT NULL,
-	knownForTitles TEXT NOT NULL,
-	PRIMARY KEY (nconst)
-);
 -- create enum for titleType: ATTENTION: New values may be added in the future without warning
 CREATE TYPE title_basics_titleType AS ENUM (
 	'movie',
 	'short',
-	'tvseries',
-	'tvepisode',
-	'video' -- etc. -- TODO: add missing ones
+	'tvEpisode',
+	'tvMiniSeries',
+	'tvMovie',
+	'tvSeries',
+	'tvShort',
+	'tvSpecial',
+	'video',
+	'videoGame'
 );
 -- create enum for genres: ATTENTION: New values may be added in the future without warning
 CREATE TYPE title_basics_genres AS ENUM (
-	'Documentary',
-	'Short',
-	'Animation',
+	'Game-Show',
+	'Family',
+	'Music',
+	'Reality-TV',
 	'Comedy',
+	'Western',
+	'Short',
+	'Crime',
+	'War',
 	'Romance',
-	'Sport' -- etc. -- TODO: add missing ones
+	'Biography',
+	'Drama',
+	'Mystery',
+	'Sci-Fi',
+	'Fantasy',
+	'Adventure',
+	'Documentary',
+	'Action',
+	'Animation',
+	'Sport',
+	'Horror',
+	'Adult',
+	'News',
+	'Talk-Show',
+	'Film-Noir',
+	'Musical',
+	'Thriller',
+	'History'
 );
 -- create the table title_basics
 CREATE TABLE IF NOT EXISTS public.title_basics (
@@ -37,11 +54,29 @@ CREATE TABLE IF NOT EXISTS public.title_basics (
 	primaryTitle TEXT NOT NULL,
 	originalTitle TEXT NOT NULL,
 	isAdult boolean NOT NULL,
-	startYear INT NOT NULL,
+	startYear INT,
 	endYear INT,
-	runTimeMinutes INT NOT NULL,
+	runTimeMinutes INT,
 	genres title_basics_genres [],
 	PRIMARY KEY(tconst)
+);
+-- create enum for category: ATTENTION: New values may be added in the future without warning
+CREATE TYPE general_job AS ENUM (
+	'director',
+	'cinematographer',
+	'composer',
+	'editor',
+	'actor' -- etc. -- TODO: add missing ones
+);
+-- create the table name_basics
+CREATE TABLE IF NOT EXISTS public.name_basics (
+	nconst TEXT NOT NULL,
+	primaryName TEXT NOT NULL,
+	birthYear INT,
+	deathYear INT,
+	primaryProfession general_job [] NOT NULL,
+	knownForTitles TEXT [] NOT NULL,
+	PRIMARY KEY (nconst) -- FOREIGN KEY (EACH ELEMENT OF knownForTitles) REFERENCES public.title_basics(tconst)
 );
 -- create enum for type: ATTENTION: New values may be added in the future without warning
 CREATE TYPE title_akas_type AS ENUM (
@@ -84,23 +119,15 @@ CREATE TABLE IF NOT EXISTS public.title_episode (
 	seasonNumber INT NOT NULL,
 	episodeNumber INT NOT NULL,
 	PRIMARY KEY(tconst),
+	FOREIGN KEY (tconst) REFERENCES public.title_basics(tconst),
 	FOREIGN KEY (parentTconst) REFERENCES public.title_basics(tconst)
-);
--- create enum for category: ATTENTION: New values may be added in the future without warning
-CREATE TYPE title_principals_category AS ENUM (
-	'self',
-	'director',
-	'cinematographer',
-	'composer',
-	'editor',
-	'actor' -- etc. -- TODO: add missing ones
 );
 -- create the table title_principals
 CREATE TABLE IF NOT EXISTS public.title_principals (
 	tconst TEXT NOT NULL,
 	ordering INT NOT NULL,
 	nconst TEXT NOT NULL,
-	category title_principals_category NOT NULL,
+	category general_job NOT NULL,
 	job TEXT,
 	characters TEXT [],
 	PRIMARY KEY(tconst, ordering),
