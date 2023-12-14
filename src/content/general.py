@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import (
     Any,
     Generic,
+    Literal,
     Optional,
     Self,
     TypedDict,
@@ -501,11 +502,15 @@ def safe_index(ls: list[SF], item: SF) -> Optional[int]:
         return None
 
 
+EmitType = Literal["deserialize", "serialize"]
+
+
 def get_schema(
     any_type: Any,
     *,
     additional_properties: Optional[bool] = None,
     all_refs: Optional[bool] = None,
+    emit_type: Optional[EmitType] = None,
 ) -> MutableMapping[str, Any]:
     result: Mapping[str, Any] = deserialization_schema(
         any_type,
@@ -520,8 +525,11 @@ def get_schema(
     )
 
     if result != result2:
-        msg = "Deserialization and Serialization scheme mismatch"
-        raise RuntimeError(msg)
+        if emit_type is None:
+            msg = "Deserialization and Serialization scheme mismatch"
+            raise RuntimeError(msg)
+        if emit_type == "serialize":
+            return cast(MutableMapping[str, Any], result2)
 
     return cast(MutableMapping[str, Any], result)
 

@@ -1,0 +1,172 @@
+{
+    "$ref": "#/$defs/Config",
+    "$defs": {
+        "Config": {
+            "type": "object",
+            "properties": {
+                "general": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/GeneralConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "parser": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ParserConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "scanner": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/FullLanguageScannerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/NoLanguageScannerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/ConfigScannerConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "general",
+                "parser",
+                "scanner"
+            ],
+            "additionalProperties": false
+        },
+        "GeneralConfig": {
+            "type": "object",
+            "properties": {
+                "target_file": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "target_file"
+            ],
+            "additionalProperties": false
+        },
+        "ParserConfig": {
+            "type": "object",
+            "properties": {
+                "root_folder": {
+                    "type": "string"
+                },
+                "special": {
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "video_formats": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "default": []
+                },
+                "ignore_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": []
+                },
+                "exception_on_error": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ],
+                    "default": true
+                }
+            },
+            "required": [
+                "root_folder",
+                "special"
+            ],
+            "additionalProperties": false
+        },
+        "FullLanguageScannerConfig": {
+            "type": "object",
+            "properties": {
+                "scanner_type": {
+                    "type": "string",
+                    "const": "full"
+                }
+            },
+            "required": [
+                "scanner_type"
+            ],
+            "additionalProperties": false
+        },
+        "NoLanguageScannerConfig": {
+            "type": "object",
+            "properties": {
+                "scanner_type": {
+                    "type": "string",
+                    "const": "nothing"
+                }
+            },
+            "required": [
+                "scanner_type"
+            ],
+            "additionalProperties": false
+        },
+        "ConfigScannerConfig": {
+            "type": "object",
+            "properties": {
+                "scanner_type": {
+                    "type": "string",
+                    "const": "config"
+                },
+                "config": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ConfigScannerDict"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "scanner_type",
+                "config"
+            ],
+            "additionalProperties": false
+        },
+        "ConfigScannerDict": {
+            "type": "object",
+            "properties": {
+                "start_position": {
+                    "type": "integer"
+                },
+                "scan_amount": {
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "$schema": "http://json-schema.org/draft/2020-12/schema#"
+}

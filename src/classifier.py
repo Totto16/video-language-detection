@@ -441,9 +441,6 @@ def get_mean(
                 new_values,
                 normalize_percents=normalize_percents,
             )
-        case _:  # stupid mypy
-            msg = "UNREACHABLE"
-            raise RuntimeError(msg)
 
 
 class Prediction:
