@@ -16,12 +16,10 @@ jobs:
             - uses: actions/checkout@v3
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-            - name: install wheel build dependencies
+            - name: prepare environment
               run: |
                   apt-get update
                   apt-get install cmake -y
-            - name: prepare environment
-              run: |
                   pip install pipenv -U --quiet
                   pipenv install --dev
 
@@ -41,10 +39,10 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
+                  apt-get update
+                  apt-get install ffmpeg cmake -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
-                  apt-get update
-                  apt-get install ffmpeg -y
 
             - name: run tests
               run: |
