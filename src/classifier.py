@@ -767,8 +767,7 @@ class Classifier:
 
         best = prediction.get_best(MeanType.truncated)
         logger.error(
-            "Couldn't get Language of '%(path)s': %(best)s",
-            extra={"path": path, "best": best},
+            "Couldn't get Language of '{path}': {best}".format(path=path, best=best),
         )
 
         return (PredictionBest(0.0, Language.unknown()), 0.0)
