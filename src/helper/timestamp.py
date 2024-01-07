@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import Never, Optional, Self
 
 from apischema import deserializer, schema, serializer
@@ -47,11 +47,11 @@ class Timestamp:
     def serialize(self: Self) -> str:
         return str(self)
 
-    # https://stackoverflow.com/questions/4628122/how-to-construct-a-timedelta-object-from-a-simple-string
     @deserializer
     @staticmethod
     def deserialize_str(inp: str) -> "Timestamp":
-        t = datetime.strptime(inp, "%H:%M:%S")
+        # https://stackoverflow.com/questions/4628122/how-to-construct-a-timedelta-object-from-a-simple-string
+        t = datetime.strptime(inp, "%H:%M:%S").astimezone()
         delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
         return Timestamp(delta)
 
