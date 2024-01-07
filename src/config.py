@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yaml
-from apischema import deserialize, schema
+from apischema import ValidationError, deserialize, schema
+from classifier import ClassifierOptions
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.log import get_logger
 
@@ -55,6 +56,7 @@ class ParsedConfig:
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
+    classifier: ClassifierOptions
 
 
 logger: Logger = get_logger()
@@ -65,6 +67,7 @@ class Config:
     general: Optional[GeneralConfig]
     parser: Optional[ParserConfig]
     scanner: Optional[ScannerConfig]
+    classifier: Optional[ClassifierOptions]
 
     @staticmethod
     def __defaults() -> "ParsedConfig":
@@ -78,13 +81,14 @@ class Config:
                 exception_on_error=True,
             ),
             scanner=ConfigScannerConfig(scanner_type="config", config=None),
+            classifier=ClassifierOptions(),
         )
 
     @staticmethod
     def fill_defaults(config: "Config") -> ParsedConfig:
         defaults = Config.__defaults()
 
-        # TODO this is done manually atm, ut can be done more automated, by checking for none on every key ann replacing it with the key in defaults, if the key is none!
+        # TODO this is done manually atm, ut can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
         parsed_general = defaults.general
         if config.general is not None:
             parsed_general = GeneralConfigParsed(
@@ -109,14 +113,19 @@ class Config:
         if config.scanner is not None:
             parsed_scanner = config.scanner
 
+        parsed_classifier = defaults.classifier
+        if config.classifier is not None:
+            parsed_classifier = config.classifier
+
         return ParsedConfig(
             general=parsed_general,
             parser=parsed_parser,
             scanner=parsed_scanner,
+            classifier=parsed_classifier,
         )
 
     @staticmethod
-    def load(config_file: Path) -> ParsedConfig:
+    def load(config_file: Path) -> Optional[ParsedConfig]:
         if config_file.exists():
             with config_file.open(mode="r") as file:
                 suffix: str = config_file.suffix[1:]
@@ -131,13 +140,26 @@ class Config:
                     case _:
                         msg = f"Config not loadable from '{suffix}' file!"
                         raise RuntimeError(msg)
+                try:
+                    parsed_dict: Config = deserialize(
+                        Config,
+                        loaded_dict,
+                    )
 
-                parsed_dict: Config = deserialize(
-                    Config,
-                    loaded_dict,
-                )
+                    return Config.fill_defaults(parsed_dict)
+                except ValidationError as err:
+                    msg = f"The config file {config_file} is invalid"
+                    logger.error(msg)
+                    for error in err.errors:
+                        loc = [str(s) for s in error["loc"]]
+                        loc_pretty = ".".join(loc)
+                        err_msg = error["err"]
 
-                return Config.fill_defaults(parsed_dict)
+                        msg = f"In location '{loc_pretty}': {err_msg}"
+                        logger.error(msg)
+
+                    return None
 
         msg = f"The config file {config_file} was not found"
-        raise RuntimeError(msg)
+        logger.error(msg)
+        return None

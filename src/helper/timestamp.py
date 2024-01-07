@@ -1,5 +1,7 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Never, Optional, Self
+
+from apischema import deserializer, schema, serializer
 
 
 def parse_int_safely(inp: str) -> Optional[int]:
@@ -9,6 +11,10 @@ def parse_int_safely(inp: str) -> Optional[int]:
         return None
 
 
+# TODO check for overflow of hours everywhere!
+
+
+@schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$", min=1, max=60 * 60 * 24)
 class Timestamp:
     __delta: timedelta
 
@@ -36,6 +42,23 @@ class Timestamp:
     @staticmethod
     def from_seconds(seconds: float) -> "Timestamp":
         return Timestamp(timedelta(seconds=seconds))
+
+    @serializer
+    def serialize(self: Self) -> str:
+        return str(self)
+
+    # https://stackoverflow.com/questions/4628122/how-to-construct-a-timedelta-object-from-a-simple-string
+    @deserializer
+    @staticmethod
+    def deserialize_str(inp: str) -> "Timestamp":
+        t = datetime.strptime(inp, "%H:%M:%S")
+        delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+        return Timestamp(delta)
+
+    @deserializer
+    @staticmethod
+    def deserialize_int(inp: int) -> "Timestamp":
+        return Timestamp.from_seconds(inp)
 
     def __str__(self: Self) -> str:
         return str(self.__delta)
