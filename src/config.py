@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 import yaml
 from apischema import ValidationError, deserialize, schema
-from classifier import ClassifierOptions
+from classifier import ClassifierOptionsParsed
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.log import get_logger
 
@@ -56,7 +56,7 @@ class ParsedConfig:
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
-    classifier: ClassifierOptions
+    classifier: ClassifierOptionsParsed
 
 
 logger: Logger = get_logger()
@@ -67,7 +67,7 @@ class Config:
     general: Optional[GeneralConfig]
     parser: Optional[ParserConfig]
     scanner: Optional[ScannerConfig]
-    classifier: Optional[ClassifierOptions]
+    classifier: Optional[ClassifierOptionsParsed]
 
     @staticmethod
     def __defaults() -> "ParsedConfig":
@@ -81,7 +81,7 @@ class Config:
                 exception_on_error=True,
             ),
             scanner=ConfigScannerConfig(scanner_type="config", config=None),
-            classifier=ClassifierOptions(),
+            classifier=ClassifierOptionsParsed.default(),
         )
 
     @staticmethod
@@ -134,9 +134,7 @@ class Config:
                     case "json":
                         loaded_dict = json.load(file)
                     case "yml" | "yaml":
-                        # TODO
                         loaded_dict = yaml.safe_load(file)
-
                     case _:
                         msg = f"Config not loadable from '{suffix}' file!"
                         raise RuntimeError(msg)
@@ -149,14 +147,14 @@ class Config:
                     return Config.fill_defaults(parsed_dict)
                 except ValidationError as err:
                     msg = f"The config file {config_file} is invalid"
-                    logger.error(msg)
+                    logger.error(msg=msg)  # noqa: TRY400
                     for error in err.errors:
                         loc = [str(s) for s in error["loc"]]
                         loc_pretty = ".".join(loc)
                         err_msg = error["err"]
 
                         msg = f"In location '{loc_pretty}': {err_msg}"
-                        logger.error(msg)
+                        logger.error(msg)  # noqa: TRY400
 
                     return None
 

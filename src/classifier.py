@@ -1,6 +1,6 @@
 import gc
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import reduce
 from logging import Logger
@@ -11,10 +11,12 @@ from typing import Any, Optional, Self, TypedDict
 from warnings import filterwarnings
 
 import psutil
+from apischema import schema
 from enlighten import Manager
 from helper.ffprobe import ffprobe
 from helper.log import get_logger
 from helper.timestamp import Timestamp
+from helper.translation import get_translator
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from speechbrain.pretrained import EncoderClassifier
@@ -28,6 +30,8 @@ WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:
 
 
 logger: Logger = get_logger()
+
+_ = get_translator()
 
 
 class FileType(Enum):
@@ -506,25 +510,32 @@ class Prediction:
         return new_value
 
 
-# TODO: is there a better way?
-class ClassifierOptions(TypedDict, total=False):
-    segment_length: Timestamp
-    accuracy_threshold: float
-    final_accuracy_threshold: float
-    minimum_scanned: float
+@dataclass()
+class ClassifierOptions:
+    segment_length: Optional[Timestamp]
+    accuracy_threshold: Optional[float]
+    final_accuracy_threshold: Optional[float]
+    minimum_scanned: Optional[float]
     scan_until: Optional[float]
 
 
-## TODO: use dataclass and
-#   ## accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
-
-
-class ClassifierOptionsTotal(TypedDict, total=True):
-    segment_length: Timestamp
-    accuracy_threshold: float
-    final_accuracy_threshold: float
+@dataclass()
+class ClassifierOptionsParsed:
+    segment_length: Timestamp = field(metadata=schema())
+    accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
+    final_accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
     minimum_scanned: float
     scan_until: Optional[float]
+
+    @staticmethod
+    def default() -> "ClassifierOptionsParsed":
+        return ClassifierOptionsParsed(
+            segment_length=Timestamp.from_seconds(30),
+            accuracy_threshold=0.95,
+            final_accuracy_threshold=0.55,
+            minimum_scanned=0.2,
+            scan_until=None,
+        )
 
 
 def is_percentage(value: float) -> bool:
@@ -533,68 +544,66 @@ def is_percentage(value: float) -> bool:
 
 class Classifier:
     __save_dir: Path
-    __options: ClassifierOptionsTotal
+    __options: ClassifierOptionsParsed
     __classifier: EncoderClassifier
 
-    def __init__(self: Self, options: Optional[ClassifierOptions] = None) -> None:
+    def __init__(
+        self: Self,
+        options: Optional[ClassifierOptions] | ClassifierOptionsParsed = None,
+    ) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
         self.__classifier = self.__init_classifier()
 
-    @property
-    def __defaults(self: Self) -> ClassifierOptionsTotal:
-        return {
-            "segment_length": Timestamp.from_seconds(30),
-            "accuracy_threshold": 0.95,
-            "final_accuracy_threshold": 0.55,
-            "minimum_scanned": 0.2,
-            "scan_until": None,
-        }
-
     def __parse_options(
         self: Self,
-        options: Optional[ClassifierOptions],
-    ) -> ClassifierOptionsTotal:
-        total_options: ClassifierOptionsTotal = self.__defaults
+        options: Optional[ClassifierOptions] | ClassifierOptionsParsed,
+    ) -> ClassifierOptionsParsed:
+        total_options: ClassifierOptionsParsed = ClassifierOptionsParsed.default()
 
         if options is not None:
-            total_options["segment_length"] = options.get(
-                "segment_length",
-                self.__defaults["segment_length"],
+            total_options.segment_length = (
+                options.segment_length
+                if options.segment_length is not None
+                else total_options.segment_length
             )
-            total_options["accuracy_threshold"] = options.get(
-                "accuracy_threshold",
-                self.__defaults["accuracy_threshold"],
+            total_options.accuracy_threshold = (
+                options.accuracy_threshold
+                if options.accuracy_threshold is not None
+                else total_options.accuracy_threshold
             )
-            total_options["final_accuracy_threshold"] = options.get(
-                "final_accuracy_threshold",
-                self.__defaults["final_accuracy_threshold"],
+            total_options.final_accuracy_threshold = (
+                options.final_accuracy_threshold
+                if options.final_accuracy_threshold is not None
+                else total_options.final_accuracy_threshold
             )
-            total_options["minimum_scanned"] = options.get(
-                "minimum_scanned",
-                self.__defaults["minimum_scanned"],
+            total_options.minimum_scanned = (
+                options.minimum_scanned
+                if options.minimum_scanned is not None
+                else total_options.minimum_scanned
             )
-            total_options["scan_until"] = options.get(
-                "scan_until",
-                self.__defaults["scan_until"],
+            total_options.scan_until = (
+                options.scan_until
+                if options.scan_until is not None
+                else total_options.scan_until
             )
 
-        if not is_percentage(total_options["accuracy_threshold"]):
-            msg = f"Option 'accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options['accuracy_threshold']}"
+        if not is_percentage(total_options.accuracy_threshold):
+            msg = f"Option 'accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options.accuracy_threshold}"
             raise RuntimeError(msg)
 
-        if not is_percentage(total_options["final_accuracy_threshold"]):
-            msg = f"Option 'final_accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options['final_accuracy_threshold']}"
+        if not is_percentage(total_options.final_accuracy_threshold):
+            msg = f"Option 'final_accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options.final_accuracy_threshold}"
             raise RuntimeError(msg)
 
-        if not is_percentage(total_options["minimum_scanned"]):
-            msg = f"Option 'minimum_scanned' has to be in percentage (0.0 - 1.0) but was: {total_options['minimum_scanned']}"
+        if not is_percentage(total_options.minimum_scanned):
+            msg = f"Option 'minimum_scanned' has to be in percentage (0.0 - 1.0) but was: {total_options.minimum_scanned}"
             raise RuntimeError(msg)
 
-        if total_options["scan_until"] is not None and not is_percentage(
-            total_options["scan_until"],
+        if total_options.scan_until is not None and not is_percentage(
+            total_options.scan_until,
         ):
-            msg = f"Option 'scan_until' has to be in percentage (0.0 - 1.0) but was: {total_options['scan_until']}"
+            msg = f"Option 'scan_until' has to be in percentage (0.0 - 1.0) but was: {total_options.scan_until}"
             raise RuntimeError(msg)
 
         return total_options
@@ -698,20 +707,20 @@ class Classifier:
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
-                    if current_timestamp + self.__options["segment_length"] > runtime
-                    else current_timestamp + self.__options["segment_length"]
+                    if current_timestamp + self.__options.segment_length > runtime
+                    else current_timestamp + self.__options.segment_length
                 )
                 segment: Segment = Segment(current_timestamp, end)
                 result.append((segment, end if end is not None else runtime))
                 # ATTENTION: don't use +=, since that doesn't create a new object!
-                current_timestamp = current_timestamp + self.__options["segment_length"]
+                current_timestamp = current_timestamp + self.__options.segment_length
 
             return result
 
         # This guards for cases, where scanning is useless, e.g. when you want 20 % to be scanned, for a valid result, but scan until 10 %
         scan_nothing = (
-            self.__options["scan_until"] is not None
-            and self.__options["scan_until"] < self.__options["minimum_scanned"]
+            self.__options.scan_until is not None
+            and self.__options.scan_until < self.__options.minimum_scanned
         )
 
         segments: list[tuple[Segment, Timestamp]] = (
@@ -740,19 +749,19 @@ class Classifier:
 
             amount_scanned: float = scanned_length / wav_file.runtime
 
-            if amount_scanned < self.__options["minimum_scanned"]:
+            if amount_scanned < self.__options.minimum_scanned:
                 continue
 
             if (
-                self.__options["scan_until"] is not None
-                and amount_scanned >= self.__options["scan_until"]
+                self.__options.scan_until is not None
+                and amount_scanned >= self.__options.scan_until
             ):
                 break
 
             best: PredictionBest = prediction.get_best(MeanType.truncated)
-            if best.accuracy < self.__options["accuracy_threshold"]:
+            if best.accuracy < self.__options.accuracy_threshold:
                 if i + 1 == len(segments):
-                    if best.accuracy < self.__options["final_accuracy_threshold"]:
+                    if best.accuracy < self.__options.final_accuracy_threshold:
                         continue
                 else:
                     continue
@@ -771,9 +780,10 @@ class Classifier:
             bar.close(clear=True)
 
         best = prediction.get_best(MeanType.truncated)
-        logger.error(
-            "Couldn't get Language of '{path}': {best}".format(path=path, best=best),
+        msg = _("Couldn't get Language of '{path}': {best}").format(
+            path=path, best=best,
         )
+        logger.error(msg)
 
         return (PredictionBest(0.0, Language.unknown()), 0.0)
 
