@@ -39,12 +39,23 @@
                             "type": "null"
                         }
                     ]
+                },
+                "classifier": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ClassifierOptions"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
                 "general",
                 "parser",
-                "scanner"
+                "scanner",
+                "classifier"
             ],
             "additionalProperties": false
         },
@@ -163,9 +174,45 @@
                 },
                 "scan_amount": {
                     "type": "integer"
+                },
+                "allow_abort": {
+                    "type": "boolean"
                 }
             },
             "additionalProperties": false
+        },
+        "ClassifierOptions": {
+            "type": "object",
+            "properties": {
+                "segment_length": {
+                    "$ref": "#/$defs/Timestamp"
+                },
+                "accuracy_threshold": {
+                    "type": "number"
+                },
+                "final_accuracy_threshold": {
+                    "type": "number"
+                },
+                "minimum_scanned": {
+                    "type": "number"
+                },
+                "scan_until": {
+                    "type": [
+                        "number",
+                        "null"
+                    ]
+                }
+            },
+            "additionalProperties": false
+        },
+        "Timestamp": {
+            "type": [
+                "string",
+                "integer"
+            ],
+            "minimum": 1,
+            "maximum": 86400,
+            "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
         }
     },
     "$schema": "http://json-schema.org/draft/2020-12/schema#"

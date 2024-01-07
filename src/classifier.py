@@ -7,7 +7,7 @@ from logging import Logger
 from math import floor
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, Self, TypedDict, Unpack
+from typing import Any, Optional, Self, TypedDict
 
 import psutil
 import torchaudio
@@ -522,6 +522,10 @@ class ClassifierOptions(TypedDict, total=False):
     scan_until: Optional[float]
 
 
+## TODO: use dataclass and
+#   ## accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
+
+
 class ClassifierOptionsTotal(TypedDict, total=True):
     segment_length: Timestamp
     accuracy_threshold: float
@@ -539,9 +543,9 @@ class Classifier:
     __options: ClassifierOptionsTotal
     __classifier: EncoderClassifier
 
-    def __init__(self: Self, **options: Unpack[ClassifierOptions]) -> None:
+    def __init__(self: Self, options: Optional[ClassifierOptions] = None) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
-        self.__options = self.__parse_options(**options)
+        self.__options = self.__parse_options(options)
         self.__classifier = self.__init_classifier()
 
     @property
@@ -556,30 +560,31 @@ class Classifier:
 
     def __parse_options(
         self: Self,
-        **options: Unpack[ClassifierOptions],
+        options: Optional[ClassifierOptions],
     ) -> ClassifierOptionsTotal:
         total_options: ClassifierOptionsTotal = self.__defaults
 
-        total_options["segment_length"] = options.get(
-            "segment_length",
-            self.__defaults["segment_length"],
-        )
-        total_options["accuracy_threshold"] = options.get(
-            "accuracy_threshold",
-            self.__defaults["accuracy_threshold"],
-        )
-        total_options["final_accuracy_threshold"] = options.get(
-            "final_accuracy_threshold",
-            self.__defaults["final_accuracy_threshold"],
-        )
-        total_options["minimum_scanned"] = options.get(
-            "minimum_scanned",
-            self.__defaults["minimum_scanned"],
-        )
-        total_options["scan_until"] = options.get(
-            "scan_until",
-            self.__defaults["scan_until"],
-        )
+        if options is not None:
+            total_options["segment_length"] = options.get(
+                "segment_length",
+                self.__defaults["segment_length"],
+            )
+            total_options["accuracy_threshold"] = options.get(
+                "accuracy_threshold",
+                self.__defaults["accuracy_threshold"],
+            )
+            total_options["final_accuracy_threshold"] = options.get(
+                "final_accuracy_threshold",
+                self.__defaults["final_accuracy_threshold"],
+            )
+            total_options["minimum_scanned"] = options.get(
+                "minimum_scanned",
+                self.__defaults["minimum_scanned"],
+            )
+            total_options["scan_until"] = options.get(
+                "scan_until",
+                self.__defaults["scan_until"],
+            )
 
         if not is_percentage(total_options["accuracy_threshold"]):
             msg = f"Option 'accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options['accuracy_threshold']}"
