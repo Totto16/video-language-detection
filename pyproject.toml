@@ -8,17 +8,16 @@ testpaths = ["tests"]
 select = ["ALL"]
 
 
-# Never Enforce:
 ignore = [
-    "E501",    # E501       =>  line length violations
-    "PLR2004", # PLR2004    =>  magic-value-comparison 
-    "PLR0913", # PLR0913    =>  too-many-arguments
-    "PLR0911", # PLR0911    =>  too-many-return-statements
-    "PLR0912", # PLR0912    =>  too-many-branches 
-    "UP007",   # UP007      =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
-    "ANN401",  # ANN401     =>  any-type 
+    "E501",    # =>  line length violations
+    "PLR2004", # =>  magic-value-comparison 
+    "PLR0913", # =>  too-many-arguments
+    "PLR0911", # =>  too-many-return-statements
+    "PLR0912", # =>  too-many-branches 
+    "UP007",   # =>  non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
+    "ANN401",  # =>  any-type 
     "D",       # pydocstyle => I don't use doc strings atm. 
-    "C90",     # mccabe     => complexity isn't of concern tam.
+    "C90",     # mccabe     => complexity isn't of concern atm.
     "FIX",     # todo activate
     "TD",      # todo activate,
 ]
@@ -26,7 +25,6 @@ ignore = [
 # 88 (standard) is to small
 line-length = 100
 
-# Target Python version is 3.11.
 target-version = "py311"
 
 per-file-ignores = { "__init__.py" = [
