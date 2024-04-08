@@ -5,17 +5,10 @@ verify_ssl = true
 name = "pypi"
 
 
-[[source]]
-url = "https://download.pytorch.org/whl/nightly/cpu"
-verify_ssl = true
-name = "pytorch-dev"
-allow_prereleases = true
-
-
 [packages]
-torchaudio = {version=">=2.2.0.dev20231213+cpu", index="pytorch-dev"}
-torchvision = {version=">=0.18.0.dev20231213+cpu", index="pytorch-dev"}
-torch = {version=">=2.2.0.dev20231213+cpu", index="pytorch-dev"}
+torchaudio = "*"
+torchvision = "*"
+torch = "*"
 speechbrain = "*"
 python-ffmpeg = "*"
 pynvml = "*"
