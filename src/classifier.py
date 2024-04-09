@@ -19,7 +19,7 @@ from helper.timestamp import Timestamp
 from helper.translation import get_translator
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
-from speechbrain.pretrained import EncoderClassifier
+from speechbrain.inference.classifiers import EncoderClassifier
 from torch import cuda
 
 from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
