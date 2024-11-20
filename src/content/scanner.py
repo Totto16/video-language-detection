@@ -1,14 +1,12 @@
 import json
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Optional, Self, TypedDict
+from typing import Optional, Self, TypedDict, override
 
 from classifier import Classifier
-from helper.timestamp import parse_int_safely
-from typing_extensions import override
-
 from content.base_class import LanguageScanner, ScanType
 from content.general import EpisodeDescription
+from helper.timestamp import parse_int_safely
 
 
 class StaticLanguageScanner(LanguageScanner):
@@ -94,13 +92,13 @@ class PartialLanguageScanner(LanguageScanner):
                             temp_dict = dict(config.items(INI_SETTINGS_SECTION_KEY))
 
                             loaded_dict = {}
-                            if temp_dict.get("start_position", None) is not None:
+                            if temp_dict.get("start_position") is not None:
                                 int_result = parse_int_safely(
                                     temp_dict["start_position"],
                                 )
                                 if int_result is not None:
                                     loaded_dict["start_position"] = int_result
-                            if temp_dict.get("scan_amount", None) is not None:
+                            if temp_dict.get("scan_amount") is not None:
                                 int_result = parse_int_safely(
                                     temp_dict["scan_amount"],
                                 )

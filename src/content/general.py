@@ -16,8 +16,9 @@ from apischema.json_schema import (
     deserialization_schema,
     serialization_schema,
 )
-from classifier import Language
 from enlighten import Manager
+
+from classifier import Language
 
 
 class ScannedFileType(Enum):
@@ -199,11 +200,7 @@ class Summary:
         summary: "Summary",
     ) -> None:
         for desc in summary.descriptions:
-            if (
-                len(desc) == 2
-                and isinstance(desc[0], SeasonDescription)
-                and isinstance(desc[1], EpisodeDescription)
-            ):
+            if len(desc) == 2:
                 self.__descriptions.append(
                     (description, desc[0], desc[1]),
                 )
@@ -218,12 +215,7 @@ class Summary:
         summary: "Summary",
     ) -> None:
         for desc in summary.descriptions:
-            if (
-                len(desc) == 3
-                and isinstance(desc[0], SeriesDescription)
-                and isinstance(desc[1], SeasonDescription)
-                and isinstance(desc[2], EpisodeDescription)
-            ):
+            if len(desc) == 3:
                 self.__descriptions.append(
                     (description, desc[0], desc[1], desc[2]),
                 )
@@ -337,10 +329,7 @@ class Stats:
             self.mtime = new_stats.mtime
 
             with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)
-            if with_checksum.checksum == self.checksum:
-                return False
-
-            return True
+            return with_checksum.checksum != self.checksum
 
         msg = "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
         raise RuntimeError(msg)
@@ -363,7 +352,7 @@ class ScannedFile:
             unique=True,
         ),
     )
-    type: ScannedFileType = field(  # noqa: A003
+    type: ScannedFileType = field(
         metadata=schema(
             title="file type",
             description="The type of the file: folder or file",

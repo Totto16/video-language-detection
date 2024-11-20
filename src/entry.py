@@ -7,17 +7,19 @@ import re as regex
 import sys
 from logging import Logger
 from pathlib import Path
-from typing import Literal, Optional, Self, cast
+from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
 from classifier import Classifier, Language
-from content.base_class import Content  # noqa: TCH002
+
+if TYPE_CHECKING:
+    from content.base_class import Content
+
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
 from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import AllContent, generate_json_schema, parse_contents
-from typing_extensions import override
 
 
 class CustomNameParser(NameParser):
@@ -128,11 +130,11 @@ class ParsedArgNamespace:
 
 
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
-    subcommand: Literal["run"]
+    subcommand: Literal["run"]  # type: ignore[reportIncompatibleVariableOverride]
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
-    subcommand: Literal["schema"]
+    subcommand: Literal["schema"]  # type: ignore[reportIncompatibleVariableOverride]
     schema_file: str
 
 
@@ -184,7 +186,6 @@ if __name__ == "__main__":
     try:
         match args.subcommand:
             case "schema":
-                args = cast(SchemaCommandParsedArgNamespace, args)
                 generate_json_schema(
                     Path(args.schema_file),
                     list[AllContent],
