@@ -1,13 +1,16 @@
+
 [[source]]
 url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+
 [packages]
-python-ffmpeg = "*"
 torchaudio = "*"
-speechbrain = "*"
 torchvision = "*"
+torch = "*"
+speechbrain = "*"
+python-ffmpeg = "*"
 pynvml = "*"
 humanize = "*"
 enlighten = "*"
@@ -32,9 +35,9 @@ chardet = "*"
 [scripts]
 check = "python src/entry.py"
 lint = "bash -c 'pipenv run mypy && pipenv run ruff'"
-mypy = "mypy src/ tests/ ffmpeg/ --strict --ignore-missing-imports --enable-incomplete-feature=Unpack "
+mypy = "mypy src/ tests/ ffmpeg/ --strict --ignore-missing-imports"
 ruff = "ruff check src/ tests/ ffmpeg/"
-ruff-ci = "ruff check src/ tests/ ffmpeg/ --format=github"
+ruff-ci = "ruff check src/ tests/ ffmpeg/ --output-format"
 ruff-fix = "ruff check src/ tests/ ffmpeg/ --fix"
 schema = "python src/entry.py schema"
 test = "pytest tests/"
@@ -43,4 +46,4 @@ extract_translation = "pygettext3 -d video_language_detect -o locales/video_lang
 generate_translation = "bash -c 'for PO_FILE in locales/*/LC_MESSAGES/*.po; do MO_FILE=\"${PO_FILE/.po/.mo}\"; msgfmt -o \"$MO_FILE\" \"$PO_FILE\"; done'"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

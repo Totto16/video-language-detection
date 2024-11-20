@@ -4,12 +4,12 @@ from typing import (
     Literal,
     Optional,
     Self,
+    override,
 )
 
 from apischema import alias, schema
-from classifier import Language
-from typing_extensions import override
 
+from classifier import Language
 from content.base_class import (
     CallbackTuple,
     Content,

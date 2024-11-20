@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 import requests
-from helper.ffprobe import ffprobe, parse_float_safely
 from pytest_subtests import SubTests
+
+from helper.ffprobe import ffprobe, parse_float_safely
 
 
 @pytest.fixture(scope="module")
@@ -19,9 +20,9 @@ def temp_mp4_files() -> list[Path]:
     results: list[Path] = []
     for url in video_urls:
         response = requests.get(url, timeout=10)
-        f = tempfile.NamedTemporaryFile(delete=False)
-        f.write(response.content)
-        results.append(Path(f.file.name))
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(response.content)
+            results.append(Path(f.file.name))
 
     return results
 
@@ -51,9 +52,9 @@ and what stays off.""",
     ]
     results: list[tuple[Path, bool]] = []
     for suffix, content, res in content_description:
-        f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        f.write(bytes(content, encoding="utf-8"))
-        results.append((Path(f.file.name), res))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+            f.write(bytes(content, encoding="utf-8"))
+            results.append((Path(f.file.name), res))
 
     return results
 
@@ -167,7 +168,8 @@ def test_ffprobe_errors() -> None:
 
 
 def test_ffprobe_errors_with_files(
-    subtests: SubTests, dummy_files: list[tuple[Path, bool]],
+    subtests: SubTests,
+    dummy_files: list[tuple[Path, bool]],
 ) -> None:
     with subtests.test("dummy wrong file fails "):
         for file, should_pass in dummy_files:

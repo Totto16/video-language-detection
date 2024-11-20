@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict, override
 
 from apischema import deserialize, schema, serialize
+from enlighten import Justify, Manager, get_manager
+
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -22,9 +24,7 @@ from content.general import (
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
-from enlighten import Justify, Manager, get_manager
 from helper.translation import get_translator
-from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

@@ -1,45 +1,48 @@
 name: Python Lints / Checks
 
 on:
+    pull_request:
     push:
         branches:
             - main
 
 jobs:
     mypy_lint:
-        name: Lint with Mypy
-        runs-on: ubuntu-latest
+        name: Lint with Mypy and Ruff
+        runs-on: ubuntu-24.04
         container:
-            image: python:3.11-bookworm
+            image: python:3.12-bookworm
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
+                  apt-get update
+                  apt-get install cmake --no-install-recommends -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
 
             - name: run lint
               run: |
                   pipenv run mypy
-                  pipenv run ruff-ci
+                  pipenv run ruff-ci github
 
     tests:
         name: Test with pytest
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         container:
-            image: python:3.11-bookworm
+            image: python:3.12-bookworm
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
+                  apt-get update
+                  apt-get install ffmpeg cmake --no-install-recommends -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
-                  apt-get update
-                  apt-get install ffmpeg -y
 
             - name: run tests
               run: |
@@ -47,18 +50,18 @@ jobs:
 
     sonarqube_checks:
         name: SonarQube Checks
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         needs:
             - mypy_lint
             - tests
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
               run: |
                   sudo apt-get update
-                  sudo apt-get install python3.11 --install-recommends ffmpeg -y
+                  sudo apt-get install python3.12 ffmpeg --no-install-recommends -y
                   pip install pipenv -U --quiet
                   pipenv install --dev
             - name: run coverage report
@@ -75,7 +78,7 @@ jobs:
                   project: "Video Language Detection"
                   path: "."
                   format: HTML
-                  out: "reports" # this is the default, no need to specify unless you wish to override it
+                  out: "reports"
                   args: >
                       --failOnCVSS 7
                       --enableRetired
@@ -85,8 +88,6 @@ jobs:
               env:
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
                   SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-            # If you wish to fail your job when the Quality Gate is red, uncomment the
-            # following lines. This would typically be used to fail a deployment.
             - uses: sonarsource/sonarqube-quality-gate-action@master
               timeout-minutes: 5
               env:

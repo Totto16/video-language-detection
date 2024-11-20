@@ -1,8 +1,9 @@
 from datetime import timedelta
 
 import pytest
-from helper.timestamp import Timestamp, parse_int_safely
 from pytest_subtests import SubTests
+
+from helper.timestamp import Timestamp, parse_int_safely
 
 
 def test_int_parsing_correct(subtests: SubTests) -> None:

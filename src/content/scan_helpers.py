@@ -4,8 +4,6 @@ from typing import (
     Optional,
 )
 
-from helper.log import get_logger
-
 from content.base_class import Content
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
@@ -16,6 +14,7 @@ from content.general import (
 )
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
+from helper.log import get_logger
 
 
 def content_from_scan(

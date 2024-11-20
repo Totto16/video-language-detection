@@ -5,10 +5,10 @@ from typing import (
     Optional,
     Self,
     cast,
+    override,
 )
 
 from apischema import alias, schema
-from typing_extensions import override
 
 from content.base_class import (
     CallbackTuple,

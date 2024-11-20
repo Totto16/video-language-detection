@@ -136,8 +136,8 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
     try:
         with Path(os.devnull).open(mode="w") as temp_file:
-            subprocess.check_call(
-                ["ffprobe", "-h"],  # noqa: S607, S603
+            subprocess.check_call(  # noqa: S603
+                ["ffprobe", "-h"],  # noqa: S607
                 stdout=temp_file,
                 stderr=temp_file,
             )
@@ -162,10 +162,10 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     if not file_path.exists():
         return None, "File doesn't exist"
 
-    result = subprocess.run(  # noqa: PLW1510
+    result = subprocess.run(  # noqa: PLW1510, S602
         commands,
         capture_output=True,
-        shell=True,  # noqa: S602
+        shell=True,
     )
     if result.returncode == 0:
         return FFProbeResult(json.loads(result.stdout)), None

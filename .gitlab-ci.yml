@@ -7,21 +7,22 @@ stages: # List of stages for jobs, and their order of execution
 python-lint-job:
     stage: python_checks
     allow_failure: false
-    image: python:3.11-bookworm
+    image: python:3.12-bookworm
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
-        - pipenv run lint
+        - pipenv run mypy
+        - pipenv run ruff-ci gitlab
 
 python-test-job:
     stage: python_checks
     allow_failure: false
-    image: python:3.11-bookworm
+    image: python:3.12-bookworm
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
         - apt-get update
-        - apt-get install ffmpeg -y
+        - apt-get install ffmpeg --no-install-recommends -y
         - pipenv run test
 
 sonarqube-check:
@@ -42,9 +43,8 @@ sonarqube-check:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
-        # TODO:check if this is even debian / ubuntu or alpine and install ffprobe
         - sudo apt-get update
-        - sudo apt-get install ffmpeg -y
+        - sudo apt-get install ffmpeg --no-install-recommends -y
         - pipenv run coverage
         - sonar-scanner
     allow_failure: false

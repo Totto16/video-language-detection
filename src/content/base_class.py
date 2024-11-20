@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
 from apischema import alias
-from classifier import Classifier, FileMetadataError, Language, WAVFile
 from enlighten import Manager
-from helper.log import get_logger
 
+from classifier import Classifier, FileMetadataError, Language, WAVFile
 from content.general import (
     Callback,
     ContentType,
@@ -19,6 +18,7 @@ from content.general import (
     Summary,
     safe_index,
 )
+from helper.log import get_logger
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
@@ -83,7 +83,7 @@ class Content:
         raise MissingOverrideError
 
     @property
-    def type(self: Self) -> ContentType:  # noqa: A003
+    def type(self: Self) -> ContentType:
         return self.__type
 
     @property
@@ -142,11 +142,11 @@ def process_folder(
 
     if rescan is None:
         results: list[Content] = []
-        for file_path, file_type, parent_folders in temp:
+        for file_path, file_type, parent_folders_temp in temp:
             result: Optional[Content] = callback.process(
                 file_path,
                 file_type,
-                parent_folders,
+                parent_folders_temp,
             )
             value = (
                 result.type if result is not None else None,
@@ -166,7 +166,7 @@ def process_folder(
     ]
     scanned_file_registry: list[bool] = [False for _ in rescan]
 
-    for file_path, file_type, parent_folders in temp:
+    for file_path, file_type, parent_folders_temp in temp:
         is_rescan = (
             None
             if file_path not in already_scanned_file_paths
@@ -176,7 +176,7 @@ def process_folder(
         result = callback.process(
             file_path,
             file_type,
-            parent_folders,
+            parent_folders_temp,
             rescan=is_rescan,
         )
 
