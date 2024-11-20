@@ -13,7 +13,7 @@ jobs:
         container:
             image: python:3.12-bookworm
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
@@ -34,7 +34,7 @@ jobs:
         container:
             image: python:3.12-bookworm
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
@@ -55,7 +55,7 @@ jobs:
             - mypy_lint
             - tests
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
             - name: prepare environment
