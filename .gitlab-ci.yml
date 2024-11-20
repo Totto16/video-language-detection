@@ -22,7 +22,7 @@ python-test-job:
         - pip install pipenv -U --quiet
         - pipenv install --dev
         - apt-get update
-        - apt-get install ffmpeg -y
+        - apt-get install ffmpeg --no-install-recommends -y
         - pipenv run test
 
 sonarqube-check:
@@ -44,7 +44,7 @@ sonarqube-check:
         - pip install pipenv -U --quiet
         - pipenv install --dev
         - sudo apt-get update
-        - sudo apt-get install ffmpeg -y
+        - sudo apt-get install ffmpeg --no-install-recommends -y
         - pipenv run coverage
         - sonar-scanner
     allow_failure: false
