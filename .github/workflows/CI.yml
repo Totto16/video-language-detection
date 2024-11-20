@@ -9,7 +9,7 @@ on:
 jobs:
     mypy_lint:
         name: Lint with Mypy and Ruff
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         container:
             image: python:3.12-bookworm
         steps:
@@ -30,7 +30,7 @@ jobs:
 
     tests:
         name: Test with pytest
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         container:
             image: python:3.12-bookworm
         steps:
@@ -50,7 +50,7 @@ jobs:
 
     sonarqube_checks:
         name: SonarQube Checks
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         needs:
             - mypy_lint
             - tests
