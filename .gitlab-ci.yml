@@ -11,7 +11,8 @@ python-lint-job:
     script:
         - pip install pipenv -U --quiet
         - pipenv install --dev
-        - pipenv run lint
+        - pipenv run mypy
+        - pipenv run ruff-ci gitlab
 
 python-test-job:
     stage: python_checks

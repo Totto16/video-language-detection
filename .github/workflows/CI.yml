@@ -26,7 +26,7 @@ jobs:
             - name: run lint
               run: |
                   pipenv run mypy
-                  pipenv run ruff-ci
+                  pipenv run ruff-ci github
 
     tests:
         name: Test with pytest
