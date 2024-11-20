@@ -130,11 +130,11 @@ class ParsedArgNamespace:
 
 
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
-    subcommand: Literal["run"]  # type: ignore[reportIncompatibleVariableOverride]
+    subcommand: Literal["run"]
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
-    subcommand: Literal["schema"]  # type: ignore[reportIncompatibleVariableOverride]
+    subcommand: Literal["schema"]
     schema_file: str
 
 
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         match args.subcommand:
             case "schema":
                 generate_json_schema(
-                    Path(args.schema_file),
+                    Path(args.schema_file),  # type: ignore[union-attr]
                     list[AllContent],
                 )
                 sys.exit(0)
