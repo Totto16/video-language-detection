@@ -1,8 +1,10 @@
 import logging
+import os
 import sys
 from enum import Enum
 from logging import Formatter, Logger, StreamHandler, getLogger
 from typing import Optional, Self
+from warnings import filterwarnings
 
 __GLOBAL__LOGGER__NAME = "__global__logger__"
 
@@ -53,15 +55,24 @@ def get_logger() -> Logger:
     return getLogger(__GLOBAL__LOGGER__NAME)
 
 
+def setup_global_logger() -> None:
+    # don't log anything from the global logger (speechbrain spits many things in here)
+    root_logger = getLogger()
+    root_logger.setLevel(logging.ERROR)
+
+    filterwarnings("ignore")
+
+    # set speechbrain log level
+    os.environ["SB_LOG_LEVEL"] = str(logging.WARNING)
+
+
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
     formatter = Formatter(fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s")
 
     handler = StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
-    # don't log anything from the global logger (speechbrain spits many things in here)
-    root_logger = getLogger()
-    root_logger.setLevel(logging.ERROR)
+    setup_global_logger()
 
     logger = get_logger()
     logger.propagate = False  # don't propagate to the root handler

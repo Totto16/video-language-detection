@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
 from classifier import Classifier, Language
+from helper.log import LogLevel, get_logger, setup_custom_logger
 
 if TYPE_CHECKING:
     from content.base_class import Content
 
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
-from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import AllContent, generate_json_schema, parse_contents

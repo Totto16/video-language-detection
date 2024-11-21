@@ -8,24 +8,23 @@ from math import floor
 from pathlib import Path
 from shutil import rmtree
 from typing import Any, Optional, Self, TypedDict, Unpack
-from warnings import filterwarnings
 
 import psutil
+import torchaudio
 from enlighten import Manager
+from ffmpeg.ffmpeg import FFmpeg, FFmpegError
+from ffmpeg.progress import Progress
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
-import torchaudio
-from speechbrain.inference.classifiers import EncoderClassifier
 from torch import cuda
 
-from ffmpeg.ffmpeg import FFmpeg, FFmpegError  # type: ignore[attr-defined]
-from ffmpeg.progress import Progress  # type: ignore[attr-defined]
-
 from helper.ffprobe import ffprobe, ffprobe_check
-from helper.log import get_logger
+from helper.log import get_logger, setup_global_logger
 from helper.timestamp import Timestamp
 
-filterwarnings("ignore")
+setup_global_logger()
+
+from speechbrain.inference.classifiers import EncoderClassifier  # noqa: E402
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
 
