@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict, ove
 from apischema import deserialize, schema, serialize
 from enlighten import Justify, Manager, get_manager
 
+from config import Config
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -17,6 +18,7 @@ from content.episode_content import EpisodeContent
 from content.general import (
     Callback,
     ContentType,
+    EmitType,
     NameParser,
     ScannedFileType,
     get_schema,
@@ -24,6 +26,7 @@ from content.general import (
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
+from helper.constants import APP_NAME
 from helper.translation import get_translator
 
 if TYPE_CHECKING:
@@ -66,10 +69,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         self.__manager = manager
         self.__status_bar = self.__manager.status_bar(
-            status_format=_("Video Language Detector")
-            + "{fill}"
-            + _("Stage")
-            + ": {stage}{fill}{elapsed}",
+            status_format=APP_NAME + "{fill}" + _("Stage") + ": {stage}{fill}{elapsed}",
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
             stage=_("Scanning"),
@@ -299,11 +299,17 @@ def parse_contents(
     return new_contents
 
 
-def generate_json_schema(file_path: Path, any_type: Any) -> None:
+def generate_schema(
+    file_path: Path,
+    any_type: Any,
+    *,
+    emit_type: Optional[EmitType] = None,
+) -> None:
     result: Mapping[str, Any] = get_schema(
         any_type,
         additional_properties=False,
         all_refs=True,
+        emit_type=emit_type,
     )
 
     if not file_path.parent.exists():
@@ -311,3 +317,8 @@ def generate_json_schema(file_path: Path, any_type: Any) -> None:
 
     with file_path.open(mode="w") as file:
         json.dump(result, file, indent=4, ensure_ascii=False)
+
+
+def generate_schemas(folder: Path) -> None:
+    generate_schema(folder / "content_list_schema.json", list[AllContent])
+    generate_schema(folder / "config_schema.json", Config, emit_type="deserialize")
