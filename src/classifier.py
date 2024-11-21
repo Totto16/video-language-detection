@@ -14,11 +14,12 @@ import psutil
 from enlighten import Manager
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
+import torchaudio
 from speechbrain.inference.classifiers import EncoderClassifier
 from torch import cuda
 
 from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
-from helper.ffprobe import ffprobe
+from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger
 from helper.timestamp import Timestamp
 
@@ -611,7 +612,24 @@ class Classifier:
             msg = "Couldn't initialize Classifier"
             raise RuntimeError(msg)
 
+        self.__check_audio_backends()
+        self.__check_ffprobe()
+
         return classifier
+
+    def __check_audio_backends(self: Self) -> None:
+        backends = torchaudio.list_audio_backends()
+        if len(backends) == 0:
+            msg = "Couldn't initialize audio backends for torchaudio"
+            raise RuntimeError(msg)
+
+        logger.info("Found audio backends: %s", str(backends))
+
+    def __check_ffprobe(self: Self) -> None:
+        is_ffprobe_present = ffprobe_check()
+        if not is_ffprobe_present:
+            msg = "FFProbe not installed"
+            raise RuntimeError(msg)
 
     def __classify(
         self: Self,
