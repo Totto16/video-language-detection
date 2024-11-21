@@ -14,7 +14,7 @@ import psutil
 from enlighten import Manager
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
-from speechbrain.pretrained import EncoderClassifier
+from speechbrain.inference.classifiers import EncoderClassifier
 from torch import cuda
 
 from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
