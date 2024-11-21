@@ -1,4 +1,5 @@
 import logging
+import sys
 from enum import Enum
 from logging import Formatter, Logger, StreamHandler, getLogger
 from typing import Optional, Self
@@ -55,10 +56,20 @@ def get_logger() -> Logger:
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
     formatter = Formatter(fmt="%(asctime)s - %(levelname)s - %(module)s - %(message)s")
 
-    handler = StreamHandler()
+    handler = StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
+    # don't log anything from the global logger (speechbrain spits many things in here)
+    root_logger = getLogger()
+    root_logger.setLevel(logging.ERROR)
+
     logger = get_logger()
+    logger.propagate = False  # don't propagate to the root handler
+
+    if logger.hasHandlers():
+        msg = "Logger already initialized"
+        raise RuntimeError(msg)
+
     logger.setLevel(level.underlying)
     logger.addHandler(handler)
     return logger

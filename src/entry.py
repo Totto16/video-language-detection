@@ -183,6 +183,7 @@ if __name__ == "__main__":
 
     args = cast(AllParsedNameSpaces, parser.parse_args())
     logger: Logger = setup_custom_logger(args.level)
+
     try:
         match args.subcommand:
             case "schema":
