@@ -14,6 +14,7 @@ humanize = "*"
 enlighten = "*"
 psutil = "*"
 apischema = "*"
+pysoundfile = "*"
 
 [dev-packages]
 pylint = "*"

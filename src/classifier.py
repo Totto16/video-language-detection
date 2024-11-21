@@ -622,7 +622,7 @@ class Classifier:
     def __check_audio_backends(self: Self) -> None:
         backends = torchaudio.list_audio_backends()
         if len(backends) == 0:
-            msg = "Couldn't initialize audio backends for torchaudio"
+            msg = "Couldn't find any audio backends for torchaudio"
             raise RuntimeError(msg)
 
         logger.info("Found audio backends: %s", str(backends))
