@@ -352,10 +352,10 @@ class Language:
         return Language("un", "Unknown")
 
     def __str__(self: Self) -> str:
-        return f"<Language short: {self.short} long: {self.long}>"
+        return self.long
 
     def __repr__(self: Self) -> str:
-        return str(self)
+        return f"<Language short: {self.short!r} long: {self.long!r}>"
 
     def __hash__(self: Self) -> int:
         return hash((self.short, self.long))
@@ -389,10 +389,12 @@ class PredictionBest:
     language: Language
 
     def __str__(self: Self) -> str:
-        return f"<PredictionBest accuracy: {self.accuracy} language: {self.language}>"
+        return f"{self.language!s}: {self.accuracy:.2%}>"
 
     def __repr__(self: Self) -> str:
-        return str(self)
+        return (
+            f"<PredictionBest accuracy: {self.accuracy!r} language: {self.language!r}>"
+        )
 
 
 TRUNCATED_PERCENTILE: float = 0.2
@@ -446,6 +448,11 @@ def get_mean(
         case _:  # stupid mypy
             msg = "UNREACHABLE"
             raise RuntimeError(msg)
+
+
+# TODO: relativate to the root path
+def relative_path_str(path: Path) -> str:
+    return str(path)
 
 
 class Prediction:
@@ -788,7 +795,11 @@ class Classifier:
             bar.close(clear=True)
 
         best = prediction.get_best(MeanType.truncated)
-        logger.error("Couldn't get Language of '%s': %s", path, best)
+        logger.error(
+            "Couldn't get Language of '%s': %s",
+            relative_path_str(path),
+            str(best),
+        )
 
         return (PredictionBest(0.0, Language.unknown()), 0.0)
 
