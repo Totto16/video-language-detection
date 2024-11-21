@@ -52,7 +52,7 @@ class SeasonContent(Content):
         )
         if description is None:
             msg = f"Couldn't get SeasonDescription from '{path}'"
-            raise NameError(msg)
+            raise NameError(msg, name="SeasonDescription")
 
         return SeasonContent(ContentType.season, scanned_file, description, [])
 

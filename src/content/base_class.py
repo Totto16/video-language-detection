@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from logging import Logger
 from os import listdir
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
@@ -19,6 +20,8 @@ from content.general import (
     safe_index,
 )
 from helper.log import get_logger
+
+logger: Logger = get_logger()
 
 ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
@@ -64,7 +67,7 @@ class LanguageScanner:
                 manager,
             )
         except FileMetadataError:
-            get_logger().exception("Get Language")
+            logger.exception("Get Language")
             return Language.unknown()
         else:
             # python is funky xD, leaking variables as desired pattern xD

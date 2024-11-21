@@ -143,7 +143,7 @@ class Summary:
             dct[language] = 1
             return dct
 
-        self.__languages = Summary.combine_langauge_dicts(
+        self.__languages = Summary.combine_language_dicts(
             [get_dict(language) for language in languages],
         )
         self.__duplicates = []
@@ -190,7 +190,7 @@ class Summary:
             if isinstance(desc[0], EpisodeDescription):
                 self.__descriptions.append((description, desc[0]))
 
-        self.__languages = Summary.combine_langauge_dicts(
+        self.__languages = Summary.combine_language_dicts(
             [self.__languages, summary.languages],
         )
 
@@ -205,7 +205,7 @@ class Summary:
                     (description, desc[0], desc[1]),
                 )
 
-        self.__languages = Summary.combine_langauge_dicts(
+        self.__languages = Summary.combine_language_dicts(
             [self.__languages, summary.languages],
         )
 
@@ -220,12 +220,12 @@ class Summary:
                     (description, desc[0], desc[1], desc[2]),
                 )
 
-        self.__languages = Summary.combine_langauge_dicts(
+        self.__languages = Summary.combine_language_dicts(
             [self.__languages, summary.languages],
         )
 
     @staticmethod
-    def combine_langauge_dicts(inp: list[LanguageDict]) -> LanguageDict:
+    def combine_language_dicts(inp: list[LanguageDict]) -> LanguageDict:
         dct: LanguageDict = {}
         for input_dict in inp:
             for language, amount in input_dict.items():
@@ -244,12 +244,13 @@ class Summary:
     def languages(self: Self) -> LanguageDict:
         return self.__languages
 
-    # TODO
+    # TODO: human readable
     def __str__(self: Self) -> str:
-        return f"<Summary languages: {self.__languages}>"
+        return repr(self)
 
+    # TODO: this isn't finished yet
     def __repr__(self: Self) -> str:
-        return str(self)
+        return f"<Summary languages: {self.__languages}>"
 
 
 @dataclass(slots=True, repr=True)

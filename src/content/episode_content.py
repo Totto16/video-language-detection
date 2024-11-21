@@ -51,7 +51,7 @@ class EpisodeContent(Content):
         )
         if description is None:
             msg = f"Couldn't get EpisodeDescription from '{path}'"
-            raise NameError(msg)
+            raise NameError(msg, name="EpisodeDescription")
 
         return EpisodeContent(
             ContentType.episode,

@@ -1,3 +1,4 @@
+from logging import Logger
 from pathlib import Path
 from typing import (
     Never,
@@ -15,6 +16,8 @@ from content.general import (
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.log import get_logger
+
+logger: Logger = get_logger()
 
 
 def content_from_scan(
@@ -93,7 +96,9 @@ def content_from_scan(
             return CollectionContent.from_path(file_path, scanned_file)
 
         raise_inner("UNREACHABLE")
-
-    except Exception:  # noqa: BLE001
-        get_logger().exception("Content scan")
+    except NameError as err:
+        logger.error(str(err))  # noqa: TRY400
+        return None
+    except Exception:
+        logger.exception("Content scan")
         return None

@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
 from classifier import Classifier, Language
+from helper.log import LogLevel, setup_custom_logger
 
 if TYPE_CHECKING:
     from content.base_class import Content
 
 from content.general import NameParser, Summary
 from content.scanner import PartialLanguageScanner
-from helper.log import LogLevel, get_logger, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import AllContent, generate_json_schema, parse_contents
@@ -116,9 +116,9 @@ def main() -> None:
     )
 
     summaries = [content.summary() for content in contents]
-    final = Summary.combine_langauge_dicts([summary.languages for summary in summaries])
+    final = Summary.combine_language_dicts([summary.languages for summary in summaries])
 
-    get_logger().info(final)
+    logger.info(final)
 
 
 SubCommand = Literal["run", "schema"]
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         LogLevel.DEBUG,
         LogLevel.NOTSET,
     ]
-    loglevel_default: LogLevel = LogLevel.DEBUG
+    loglevel_default: LogLevel = LogLevel.INFO
     parser.add_argument(
         "-l",
         "--level",
@@ -183,6 +183,7 @@ if __name__ == "__main__":
 
     args = cast(AllParsedNameSpaces, parser.parse_args())
     logger: Logger = setup_custom_logger(args.level)
+
     try:
         match args.subcommand:
             case "schema":

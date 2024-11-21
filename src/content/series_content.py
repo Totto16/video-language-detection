@@ -34,8 +34,6 @@ class SeriesContentDict(ContentDict):
     seasons: list[SeasonContent]
 
 
-
-
 @schema(extra=narrow_type(("type", Literal[ContentType.series])))
 @dataclass(slots=True, repr=True)
 class SeriesContent(Content):
@@ -54,7 +52,7 @@ class SeriesContent(Content):
         )
         if description is None:
             msg = f"Couldn't get SeriesDescription from '{path}'"
-            raise NameError(msg)
+            raise NameError(msg, name="SeriesDescription")
 
         return SeriesContent(ContentType.series, scanned_file, description, [])
 

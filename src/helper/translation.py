@@ -10,7 +10,7 @@ DEFAULT_LANGUAGE: SupportedLanguage = "en"
 
 
 def get_current_language() -> SupportedLanguage:
-    lang_str, _ = locale.getdefaultlocale()
+    lang_str, _ = locale.getlocale()
     if lang_str is None:
         return DEFAULT_LANGUAGE
 

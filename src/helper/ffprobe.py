@@ -131,6 +131,21 @@ class FFProbeResult:
         return len(self.audio_streams()) != 0
 
 
+def ffprobe_check() -> bool:
+    # some things here were copied and modified from the original ffprobe-python repo:
+    # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
+    try:
+        with Path(os.devnull).open(mode="w") as temp_file:
+            subprocess.check_call(  # noqa: S603
+                ["ffprobe", "-h"],  # noqa: S607
+                stdout=temp_file,
+                stderr=temp_file,
+            )
+    except FileNotFoundError:
+        return False
+    return True
+
+
 def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     # some things here were copied and modified from the original ffprobe-python repo:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
