@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import yaml
 from apischema import deserialize, schema
+
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.log import get_logger
 

@@ -1,7 +1,8 @@
 import logging
 
-from helper.log import LogLevel, get_logger, setup_custom_logger
 from pytest_subtests import SubTests
+
+from helper.log import LogLevel, get_logger, setup_custom_logger
 
 
 def test_loglevel_from_str(subtests: SubTests) -> None:

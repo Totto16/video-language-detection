@@ -16,17 +16,14 @@ if TYPE_CHECKING:
     from content.base_class import Content
 
 from config import Config, ParsedConfig
-from content.base_class import Content  # noqa: TCH002
 from content.general import NameParser, Summary
 from content.scanner import (
     get_scanner_from_config,
 )
 from gui.main import launch
-from helper.log import LogLevel, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
-from main import AllContent, generate_schemas, parse_contents
-from typing_extensions import override
+from main import generate_schemas, parse_contents
 
 
 class CustomNameParser(NameParser):
