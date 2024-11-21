@@ -18,7 +18,9 @@ import torchaudio
 from speechbrain.inference.classifiers import EncoderClassifier
 from torch import cuda
 
-from ffmpeg import FFmpeg, FFmpegError, Progress  # type: ignore[attr-defined]
+from ffmpeg.ffmpeg import FFmpeg, FFmpegError  # type: ignore[attr-defined]
+from ffmpeg.progress import Progress  # type: ignore[attr-defined]
+
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger
 from helper.timestamp import Timestamp
