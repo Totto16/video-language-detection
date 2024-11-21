@@ -28,9 +28,7 @@ from speechbrain.inference.classifiers import EncoderClassifier  # noqa: E402
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
 
-
 logger: Logger = get_logger()
-
 
 class FileType(Enum):
     wav = "wav"
@@ -389,7 +387,7 @@ class PredictionBest:
     language: Language
 
     def __str__(self: Self) -> str:
-        return f"{self.language!s}: {self.accuracy:.2%}>"
+        return f"{self.language!s} ({self.accuracy:.2%})"
 
     def __repr__(self: Self) -> str:
         return (
@@ -631,7 +629,7 @@ class Classifier:
             msg = "Couldn't find any audio backends for torchaudio"
             raise RuntimeError(msg)
 
-        logger.info("Found audio backends: %s", str(backends))
+        logger.debug("Found audio backends: %s", str(backends))
 
     def __check_ffprobe(self: Self) -> None:
         is_ffprobe_present = ffprobe_check()
@@ -796,7 +794,7 @@ class Classifier:
 
         best = prediction.get_best(MeanType.truncated)
         logger.error(
-            "Couldn't get Language of '%s': %s",
+            "Couldn't get Language of '%s': Best was %s",
             relative_path_str(path),
             str(best),
         )

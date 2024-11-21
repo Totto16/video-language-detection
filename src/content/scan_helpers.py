@@ -97,7 +97,7 @@ def content_from_scan(
 
         raise_inner("UNREACHABLE")
     except NameError as err:
-        logger.error(err.name)  # noqa: TRY400
+        logger.error(str(err))  # noqa: TRY400
         return None
     except Exception:
         logger.exception("Content scan")
