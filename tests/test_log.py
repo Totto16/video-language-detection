@@ -50,8 +50,9 @@ def test_get_logger() -> None:
 
 
 def test_setup_custom_logger() -> None:
-    assert setup_custom_logger() is not None, "get_logger returns not None"
+    logger = setup_custom_logger()
+    assert logger is not None, "get_logger returns not None"
     assert isinstance(
-        setup_custom_logger(),
+        logger,
         logging.Logger,
     ), "get_logger returns Logger"
