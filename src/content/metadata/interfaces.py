@@ -11,6 +11,19 @@ class Provider:
     def __init__(self: Self, name: str) -> None:
         self.__name = name
 
+    def get_series_metadata(
+        self: Self,
+        series_name: str,  # noqa: ARG002
+    ) -> Optional[Any]:
+        raise MissingOverrideError
+
+    def get_season_metadata(
+        self: Self,
+        series_data: Any,  # noqa: ARG002
+        season: int,  # noqa: ARG002
+    ) -> Optional[Any]:
+        raise MissingOverrideError
+
     def get_episode_metadata(
         self: Self,
         series_data: Any,  # noqa: ARG002

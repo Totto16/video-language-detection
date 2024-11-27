@@ -27,11 +27,17 @@ from content.general import (
     Summary,
     narrow_type,
 )
+from content.metadata.metadata import HandlesType, MetadataHandle
+from content.shared import ScanKind, ScanType
 
 
 class SeasonContentDict(ContentDict):
     description: SeasonDescription
     episodes: list[EpisodeContent]
+
+
+# TODO: Remove this temporary helper
+DUMMY_HANDLE_TODO: MetadataHandle = MetadataHandle("", {})
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.season])))
@@ -54,7 +60,13 @@ class SeasonContent(Content):
             msg = f"Couldn't get SeasonDescription from '{path}'"
             raise NameError(msg, name="SeasonDescription")
 
-        return SeasonContent(ContentType.season, scanned_file, description, [])
+        return SeasonContent(
+            ContentType.season,
+            scanned_file,
+            None,
+            description,
+            [],
+        )
 
     @staticmethod
     def is_valid_name(
@@ -100,13 +112,28 @@ class SeasonContent(Content):
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
+        handles: HandlesType,
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
+        _, scanner = callback.get_saved()
+
+        new_handles = self._get_new_handles(handles)
+
         if not rescan:
+            if self.metadata is None and scanner.should_scan(
+                ScanType.first_scan,
+                ScanKind.metadata,
+            ):
+                self._metadata = scanner.metadata_scanner.get_season_metadata(
+                    DUMMY_HANDLE_TODO,
+                    self.description.season,
+                )
+
             contents: list[Content] = process_folder(
                 self.scanned_file.path,
                 callback=callback,
+                handles=new_handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
             )
@@ -116,18 +143,29 @@ class SeasonContent(Content):
                 else:
                     msg = f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
                     raise TypeError(msg)
-        else:
-            ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
-            process_folder(
-                self.scanned_file.path,
-                callback=callback,
-                parent_folders=[*parent_folders, self.scanned_file.path.name],
-                parent_type=self.type,
-                rescan=cast(list[Content], self.__episodes),
+            return
+
+        if self.metadata is None and scanner.should_scan(
+            ScanType.rescan,
+            ScanKind.metadata,
+        ):
+            self._metadata = scanner.metadata_scanner.get_season_metadata(
+                DUMMY_HANDLE_TODO,
+                self.description.season,
             )
 
-            # since some are added unchecked, check again now!
-            for content in cast(list[Content], self.__episodes):
-                if not isinstance(content, EpisodeContent):
-                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
-                    raise TypeError(msg)
+        # no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
+        process_folder(
+            self.scanned_file.path,
+            callback=callback,
+            handles=new_handles,
+            parent_folders=[*parent_folders, self.scanned_file.path.name],
+            parent_type=self.type,
+            rescan=cast(list[Content], self.__episodes),
+        )
+
+        # since some are added unchecked, check again now!
+        for content in cast(list[Content], self.__episodes):
+            if not isinstance(content, EpisodeContent):
+                msg = f"No child with class '{content.__class__.__name__}' is possible in SeasonContent"
+                raise TypeError(msg)

@@ -23,6 +23,7 @@ from content.general import (
     ScannedFileType,
     get_schema,
 )
+from content.metadata.metadata import HandlesType
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
@@ -107,6 +108,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self: Self,
         file_path: Path,
         file_type: ScannedFileType,
+        handles: HandlesType,
         parent_folders: list[str],
         *,
         rescan: Optional[Content] = None,
@@ -129,6 +131,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
             content.scan(
                 callback=self,
+                handles=handles,
                 parent_folders=parent_folders,
             )
 
@@ -136,6 +139,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         rescan.scan(
             callback=self,
+            handles=handles,
             parent_folders=parent_folders,
             rescan=True,
         )
@@ -279,6 +283,7 @@ def parse_contents(
         contents: list[Content] = process_folder(
             root_folder,
             callback=callback,
+            handles=[],
             parent_folders=[],
         )
 
@@ -290,6 +295,7 @@ def parse_contents(
     new_contents: list[Content] = process_folder(
         root_folder,
         callback=callback,
+        handles=[],
         rescan=contents,
         parent_folders=[],
     )

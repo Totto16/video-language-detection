@@ -25,7 +25,7 @@ from content.general import (
     Summary,
     narrow_type,
 )
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import HandlesType, MetadataHandle
 from content.shared import ScanKind, ScanType
 
 
@@ -44,9 +44,6 @@ DUMMY_HANDLE_TODO: MetadataHandle = MetadataHandle("", {})
 class EpisodeContent(Content):
     __description: EpisodeDescription = field(metadata=alias("description"))
     __language: Language = field(metadata=alias("language"))
-    __metadata: Optional[MetadataHandle] = field(
-        metadata=alias("metadata"),
-    )
 
     @staticmethod
     def from_path(
@@ -65,9 +62,9 @@ class EpisodeContent(Content):
         return EpisodeContent(
             ContentType.episode,
             scanned_file,
+            None,
             description,
             Language.unknown(),
-            None,
         )
 
     @property
@@ -77,10 +74,6 @@ class EpisodeContent(Content):
     @property
     def language(self: Self) -> Language:
         return self.__language
-
-    @property
-    def metadata(self: Self) -> Optional[MetadataHandle]:
-        return self.__metadata
 
     @staticmethod
     def is_valid_name(
@@ -115,13 +108,11 @@ class EpisodeContent(Content):
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
+        handles: HandlesType,
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
         manager, scanner = callback.get_saved()
-
-        # TODO: get this as input param or similar
-        episode: int = 0
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
@@ -129,7 +120,7 @@ class EpisodeContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
 
             if not is_outdated:
-                if self.__language == Language.unknown() or self.__metadata is None:
+                if self.__language == Language.unknown() or self._metadata is None:
                     callback.start(
                         (2, 2, 0),
                         self.scanned_file.path.name,
@@ -138,7 +129,6 @@ class EpisodeContent(Content):
                     )
 
                     if self.__language == Language.unknown() and scanner.should_scan(
-                        self.__description,
                         ScanType.rescan,
                         ScanKind.language,
                     ):
@@ -153,15 +143,14 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if self.__metadata is None and scanner.should_scan(
-                        self.__description,
+                    if self.metadata is None and scanner.should_scan(
                         ScanType.rescan,
                         ScanKind.metadata,
                     ):
-                        self.__metadata = scanner.metadata_scanner.get_episode_metadata(
+                        self._metadata = scanner.metadata_scanner.get_episode_metadata(
                             DUMMY_HANDLE_TODO,
                             DUMMY_HANDLE_TODO,
-                            episode,
+                            self.description.episode,
                         )
 
                     callback.progress(
@@ -194,7 +183,6 @@ class EpisodeContent(Content):
         )
 
         if scanner.should_scan(
-            self.__description,
             ScanType.first_scan,
             ScanKind.language,
         ):
@@ -210,14 +198,13 @@ class EpisodeContent(Content):
         )
 
         if scanner.should_scan(
-            self.__description,
             ScanType.first_scan,
             ScanKind.metadata,
         ):
-            self.__metadata = scanner.metadata_scanner.get_episode_metadata(
+            self._metadata = scanner.metadata_scanner.get_episode_metadata(
                 DUMMY_HANDLE_TODO,
                 DUMMY_HANDLE_TODO,
-                episode,
+                self.description.episode,
             )
 
         callback.progress(

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Literal, Optional, Self, TypedDict, cast, override
 
 from content.base_class import LanguageScanner, Scanner
-from content.general import EpisodeDescription
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
 
@@ -23,7 +22,6 @@ class StaticScanner(Scanner):
     @override
     def should_scan(
         self: Self,
-        description: EpisodeDescription,
         scan_type: ScanType,
         scan_kind: ScanKind,
     ) -> bool:
@@ -108,7 +106,6 @@ class ConfigScanner(Scanner):
     @override
     def should_scan(
         self: Self,
-        description: EpisodeDescription,
         scan_type: ScanType,
         scan_kind: ScanKind,
     ) -> bool:

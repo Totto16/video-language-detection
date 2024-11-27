@@ -11,13 +11,13 @@ from classifier import Classifier, FileMetadataError, Language, WAVFile
 from content.general import (
     Callback,
     ContentType,
-    EpisodeDescription,
     MissingOverrideError,
     ScannedFile,
     ScannedFileType,
     Summary,
     safe_index,
 )
+from content.metadata.metadata import HandlesType, MetadataHandle
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
 from helper.log import get_logger
@@ -77,7 +77,6 @@ class Scanner:
 
     def should_scan(
         self: Self,
-        description: EpisodeDescription,  # noqa: ARG002
         scan_type: ScanType,  # noqa: ARG002
         scan_kind: ScanKind,  # noqa: ARG002
     ) -> bool:
@@ -99,6 +98,9 @@ CallbackTuple = tuple[Manager, Scanner]
 class Content:
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
+    _metadata: Optional[MetadataHandle] = field(
+        metadata=alias("metadata"),
+    )
 
     def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
         raise MissingOverrideError
@@ -115,6 +117,19 @@ class Content:
     def scanned_file(self: Self) -> ScannedFile:
         return self.__scanned_file
 
+    @property
+    def metadata(self: Self) -> Optional[MetadataHandle]:
+        return self._metadata
+
+    def _get_new_handles(self: Self, old_handles: HandlesType) -> HandlesType:
+        new_handles: HandlesType = None
+        if self.metadata is not None and old_handles is not None:
+            # Note: this is important, so that it's a copy
+            new_handles = list(old_handles)
+            new_handles.append(self.metadata)
+
+        return new_handles
+
     def generate_checksum(self: Self, manager: Manager) -> None:
         self.__scanned_file.generate_checksum(manager)
 
@@ -126,6 +141,7 @@ class Content:
             CallbackTuple,
         ],
         *,
+        handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         rescan: bool = False,  # noqa: ARG002
     ) -> None:
@@ -136,6 +152,7 @@ def process_folder(
     directory: Path,
     callback: Callback[Content, ContentCharacteristic, CallbackTuple],
     *,
+    handles: HandlesType,
     parent_folders: list[str],
     parent_type: Optional[ContentType] = None,
     rescan: Optional[list[Content]] = None,
@@ -167,6 +184,7 @@ def process_folder(
             result: Optional[Content] = callback.process(
                 file_path,
                 file_type,
+                handles,
                 parent_folders_temp,
             )
             value = (
@@ -197,6 +215,7 @@ def process_folder(
         result = callback.process(
             file_path,
             file_type,
+            handles,
             parent_folders_temp,
             rescan=is_rescan,
         )

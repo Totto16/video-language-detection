@@ -20,6 +20,7 @@ from apischema.json_schema import (
 from enlighten import Manager
 
 from classifier import Language
+from content.metadata.metadata import HandlesType
 
 
 class ScannedFileType(Enum):
@@ -429,6 +430,7 @@ class Callback[C, CT, RT]:
         self: Self,
         file_path: Path,  # noqa: ARG002
         file_type: ScannedFileType,  # noqa: ARG002
+        handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         *,
         rescan: Optional[C] = None,  # noqa: ARG002
