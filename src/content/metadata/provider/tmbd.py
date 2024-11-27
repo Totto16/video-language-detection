@@ -1,9 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from logging import Logger
 from typing import Any, Literal, Optional, Self, override
 
+
 from themoviedb import TMDb
+from apischema.metadata import none_as_undefined
 
 from content.metadata.interfaces import Provider
 from content.shared import ScanType
@@ -13,16 +15,16 @@ logger: Logger = get_logger()
 
 
 @dataclass
-class Config:
+class TMDBConfig:
     api_key: str
-    language: Optional[str]
-    region: Optional[str]
+    language: Optional[str] = field(default=None, metadata=none_as_undefined)
+    region: Optional[str] = field(default=None, metadata=none_as_undefined)
 
 
 @dataclass
 class TMDBMetadataConfig:
     type: Literal["tmdb"]
-    config: Optional[Config]
+    config: Optional[TMDBConfig]
 
 
 @dataclass
@@ -86,7 +88,7 @@ class EpisodeMetadata:
 class TMDBProvider(Provider):
     __client: TMDb
 
-    def __init__(self: Self, config: Config) -> None:
+    def __init__(self: Self, config: TMDBConfig) -> None:
         super().__init__("tmdb")
         self.__client = TMDb(
             key=config.api_key,
