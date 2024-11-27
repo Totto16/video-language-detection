@@ -2,12 +2,13 @@ from pathlib import Path
 
 import wx
 
+from helper.constants import APP_NAME
 
-## TODO: this is just an exampel gui application atm
+
 def launch(_config: Path) -> None:
     app = wx.App()
-    window = wx.Frame(None, title="wxPython Frame", size=(300, 200))
+    window = wx.Frame(None, title=APP_NAME, size=(300, 200))
     panel = wx.Panel(window)
-    wx.StaticText(panel, label="Hello World", pos=(100, 50))
+    wx.StaticText(panel, label="WIP", pos=(100, 50))
     window.Show(show=True)
     app.MainLoop()

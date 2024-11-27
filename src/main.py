@@ -26,6 +26,7 @@ from content.general import (
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
+from helper.constants import APP_NAME
 from helper.translation import get_translator
 
 if TYPE_CHECKING:
@@ -68,10 +69,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         self.__manager = manager
         self.__status_bar = self.__manager.status_bar(
-            status_format=_("Video Language Detector")
-            + "{fill}"
-            + _("Stage")
-            + ": {stage}{fill}{elapsed}",
+            status_format=APP_NAME + "{fill}" + _("Stage") + ": {stage}{fill}{elapsed}",
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
             stage=_("Scanning"),
