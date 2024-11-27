@@ -47,22 +47,27 @@ class NoLanguageScanner(StaticLanguageScanner):
 class ConfigScannerDict(TypedDict, total=False):
     start_position: int
     scan_amount: int
+    allow_abort: bool
 
 
 class ConfigScannerDictTotal(TypedDict, total=True):
     start_position: int
     scan_amount: int
+    allow_abort: bool
     # TODO: print progress option
 
 
 class ConfigLanguageScanner(LanguageScanner):
     __start_position: int
     __scan_amount: int
+    __allow_abort: bool
+    # state
     __current_position: int
+    __is_aborted: bool
 
     @property
     def __defaults(self: Self) -> ConfigScannerDictTotal:
-        return {"start_position": 0, "scan_amount": 100}
+        return {"start_position": 0, "scan_amount": 100, "allow_abort": True}
 
     def __init__(
         self: Self,
@@ -81,11 +86,17 @@ class ConfigLanguageScanner(LanguageScanner):
                 "scan_amount",
                 self.__defaults["scan_amount"],
             )
+            self.__allow_abort = loaded_dict.get(
+                "allow_abort",
+                self.__defaults["allow_abort"],
+            )
         else:
             self.__start_position = self.__defaults["start_position"]
             self.__scan_amount = self.__defaults["scan_amount"]
+            self.__allow_abort = self.__defaults["allow_abort"]
 
         self.__current_position = 0
+        self.__is_aborted = False
 
     @override
     def should_scan(
@@ -93,6 +104,10 @@ class ConfigLanguageScanner(LanguageScanner):
         description: EpisodeDescription,
         scan_type: ScanType,
     ) -> bool:
+        ## TODO: set somewhere, e.g. in gui
+        if self.__is_aborted:
+            return False
+
         if (self.__start_position >= self.__current_position) and (
             self.__start_position < (self.__current_position + self.__scan_amount)
         ):

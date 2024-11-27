@@ -93,7 +93,7 @@ class CustomNameParser(NameParser):
 
 
 def main(config: ParsedConfig) -> None:
-    scanner = get_scanner_from_config(config.scanner, Classifier())
+    scanner = get_scanner_from_config(config.scanner, Classifier(config.classifier))
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,
@@ -214,6 +214,9 @@ if __name__ == "__main__":
                     args,
                 )
                 parsed_config = Config.load(Path(args_run.config))
+                if parsed_config is None:
+                    sys.exit(1)
+
                 main(parsed_config)
 
     except KeyboardInterrupt:
