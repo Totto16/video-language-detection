@@ -13,8 +13,8 @@ exclude = []
 line-length = 100
 indent-width = 4
 
-# Target Python version is 3.12.
-target-version = "py312"
+# Target Python version is 3.13.
+target-version = "py313"
 
 [tool.ruff.lint]
 
