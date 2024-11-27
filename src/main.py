@@ -10,7 +10,7 @@ from content.base_class import (
     CallbackTuple,
     Content,
     ContentCharacteristic,
-    LanguageScanner,
+    Scanner,
     process_folder,
 )
 from content.collection_content import CollectionContent
@@ -45,7 +45,7 @@ class ContentOptions(TypedDict):
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __name_parser: NameParser
-    __scanner: LanguageScanner
+    __scanner: Scanner
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
@@ -54,7 +54,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self: Self,
         options: ContentOptions,
         name_parser: NameParser,
-        scanner: LanguageScanner,
+        scanner: Scanner,
     ) -> None:
         super().__init__()
 
@@ -271,7 +271,7 @@ def parse_contents(
     options: ContentOptions,
     save_file: Path,
     name_parser: NameParser,
-    scanner: LanguageScanner,
+    scanner: Scanner,
 ) -> list[Content]:
     callback = ContentCallback(options, name_parser, scanner)
 

@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
 from classifier import Classifier, Language
+from content.base_class import LanguageScanner, Scanner
+from content.metadata.config import get_metadata_scanner_from_config
 from helper.log import LogLevel, setup_custom_logger
 
 if TYPE_CHECKING:
     from content.base_class import Content
+    from content.metadata.scanner import MetadataScanner
 
 from config import Config, ParsedConfig
 from content.general import NameParser, Summary
@@ -93,7 +96,16 @@ class CustomNameParser(NameParser):
 
 
 def main(config: ParsedConfig) -> None:
-    scanner = get_scanner_from_config(config.scanner, Classifier(config.classifier))
+    classifier = Classifier(config.classifier)
+    language_scanner = LanguageScanner(classifier=classifier)
+    metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
+        config.metadata,
+    )
+    scanner: Scanner = get_scanner_from_config(
+        config.scanner,
+        language_scanner,
+        metadata_scanner,
+    )
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,

@@ -17,6 +17,7 @@ psutil = "*"
 apischema = "*"
 pysoundfile = "*"
 wxpython = "*"
+themoviedb = {extras = ["sync"], version = "*"}
 
 [dev-packages]
 pylint = "*"

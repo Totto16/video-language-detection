@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from logging import Logger
 from os import listdir
 from pathlib import Path
@@ -19,6 +18,8 @@ from content.general import (
     Summary,
     safe_index,
 )
+from content.metadata.scanner import MetadataScanner
+from content.shared import ScanKind, ScanType
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -31,11 +32,6 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
-class ScanType(Enum):
-    first_scan = "first_scan"
-    rescan = "rescan"
-
-
 class LanguageScanner:
     __classifier: Classifier
 
@@ -44,13 +40,6 @@ class LanguageScanner:
         classifier: Classifier,
     ) -> None:
         self.__classifier = classifier
-
-    def should_scan(
-        self: Self,
-        description: EpisodeDescription,  # noqa: ARG002
-        scan_type: ScanType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
 
     def get_language(
         self: Self,
@@ -74,7 +63,36 @@ class LanguageScanner:
             return best.language
 
 
-CallbackTuple = tuple[Manager, LanguageScanner]
+class Scanner:
+    __language_scanner: LanguageScanner
+    __metadata_scanner: MetadataScanner
+
+    def __init__(
+        self: Self,
+        language_scanner: LanguageScanner,
+        metadata_scanner: MetadataScanner,
+    ) -> None:
+        self.__language_scanner = language_scanner
+        self.__metadata_scanner = metadata_scanner
+
+    def should_scan(
+        self: Self,
+        description: EpisodeDescription,  # noqa: ARG002
+        scan_type: ScanType,  # noqa: ARG002
+        scan_kind: ScanKind,  # noqa: ARG002
+    ) -> bool:
+        raise MissingOverrideError
+
+    @property
+    def language_scanner(self: Self) -> LanguageScanner:
+        return self.__language_scanner
+
+    @property
+    def metadata_scanner(self: Self) -> MetadataScanner:
+        return self.__metadata_scanner
+
+
+CallbackTuple = tuple[Manager, Scanner]
 
 
 @dataclass(slots=True, repr=True)

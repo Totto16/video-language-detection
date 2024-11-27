@@ -8,6 +8,8 @@ import yaml
 from apischema import ValidationError, deserialize, schema
 
 from classifier import ClassifierOptionsParsed
+from content.metadata.config import MetadataConfig
+from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.log import get_logger
 
@@ -58,6 +60,7 @@ class ParsedConfig:
     parser: ParserConfigParsed
     scanner: ScannerConfig
     classifier: ClassifierOptionsParsed
+    metadata: MetadataConfig
 
 
 logger: Logger = get_logger()
@@ -69,6 +72,7 @@ class Config:
     parser: Optional[ParserConfig]
     scanner: Optional[ScannerConfig]
     classifier: Optional[ClassifierOptionsParsed]
+    metadata: Optional[MetadataConfig]
 
     @staticmethod
     def __defaults() -> "ParsedConfig":
@@ -83,6 +87,7 @@ class Config:
             ),
             scanner=ConfigScannerConfig(scanner_type="config", config=None),
             classifier=ClassifierOptionsParsed.default(),
+            metadata=MissingProviderMetadataConfig(type="none"),
         )
 
     @staticmethod
@@ -122,11 +127,16 @@ class Config:
         if config.classifier is not None:
             parsed_classifier = config.classifier
 
+        parsed_metadata = defaults.metadata
+        if config.metadata is not None:
+            parsed_metadata = config.metadata
+
         return ParsedConfig(
             general=parsed_general,
             parser=parsed_parser,
             scanner=parsed_scanner,
             classifier=parsed_classifier,
+            metadata=parsed_metadata,
         )
 
     @staticmethod
