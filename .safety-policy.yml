@@ -1,0 +1,44 @@
+version: "2.3.2"
+
+scanning-settings:
+    max-depth: 6
+    exclude: []
+    include-files: []
+    system:
+        targets: []
+
+report:
+    dependency-vulnerabilities:
+        enabled: true
+        auto-ignore-in-report:
+            python:
+                environment-results: true
+                unpinned-requirements: true
+            cvss-severity: []
+
+fail-scan-with-exit-code:
+    dependency-vulnerabilities:
+        enabled: true
+        fail-on-any-of:
+            cvss-severity:
+                - critical
+                - high
+                - medium
+            exploitability:
+                - critical
+                - high
+                - medium
+
+security-updates:
+    dependency-vulnerabilities:
+        auto-security-updates-limit:
+            - patch
+
+# Safety Security and License Configuration file
+security: # configuration for the `safety check` command
+    ignore-cvss-severity-below: 0 # A severity number between 0 and 10. Some helpful reference points: 9=ignore all vulnerabilities except CRITICAL severity. 7=ignore all vulnerabilities except CRITICAL
+    ignore-cvss-unknown-severity: False # True or False. We recommend you set this to False.
+    ignore-vulnerabilities: # Here you can list multiple specific vulnerabilities you want to ignore (optionally for a time period)
+        70612:
+            reason: This is a disputed vulnerability
+    continue-on-vulnerability-error: False # Suppress non-zero exit codes when vulnerabiliti

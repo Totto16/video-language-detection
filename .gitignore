@@ -7,5 +7,4 @@ model/
 /.vscode
 /.coverage
 /coverage.xml
-/config.ini
 /config.yaml

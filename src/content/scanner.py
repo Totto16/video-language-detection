@@ -1,12 +1,9 @@
-import json
-from configparser import ConfigParser
-from pathlib import Path
-from typing import Optional, Self, TypedDict, override
+from dataclasses import dataclass
+from typing import Literal, Optional, Self, TypedDict, cast, override
 
 from classifier import Classifier
 from content.base_class import LanguageScanner, ScanType
 from content.general import EpisodeDescription
-from helper.timestamp import parse_int_safely
 
 
 class StaticLanguageScanner(LanguageScanner):
@@ -43,72 +40,38 @@ class NoLanguageScanner(StaticLanguageScanner):
         self: Self,
         classifier: Classifier,
     ) -> None:
-        super().__init__(classifier, value=True)
+        super().__init__(classifier, value=False)
 
 
 # TODO: is there a better way?
-class PartialScannerDict(TypedDict, total=False):
+class ConfigScannerDict(TypedDict, total=False):
     start_position: int
     scan_amount: int
 
 
-class PartialScannerDictTotal(TypedDict, total=True):
+class ConfigScannerDictTotal(TypedDict, total=True):
     start_position: int
     scan_amount: int
-    #TODO: print progress option
+    # TODO: print progress option
 
 
-INI_SETTINGS_SECTION_KEY = "settings"
-
-
-class PartialLanguageScanner(LanguageScanner):
+class ConfigLanguageScanner(LanguageScanner):
     __start_position: int
     __scan_amount: int
     __current_position: int
 
     @property
-    def __defaults(self: Self) -> PartialScannerDictTotal:
+    def __defaults(self: Self) -> ConfigScannerDictTotal:
         return {"start_position": 0, "scan_amount": 100}
 
     def __init__(
         self: Self,
         classifier: Classifier,
         *,
-        config_file: Path = Path("./config.ini"),
+        config: Optional[ConfigScannerDict] = None,
     ) -> None:
         super().__init__(classifier)
-        loaded_dict: Optional[PartialScannerDict] = None
-
-        if config_file.exists():
-            with config_file.open(mode="r") as file:
-                suffix: str = config_file.suffix[1:]
-                match suffix:
-                    case "json":
-                        loaded_dict = json.load(file)
-                    case "ini":
-                        config = ConfigParser()
-                        config.read(config_file)
-                        if INI_SETTINGS_SECTION_KEY in config:
-                            temp_dict = dict(config.items(INI_SETTINGS_SECTION_KEY))
-
-                            loaded_dict = {}
-                            if temp_dict.get("start_position") is not None:
-                                int_result = parse_int_safely(
-                                    temp_dict["start_position"],
-                                )
-                                if int_result is not None:
-                                    loaded_dict["start_position"] = int_result
-                            if temp_dict.get("scan_amount") is not None:
-                                int_result = parse_int_safely(
-                                    temp_dict["scan_amount"],
-                                )
-                                if int_result is not None:
-                                    loaded_dict["scan_amount"] = int_result
-
-                    case _:
-                        msg = f"Config not loadable from '{suffix}' file!"
-                        raise RuntimeError(msg)
-
+        loaded_dict: Optional[ConfigScannerDict] = config
         if loaded_dict is not None:
             self.__start_position = loaded_dict.get(
                 "start_position",
@@ -138,6 +101,43 @@ class PartialLanguageScanner(LanguageScanner):
 
         self.__current_position += 1
         return False
+
+
+@dataclass
+class FullLanguageScannerConfig:
+    scanner_type: Literal["full"]
+
+
+@dataclass
+class NoLanguageScannerConfig:
+    scanner_type: Literal["nothing"]
+
+
+@dataclass
+class ConfigScannerConfig:
+    scanner_type: Literal["config"]
+    config: Optional[ConfigScannerDict]
+
+
+ScannerConfig = (
+    FullLanguageScannerConfig | NoLanguageScannerConfig | ConfigScannerConfig
+)
+
+
+def get_scanner_from_config(
+    config: ScannerConfig,
+    classifier: Classifier,
+) -> LanguageScanner:
+    match config.scanner_type:
+        case "config":
+            return ConfigLanguageScanner(
+                classifier=classifier,
+                config=cast(ConfigScannerConfig, config).config,
+            )
+        case "full":
+            return FullLanguageScanner(classifier=classifier)
+        case "nothing":
+            return NoLanguageScanner(classifier=classifier)
 
 
 # TODO add time based scanner
