@@ -3,9 +3,8 @@ from datetime import date
 from logging import Logger
 from typing import Any, Literal, Optional, Self, override
 
-
-from themoviedb import TMDb
 from apischema.metadata import none_as_undefined
+from themoviedb import TMDb
 
 from content.metadata.interfaces import Provider
 from content.shared import ScanType

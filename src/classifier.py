@@ -12,6 +12,7 @@ from typing import Any, Optional, Self, TypedDict
 import psutil
 import torchaudio
 from apischema import schema
+from apischema.metadata import none_as_undefined
 from enlighten import Manager
 from ffmpeg.ffmpeg import FFmpeg, FFmpegError
 from ffmpeg.progress import Progress
@@ -533,7 +534,7 @@ class ClassifierOptionsParsed:
     accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
     final_accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
     minimum_scanned: float
-    scan_until: Optional[float]
+    scan_until: Optional[float] = field(metadata=none_as_undefined, default=None)
 
     @staticmethod
     def default() -> "ClassifierOptionsParsed":
@@ -807,7 +808,8 @@ class Classifier:
         best = prediction.get_best(MeanType.truncated)
 
         msg = _("Couldn't get Language of '{path}': Best was {best}").format(
-            path=relative_path_str(path), best=str(best),
+            path=relative_path_str(path),
+            best=str(best),
         )
 
         logger.error(msg)

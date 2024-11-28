@@ -266,7 +266,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 )
                 json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
             case _:
-                msg = _("Data not saveable from '{suffix}' file!").format(suffix=suffix)
+                msg = _("Data not saveable to '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
 
 
