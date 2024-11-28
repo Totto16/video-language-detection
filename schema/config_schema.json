@@ -218,18 +218,14 @@
                     "type": "number"
                 },
                 "scan_until": {
-                    "type": [
-                        "number",
-                        "null"
-                    ]
+                    "type": "number"
                 }
             },
             "required": [
                 "segment_length",
                 "accuracy_threshold",
                 "final_accuracy_threshold",
-                "minimum_scanned",
-                "scan_until"
+                "minimum_scanned"
             ],
             "additionalProperties": false
         },
