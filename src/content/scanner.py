@@ -148,7 +148,19 @@ class ConfigScanner(Scanner):
     def __get_index_for(self: Self, scan_kind: ScanKind) -> int:
         return 0 if scan_kind == ScanKind.language else 1
 
+    def __is_type(self: Self, scan_kind: ScanKind) -> bool:
+        if self.__types == ScannerTypes.both:
+            return True
+
+        if self.__types == ScannerTypes.only_language:
+            return scan_kind == ScanKind.language
+
+        return scan_kind == ScanKind.metadata
+
     def __should_scan_kind(self: Self, scan_kind: ScanKind) -> bool:
+        if not self.__is_type(scan_kind):
+            return False
+
         ## TODO: set somewhere, e.g. in gui
         if self.__is_aborted and self.__allow_abort:
             return False
