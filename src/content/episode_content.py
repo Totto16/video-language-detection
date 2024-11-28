@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from logging import Logger
 from pathlib import Path
 from typing import (
     Literal,
@@ -27,16 +28,15 @@ from content.general import (
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.shared import ScanKind, ScanType
+from helper.log import get_logger
+
+logger: Logger = get_logger()
 
 
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
     metadata: Optional[MetadataHandle]
-
-
-# TODO: Remove this temporary helper
-DUMMY_HANDLE_TODO: MetadataHandle = MetadataHandle("", {})
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))
@@ -103,6 +103,20 @@ class EpisodeContent(Content):
             detailed=detailed,
         )
 
+    def __get_handles(
+        self: Self,
+        handles: HandlesType,
+    ) -> Optional[tuple[MetadataHandle, MetadataHandle]]:
+        if handles is None:
+            return None
+
+        if len(handles) != 2:
+            msg = f"Length of handles is invalid, expected 2 but got {len(handles)}"
+            logger.warning(msg)
+            return None
+
+        return (handles[0], handles[1])
+
     @override
     def scan(
         self: Self,
@@ -113,6 +127,8 @@ class EpisodeContent(Content):
         rescan: bool = False,
     ) -> None:
         manager, scanner = callback.get_saved()
+
+        current_handles = self.__get_handles(handles)
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
@@ -143,13 +159,19 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if self.metadata is None and scanner.should_scan(
-                        ScanType.rescan,
-                        ScanKind.metadata,
+                    if (
+                        self.metadata is None
+                        and current_handles is not None
+                        and scanner.should_scan(
+                            ScanType.rescan,
+                            ScanKind.metadata,
+                        )
                     ):
+                        series_handle, season_handle = current_handles
+
                         self._metadata = scanner.metadata_scanner.get_episode_metadata(
-                            DUMMY_HANDLE_TODO,
-                            DUMMY_HANDLE_TODO,
+                            series_handle,
+                            season_handle,
                             self.description.episode,
                         )
 
@@ -197,13 +219,18 @@ class EpisodeContent(Content):
             characteristic,
         )
 
-        if scanner.should_scan(
-            ScanType.first_scan,
-            ScanKind.metadata,
+        if (
+            scanner.should_scan(
+                ScanType.first_scan,
+                ScanKind.metadata,
+            )
+            and current_handles is not None
         ):
+            series_handle, season_handle = current_handles
+
             self._metadata = scanner.metadata_scanner.get_episode_metadata(
-                DUMMY_HANDLE_TODO,
-                DUMMY_HANDLE_TODO,
+                series_handle,
+                season_handle,
                 self.description.episode,
             )
 

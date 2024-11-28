@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from logging import Logger
 from pathlib import Path
 from typing import (
     Literal,
@@ -29,15 +30,15 @@ from content.general import (
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.shared import ScanKind, ScanType
+from helper.log import get_logger
+
+
+logger: Logger = get_logger()
 
 
 class SeasonContentDict(ContentDict):
     description: SeasonDescription
     episodes: list[EpisodeContent]
-
-
-# TODO: Remove this temporary helper
-DUMMY_HANDLE_TODO: MetadataHandle = MetadataHandle("", {})
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.season])))
@@ -107,6 +108,20 @@ class SeasonContent(Content):
 
         return summary
 
+    def __get_handle(
+        self: Self,
+        handles: HandlesType,
+    ) -> Optional[MetadataHandle]:
+        if handles is None:
+            return None
+
+        if len(handles) != 1:
+            msg = f"Length of handles is invalid, expected 1 but got {len(handles)}"
+            logger.warning(msg)
+            return None
+
+        return handles[0]
+
     @override
     def scan(
         self: Self,
@@ -118,15 +133,20 @@ class SeasonContent(Content):
     ) -> None:
         _, scanner = callback.get_saved()
 
+        series_handle = self.__get_handle(handles)
         new_handles = self._get_new_handles(handles)
 
         if not rescan:
-            if self.metadata is None and scanner.should_scan(
-                ScanType.first_scan,
-                ScanKind.metadata,
+            if (
+                self.metadata is None
+                and series_handle is not None
+                and scanner.should_scan(
+                    ScanType.first_scan,
+                    ScanKind.metadata,
+                )
             ):
                 self._metadata = scanner.metadata_scanner.get_season_metadata(
-                    DUMMY_HANDLE_TODO,
+                    series_handle,
                     self.description.season,
                 )
 
@@ -145,12 +165,16 @@ class SeasonContent(Content):
                     raise TypeError(msg)
             return
 
-        if self.metadata is None and scanner.should_scan(
-            ScanType.rescan,
-            ScanKind.metadata,
+        if (
+            self.metadata is None
+            and series_handle is not None
+            and scanner.should_scan(
+                ScanType.rescan,
+                ScanKind.metadata,
+            )
         ):
             self._metadata = scanner.metadata_scanner.get_season_metadata(
-                DUMMY_HANDLE_TODO,
+                series_handle,
                 self.description.season,
             )
 
