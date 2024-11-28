@@ -25,6 +25,15 @@ class StaticScanner(Scanner):
         scan_type: ScanType,
         scan_kind: ScanKind,
     ) -> bool:
+        if scan_kind == ScanKind.metadata:
+            if not self.__value:
+                return False
+
+            return (
+                self.metadata_scanner.can_scan()
+                and self.metadata_scanner.should_scan(scan_type)
+            )
+
         return self.__value
 
 
@@ -110,13 +119,20 @@ class ConfigScanner(Scanner):
         scan_kind: ScanKind,
     ) -> bool:
         ## TODO: set somewhere, e.g. in gui
-        if self.__is_aborted:
+        if self.__is_aborted and self.__allow_abort:
             return False
 
         if (self.__start_position >= self.__current_position) and (
             self.__start_position < (self.__current_position + self.__scan_amount)
         ):
             self.__current_position += 1
+
+            if scan_kind == ScanKind.metadata:
+                return (
+                    self.metadata_scanner.can_scan()
+                    and self.metadata_scanner.should_scan(scan_type)
+                )
+
             return True
 
         self.__current_position += 1

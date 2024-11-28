@@ -159,13 +159,9 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if (
-                        self.metadata is None
-                        and current_handles is not None
-                        and scanner.should_scan(
-                            ScanType.rescan,
-                            ScanKind.metadata,
-                        )
+                    if current_handles is not None and scanner.should_scan(
+                        ScanType.rescan,
+                        ScanKind.metadata,
                     ):
                         series_handle, season_handle = current_handles
 
@@ -220,11 +216,12 @@ class EpisodeContent(Content):
         )
 
         if (
-            scanner.should_scan(
+            current_handles is not None
+            and self.metadata is None
+            and scanner.should_scan(
                 ScanType.first_scan,
                 ScanKind.metadata,
             )
-            and current_handles is not None
         ):
             series_handle, season_handle = current_handles
 

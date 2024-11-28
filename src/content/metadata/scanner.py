@@ -20,6 +20,9 @@ class MetadataScanner:
     ) -> bool:
         return self.__provider.should_scan(scan_type)
 
+    def can_scan(self: Self) -> bool:
+        return self.__provider.can_scan()
+
     def get_series_metadata(
         self: Self,
         series_name: str,

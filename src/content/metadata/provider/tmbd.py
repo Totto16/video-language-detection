@@ -4,6 +4,7 @@ from logging import Logger
 from typing import Any, Literal, Optional, Self, override
 
 from apischema.metadata import none_as_undefined
+from requests import HTTPError
 from themoviedb import TMDb
 
 from content.metadata.interfaces import Provider
@@ -107,6 +108,11 @@ class TMDBProvider(Provider):
 
         return False
 
+    # TODO: if we are being rate limited, return false here
+    @override
+    def can_scan(self: Self) -> bool:
+        return True
+
     def __get_metadata_for_season(
         self: Self,
         series_data: Any,
@@ -137,7 +143,6 @@ class TMDBProvider(Provider):
     ) -> Optional[Any]:
         try:
             search_result = self.__client.search().tv(series_name)
-
             if search_result.results is None:
                 return None
 
@@ -165,6 +170,9 @@ class TMDBProvider(Provider):
                 result.first_air_date,
                 result.id,
             )
+        except HTTPError as err:
+            logger.error(err)  # noqa: TRY400
+            return None
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
             return None
@@ -193,6 +201,9 @@ class TMDBProvider(Provider):
                 result.season_number,
                 result.season_id,
             )
+        except HTTPError as err:
+            logger.error(err)  # noqa: TRY400
+            return None
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
             return None
@@ -204,7 +215,6 @@ class TMDBProvider(Provider):
         season_data: Any,
         episode: int,
     ) -> Optional[Any]:
-
         episode_metadata = self.__get_metadata_for_episode(series_data, season_data)
 
         if episode_metadata is None:
@@ -226,6 +236,9 @@ class TMDBProvider(Provider):
                 result.name,
                 result.episode_number,
             )
+        except HTTPError as err:
+            logger.error(err)  # noqa: TRY400
+            return None
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
             return None

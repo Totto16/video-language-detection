@@ -38,6 +38,9 @@ class Provider:
     ) -> bool:
         raise MissingOverrideError
 
+    def can_scan(self: Self) -> bool:
+        raise MissingOverrideError
+
     @property
     def name(self: Self) -> str:
         return self.__name
@@ -68,4 +71,8 @@ class MissingProvider(Provider):
         self: Self,
         scan_type: ScanType,
     ) -> bool:
+        return False
+
+    @override
+    def can_scan(self: Self) -> bool:
         return False

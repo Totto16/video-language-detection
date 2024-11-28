@@ -35,3 +35,7 @@ class IMDBProvider(Provider):
         scan_type: ScanType,
     ) -> bool:
         return False
+
+    @override
+    def can_scan(self: Self) -> bool:
+        return False
