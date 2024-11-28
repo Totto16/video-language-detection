@@ -19,7 +19,7 @@ from content.general import (
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.metadata.scanner import MetadataScanner
-from content.shared import ScanKind, ScanType
+from content.shared import ScanType
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -75,10 +75,16 @@ class Scanner:
         self.__language_scanner = language_scanner
         self.__metadata_scanner = metadata_scanner
 
-    def should_scan(
+    def should_scan_language(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
-        scan_kind: ScanKind,  # noqa: ARG002
+    ) -> bool:
+        raise MissingOverrideError
+
+    def should_scan_metadata(
+        self: Self,
+        scan_type: ScanType,  # noqa: ARG002
+        metadata: Optional[MetadataHandle],  # noqa: ARG002
     ) -> bool:
         raise MissingOverrideError
 

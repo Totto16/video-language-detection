@@ -29,7 +29,7 @@ from content.general import (
     narrow_type,
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
-from content.shared import ScanKind, ScanType
+from content.shared import ScanType
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -139,9 +139,9 @@ class SeasonContent(Content):
             if (
                 series_handle is not None
                 and self.metadata is None
-                and scanner.should_scan(
+                and scanner.should_scan_metadata(
                     ScanType.first_scan,
-                    ScanKind.metadata,
+                    self.metadata,
                 )
             ):
                 self._metadata = scanner.metadata_scanner.get_season_metadata(
@@ -164,9 +164,9 @@ class SeasonContent(Content):
                     raise TypeError(msg)
             return
 
-        if series_handle is not None and scanner.should_scan(
+        if series_handle is not None and scanner.should_scan_metadata(
             ScanType.rescan,
-            ScanKind.metadata,
+            self.metadata,
         ):
             self._metadata = scanner.metadata_scanner.get_season_metadata(
                 series_handle,

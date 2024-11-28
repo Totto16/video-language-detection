@@ -17,8 +17,9 @@ class MetadataScanner:
     def should_scan(
         self: Self,
         scan_type: ScanType,
+        metadata: Optional[MetadataHandle],
     ) -> bool:
-        return self.__provider.should_scan(scan_type)
+        return self.__provider.should_scan(scan_type, metadata)
 
     def can_scan(self: Self) -> bool:
         return self.__provider.can_scan()

@@ -194,9 +194,20 @@
                 },
                 "allow_abort": {
                     "type": "boolean"
+                },
+                "types": {
+                    "$ref": "#/$defs/ScannerTypes"
                 }
             },
             "additionalProperties": false
+        },
+        "ScannerTypes": {
+            "type": "string",
+            "enum": [
+                "only_metadata",
+                "only_language",
+                "both"
+            ]
         },
         "ClassifierOptionsParsed": {
             "type": "object",

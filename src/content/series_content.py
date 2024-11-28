@@ -28,7 +28,7 @@ from content.general import (
 )
 from content.metadata.metadata import HandlesType
 from content.season_content import SeasonContent
-from content.shared import ScanKind, ScanType
+from content.shared import ScanType
 
 
 class SeriesContentDict(ContentDict):
@@ -114,9 +114,9 @@ class SeriesContent(Content):
         new_handles = self._get_new_handles(handles)
 
         if not rescan:
-            if self.metadata is None and scanner.should_scan(
+            if self.metadata is None and scanner.should_scan_metadata(
                 ScanType.first_scan,
-                ScanKind.metadata,
+                self.metadata,
             ):
                 self._metadata = scanner.metadata_scanner.get_series_metadata(
                     self.description.name,
@@ -138,9 +138,9 @@ class SeriesContent(Content):
 
             return
 
-        if self.metadata is None and scanner.should_scan(
+        if self.metadata is None and scanner.should_scan_metadata(
             ScanType.rescan,
-            ScanKind.metadata,
+            self.metadata,
         ):
             self._metadata = scanner.metadata_scanner.get_series_metadata(
                 self.description.name,

@@ -8,6 +8,7 @@ from requests import HTTPError
 from themoviedb import TMDb
 
 from content.metadata.interfaces import Provider
+from content.metadata.metadata import MetadataHandle
 from content.shared import ScanType
 from helper.log import get_logger
 
@@ -100,8 +101,12 @@ class TMDBProvider(Provider):
     def should_scan(
         self: Self,
         scan_type: ScanType,
+        metadata: Optional[MetadataHandle],
     ) -> bool:
-        if scan_type == ScanType.first_scan:  # noqa: SIM103
+        if scan_type == ScanType.first_scan:
+            return True
+
+        if metadata is None:  # noqa: SIM103
             return True
 
         # TODO: a rescan should be requested, or done in newly added things, that likely changed

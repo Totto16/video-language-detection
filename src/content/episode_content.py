@@ -27,7 +27,7 @@ from content.general import (
     narrow_type,
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
-from content.shared import ScanKind, ScanType
+from content.shared import ScanType
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -144,9 +144,9 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if self.__language == Language.unknown() and scanner.should_scan(
-                        ScanType.rescan,
-                        ScanKind.language,
+                    if (
+                        self.__language == Language.unknown()
+                        and scanner.should_scan_language(ScanType.rescan)
                     ):
                         self.__language = scanner.language_scanner.get_language(
                             self.scanned_file,
@@ -159,9 +159,9 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if current_handles is not None and scanner.should_scan(
+                    if current_handles is not None and scanner.should_scan_metadata(
                         ScanType.rescan,
-                        ScanKind.metadata,
+                        self.metadata,
                     ):
                         series_handle, season_handle = current_handles
 
@@ -200,10 +200,7 @@ class EpisodeContent(Content):
             characteristic,
         )
 
-        if scanner.should_scan(
-            ScanType.first_scan,
-            ScanKind.language,
-        ):
+        if scanner.should_scan_language(ScanType.first_scan):
             self.__language = scanner.language_scanner.get_language(
                 self.scanned_file,
                 manager=manager,
@@ -218,10 +215,7 @@ class EpisodeContent(Content):
         if (
             current_handles is not None
             and self.metadata is None
-            and scanner.should_scan(
-                ScanType.first_scan,
-                ScanKind.metadata,
-            )
+            and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
         ):
             series_handle, season_handle = current_handles
 

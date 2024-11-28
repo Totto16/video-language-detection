@@ -9,3 +9,4 @@ class ScanType(Enum):
 class ScanKind(Enum):
     metadata = "metadata"
     language = "language"
+
