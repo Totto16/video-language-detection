@@ -98,7 +98,7 @@ class SeasonDescription:
     season: int = field(metadata=schema(min=0))
 
     def __str__(self: Self) -> str:
-        return f"<Season season: {self.season}>y"
+        return f"<Season season: {self.season}>"
 
     def __repr__(self: Self) -> str:
         return str(self)

@@ -167,19 +167,22 @@ class ConfigScanner(Scanner):
 
         index = self.__get_index_for(scan_kind)
 
-        if (self.__start_position[index] >= self.__current_position[index]) and (
-            self.__start_position[index]
-            < (self.__current_position[index] + self.__scan_amount[index])
+        result = False
+
+        if (self.__start_position[index] <= self.__current_position[index]) and (
+            self.__current_position[index] - self.__start_position[index]
+            < self.__scan_amount[index]
         ):
-            pos1, pos2 = self.__current_position
+            result = True
 
-            add1 = 1 if index == 0 else 0
-            add2 = 1 if index == 1 else 0
+        pos1, pos2 = self.__current_position
 
-            self.__current_position = (pos1 + add1, pos2 + add2)
-            return True
+        add1 = 1 if index == 0 else 0
+        add2 = 1 if index == 1 else 0
 
-        return False
+        self.__current_position = (pos1 + add1, pos2 + add2)
+
+        return result
 
     @override
     def should_scan_language(
