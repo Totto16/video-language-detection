@@ -111,8 +111,6 @@ class SeriesContent(Content):
     ) -> None:
         _, scanner = callback.get_saved()
 
-        new_handles = self._get_new_handles(handles)
-
         if not rescan:
             if self.metadata is None and scanner.should_scan_metadata(
                 ScanType.first_scan,
@@ -121,6 +119,8 @@ class SeriesContent(Content):
                 self._metadata = scanner.metadata_scanner.get_series_metadata(
                     self.description.name,
                 )
+
+            new_handles = self._get_new_handles(handles)
 
             contents: list[Content] = process_folder(
                 self.scanned_file.path,
@@ -145,6 +145,8 @@ class SeriesContent(Content):
             self._metadata = scanner.metadata_scanner.get_series_metadata(
                 self.description.name,
             )
+
+        new_handles = self._get_new_handles(handles)
 
         ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
         process_folder(

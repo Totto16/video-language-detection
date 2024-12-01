@@ -132,8 +132,7 @@ class SeasonContent(Content):
     ) -> None:
         _, scanner = callback.get_saved()
 
-        series_handle = self.__get_handle(handles)
-        new_handles = self._get_new_handles(handles)
+        series_handle = self.__get_handle(handles=handles)
 
         if not rescan:
             if (
@@ -148,6 +147,8 @@ class SeasonContent(Content):
                     series_handle,
                     self.description.season,
                 )
+
+            new_handles = self._get_new_handles(handles)
 
             contents: list[Content] = process_folder(
                 self.scanned_file.path,
@@ -172,6 +173,8 @@ class SeasonContent(Content):
                 series_handle,
                 self.description.season,
             )
+
+        new_handles = self._get_new_handles(handles)
 
         # no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
         process_folder(

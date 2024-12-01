@@ -43,7 +43,7 @@ class MetadataScanner:
         season: int,
     ) -> Optional[MetadataHandle]:
         provider_name = self.__provider.name
-        if series_handle.provider is not provider_name:
+        if series_handle.provider != provider_name:
             return None
 
         data: Optional[Any] = self.__provider.get_season_metadata(
@@ -63,10 +63,10 @@ class MetadataScanner:
         episode: int,
     ) -> Optional[MetadataHandle]:
         provider_name = self.__provider.name
-        if series_handle.provider is not provider_name:
+        if series_handle.provider != provider_name:
             return None
 
-        if season_handle.provider is not provider_name:
+        if season_handle.provider != provider_name:
             return None
 
         data: Optional[Any] = self.__provider.get_episode_metadata(
