@@ -98,14 +98,12 @@ class SeasonContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed=detailed)
-        for episode in self.__episodes:
-            summary.combine_episodes(
-                self.description,
-                episode.summary(detailed=detailed),
-            )
-
-        return summary
+        return Summary.construct_for_season(
+            self.metadata,
+            self.description,
+            (episode.summary(detailed=detailed) for episode in self.__episodes),
+            detailed=detailed,
+        )
 
     def __get_handle(
         self: Self,

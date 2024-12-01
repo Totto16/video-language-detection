@@ -59,11 +59,11 @@ class CollectionContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed=detailed)
-        for serie in self.__series:
-            summary.combine_series(self.description, serie.summary(detailed=detailed))
-
-        return summary
+        return Summary.construct_for_collection(
+            self.description,
+            (serie.summary(detailed=detailed) for serie in self.__series),
+            detailed=detailed,
+        )
 
     @override
     def scan(

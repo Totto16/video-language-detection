@@ -120,9 +120,11 @@ def main(config: ParsedConfig) -> None:
     )
 
     summaries = [content.summary() for content in contents]
-    final = Summary.combine_language_dicts([summary.languages for summary in summaries])
 
-    logger.info(final)
+    language_summary, metadata_summary = Summary.combine_summaries(summaries)
+
+    logger.info(language_summary)
+    logger.info(metadata_summary)
 
 
 SubCommand = Literal["run", "schema", "gui"]

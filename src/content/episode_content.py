@@ -97,8 +97,9 @@ class EpisodeContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        return Summary.from_single(
+        return Summary.construct_for_episode(
             self.__language,
+            self.metadata,
             self.__description,
             detailed=detailed,
         )

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from hashlib import sha256
@@ -20,7 +20,8 @@ from apischema.json_schema import (
 from enlighten import Manager
 
 from classifier import Language
-from content.metadata.metadata import HandlesType
+from content.metadata.metadata import HandlesType, MetadataHandle
+from content.shared import MetadataKind
 
 
 class ScannedFileType(Enum):
@@ -120,34 +121,52 @@ IdentifierDescription = (
 
 
 LanguageDict = dict[Language, int]
+MetadataSubDict = dict[bool, int]
+MetadataDict = dict[MetadataKind, MetadataSubDict]
+
+MetadataInput = tuple[MetadataKind, Optional[MetadataHandle]]
 
 
-# TODO
+# TODO: refactor into multiple files
 class Summary:
     __complete: bool
     __detailed: bool
 
     __descriptions: list[IdentifierDescription]
 
-    __languages: LanguageDict
+    __language: LanguageDict
+    __metadata: MetadataDict
     __duplicates: list[IdentifierDescription]
     __missing: list[IdentifierDescription]
 
     def __init__(
         self: Self,
         languages: list[Language],
+        metadatas: list[MetadataInput],
         descriptions: list[IdentifierDescription],
         *,
         detailed: bool = False,
     ) -> None:
-        def get_dict(language: Language) -> LanguageDict:
+        def get_lang_dict(language: Language) -> LanguageDict:
             dct: LanguageDict = {}
             dct[language] = 1
             return dct
 
-        self.__languages = Summary.combine_language_dicts(
-            [get_dict(language) for language in languages],
+        self.__language = Summary.__combine_language_dicts(
+            get_lang_dict(language) for language in languages
         )
+
+        def get_metadata_dict(metadata: MetadataInput) -> MetadataDict:
+            dct: MetadataDict = {}
+            kind, handle = metadata
+            dct[kind] = {True: 0, False: 0}
+            dct[kind][handle is not None] += 1
+            return dct
+
+        self.__metadata = Summary.__combine_metadata_dicts(
+            get_metadata_dict(metadata) for metadata in metadatas
+        )
+
         self.__duplicates = []
         self.__missing = []
         self.__complete = False
@@ -171,17 +190,20 @@ class Summary:
         return self.__missing
 
     @staticmethod
-    def from_single(
+    def construct_for_episode(
         language: Language,
+        metadata: Optional[MetadataHandle],
         description: EpisodeDescription,
         *,
         detailed: bool,
     ) -> "Summary":
-        return Summary([language], [(description,)], detailed=detailed)
 
-    @staticmethod
-    def empty(*, detailed: bool) -> "Summary":
-        return Summary([], [], detailed=detailed)
+        return Summary(
+            [language],
+            [(MetadataKind.episode, metadata)],
+            [(description,)],
+            detailed=detailed,
+        )
 
     def combine_episodes(
         self: Self,
@@ -192,9 +214,27 @@ class Summary:
             if isinstance(desc[0], EpisodeDescription):
                 self.__descriptions.append((description, desc[0]))
 
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
+        self.__language = Summary.__combine_language_dicts(
+            [self.__language, summary.language],
         )
+
+        self.__metadata = Summary.__combine_metadata_dicts(
+            [self.__metadata, summary.metadata],
+        )
+
+    @staticmethod
+    def construct_for_season(
+        metadata: Optional[MetadataHandle],
+        description: SeasonDescription,
+        episode_summaries: Iterable["Summary"],
+        *,
+        detailed: bool,
+    ) -> "Summary":
+        summary = Summary([], [(MetadataKind.season, metadata)], [], detailed=detailed)
+        for episode_summary in episode_summaries:
+            summary.combine_episodes(description, episode_summary)
+
+        return summary
 
     def combine_seasons(
         self: Self,
@@ -207,9 +247,27 @@ class Summary:
                     (description, desc[0], desc[1]),
                 )
 
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
+        self.__language = Summary.__combine_language_dicts(
+            [self.__language, summary.language],
         )
+
+        self.__metadata = Summary.__combine_metadata_dicts(
+            [self.__metadata, summary.metadata],
+        )
+
+    @staticmethod
+    def construct_for_series(
+        metadata: Optional[MetadataHandle],
+        description: SeriesDescription,
+        season_summaries: Iterable["Summary"],
+        *,
+        detailed: bool,
+    ) -> "Summary":
+        summary = Summary([], [(MetadataKind.series, metadata)], [], detailed=detailed)
+        for season_summary in season_summaries:
+            summary.combine_seasons(description, season_summary)
+
+        return summary
 
     def combine_series(
         self: Self,
@@ -222,12 +280,31 @@ class Summary:
                     (description, desc[0], desc[1], desc[2]),
                 )
 
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
+        self.__language = Summary.__combine_language_dicts(
+            [self.__language, summary.language],
+        )
+
+        self.__metadata = Summary.__combine_metadata_dicts(
+            [self.__metadata, summary.metadata],
         )
 
     @staticmethod
-    def combine_language_dicts(inp: list[LanguageDict]) -> LanguageDict:
+    def construct_for_collection(
+        description: CollectionDescription,
+        series_summaries: Iterable["Summary"],
+        *,
+        detailed: bool,
+    ) -> "Summary":
+        summary = Summary([], [], [], detailed=detailed)
+        for series_summary in series_summaries:
+            summary.combine_series(description, series_summary)
+
+        return summary
+
+    @staticmethod
+    def __combine_language_dicts(
+        inp: Iterable[LanguageDict],
+    ) -> LanguageDict:
         dct: LanguageDict = {}
         for input_dict in inp:
             for language, amount in input_dict.items():
@@ -238,13 +315,56 @@ class Summary:
 
         return dct
 
+    @staticmethod
+    def __combine_metadata_dicts(
+        inp: Iterable[MetadataDict],
+    ) -> MetadataDict:
+        dct: MetadataDict = {}
+
+        def combine_dicts(
+            dict1: MetadataSubDict,
+            dict2: MetadataSubDict,
+        ) -> MetadataSubDict:
+            final_dct: MetadataSubDict = {True: 0, False: 0}
+            for key, value in dict1.items():
+                final_dct[key] += value
+
+            for key, value in dict2.items():
+                final_dct[key] += value
+
+            return final_dct
+
+        for input_dict in inp:
+            for key, value in input_dict.items():
+                if dct.get(key) is None:
+                    dct[key] = {True: 0, False: 0}
+                dct[key] = combine_dicts(dct[key], value)
+
+        return dct
+
+    @staticmethod
+    def combine_summaries(
+        input_list: list["Summary"],
+    ) -> tuple[LanguageDict, MetadataDict]:
+        lang_dict = Summary.__combine_language_dicts(inp.language for inp in input_list)
+
+        metadata_dict = Summary.__combine_metadata_dicts(
+            inp.metadata for inp in input_list
+        )
+
+        return (lang_dict, metadata_dict)
+
     @property
     def descriptions(self: Self) -> list[IdentifierDescription]:
         return self.__descriptions
 
     @property
-    def languages(self: Self) -> LanguageDict:
-        return self.__languages
+    def language(self: Self) -> LanguageDict:
+        return self.__language
+
+    @property
+    def metadata(self: Self) -> MetadataDict:
+        return self.__metadata
 
     # TODO: human readable
     def __str__(self: Self) -> str:
@@ -252,7 +372,7 @@ class Summary:
 
     # TODO: this isn't finished yet
     def __repr__(self: Self) -> str:
-        return f"<Summary languages: {self.__languages}>"
+        return f"<Summary languages: {self.__language}>"
 
 
 @dataclass(slots=True, repr=True)

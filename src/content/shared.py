@@ -10,3 +10,9 @@ class ScanKind(Enum):
     metadata = "metadata"
     language = "language"
 
+
+
+class MetadataKind(Enum):
+    series = "series"
+    season = "season"
+    episode = "episode"
