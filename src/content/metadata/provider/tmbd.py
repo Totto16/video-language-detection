@@ -39,6 +39,7 @@ class SeriesMetadata:
     vote_average: Optional[float]
     vote_count: Optional[int]
     first_air_date: Optional[date]
+    original_name: Optional[str]
     series_id: int
     metadata_type: Literal["series"] = "series"
 
@@ -49,7 +50,7 @@ class SeasonMetadata:
     air_date: Optional[date]
     episodes_count: Optional[int]
     name: Optional[str]
-    season_number: Optional[int]
+    season_number: int
     season_id: int
     metadata_type: Literal["season"] = "season"
 
@@ -117,7 +118,7 @@ class TMDBProvider(Provider):
             return None
 
         if isinstance(season_data, SeasonMetadata):
-            return (series_id, season_data.season_id)
+            return (series_id, season_data.season_number)
 
         return None
 
@@ -153,6 +154,7 @@ class TMDBProvider(Provider):
                 result.vote_average,
                 result.vote_count,
                 result.first_air_date,
+                result.original_name,
                 result.id,
             )
         except HTTPError as err:
@@ -168,23 +170,22 @@ class TMDBProvider(Provider):
         series_data: Any,
         season: int,
     ) -> Optional[Any]:
-        season_metadata = self.__get_metadata_for_season(series_data)
-
-        if season_metadata is None:
+        series_metadata = self.__get_metadata_for_season(series_data)
+        if series_metadata is None:
             return None
 
         try:
-            result = self.__client.season(season_metadata, season).details()
+            result = self.__client.season(series_metadata, season).details()
 
-            if result.season_id is None:
+            if result.id is None:
                 return None
 
             return SeasonMetadata(
                 result.air_date,
                 len(result.episodes) if result.episodes is not None else None,
                 result.name,
-                result.season_number,
-                result.season_id,
+                result.season_number if result.season_number else season,
+                result.id,
             )
         except HTTPError as err:
             logger.error(err)  # noqa: TRY400
@@ -200,15 +201,15 @@ class TMDBProvider(Provider):
         season_data: Any,
         episode: int,
     ) -> Optional[Any]:
-        episode_metadata = self.__get_metadata_for_episode(series_data, season_data)
+        metadata_for_episode = self.__get_metadata_for_episode(series_data, season_data)
 
-        if episode_metadata is None:
+        if metadata_for_episode is None:
             return None
 
-        series_id, season_id = episode_metadata
+        series_id, season_number = metadata_for_episode
 
         try:
-            result = self.__client.episode(series_id, season_id, episode).details()
+            result = self.__client.episode(series_id, season_number, episode).details()
 
             if result.episode_number is None:
                 return None
