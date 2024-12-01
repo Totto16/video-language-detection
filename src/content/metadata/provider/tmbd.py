@@ -3,6 +3,7 @@ from datetime import date
 from logging import Logger
 from typing import Any, Literal, Optional, Self, override
 
+from apischema import deserialize, schema
 from apischema.metadata import none_as_undefined
 from requests import HTTPError
 from themoviedb import TMDb
@@ -29,6 +30,7 @@ class TMDBMetadataConfig:
 
 
 @dataclass
+@schema()
 class SeriesMetadata:
     episodes_count: Optional[int]
     seasons_count: Optional[int]
@@ -38,34 +40,22 @@ class SeriesMetadata:
     vote_count: Optional[int]
     first_air_date: Optional[date]
     series_id: int
-
-    # TODO: serialize and deserialize this
-    def as_dict(self: Self) -> dict[str, Any]:
-        return {
-            # TODO
-        }
+    metadata_type: Literal["series"] = "series"
 
 
 @dataclass
+@schema()
 class SeasonMetadata:
     air_date: Optional[date]
     episodes_count: Optional[int]
     name: Optional[str]
     season_number: Optional[int]
     season_id: int
-
-    # TODO: serialize and deserialize this
-    def as_dict(self: Self) -> dict[str, Any]:
-        return {
-            "air_date": self.air_date,
-            "episodes_count": self.episodes_count,
-            "name": self.name,
-            "season_number": self.season_number,
-            "season_id": self.season_id,
-        }
+    metadata_type: Literal["season"] = "season"
 
 
 @dataclass
+@schema()
 class EpisodeMetadata:
     air_date: Optional[date]
     runtime: Optional[int]
@@ -73,17 +63,7 @@ class EpisodeMetadata:
     vote_count: Optional[int]
     name: Optional[str]
     episode_number: int
-
-    # TODO: serialize and deserialize this
-    def as_dict(self: Self) -> dict[str, Any]:
-        return {
-            "air_date": self.air_date,
-            "runtime": self.runtime,
-            "vote_average": self.vote_average,
-            "vote_count": self.vote_count,
-            "name": self.name,
-            "episode_number": self.episode_number,
-        }
+    metadata_type: Literal["episode"] = "episode"
 
 
 class TMDBProvider(Provider):
@@ -247,3 +227,26 @@ class TMDBProvider(Provider):
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
             return None
+
+    @staticmethod
+    def deserialize_metadata(data: dict[str, Any]) -> Any:
+        metadata_type = data.get("metadata_type")
+
+        if metadata_type is None:
+            msg = "Deserialization error: missing property 'metadata_type'"
+            raise TypeError(msg)
+
+        if not isinstance(metadata_type, str):
+            msg = "Deserialization error: property 'metadata_type' is not a str"
+            raise TypeError(msg)
+
+        match metadata_type:
+            case "series":
+                return deserialize(SeriesMetadata, data)
+            case "season":
+                return deserialize(SeasonMetadata, data)
+            case "episode":
+                return deserialize(EpisodeMetadata, data)
+            case _:
+                msg = f"Deserialization error: Unknown metadata_type {metadata_type}"
+                raise TypeError(msg)
