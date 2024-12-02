@@ -1,5 +1,6 @@
-from typing import cast
+from typing import Annotated, cast
 
+from content.general import OneOf
 from content.metadata.interfaces import (
     MissingProvider,
     MissingProviderMetadataConfig,
@@ -9,7 +10,10 @@ from content.metadata.provider.imdb import IMDBMetadataConfig, IMDBProvider
 from content.metadata.provider.tmbd import TMDBMetadataConfig, TMDBProvider
 from content.metadata.scanner import MetadataScanner
 
-MetadataConfig = TMDBMetadataConfig | IMDBMetadataConfig | MissingProviderMetadataConfig
+MetadataConfig = Annotated[
+    TMDBMetadataConfig | IMDBMetadataConfig | MissingProviderMetadataConfig,
+    OneOf,
+]
 
 
 def __get_provider(config: MetadataConfig) -> Provider:

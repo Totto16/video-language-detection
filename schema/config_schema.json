@@ -27,13 +27,17 @@
                 "scanner": {
                     "anyOf": [
                         {
-                            "$ref": "#/$defs/FullScannerConfig"
-                        },
-                        {
-                            "$ref": "#/$defs/NoScannerConfig"
-                        },
-                        {
-                            "$ref": "#/$defs/ConfigScannerConfig"
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/FullScannerConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/NoScannerConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/ConfigScannerConfig"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -53,13 +57,17 @@
                 "metadata": {
                     "anyOf": [
                         {
-                            "$ref": "#/$defs/TMDBMetadataConfig"
-                        },
-                        {
-                            "$ref": "#/$defs/IMDBMetadataConfig"
-                        },
-                        {
-                            "$ref": "#/$defs/MissingProviderMetadataConfig"
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/TMDBMetadataConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/IMDBMetadataConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/MissingProviderMetadataConfig"
+                                }
+                            ]
                         },
                         {
                             "type": "null"

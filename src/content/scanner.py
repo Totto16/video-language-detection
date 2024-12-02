@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Optional, Self, TypedDict, cast, override
+from typing import Annotated, Literal, Optional, Self, TypedDict, cast, override
 
 from content.base_class import LanguageScanner, Scanner
+from content.general import OneOf
 from content.metadata.metadata import MetadataHandle
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
@@ -224,7 +225,10 @@ class ConfigScannerConfig:
     config: Optional[ConfigScannerDict]
 
 
-ScannerConfig = FullScannerConfig | NoScannerConfig | ConfigScannerConfig
+ScannerConfig = Annotated[
+    FullScannerConfig | NoScannerConfig | ConfigScannerConfig,
+    OneOf,
+]
 
 
 def get_scanner_from_config(
