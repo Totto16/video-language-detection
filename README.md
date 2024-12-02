@@ -41,5 +41,5 @@ scanner:
 ## Current version 
 
 ```yaml
-2.2.0
+2.3.0
 ```
