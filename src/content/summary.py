@@ -247,13 +247,15 @@ class Summary:
 
     @staticmethod
     def combine_summaries(
-        input_list: Iterable["Summary"],
+        input_iterable: Iterable["Summary"],
     ) -> tuple[LanguageDict, MetadataDict]:
-        lang_dict = Summary.__combine_language_dicts(inp.language for inp in input_list)
+        input_list: list[tuple[LanguageDict, MetadataDict]] = [
+            (inp.language, inp.metadata) for inp in input_iterable
+        ]
 
-        metadata_dict = Summary.__combine_metadata_dicts(
-            inp.metadata for inp in input_list
-        )
+        lang_dict = Summary.__combine_language_dicts(inp[0] for inp in input_list)
+
+        metadata_dict = Summary.__combine_metadata_dicts(inp[1] for inp in input_list)
 
         return (lang_dict, metadata_dict)
 
