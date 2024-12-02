@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 from classifier import Classifier, Language
 from content.base_class import LanguageScanner, Scanner
 from content.metadata.config import get_metadata_scanner_from_config
+from content.summary import Summary
 from helper.log import LogLevel, setup_custom_logger
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from content.metadata.scanner import MetadataScanner
 
 from config import Config, ParsedConfig
-from content.general import NameParser, Summary
+from content.general import NameParser
 from content.scanner import (
     get_scanner_from_config,
 )
@@ -119,9 +120,9 @@ def main(config: ParsedConfig) -> None:
         scanner=scanner,
     )
 
-    summaries = [content.summary() for content in contents]
-
-    language_summary, metadata_summary = Summary.combine_summaries(summaries)
+    language_summary, metadata_summary = Summary.combine_summaries(
+        content.summary() for content in contents
+    )
 
     logger.info(language_summary)
     logger.info(metadata_summary)

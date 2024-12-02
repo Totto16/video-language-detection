@@ -14,12 +14,12 @@ from content.general import (
     MissingOverrideError,
     ScannedFile,
     ScannedFileType,
-    Summary,
     safe_index,
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanType
+from content.summary import Summary
 from helper.log import get_logger
 
 logger: Logger = get_logger()

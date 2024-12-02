@@ -23,12 +23,12 @@ from content.general import (
     NameParser,
     ScannedFile,
     SeriesDescription,
-    Summary,
     narrow_type,
 )
 from content.metadata.metadata import HandlesType
 from content.season_content import SeasonContent
 from content.shared import ScanType
+from content.summary import Summary
 
 
 class SeriesContentDict(ContentDict):

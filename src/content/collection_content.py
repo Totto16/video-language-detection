@@ -18,14 +18,13 @@ from content.base_class import (
 )
 from content.general import (
     Callback,
-    CollectionDescription,
     ContentType,
     ScannedFile,
-    Summary,
     narrow_type,
 )
 from content.metadata.metadata import HandlesType
 from content.series_content import SeriesContent
+from content.summary import CollectionDescription, Summary
 
 
 class CollectionContentDict(ContentDict):

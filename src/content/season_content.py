@@ -25,11 +25,11 @@ from content.general import (
     NameParser,
     ScannedFile,
     SeasonDescription,
-    Summary,
     narrow_type,
 )
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.shared import ScanType
+from content.summary import Summary
 from helper.log import get_logger
 
 logger: Logger = get_logger()
