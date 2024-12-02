@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict, override
 
-from apischema import deserialize, schema, serialize
+from apischema import deserialize, serialize
 from enlighten import Justify, Manager, get_manager
 
 from config import Config
@@ -20,6 +20,7 @@ from content.general import (
     ContentType,
     EmitType,
     NameParser,
+    OneOf,
     ScannedFileType,
     get_schema,
 )
@@ -218,16 +219,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
 
-# from: https://wyfo.github.io/apischema/0.18/json_schema/
-# schema extra can be callable to modify the schema in place
-def to_one_of(schema: dict[str, Any]) -> None:
-    if "anyOf" in schema:
-        schema["oneOf"] = schema.pop("anyOf")
-
-
-OneOf = schema(extra=to_one_of)
-
-
 AllContent = Annotated[
     EpisodeContent | SeasonContent | SeriesContent | CollectionContent,
     OneOf,
@@ -326,5 +317,9 @@ def generate_schema(
 
 
 def generate_schemas(folder: Path) -> None:
-    generate_schema(folder / "content_list_schema.json", list[AllContent])
+    generate_schema(
+        folder / "content_list_schema.json",
+        list[AllContent],
+        emit_type="deserialize",
+    )
     generate_schema(folder / "config_schema.json", Config, emit_type="deserialize")

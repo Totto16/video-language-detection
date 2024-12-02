@@ -607,13 +607,15 @@ def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:
 EmitType = Literal["deserialize", "serialize"]
 
 
+SchemaType = MutableMapping[str, Any]
+
 def get_schema(
     any_type: Any,
     *,
     additional_properties: Optional[bool] = None,
     all_refs: Optional[bool] = None,
     emit_type: Optional[EmitType] = None,
-) -> MutableMapping[str, Any]:
+) -> SchemaType:
     result: Mapping[str, Any] = deserialization_schema(
         any_type,
         additional_properties=additional_properties,
@@ -631,9 +633,9 @@ def get_schema(
             msg = "Deserialization and Serialization scheme mismatch"
             raise RuntimeError(msg)
         if emit_type == "serialize":
-            return cast(MutableMapping[str, Any], result2)
+            return cast(SchemaType, result2)
 
-    return cast(MutableMapping[str, Any], result)
+    return cast(SchemaType, result)
 
 
 def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
@@ -644,7 +646,7 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"],
             dict,
         ):
-            resulting_type: MutableMapping[str, Any] = get_schema(type_desc)
+            resulting_type: SchemaType = get_schema(type_desc)
             del resulting_type["$schema"]
 
             if cast(dict[str, Any], schema["properties"]).get(name) is None:
@@ -654,3 +656,13 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"][name] = resulting_type
 
     return narrow_schema
+
+
+# from: https://wyfo.github.io/apischema/0.18/json_schema/
+# schema extra can be callable to modify the schema in place
+def to_one_of(schema: dict[str, Any]) -> None:
+    if "anyOf" in schema:
+        schema["oneOf"] = schema.pop("anyOf")
+
+
+OneOf = schema(extra=to_one_of)

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 from apischema import alias, deserializer, schema, serialize, serializer
 
@@ -11,7 +12,30 @@ class MetadataHandleHelper:
     data: Any
 
 
-@schema()
+def generate_provider_schema() -> Callable[[dict[str, Any]], None]:
+    def make_provider_schema(schema: dict[str, Any]) -> None:
+        from content.metadata.provider.imdb import IMDBProvider
+        from content.metadata.provider.tmbd import TMDBProvider
+
+        if TYPE_CHECKING:
+            from content.general import SchemaType
+            from content.metadata.interfaces import Provider
+
+        providers: list[type[Provider]] = [
+            IMDBProvider,
+            TMDBProvider,
+        ]
+
+        provider_schemas: list[SchemaType] = [
+            provider.get_metadata_schema() for provider in providers
+        ]
+
+        schema["oneOf"] = provider_schemas
+
+    return make_provider_schema
+
+
+@schema(extra=generate_provider_schema())
 class MetadataHandle:
     __provider: str = field(metadata=alias("provider"))
     __data: Any = field(metadata=alias("data"))

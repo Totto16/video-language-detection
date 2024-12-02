@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Self, override
 
-from content.general import MissingOverrideError
+from content.general import MissingOverrideError, SchemaType
 from content.metadata.metadata import MetadataHandle
 from content.shared import ScanType
 
@@ -46,6 +46,10 @@ class Provider:
     @property
     def name(self: Self) -> str:
         return self.__name
+
+    @staticmethod
+    def get_metadata_schema() -> SchemaType:
+        raise MissingOverrideError
 
 
 @dataclass

@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
 from datetime import date
 from logging import Logger
-from typing import Any, Literal, Optional, Self, override
+from typing import Annotated, Any, Literal, Optional, Self, override
 
 from apischema import deserialize, schema
 from apischema.metadata import none_as_undefined
 from requests import HTTPError
 from themoviedb import TMDb
 
+from content.general import OneOf, SchemaType, get_schema
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import MetadataHandle
 from content.shared import ScanType
@@ -41,7 +42,7 @@ class SeriesMetadata:
     first_air_date: Optional[date]
     original_name: Optional[str]
     series_id: int
-    metadata_type: Literal["series"] = "series"
+    metadata_type: Literal["series"]
 
 
 @dataclass
@@ -52,7 +53,7 @@ class SeasonMetadata:
     name: Optional[str]
     season_number: int
     season_id: int
-    metadata_type: Literal["season"] = "season"
+    metadata_type: Literal["season"]
 
 
 @dataclass
@@ -64,14 +65,27 @@ class EpisodeMetadata:
     vote_count: Optional[int]
     name: Optional[str]
     episode_number: int
-    metadata_type: Literal["episode"] = "episode"
+    metadata_type: Literal["episode"]
 
 
 @dataclass
 @schema()
 class SkipMetadata:
     reason: str
-    metadata_type: Literal["skip"] = "skip"
+    metadata_type: Literal["skip"]
+
+
+MetadataData = Annotated[
+    SkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
+    OneOf,
+]
+
+
+@dataclass
+@schema()
+class TMDBMetadataSchema:
+    data: MetadataData
+    provider: Literal["tmdb"]
 
 
 class TMDBProvider(Provider):
@@ -175,6 +189,7 @@ class TMDBProvider(Provider):
                 result.first_air_date,
                 result.original_name,
                 result.id,
+                "series",
             )
         except HTTPError as err:
             logger.error(err)  # noqa: TRY400
@@ -205,6 +220,7 @@ class TMDBProvider(Provider):
                 result.name,
                 result.season_number if result.season_number else season,
                 result.id,
+                "season",
             )
         except HTTPError as err:
             logger.error(err)  # noqa: TRY400
@@ -240,6 +256,7 @@ class TMDBProvider(Provider):
                 result.vote_count,
                 result.name,
                 result.episode_number,
+                "episode",
             )
         except HTTPError as err:
             logger.error(err)  # noqa: TRY400
@@ -272,3 +289,8 @@ class TMDBProvider(Provider):
             case _:
                 msg = f"Deserialization error: Unknown metadata_type {metadata_type}"
                 raise TypeError(msg)
+
+    @override
+    @staticmethod
+    def get_metadata_schema() -> SchemaType:
+        return get_schema(TMDBMetadataSchema, emit_type="deserialize")
