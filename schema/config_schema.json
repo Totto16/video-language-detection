@@ -27,13 +27,47 @@
                 "scanner": {
                     "anyOf": [
                         {
-                            "$ref": "#/$defs/FullLanguageScannerConfig"
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/FullScannerConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/NoScannerConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/ConfigScannerConfig"
+                                }
+                            ]
                         },
                         {
-                            "$ref": "#/$defs/NoLanguageScannerConfig"
+                            "type": "null"
+                        }
+                    ]
+                },
+                "classifier": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ClassifierOptionsParsed"
                         },
                         {
-                            "$ref": "#/$defs/ConfigScannerConfig"
+                            "type": "null"
+                        }
+                    ]
+                },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/TMDBMetadataConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/IMDBMetadataConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/MissingProviderMetadataConfig"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -44,7 +78,9 @@
             "required": [
                 "general",
                 "parser",
-                "scanner"
+                "scanner",
+                "classifier",
+                "metadata"
             ],
             "additionalProperties": false
         },
@@ -105,7 +141,7 @@
             ],
             "additionalProperties": false
         },
-        "FullLanguageScannerConfig": {
+        "FullScannerConfig": {
             "type": "object",
             "properties": {
                 "scanner_type": {
@@ -118,7 +154,7 @@
             ],
             "additionalProperties": false
         },
-        "NoLanguageScannerConfig": {
+        "NoScannerConfig": {
             "type": "object",
             "properties": {
                 "scanner_type": {
@@ -163,8 +199,153 @@
                 },
                 "scan_amount": {
                     "type": "integer"
+                },
+                "allow_abort": {
+                    "type": "boolean"
+                },
+                "types": {
+                    "$ref": "#/$defs/ScannerTypes"
                 }
             },
+            "additionalProperties": false
+        },
+        "ScannerTypes": {
+            "type": "string",
+            "enum": [
+                "only_metadata",
+                "only_language",
+                "both"
+            ]
+        },
+        "ClassifierOptionsParsed": {
+            "type": "object",
+            "properties": {
+                "segment_length": {
+                    "$ref": "#/$defs/Timestamp"
+                },
+                "accuracy_threshold": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "final_accuracy_threshold": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "minimum_scanned": {
+                    "type": "number"
+                },
+                "scan_until": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "segment_length",
+                "accuracy_threshold",
+                "final_accuracy_threshold",
+                "minimum_scanned"
+            ],
+            "additionalProperties": false
+        },
+        "Timestamp": {
+            "type": [
+                "string",
+                "integer"
+            ],
+            "minimum": 1,
+            "maximum": 86400,
+            "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
+        },
+        "TMDBMetadataConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "tmdb"
+                },
+                "config": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/TMDBConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "type",
+                "config"
+            ],
+            "additionalProperties": false
+        },
+        "TMDBConfig": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "api_key"
+            ],
+            "additionalProperties": false
+        },
+        "IMDBMetadataConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "imdb"
+                },
+                "config": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/IMDBConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "type",
+                "config"
+            ],
+            "additionalProperties": false
+        },
+        "IMDBConfig": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "url"
+            ],
+            "additionalProperties": false
+        },
+        "MissingProviderMetadataConfig": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "none"
+                }
+            },
+            "required": [
+                "type"
+            ],
             "additionalProperties": false
         }
     },

@@ -18,13 +18,13 @@ from content.base_class import (
 )
 from content.general import (
     Callback,
-    CollectionDescription,
     ContentType,
     ScannedFile,
-    Summary,
     narrow_type,
 )
+from content.metadata.metadata import HandlesType
 from content.series_content import SeriesContent
+from content.summary import CollectionDescription, Summary
 
 
 class CollectionContentDict(ContentDict):
@@ -40,7 +40,13 @@ class CollectionContent(Content):
 
     @staticmethod
     def from_path(path: Path, scanned_file: ScannedFile) -> "CollectionContent":
-        return CollectionContent(ContentType.collection, scanned_file, path.name, [])
+        return CollectionContent(
+            ContentType.collection,
+            scanned_file,
+            None,
+            path.name,
+            [],
+        )
 
     @property
     def description(self: Self) -> str:
@@ -52,17 +58,18 @@ class CollectionContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed=detailed)
-        for serie in self.__series:
-            summary.combine_series(self.description, serie.summary(detailed=detailed))
-
-        return summary
+        return Summary.construct_for_collection(
+            self.description,
+            (serie.summary(detailed=detailed) for serie in self.__series),
+            detailed=detailed,
+        )
 
     @override
     def scan(
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
+        handles: HandlesType,
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
@@ -70,6 +77,7 @@ class CollectionContent(Content):
             contents: list[Content] = process_folder(
                 self.scanned_file.path,
                 callback=callback,
+                handles=handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
             )
@@ -85,6 +93,7 @@ class CollectionContent(Content):
             process_folder(
                 self.scanned_file.path,
                 callback=callback,
+                handles=handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
                 rescan=cast(list[Content], self.__series),

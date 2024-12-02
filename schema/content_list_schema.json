@@ -27,6 +27,16 @@
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
                 },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/MetadataHandle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
                 "description": {
                     "$ref": "#/$defs/EpisodeDescription"
                 },
@@ -37,6 +47,7 @@
             "required": [
                 "type",
                 "scanned_file",
+                "metadata",
                 "description",
                 "language"
             ],
@@ -106,6 +117,234 @@
             ],
             "additionalProperties": false
         },
+        "MetadataHandle": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "type": "null"
+                        },
+                        "provider": {
+                            "type": "string",
+                            "const": "imdb"
+                        }
+                    },
+                    "required": [
+                        "data",
+                        "provider"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft/2020-12/schema#"
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "metadata_type": {
+                                            "type": "string",
+                                            "const": "skip"
+                                        }
+                                    },
+                                    "required": [
+                                        "reason",
+                                        "metadata_type"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "air_date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "format": "date"
+                                        },
+                                        "runtime": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "vote_average": {
+                                            "type": [
+                                                "number",
+                                                "null"
+                                            ]
+                                        },
+                                        "vote_count": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "name": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "episode_number": {
+                                            "type": "integer"
+                                        },
+                                        "metadata_type": {
+                                            "type": "string",
+                                            "const": "episode"
+                                        }
+                                    },
+                                    "required": [
+                                        "air_date",
+                                        "runtime",
+                                        "vote_average",
+                                        "vote_count",
+                                        "name",
+                                        "episode_number",
+                                        "metadata_type"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "air_date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "format": "date"
+                                        },
+                                        "episodes_count": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "name": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "season_number": {
+                                            "type": "integer"
+                                        },
+                                        "season_id": {
+                                            "type": "integer"
+                                        },
+                                        "metadata_type": {
+                                            "type": "string",
+                                            "const": "season"
+                                        }
+                                    },
+                                    "required": [
+                                        "air_date",
+                                        "episodes_count",
+                                        "name",
+                                        "season_number",
+                                        "season_id",
+                                        "metadata_type"
+                                    ],
+                                    "additionalProperties": false
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "episodes_count": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "seasons_count": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "status": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "type": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "vote_average": {
+                                            "type": [
+                                                "number",
+                                                "null"
+                                            ]
+                                        },
+                                        "vote_count": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "first_air_date": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "format": "date"
+                                        },
+                                        "original_name": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "series_id": {
+                                            "type": "integer"
+                                        },
+                                        "metadata_type": {
+                                            "type": "string",
+                                            "const": "series"
+                                        }
+                                    },
+                                    "required": [
+                                        "episodes_count",
+                                        "seasons_count",
+                                        "status",
+                                        "type",
+                                        "vote_average",
+                                        "vote_count",
+                                        "first_air_date",
+                                        "original_name",
+                                        "series_id",
+                                        "metadata_type"
+                                    ],
+                                    "additionalProperties": false
+                                }
+                            ]
+                        },
+                        "provider": {
+                            "type": "string",
+                            "const": "tmdb"
+                        }
+                    },
+                    "required": [
+                        "data",
+                        "provider"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft/2020-12/schema#"
+                }
+            ]
+        },
         "EpisodeDescription": {
             "type": "object",
             "properties": {
@@ -154,6 +393,16 @@
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
                 },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/MetadataHandle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
                 "description": {
                     "$ref": "#/$defs/SeasonDescription"
                 },
@@ -167,6 +416,7 @@
             "required": [
                 "type",
                 "scanned_file",
+                "metadata",
                 "description",
                 "episodes"
             ],
@@ -195,6 +445,16 @@
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
                 },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/MetadataHandle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
                 "description": {
                     "$ref": "#/$defs/SeriesDescription"
                 },
@@ -208,6 +468,7 @@
             "required": [
                 "type",
                 "scanned_file",
+                "metadata",
                 "description",
                 "seasons"
             ],
@@ -240,6 +501,16 @@
                 "scanned_file": {
                     "$ref": "#/$defs/ScannedFile"
                 },
+                "metadata": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/MetadataHandle"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
                 "description": {
                     "type": "string"
                 },
@@ -253,6 +524,7 @@
             "required": [
                 "type",
                 "scanned_file",
+                "metadata",
                 "description",
                 "series"
             ],

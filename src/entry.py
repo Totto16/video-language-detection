@@ -10,13 +10,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
 from classifier import Classifier, Language
+from content.base_class import LanguageScanner, Scanner
+from content.metadata.config import get_metadata_scanner_from_config
+from content.summary import Summary
 from helper.log import LogLevel, setup_custom_logger
 
 if TYPE_CHECKING:
     from content.base_class import Content
+    from content.metadata.scanner import MetadataScanner
 
 from config import Config, ParsedConfig
-from content.general import NameParser, Summary
+from content.general import NameParser
 from content.scanner import (
     get_scanner_from_config,
 )
@@ -93,7 +97,16 @@ class CustomNameParser(NameParser):
 
 
 def main(config: ParsedConfig) -> None:
-    scanner = get_scanner_from_config(config.scanner, Classifier())
+    classifier = Classifier(config.classifier)
+    language_scanner = LanguageScanner(classifier=classifier)
+    metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
+        config.metadata,
+    )
+    scanner: Scanner = get_scanner_from_config(
+        config.scanner,
+        language_scanner,
+        metadata_scanner,
+    )
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,
@@ -107,10 +120,12 @@ def main(config: ParsedConfig) -> None:
         scanner=scanner,
     )
 
-    summaries = [content.summary() for content in contents]
-    final = Summary.combine_language_dicts([summary.languages for summary in summaries])
+    language_summary, metadata_summary = Summary.combine_summaries(
+        content.summary() for content in contents
+    )
 
-    logger.info(final)
+    logger.info(language_summary)
+    logger.info(metadata_summary)
 
 
 SubCommand = Literal["run", "schema", "gui"]
@@ -214,6 +229,9 @@ if __name__ == "__main__":
                     args,
                 )
                 parsed_config = Config.load(Path(args_run.config))
+                if parsed_config is None:
+                    sys.exit(1)
+
                 main(parsed_config)
 
     except KeyboardInterrupt:

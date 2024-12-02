@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from logging import Logger
 from pathlib import Path
 from typing import (
     Literal,
@@ -15,7 +16,6 @@ from content.base_class import (
     Content,
     ContentCharacteristic,
     ContentDict,
-    ScanType,
 )
 from content.general import (
     Callback,
@@ -23,14 +23,20 @@ from content.general import (
     EpisodeDescription,
     NameParser,
     ScannedFile,
-    Summary,
     narrow_type,
 )
+from content.metadata.metadata import HandlesType, MetadataHandle
+from content.shared import ScanType
+from content.summary import Summary
+from helper.log import get_logger
+
+logger: Logger = get_logger()
 
 
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
+    metadata: Optional[MetadataHandle]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))
@@ -56,6 +62,7 @@ class EpisodeContent(Content):
         return EpisodeContent(
             ContentType.episode,
             scanned_file,
+            None,
             description,
             Language.unknown(),
         )
@@ -90,21 +97,39 @@ class EpisodeContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        return Summary.from_single(
+        return Summary.construct_for_episode(
             self.__language,
+            self.metadata,
             self.__description,
             detailed=detailed,
         )
+
+    def __get_handles(
+        self: Self,
+        handles: HandlesType,
+    ) -> Optional[tuple[MetadataHandle, MetadataHandle]]:
+        if handles is None:
+            return None
+
+        if len(handles) != 2:
+            msg = f"Length of handles is invalid, expected 2 but got {len(handles)}"
+            logger.warning(msg)
+            return None
+
+        return (handles[0], handles[1])
 
     @override
     def scan(
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
+        handles: HandlesType,
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
         manager, scanner = callback.get_saved()
+
+        current_handles = self.__get_handles(handles)
 
         characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
 
@@ -112,16 +137,19 @@ class EpisodeContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
 
             if not is_outdated:
-                if self.__language == Language.unknown():
+                if self.__language == Language.unknown() or self._metadata is None:
                     callback.start(
-                        (1, 1, 0),
+                        (2, 2, 0),
                         self.scanned_file.path.name,
                         self.scanned_file.parents,
                         characteristic,
                     )
 
-                    if scanner.should_scan(self.__description, ScanType.rescan):
-                        self.__language = scanner.get_language(
+                    if (
+                        self.__language == Language.unknown()
+                        and scanner.should_scan_language(ScanType.rescan)
+                    ):
+                        self.__language = scanner.language_scanner.get_language(
                             self.scanned_file,
                             manager=manager,
                         )
@@ -131,6 +159,25 @@ class EpisodeContent(Content):
                         self.scanned_file.parents,
                         characteristic,
                     )
+
+                    if current_handles is not None and scanner.should_scan_metadata(
+                        ScanType.rescan,
+                        self.metadata,
+                    ):
+                        series_handle, season_handle = current_handles
+
+                        self._metadata = scanner.metadata_scanner.get_episode_metadata(
+                            series_handle,
+                            season_handle,
+                            self.description.episode,
+                        )
+
+                    callback.progress(
+                        self.scanned_file.path.name,
+                        self.scanned_file.parents,
+                        characteristic,
+                    )
+
                     callback.finish(
                         self.scanned_file.path.name,
                         self.scanned_file.parents,
@@ -141,7 +188,7 @@ class EpisodeContent(Content):
                 return
 
         callback.start(
-            (2, 2, 0),
+            (3, 3, 0),
             self.scanned_file.path.name,
             self.scanned_file.parents,
             characteristic,
@@ -154,8 +201,8 @@ class EpisodeContent(Content):
             characteristic,
         )
 
-        if scanner.should_scan(self.__description, ScanType.first_scan):
-            self.__language = scanner.get_language(
+        if scanner.should_scan_language(ScanType.first_scan):
+            self.__language = scanner.language_scanner.get_language(
                 self.scanned_file,
                 manager=manager,
             )
@@ -165,6 +212,26 @@ class EpisodeContent(Content):
             self.scanned_file.parents,
             characteristic,
         )
+
+        if (
+            current_handles is not None
+            and self.metadata is None
+            and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
+        ):
+            series_handle, season_handle = current_handles
+
+            self._metadata = scanner.metadata_scanner.get_episode_metadata(
+                series_handle,
+                season_handle,
+                self.description.episode,
+            )
+
+        callback.progress(
+            self.scanned_file.path.name,
+            self.scanned_file.parents,
+            characteristic,
+        )
+
         callback.finish(
             self.scanned_file.path.name,
             self.scanned_file.parents,

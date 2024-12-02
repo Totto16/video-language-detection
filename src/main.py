@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict, override
 
-from apischema import deserialize, schema, serialize
+from apischema import deserialize, serialize
 from enlighten import Justify, Manager, get_manager
 
 from config import Config
@@ -10,7 +10,7 @@ from content.base_class import (
     CallbackTuple,
     Content,
     ContentCharacteristic,
-    LanguageScanner,
+    Scanner,
     process_folder,
 )
 from content.collection_content import CollectionContent
@@ -20,9 +20,11 @@ from content.general import (
     ContentType,
     EmitType,
     NameParser,
+    OneOf,
     ScannedFileType,
     get_schema,
 )
+from content.metadata.metadata import HandlesType
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
@@ -45,7 +47,7 @@ class ContentOptions(TypedDict):
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __name_parser: NameParser
-    __scanner: LanguageScanner
+    __scanner: Scanner
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
@@ -54,7 +56,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self: Self,
         options: ContentOptions,
         name_parser: NameParser,
-        scanner: LanguageScanner,
+        scanner: Scanner,
     ) -> None:
         super().__init__()
 
@@ -107,6 +109,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self: Self,
         file_path: Path,
         file_type: ScannedFileType,
+        handles: HandlesType,
         parent_folders: list[str],
         *,
         rescan: Optional[Content] = None,
@@ -129,6 +132,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
             content.scan(
                 callback=self,
+                handles=handles,
                 parent_folders=parent_folders,
             )
 
@@ -136,6 +140,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         rescan.scan(
             callback=self,
+            handles=handles,
             parent_folders=parent_folders,
             rescan=True,
         )
@@ -214,16 +219,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
 
-# from: https://wyfo.github.io/apischema/0.18/json_schema/
-# schema extra can be callable to modify the schema in place
-def to_one_of(schema: dict[str, Any]) -> None:
-    if "anyOf" in schema:
-        schema["oneOf"] = schema.pop("anyOf")
-
-
-OneOf = schema(extra=to_one_of)
-
-
 AllContent = Annotated[
     EpisodeContent | SeasonContent | SeriesContent | CollectionContent,
     OneOf,
@@ -262,7 +257,7 @@ def save_to_file(file_path: Path, contents: list[Content]) -> None:
                 )
                 json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
             case _:
-                msg = _("Data not saveable from '{suffix}' file!").format(suffix=suffix)
+                msg = _("Data not saveable to '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
 
 
@@ -271,7 +266,7 @@ def parse_contents(
     options: ContentOptions,
     save_file: Path,
     name_parser: NameParser,
-    scanner: LanguageScanner,
+    scanner: Scanner,
 ) -> list[Content]:
     callback = ContentCallback(options, name_parser, scanner)
 
@@ -279,6 +274,7 @@ def parse_contents(
         contents: list[Content] = process_folder(
             root_folder,
             callback=callback,
+            handles=[],
             parent_folders=[],
         )
 
@@ -290,6 +286,7 @@ def parse_contents(
     new_contents: list[Content] = process_folder(
         root_folder,
         callback=callback,
+        handles=[],
         rescan=contents,
         parent_folders=[],
     )
@@ -320,5 +317,9 @@ def generate_schema(
 
 
 def generate_schemas(folder: Path) -> None:
-    generate_schema(folder / "content_list_schema.json", list[AllContent])
+    generate_schema(
+        folder / "content_list_schema.json",
+        list[AllContent],
+        emit_type="deserialize",
+    )
     generate_schema(folder / "config_schema.json", Config, emit_type="deserialize")

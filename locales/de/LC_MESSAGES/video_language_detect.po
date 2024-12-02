@@ -43,7 +43,7 @@ msgstr "Scannen"
 
 #: src/main.py:125
 msgid "Parse Error: Couldn't parse content from '{file}'"
-msgstr "Parse Fehler: Konnte Inhalt nicht von '{file}'' parsen"
+msgstr "Parse Fehler: Konnte Inhalt nicht von '{file}' parsen"
 
 #: src/main.py:161
 msgid "series"

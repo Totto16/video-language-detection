@@ -9,9 +9,9 @@ from typing import (
 )
 
 from apischema import alias, schema
-from enlighten import Manager
 
 from content.base_class import (
+    CallbackTuple,
     Content,
     ContentCharacteristic,
     ContentDict,
@@ -23,10 +23,12 @@ from content.general import (
     NameParser,
     ScannedFile,
     SeriesDescription,
-    Summary,
     narrow_type,
 )
+from content.metadata.metadata import HandlesType
 from content.season_content import SeasonContent
+from content.shared import ScanType
+from content.summary import Summary
 
 
 class SeriesContentDict(ContentDict):
@@ -54,7 +56,13 @@ class SeriesContent(Content):
             msg = f"Couldn't get SeriesDescription from '{path}'"
             raise NameError(msg, name="SeriesDescription")
 
-        return SeriesContent(ContentType.series, scanned_file, description, [])
+        return SeriesContent(
+            ContentType.series,
+            scanned_file,
+            None,
+            description,
+            [],
+        )
 
     @property
     def description(self: Self) -> SeriesDescription:
@@ -86,24 +94,39 @@ class SeriesContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        summary: Summary = Summary.empty(detailed=detailed)
-        for season in self.__seasons:
-            summary.combine_seasons(self.description, season.summary(detailed=detailed))
-
-        return summary
+        return Summary.construct_for_series(
+            self.metadata,
+            self.description,
+            (season.summary(detailed=detailed) for season in self.__seasons),
+            detailed=detailed,
+        )
 
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, Manager],
+        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
         *,
+        handles: HandlesType,
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
+        _, scanner = callback.get_saved()
+
         if not rescan:
+            if self.metadata is None and scanner.should_scan_metadata(
+                ScanType.first_scan,
+                self.metadata,
+            ):
+                self._metadata = scanner.metadata_scanner.get_series_metadata(
+                    self.description.name,
+                )
+
+            new_handles = self._get_new_handles(handles)
+
             contents: list[Content] = process_folder(
                 self.scanned_file.path,
                 callback=callback,
+                handles=new_handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
             )
@@ -114,18 +137,30 @@ class SeriesContent(Content):
                     msg = f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
                     raise TypeError(msg)
 
-        else:
-            ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
-            process_folder(
-                self.scanned_file.path,
-                callback=callback,
-                parent_folders=[*parent_folders, self.scanned_file.path.name],
-                parent_type=self.type,
-                rescan=cast(list[Content], self.__seasons),
+            return
+
+        if self.metadata is None and scanner.should_scan_metadata(
+            ScanType.rescan,
+            self.metadata,
+        ):
+            self._metadata = scanner.metadata_scanner.get_series_metadata(
+                self.description.name,
             )
 
-            # since some are added unchecked, check again now!
-            for content in cast(list[Content], self.__seasons):
-                if not isinstance(content, SeasonContent):
-                    msg = f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
-                    raise TypeError(msg)
+        new_handles = self._get_new_handles(handles)
+
+        ## no assignment of the return value is needed, it get's added implicitly per appending to the local reference of self
+        process_folder(
+            self.scanned_file.path,
+            callback=callback,
+            handles=new_handles,
+            parent_folders=[*parent_folders, self.scanned_file.path.name],
+            parent_type=self.type,
+            rescan=cast(list[Content], self.__seasons),
+        )
+
+        # since some are added unchecked, check again now!
+        for content in cast(list[Content], self.__seasons):
+            if not isinstance(content, SeasonContent):
+                msg = f"No child with class '{content.__class__.__name__}' is possible in SeriesContent"
+                raise TypeError(msg)

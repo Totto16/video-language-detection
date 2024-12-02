@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from logging import Logger
 from os import listdir
 from pathlib import Path
@@ -12,13 +11,15 @@ from classifier import Classifier, FileMetadataError, Language, WAVFile
 from content.general import (
     Callback,
     ContentType,
-    EpisodeDescription,
     MissingOverrideError,
     ScannedFile,
     ScannedFileType,
-    Summary,
     safe_index,
 )
+from content.metadata.metadata import HandlesType, MetadataHandle
+from content.metadata.scanner import MetadataScanner
+from content.shared import ScanType
+from content.summary import Summary
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -31,11 +32,6 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
-class ScanType(Enum):
-    first_scan = "first_scan"
-    rescan = "rescan"
-
-
 class LanguageScanner:
     __classifier: Classifier
 
@@ -44,13 +40,6 @@ class LanguageScanner:
         classifier: Classifier,
     ) -> None:
         self.__classifier = classifier
-
-    def should_scan(
-        self: Self,
-        description: EpisodeDescription,  # noqa: ARG002
-        scan_type: ScanType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
 
     def get_language(
         self: Self,
@@ -74,13 +63,50 @@ class LanguageScanner:
             return best.language
 
 
-CallbackTuple = tuple[Manager, LanguageScanner]
+class Scanner:
+    __language_scanner: LanguageScanner
+    __metadata_scanner: MetadataScanner
+
+    def __init__(
+        self: Self,
+        language_scanner: LanguageScanner,
+        metadata_scanner: MetadataScanner,
+    ) -> None:
+        self.__language_scanner = language_scanner
+        self.__metadata_scanner = metadata_scanner
+
+    def should_scan_language(
+        self: Self,
+        scan_type: ScanType,  # noqa: ARG002
+    ) -> bool:
+        raise MissingOverrideError
+
+    def should_scan_metadata(
+        self: Self,
+        scan_type: ScanType,  # noqa: ARG002
+        metadata: Optional[MetadataHandle],  # noqa: ARG002
+    ) -> bool:
+        raise MissingOverrideError
+
+    @property
+    def language_scanner(self: Self) -> LanguageScanner:
+        return self.__language_scanner
+
+    @property
+    def metadata_scanner(self: Self) -> MetadataScanner:
+        return self.__metadata_scanner
+
+
+CallbackTuple = tuple[Manager, Scanner]
 
 
 @dataclass(slots=True, repr=True)
 class Content:
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
+    _metadata: Optional[MetadataHandle] = field(
+        metadata=alias("metadata"),
+    )
 
     def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
         raise MissingOverrideError
@@ -97,6 +123,19 @@ class Content:
     def scanned_file(self: Self) -> ScannedFile:
         return self.__scanned_file
 
+    @property
+    def metadata(self: Self) -> Optional[MetadataHandle]:
+        return self._metadata
+
+    def _get_new_handles(self: Self, old_handles: HandlesType) -> HandlesType:
+        new_handles: HandlesType = None
+        if self.metadata is not None and old_handles is not None:
+            # Note: this is important, so that it's a copy
+            new_handles = list(old_handles)
+            new_handles.append(self.metadata)
+
+        return new_handles
+
     def generate_checksum(self: Self, manager: Manager) -> None:
         self.__scanned_file.generate_checksum(manager)
 
@@ -108,6 +147,7 @@ class Content:
             CallbackTuple,
         ],
         *,
+        handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         rescan: bool = False,  # noqa: ARG002
     ) -> None:
@@ -118,6 +158,7 @@ def process_folder(
     directory: Path,
     callback: Callback[Content, ContentCharacteristic, CallbackTuple],
     *,
+    handles: HandlesType,
     parent_folders: list[str],
     parent_type: Optional[ContentType] = None,
     rescan: Optional[list[Content]] = None,
@@ -149,6 +190,7 @@ def process_folder(
             result: Optional[Content] = callback.process(
                 file_path,
                 file_type,
+                handles,
                 parent_folders_temp,
             )
             value = (
@@ -179,6 +221,7 @@ def process_folder(
         result = callback.process(
             file_path,
             file_type,
+            handles,
             parent_folders_temp,
             rescan=is_rescan,
         )

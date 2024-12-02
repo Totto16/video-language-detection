@@ -20,6 +20,7 @@ from apischema.json_schema import (
 from enlighten import Manager
 
 from classifier import Language
+from content.metadata.metadata import HandlesType
 
 
 class ScannedFileType(Enum):
@@ -97,161 +98,10 @@ class SeasonDescription:
     season: int = field(metadata=schema(min=0))
 
     def __str__(self: Self) -> str:
-        return f"<Season season: {self.season}>y"
+        return f"<Season season: {self.season}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
-
-
-CollectionDescription = str
-
-IdentifierDescription = (
-    tuple[EpisodeDescription]
-    | tuple[SeasonDescription, EpisodeDescription]
-    | tuple[SeriesDescription, SeasonDescription, EpisodeDescription]
-    | tuple[
-        CollectionDescription,
-        SeriesDescription,
-        SeasonDescription,
-        EpisodeDescription,
-    ]
-)
-
-
-LanguageDict = dict[Language, int]
-
-
-# TODO
-class Summary:
-    __complete: bool
-    __detailed: bool
-
-    __descriptions: list[IdentifierDescription]
-
-    __languages: LanguageDict
-    __duplicates: list[IdentifierDescription]
-    __missing: list[IdentifierDescription]
-
-    def __init__(
-        self: Self,
-        languages: list[Language],
-        descriptions: list[IdentifierDescription],
-        *,
-        detailed: bool = False,
-    ) -> None:
-        def get_dict(language: Language) -> LanguageDict:
-            dct: LanguageDict = {}
-            dct[language] = 1
-            return dct
-
-        self.__languages = Summary.combine_language_dicts(
-            [get_dict(language) for language in languages],
-        )
-        self.__duplicates = []
-        self.__missing = []
-        self.__complete = False
-        self.__detailed = detailed
-        self.__descriptions = descriptions
-
-    @property
-    def complete(self: Self) -> bool:
-        return self.__complete
-
-    @property
-    def detailed(self: Self) -> bool:
-        return self.__detailed
-
-    @property
-    def duplicates(self: Self) -> list[IdentifierDescription]:
-        return self.__duplicates
-
-    @property
-    def missing(self: Self) -> list[IdentifierDescription]:
-        return self.__missing
-
-    @staticmethod
-    def from_single(
-        language: Language,
-        description: EpisodeDescription,
-        *,
-        detailed: bool,
-    ) -> "Summary":
-        return Summary([language], [(description,)], detailed=detailed)
-
-    @staticmethod
-    def empty(*, detailed: bool) -> "Summary":
-        return Summary([], [], detailed=detailed)
-
-    def combine_episodes(
-        self: Self,
-        description: SeasonDescription,
-        summary: "Summary",
-    ) -> None:
-        for desc in summary.descriptions:
-            if isinstance(desc[0], EpisodeDescription):
-                self.__descriptions.append((description, desc[0]))
-
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
-        )
-
-    def combine_seasons(
-        self: Self,
-        description: SeriesDescription,
-        summary: "Summary",
-    ) -> None:
-        for desc in summary.descriptions:
-            if len(desc) == 2:
-                self.__descriptions.append(
-                    (description, desc[0], desc[1]),
-                )
-
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
-        )
-
-    def combine_series(
-        self: Self,
-        description: CollectionDescription,
-        summary: "Summary",
-    ) -> None:
-        for desc in summary.descriptions:
-            if len(desc) == 3:
-                self.__descriptions.append(
-                    (description, desc[0], desc[1], desc[2]),
-                )
-
-        self.__languages = Summary.combine_language_dicts(
-            [self.__languages, summary.languages],
-        )
-
-    @staticmethod
-    def combine_language_dicts(inp: list[LanguageDict]) -> LanguageDict:
-        dct: LanguageDict = {}
-        for input_dict in inp:
-            for language, amount in input_dict.items():
-                if dct.get(language) is None:
-                    dct[language] = 0
-
-                dct[language] += amount
-
-        return dct
-
-    @property
-    def descriptions(self: Self) -> list[IdentifierDescription]:
-        return self.__descriptions
-
-    @property
-    def languages(self: Self) -> LanguageDict:
-        return self.__languages
-
-    # TODO: human readable
-    def __str__(self: Self) -> str:
-        return repr(self)
-
-    # TODO: this isn't finished yet
-    def __repr__(self: Self) -> str:
-        return f"<Summary languages: {self.__languages}>"
 
 
 @dataclass(slots=True, repr=True)
@@ -429,6 +279,7 @@ class Callback[C, CT, RT]:
         self: Self,
         file_path: Path,  # noqa: ARG002
         file_type: ScannedFileType,  # noqa: ARG002
+        handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         *,
         rescan: Optional[C] = None,  # noqa: ARG002
@@ -485,13 +336,15 @@ def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:
 EmitType = Literal["deserialize", "serialize"]
 
 
+SchemaType = MutableMapping[str, Any]
+
 def get_schema(
     any_type: Any,
     *,
     additional_properties: Optional[bool] = None,
     all_refs: Optional[bool] = None,
     emit_type: Optional[EmitType] = None,
-) -> MutableMapping[str, Any]:
+) -> SchemaType:
     result: Mapping[str, Any] = deserialization_schema(
         any_type,
         additional_properties=additional_properties,
@@ -509,9 +362,9 @@ def get_schema(
             msg = "Deserialization and Serialization scheme mismatch"
             raise RuntimeError(msg)
         if emit_type == "serialize":
-            return cast(MutableMapping[str, Any], result2)
+            return cast(SchemaType, result2)
 
-    return cast(MutableMapping[str, Any], result)
+    return cast(SchemaType, result)
 
 
 def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
@@ -522,7 +375,7 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"],
             dict,
         ):
-            resulting_type: MutableMapping[str, Any] = get_schema(type_desc)
+            resulting_type: SchemaType = get_schema(type_desc)
             del resulting_type["$schema"]
 
             if cast(dict[str, Any], schema["properties"]).get(name) is None:
@@ -532,3 +385,13 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"][name] = resulting_type
 
     return narrow_schema
+
+
+# from: https://wyfo.github.io/apischema/0.18/json_schema/
+# schema extra can be callable to modify the schema in place
+def to_one_of(schema: dict[str, Any]) -> None:
+    if "anyOf" in schema:
+        schema["oneOf"] = schema.pop("anyOf")
+
+
+OneOf = schema(extra=to_one_of)
