@@ -67,6 +67,13 @@ class EpisodeMetadata:
     metadata_type: Literal["episode"] = "episode"
 
 
+@dataclass
+@schema()
+class SkipMetadata:
+    reason: str
+    metadata_type: Literal["skip"] = "skip"
+
+
 class TMDBProvider(Provider):
     __client: TMDb
 
@@ -106,6 +113,12 @@ class TMDBProvider(Provider):
         if isinstance(series_data, SeriesMetadata):
             return series_data.series_id
 
+        if isinstance(series_data, SkipMetadata):
+            return None
+
+        msg = "Expected SeriesMetadata, but got other metadata data"
+        logger.warning(msg)
+
         return None
 
     def __get_metadata_for_episode(
@@ -119,6 +132,12 @@ class TMDBProvider(Provider):
 
         if isinstance(season_data, SeasonMetadata):
             return (series_id, season_data.season_number)
+
+        if isinstance(season_data, SkipMetadata):
+            return None
+
+        msg = "Expected SeasonMetadata, but got other metadata data"
+        logger.warning(msg)
 
         return None
 
@@ -248,6 +267,8 @@ class TMDBProvider(Provider):
                 return deserialize(SeasonMetadata, data)
             case "episode":
                 return deserialize(EpisodeMetadata, data)
+            case "skip":
+                return deserialize(SkipMetadata, data)
             case _:
                 msg = f"Deserialization error: Unknown metadata_type {metadata_type}"
                 raise TypeError(msg)
