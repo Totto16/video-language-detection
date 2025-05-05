@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from logging import Logger
-from os import listdir
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
@@ -165,9 +164,9 @@ def process_folder(
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
     ignored: int = 0
-    sorted_files: list[str] = sorted(listdir(directory))
+    sorted_files: list[Path] = sorted(Path.iterdir(directory))
     for file in sorted_files:
-        file_path: Path = Path(directory) / file
+        file_path: Path = directory / file
 
         file_type: ScannedFileType = ScannedFileType.from_path(file_path)
         should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)

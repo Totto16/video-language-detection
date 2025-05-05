@@ -29,6 +29,7 @@ ignore = [
     "ANN401",  # => any-type 
     "D",       # pydocstyle => I don't use doc strings atm. 
     "C90",     # mccabe => complexity isn't of concern atm.
+    "TC006",   # runtime-cast-value => I prefer using normal types, not string quoted ones
     "FIX",     # todo activate
     "TD",      # todo activate,
 ]
