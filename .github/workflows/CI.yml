@@ -29,7 +29,7 @@ jobs:
             - name: run lint
               run: |
                   pipenv run mypy
-                  pipenv run ruff-ci github
+                  pipenv run ruff --output-format github
 
             - name: run checks
               run: |
