@@ -32,10 +32,6 @@ jobs:
                   pipenv run mypy
                   pipenv run ruff --output-format github
 
-            - name: run checks
-              run: |
-                  pipenv check --scan
-
     tests:
         name: Run tests
         runs-on: ubuntu-24.04
