@@ -34,7 +34,7 @@ jobs:
 
             - name: run checks
               run: |
-                  pipenv check
+                  pipenv check --scan
 
     tests:
         name: Run tests

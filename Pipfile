@@ -36,6 +36,7 @@ requests = "*"
 chardet = "*"
 types-wxpython = "*"
 types-pyyaml = "*"
+safety = "*"
 
 [scripts]
 check = "python src/entry.py run"
