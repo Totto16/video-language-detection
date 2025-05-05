@@ -51,4 +51,4 @@ extract_translation = "pygettext3 -d video_language_detect -o locales/video_lang
 generate_translation = "bash -c 'for PO_FILE in locales/*/LC_MESSAGES/*.po; do MO_FILE=\"${PO_FILE/.po/.mo}\"; msgfmt -o \"$MO_FILE\" \"$PO_FILE\"; done'"
 
 [requires]
-python_version = "3.12"
+python_version = "3.13"
