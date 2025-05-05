@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "62d24b6419309ec959683440f2697b070a913a4ecae0b0448118d40b3ddd475a"
+            "sha256": "8ac4a35d2ae720c4610025ff829ab91eccdf57cb7ebfbf131276cd52a85606d0"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -1373,13 +1373,11 @@
             "version": "==1.14.0"
         },
         "themoviedb": {
-            "extras": [
-                "sync"
-            ],
             "hashes": [
                 "sha256:7835615142a44e7ca25e48645a3a3c5e06b382e8c518c38c3537effa9a2596ce",
                 "sha256:badf85e91010c7085509f40270bf2a40ea30ee5ef3ed6fb3ec332c5e50adb576"
             ],
+            "index": "pypi",
             "markers": "python_version >= '3.8'",
             "version": "==1.0.2"
         },
