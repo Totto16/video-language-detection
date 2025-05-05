@@ -63,7 +63,7 @@ def setup_global_logger() -> None:
     filterwarnings("ignore")
 
     # set speechbrain log level
-    os.environ["SB_LOG_LEVEL"] = str(logging.WARNING)
+    os.environ["SB_LOG_LEVEL"] = "WARNING"
 
 
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
