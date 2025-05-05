@@ -16,8 +16,9 @@ enlighten = "*"
 psutil = "*"
 apischema = "*"
 pysoundfile = "*"
-wxpython = "*"
-themoviedb = {extras = ["sync"], version = "*"}
+wxpython = {version = "*", find-links="https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/"}
+themoviedb = "*"
+sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python"}
 
 [dev-packages]
 pylint = "*"
@@ -41,8 +42,7 @@ check = "python src/entry.py run"
 lint = "bash -c 'pipenv run mypy && pipenv run ruff'"
 mypy = "mypy src/ tests/ ffmpeg_helper/ --strict --ignore-missing-imports --warn-unreachable"
 ruff = "ruff check src/ tests/ ffmpeg_helper/"
-ruff-ci = "ruff check src/ tests/ ffmpeg_helper/ --output-format"
-ruff-fix = "ruff check src/ tests/ ffmpeg_helper/ --fix"
+ruff-fix = "pipenv run ruff --fix"
 schema = "python src/entry.py schema"
 gui = "python src/entry.py gui"
 test = "pytest tests/"
@@ -51,4 +51,4 @@ extract_translation = "pygettext3 -d video_language_detect -o locales/video_lang
 generate_translation = "bash -c 'for PO_FILE in locales/*/LC_MESSAGES/*.po; do MO_FILE=\"${PO_FILE/.po/.mo}\"; msgfmt -o \"$MO_FILE\" \"$PO_FILE\"; done'"
 
 [requires]
-python_version = "3.12"
+python_version = "3.13"

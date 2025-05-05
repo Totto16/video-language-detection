@@ -92,7 +92,7 @@ class Timestamp:
             return str(delta)
 
         def round_to_tens(value: int, tens: int) -> int:
-            return int(round(value / (10**tens)))
+            return int(round(value / (10**tens)))  # noqa: RUF046
 
         def emit_error(reason: str) -> Never:
             msg = f"Invalid format specifier '{spec}' for object of type 'Timestamp': reason {reason}"
