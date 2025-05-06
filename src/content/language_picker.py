@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Annotated, Literal, Optional, Self, TypedDict, cast, override
+from typing import Annotated, Any, Literal, Optional, Self, TypedDict, cast, override
 
 from questionary import Choice, Question, Separator, select
 from questionary.prompts.common import FormattedText
@@ -85,7 +85,7 @@ def construct_choice(title: FormattedText, value: SelectResult) -> Choice:
     return Choice(title=title, value=value)
 
 
-def ask_question(question: Question) -> Optional[SelectResult]:
+def ask_question(question: Question) -> Optional[SelectResult] | Any:
     return question.ask()
 
 
@@ -230,6 +230,12 @@ class InteractiveLanguagePicker(LanguagePicker):
             while True:
                 result = ask_question(question)
                 if result is None:
+                    continue
+
+                if not isinstance(
+                    result,
+                    PredictionBestSelectResult,
+                ) and not isinstance(result, ManualSelectResult):
                     continue
 
                 match result.select_result_type:
