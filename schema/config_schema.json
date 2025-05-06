@@ -411,6 +411,9 @@
                 },
                 "show_full_list": {
                     "type": "boolean"
+                },
+                "play_sound": {
+                    "type": "boolean"
                 }
             },
             "additionalProperties": false
