@@ -36,6 +36,8 @@ logger: Logger = get_logger()
 
 _ = get_translator()
 
+VOXLINGUA_SAMPLE_COUNT: int = 107
+
 
 class FileType(Enum):
     wav = "wav"
@@ -623,7 +625,7 @@ class Classifier:
         if not force_cpu:
             run_opts = self.__get_run_opts()
 
-        classifier = EncoderClassifier.from_hparams(
+        classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
             source="speechbrain/lang-id-voxlingua107-ecapa",
             savedir="model",
             run_opts=run_opts,
@@ -676,7 +678,9 @@ class Classifier:
             Classifier.clear_gpu_cache()
 
             emb = self.__classifier.encode_batch(wavs, wav_lens=None)
-            out_prob = self.__classifier.mods.classifier(emb).squeeze(1)
+            out_prob = self.__classifier.mods.classifier(emb).squeeze(1)  # type: ignore[operator]
+
+            self.__classifier.hparams.label_encoder.expect_len(VOXLINGUA_SAMPLE_COUNT)
 
             # NOTE:  ATTENTION - unsorted list
             prob: list[tuple[float, Language]] = [
