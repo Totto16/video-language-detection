@@ -213,10 +213,46 @@
             "type": "object",
             "properties": {
                 "start_position": {
-                    "type": "integer"
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "array",
+                            "prefixItems": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ],
+                            "items": false,
+                            "minItems": 2,
+                            "maxItems": 2
+                        }
+                    ]
                 },
                 "scan_amount": {
-                    "type": "integer"
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "array",
+                            "prefixItems": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ],
+                            "items": false,
+                            "minItems": 2,
+                            "maxItems": 2
+                        }
+                    ]
                 },
                 "allow_abort": {
                     "type": "boolean"

@@ -67,15 +67,15 @@ class ScannerTypes(Enum):
 
 # TODO: is there a better way?
 class ConfigScannerDict(TypedDict, total=False):
-    start_position: int
-    scan_amount: int
+    start_position: int | tuple[int, int]
+    scan_amount: int | tuple[int, int]
     allow_abort: bool
     types: ScannerTypes
 
 
 class ConfigScannerDictTotal(TypedDict, total=True):
-    start_position: int
-    scan_amount: int
+    start_position: tuple[int, int]
+    scan_amount: tuple[int, int]
     allow_abort: bool
     types: ScannerTypes
     # TODO: print progress option
@@ -93,8 +93,8 @@ class ConfigScanner(Scanner):
     @property
     def __defaults(self: Self) -> ConfigScannerDictTotal:
         return {
-            "start_position": 0,
-            "scan_amount": 100,
+            "start_position": (0, 0),
+            "scan_amount": (100, 100),
             "allow_abort": True,
             "types": ScannerTypes.both,
         }
@@ -110,17 +110,25 @@ class ConfigScanner(Scanner):
 
         loaded_dict: Optional[ConfigScannerDict] = config
         if loaded_dict is not None:
-            start_position: int = loaded_dict.get(
+            start_position: int | tuple[int, int] = loaded_dict.get(
                 "start_position",
                 self.__defaults["start_position"],
             )
-            self.__start_position = (start_position, start_position)
 
-            scan_amount: int = loaded_dict.get(
+            if isinstance(start_position, int):
+                self.__start_position = (start_position, start_position)
+            else:
+                self.__start_position = start_position
+
+            scan_amount: int | tuple[int, int] = loaded_dict.get(
                 "scan_amount",
                 self.__defaults["scan_amount"],
             )
-            self.__scan_amount = (scan_amount, scan_amount)
+
+            if isinstance(scan_amount, int):
+                self.__scan_amount = (scan_amount, scan_amount)
+            else:
+                self.__scan_amount = scan_amount
 
             self.__allow_abort = loaded_dict.get(
                 "allow_abort",
@@ -131,12 +139,8 @@ class ConfigScanner(Scanner):
                 self.__defaults["types"],
             )
         else:
-            start_position = self.__defaults["start_position"]
-            self.__start_position = (start_position, start_position)
-
-            scan_amount = self.__defaults["scan_amount"]
-            self.__scan_amount = (scan_amount, scan_amount)
-
+            self.__start_position = self.__defaults["start_position"]
+            self.__scan_amount = self.__defaults["scan_amount"]
             self.__allow_abort = self.__defaults["allow_abort"]
             self.__types = self.__defaults["types"]
 
