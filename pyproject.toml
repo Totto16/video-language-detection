@@ -84,3 +84,33 @@ docstring-code-line-length = "dynamic"
 [tool.coverage.run]
 relative_files = true
 source = ["src/"]
+
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = false
+disallow_untyped_calls = false
+strict = true
+ignore_missing_imports = false
+warn_unreachable = true
+disallow_any_explicit = false
+allow_redefinition = true
+strict_optional = true
+show_error_codes = true
+show_column_numbers = true
+warn_no_return = true
+disallow_any_unimported = false
+disallow_any_generics = true
+implicit_reexport = false
+
+
+[[tool.mypy.overrides]]
+module = [
+    "enlighten",
+    "torchaudio",
+    "ffmpeg.*",
+    "pynvml",
+    "speechbrain.*",
+    "themoviedb.*",
+]
+follow_untyped_imports = true
