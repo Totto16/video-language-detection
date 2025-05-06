@@ -14,7 +14,8 @@ import torchaudio
 from apischema import schema
 from apischema.metadata import none_as_undefined
 from enlighten import Manager
-from ffmpeg.ffmpeg import FFmpeg, FFmpegError
+from ffmpeg.errors import FFmpegError
+from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
 from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit

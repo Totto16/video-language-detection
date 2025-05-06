@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Optional, Self, override
 from apischema import deserialize, schema
 from apischema.metadata import none_as_undefined
 from requests import HTTPError
-from themoviedb import TMDb
+from themoviedb.tmdb import TMDb
 
 from content.general import OneOf, SchemaType, get_schema
 from content.metadata.interfaces import Provider
