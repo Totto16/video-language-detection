@@ -110,7 +110,7 @@ class SeriesContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner = callback.get_saved()
+        _, scanner, _ = callback.get_saved()
 
         if not rescan:
             if self.metadata is None and scanner.should_scan_metadata(

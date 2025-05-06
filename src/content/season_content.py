@@ -128,7 +128,7 @@ class SeasonContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner = callback.get_saved()
+        _, scanner, language_picker = callback.get_saved()
 
         series_handle = self.__get_handle(handles=handles)
 

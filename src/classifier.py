@@ -552,8 +552,8 @@ class Classifier:
         self: Self,
         wav_file: WAVFile,
         path: Path,
+        language_picker: LanguagePicker,
         manager: Optional[Manager] = None,
-        language_picker: Optional[LanguagePicker] = None,
     ) -> tuple[PredictionBest, float]:
         def get_segments(runtime: Timestamp) -> list[tuple[Segment, Timestamp]]:
             result: list[tuple[Segment, Timestamp]] = []
@@ -634,21 +634,19 @@ class Classifier:
         if bar is not None:
             bar.close(clear=True)
 
-        if language_picker is not None:
-            picked_language = language_picker.pick_language(path, prediction)
+        picked_language = language_picker.pick_language(path, prediction)
 
-            if picked_language is not None:
-                return (PredictionBest(1.0, picked_language), 1.0)
+        if picked_language is not None:
+            return (PredictionBest(1.0, picked_language), 1.0)
 
-        else:
-            best = prediction.get_best(MeanType.truncated)
+        best = prediction.get_best(MeanType.truncated)
 
-            msg = _("Couldn't get Language of '{path}': Best was {best}").format(
-                path=relative_path_str(path),
-                best=str(best),
-            )
+        msg = _("Couldn't get Language of '{path}': Best was {best}").format(
+            path=relative_path_str(path),
+            best=str(best),
+        )
 
-            logger.error(msg)
+        logger.error(msg)
 
         # return unknown language
         return (PredictionBest(0.0, Language.unknown()), 0.0)

@@ -127,7 +127,7 @@ class EpisodeContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        manager, scanner = callback.get_saved()
+        manager, scanner, language_picker = callback.get_saved()
 
         current_handles = self.__get_handles(handles)
 
@@ -151,6 +151,7 @@ class EpisodeContent(Content):
                     ):
                         self.__language = scanner.language_scanner.get_language(
                             self.scanned_file,
+                            language_picker,
                             manager=manager,
                         )
 
@@ -204,6 +205,7 @@ class EpisodeContent(Content):
         if scanner.should_scan_language(ScanType.first_scan):
             self.__language = scanner.language_scanner.get_language(
                 self.scanned_file,
+                language_picker,
                 manager=manager,
             )
 

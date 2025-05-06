@@ -16,6 +16,7 @@ from content.general import (
     safe_index,
 )
 from content.language import Language
+from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanType
@@ -44,6 +45,7 @@ class LanguageScanner:
     def get_language(
         self: Self,
         scanned_file: ScannedFile,
+        language_picker: LanguagePicker,
         *,
         manager: Optional[Manager] = None,
     ) -> Language:
@@ -53,6 +55,7 @@ class LanguageScanner:
             best, _ = self.__classifier.predict(
                 wav_file,
                 scanned_file.path,
+                language_picker,
                 manager,
             )
         except FileMetadataError:
@@ -97,7 +100,7 @@ class Scanner:
         return self.__metadata_scanner
 
 
-CallbackTuple = tuple[Manager, Scanner]
+CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
 
 
 @dataclass(slots=True, repr=True)

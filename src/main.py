@@ -24,6 +24,7 @@ from content.general import (
     ScannedFileType,
     get_schema,
 )
+from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
@@ -51,12 +52,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __progress_bars: dict[str, Any]
     __manager: Manager
     __status_bar: Any
+    __language_picker: LanguagePicker
 
     def __init__(
         self: Self,
         options: ContentOptions,
         name_parser: NameParser,
         scanner: Scanner,
+        language_picker: LanguagePicker,
     ) -> None:
         super().__init__()
 
@@ -78,10 +81,11 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             autorefresh=True,
             min_delta=0.5,
         )
+        self.__language_picker = language_picker
 
     @override
     def get_saved(self: Self) -> CallbackTuple:
-        return (self.__manager, self.__scanner)
+        return (self.__manager, self.__scanner, self.__language_picker)
 
     @override
     def ignore(
@@ -267,8 +271,9 @@ def parse_contents(
     save_file: Path,
     name_parser: NameParser,
     scanner: Scanner,
+    language_picker: LanguagePicker,
 ) -> list[Content]:
-    callback = ContentCallback(options, name_parser, scanner)
+    callback = ContentCallback(options, name_parser, scanner, language_picker)
 
     if not save_file.exists():
         contents: list[Content] = process_folder(
