@@ -52,11 +52,13 @@ class NoLanguagePicker(LanguagePicker):
 class InteractiveLanguagePickerDict(TypedDict, total=False):
     entries_to_show: int
     show_full_list: bool
+    play_sound: bool
 
 
 class InteractiveLanguagePickerDictTotal(TypedDict, total=True):
     entries_to_show: int
     show_full_list: bool
+    play_sound: bool
 
 
 @dataclass()
@@ -103,12 +105,17 @@ def open_file(path: Path) -> None:
         raise OSError(msg)
 
 
+def play_notification_sound() -> None:
+    print("\a")  # noqa: T201
+
+
 logger: Logger = get_logger()
 
 
 class InteractiveLanguagePicker(LanguagePicker):
     __entries_to_show: int
     __show_full_list: bool
+    __play_sound: bool
 
     def __init__(
         self: Self,
@@ -128,15 +135,22 @@ class InteractiveLanguagePicker(LanguagePicker):
                 "show_full_list",
                 self.__defaults["show_full_list"],
             )
+
+            self.__play_sound = loaded_dict.get(
+                "play_sound",
+                self.__defaults["play_sound"],
+            )
         else:
             self.__entries_to_show = self.__defaults["entries_to_show"]
             self.__show_full_list = self.__defaults["show_full_list"]
+            self.__play_sound = self.__defaults["play_sound"]
 
     @property
     def __defaults(self: Self) -> InteractiveLanguagePickerDictTotal:
         return {
             "entries_to_show": 10,
             "show_full_list": False,
+            "play_sound": True,
         }
 
     def __get_choices(
