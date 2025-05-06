@@ -189,14 +189,19 @@ class InteractiveLanguagePicker(LanguagePicker):
 
         result.append(
             construct_choice(
-                title=f"[open] '[{path}]'",
+                title=[
+                    ("fg:ansiblue", "[open]"),
+                    ("fg:ansigreen", " '"),
+                    ("", f"{path}"),
+                    ("fg:ansigreen", "'"),
+                ],
                 value=ManualSelectResult("manual", SelectedType.open),
             ),
         )
 
         result.append(
             construct_choice(
-                title="[no language]",
+                title=[("fg:ansiblue", "[no language]")],
                 value=ManualSelectResult("manual", SelectedType.no_language),
             ),
         )
@@ -209,37 +214,40 @@ class InteractiveLanguagePicker(LanguagePicker):
         path: Path,
         prediction: Prediction,
     ) -> Optional[Language]:
-        Terminal.clear()
+        with Terminal.clear_block():
 
-        choices = self.__get_choices(path, prediction)
+            choices = self.__get_choices(path, prediction)
 
-        question = select(
-            "Select the desired option:",
-            choices=choices,
-            default=choices[0],
-        )
+            question = select(
+                "Select the desired option:",
+                choices=choices,
+                default=choices[0],
+            )
 
-        while True:
-            result = ask_question(question)
-            if result is None:
-                continue
+            if self.__play_sound:
+                play_notification_sound()
 
-            match result.select_result_type:
-                case "manual":
-                    manual_value = cast(ManualSelectResult, result)
-                    match manual_value.selected:
-                        case SelectedType.open:
-                            try:
-                                open_file(path)
-                            except RuntimeError as err:
-                                msg: str = f"Couldn't open file '{path}':\n{err}"
-                                logger.warning(msg)
-                            # fall trough and run the loop again
-                        case SelectedType.no_language:
-                            return None
-                case "prediction_best":
-                    prediction_value = cast(PredictionBestSelectResult, result)
-                    return prediction_value.value.language
+            while True:
+                result = ask_question(question)
+                if result is None:
+                    continue
+
+                match result.select_result_type:
+                    case "manual":
+                        manual_value = cast(ManualSelectResult, result)
+                        match manual_value.selected:
+                            case SelectedType.open:
+                                try:
+                                    open_file(path)
+                                except RuntimeError as err:
+                                    msg: str = f"Couldn't open file '{path}':\n{err}"
+                                    logger.warning(msg)
+                                # fall trough and run the loop again
+                            case SelectedType.no_language:
+                                return None
+                    case "prediction_best":
+                        prediction_value = cast(PredictionBestSelectResult, result)
+                        return prediction_value.value.language
 
 
 @dataclass
