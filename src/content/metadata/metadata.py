@@ -99,9 +99,11 @@ class MetadataHandle:
                 raise TypeError(msg)
 
 
-# empty palceholder class
 class SkipHandle:
-    pass
+    # serialize the same as None
+    @serializer
+    def serialize(self: Self) -> None:
+        return None
 
 
 HandlesType = Optional[list[MetadataHandle] | SkipHandle]

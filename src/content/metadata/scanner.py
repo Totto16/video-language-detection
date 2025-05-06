@@ -1,7 +1,7 @@
 from typing import Any, Optional, Self
 
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import InternalMetadataType, MetadataHandle
+from content.metadata.metadata import InternalMetadataType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 
 
@@ -27,10 +27,13 @@ class MetadataScanner:
     def get_series_metadata(
         self: Self,
         series_name: str,
-    ) -> Optional[MetadataHandle]:
+    ) -> InternalMetadataType:
         provider_name = self.__provider.name
 
         data: Optional[Any] = self.__provider.get_series_metadata(series_name)
+
+        if isinstance(data, SkipHandle):
+            return SkipHandle()
 
         if data is not None:
             return MetadataHandle(provider_name, data)
@@ -41,7 +44,7 @@ class MetadataScanner:
         self: Self,
         series_handle: MetadataHandle,
         season: int,
-    ) -> Optional[MetadataHandle]:
+    ) -> InternalMetadataType:
         provider_name = self.__provider.name
         if series_handle.provider != provider_name:
             return None
@@ -50,6 +53,9 @@ class MetadataScanner:
             series_handle.data,
             season,
         )
+
+        if isinstance(data, SkipHandle):
+            return SkipHandle()
 
         if data is not None:
             return MetadataHandle(provider_name, data)
@@ -61,7 +67,7 @@ class MetadataScanner:
         series_handle: MetadataHandle,
         season_handle: MetadataHandle,
         episode: int,
-    ) -> Optional[MetadataHandle]:
+    ) -> InternalMetadataType:
         provider_name: str = self.__provider.name
         if series_handle.provider != provider_name:
             return None
@@ -74,6 +80,9 @@ class MetadataScanner:
             season_handle.data,
             episode,
         )
+
+        if isinstance(data, SkipHandle):
+            return SkipHandle()
 
         if data is not None:
             return MetadataHandle(provider_name, data)

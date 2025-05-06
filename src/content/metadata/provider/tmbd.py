@@ -234,7 +234,7 @@ class TMDBProvider(Provider):
             return None
 
         if isinstance(series_metadata, SkipHandle):
-            return SkipHandle
+            return SkipHandle()
 
         try:
             result = self.__client.season(series_metadata.series_id, season).details()
@@ -270,7 +270,7 @@ class TMDBProvider(Provider):
             return None
 
         if isinstance(metadata_for_episode, SkipHandle):
-            return SkipHandle
+            return SkipHandle()
 
         series_id, season_number = metadata_for_episode.as_tuple()
 
