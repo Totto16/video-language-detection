@@ -18,8 +18,8 @@ from humanize import naturalsize
 from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from torch import cuda
 
-from content.base_class import LanguagePicker
 from content.language import Language
+from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger

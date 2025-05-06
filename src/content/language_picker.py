@@ -2,10 +2,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Self, override
 
-from content.base_class import LanguagePicker
-from content.general import OneOf
+from content.general import (
+    MissingOverrideError,
+    OneOf,
+)
 from content.language import Language
 from content.prediction import Prediction
+
+
+class LanguagePicker:
+    def __init__(
+        self: Self,
+    ) -> None:
+        pass
+
+    def pick_language(
+        self: Self,
+        path: Path,  # noqa: ARG002
+        prediction: Prediction,  # noqa: ARG002
+    ) -> Optional[Language]:
+        raise MissingOverrideError
 
 
 class NoLanguagePicker(LanguagePicker):

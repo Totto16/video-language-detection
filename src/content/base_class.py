@@ -18,7 +18,6 @@ from content.general import (
 from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.metadata.scanner import MetadataScanner
-from content.prediction import Prediction
 from content.shared import ScanType
 from content.summary import Summary
 from helper.log import get_logger
@@ -264,17 +263,3 @@ def process_folder(
     callback.finish(directory.name, parent_folders, deleted, value)
 
     return rescan
-
-
-class LanguagePicker:
-    def __init__(
-        self: Self,
-    ) -> None:
-        pass
-
-    def pick_language(
-        self: Self,
-        path: Path,  # noqa: ARG002
-        prediction: Prediction,  # noqa: ARG002
-    ) -> Optional[Language]:
-        raise MissingOverrideError
