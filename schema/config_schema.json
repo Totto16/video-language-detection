@@ -385,11 +385,34 @@
                 "picker_type": {
                     "type": "string",
                     "const": "interactive"
+                },
+                "config": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/InteractiveLanguagePickerDict"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
-                "picker_type"
+                "picker_type",
+                "config"
             ],
+            "additionalProperties": false
+        },
+        "InteractiveLanguagePickerDict": {
+            "type": "object",
+            "properties": {
+                "entries_to_show": {
+                    "type": "integer"
+                },
+                "show_full_list": {
+                    "type": "boolean"
+                }
+            },
             "additionalProperties": false
         }
     },
