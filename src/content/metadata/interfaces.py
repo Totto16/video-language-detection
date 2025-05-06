@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, Self, override
+from typing import Literal, Optional, Self, override
 
 from content.general import MissingOverrideError, SchemaType
 from content.metadata.metadata import InternalMetadataType
@@ -15,22 +15,22 @@ class Provider:
     def get_series_metadata(
         self: Self,
         series_name: str,  # noqa: ARG002
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         raise MissingOverrideError
 
     def get_season_metadata(
         self: Self,
-        series_data: Any,  # noqa: ARG002
+        series_data: object,  # noqa: ARG002
         season: int,  # noqa: ARG002
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         raise MissingOverrideError
 
     def get_episode_metadata(
         self: Self,
-        series_data: Any,  # noqa: ARG002
-        season_data: Any,  # noqa: ARG002
+        series_data: object,  # noqa: ARG002
+        season_data: object,  # noqa: ARG002
         episode: int,  # noqa: ARG002
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         raise MissingOverrideError
 
     def should_scan(
@@ -65,10 +65,10 @@ class MissingProvider(Provider):
     @override
     def get_episode_metadata(
         self: Self,
-        series_data: Any,
-        season_data: Any,
+        series_data: object,
+        season_data: object,
         episode: int,
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         msg = "Method 'get_episode_metadata' on MissingProvider called"
         raise RuntimeError(msg)
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import date
 from logging import Logger
-from typing import Annotated, Any, Literal, Optional, Self, override
+from typing import Annotated, Literal, Optional, Self, override
 
 from apischema import deserialize, schema
 from apischema.metadata import none_as_undefined
@@ -141,7 +141,7 @@ class TMDBProvider(Provider):
 
     def __get_metadata_for_season(
         self: Self,
-        series_data: Any,
+        series_data: object,
     ) -> Optional[SeriesHandle | SkipHandle]:
         if isinstance(series_data, SeriesMetadata):
             return SeriesHandle(series_id=series_data.series_id)
@@ -156,8 +156,8 @@ class TMDBProvider(Provider):
 
     def __get_metadata_for_episode(
         self: Self,
-        series_data: Any,
-        season_data: Any,
+        series_data: object,
+        season_data: object,
     ) -> Optional[SeasonHandle | SkipHandle]:
         series_id = self.__get_metadata_for_season(series_data)
         if series_id is None:
@@ -184,7 +184,7 @@ class TMDBProvider(Provider):
     def get_series_metadata(
         self: Self,
         series_name: str,
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         try:
             search_result = self.__client.search().tv(series_name)
             if search_result.results is None:
@@ -226,9 +226,9 @@ class TMDBProvider(Provider):
     @override
     def get_season_metadata(
         self: Self,
-        series_data: Any,
+        series_data: object,
         season: int,
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         series_metadata = self.__get_metadata_for_season(series_data)
         if series_metadata is None:
             return None
@@ -260,10 +260,10 @@ class TMDBProvider(Provider):
     @override
     def get_episode_metadata(
         self: Self,
-        series_data: Any,
-        season_data: Any,
+        series_data: object,
+        season_data: object,
         episode: int,
-    ) -> Optional[Any]:
+    ) -> Optional[object]:
         metadata_for_episode = self.__get_metadata_for_episode(series_data, season_data)
 
         if metadata_for_episode is None:
@@ -297,7 +297,7 @@ class TMDBProvider(Provider):
             return None
 
     @staticmethod
-    def deserialize_metadata(data: dict[str, Any]) -> Any:
+    def deserialize_metadata(data: dict[str, object]) -> object:
         metadata_type = data.get("metadata_type")
 
         if metadata_type is None:
