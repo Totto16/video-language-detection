@@ -19,6 +19,7 @@ pysoundfile = "*"
 wxpython = {version = "*", find-links="https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/"}
 themoviedb = "*"
 sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python"}
+prompt-toolkit = "*"
 
 [dev-packages]
 pylint = "*"
