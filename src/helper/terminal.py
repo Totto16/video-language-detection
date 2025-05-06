@@ -6,10 +6,21 @@ from prompt_toolkit.shortcuts import clear
 
 
 class ClearContextManager(AbstractContextManager["ClearContextManager"]):
+    __clear_on_entry: bool
+
+    def __init__(
+        self: Self,
+        *,
+        clear_on_entry: bool,
+    ) -> None:
+        super().__init__()
+
+        self.__clear_on_entry = clear_on_entry
 
     @override
     def __enter__(self: Self) -> Self:
-        Terminal.clear()
+        if self.__clear_on_entry:
+            Terminal.clear()
         return self
 
     @override
@@ -29,5 +40,8 @@ class Terminal:
         clear()
 
     @staticmethod
-    def clear_block() -> ClearContextManager:
-        return ClearContextManager()
+    def clear_block(
+        *,
+        clear_on_entry: bool = True,
+    ) -> ClearContextManager:
+        return ClearContextManager(clear_on_entry=clear_on_entry)

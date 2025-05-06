@@ -16,7 +16,6 @@ from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.log import LogLevel, setup_custom_logger
-from helper.terminal import Terminal
 
 if TYPE_CHECKING:
     from content.base_class import Content
@@ -112,8 +111,6 @@ def main(config: ParsedConfig) -> None:
     )
 
     language_picker: LanguagePicker = get_picker_from_config(config.picker)
-
-    Terminal.clear()
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,

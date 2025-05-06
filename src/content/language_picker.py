@@ -214,7 +214,7 @@ class InteractiveLanguagePicker(LanguagePicker):
         path: Path,
         prediction: Prediction,
     ) -> Optional[Language]:
-        with Terminal.clear_block():
+        with Terminal.clear_block(clear_on_entry=False):
 
             choices = self.__get_choices(path, prediction)
 
