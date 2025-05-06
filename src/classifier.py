@@ -38,6 +38,8 @@ _ = get_translator()
 
 VOXLINGUA_SAMPLE_COUNT: int = 107
 
+MAX_RETRY_COUNT: int = 10
+
 
 class FileType(Enum):
     wav = "wav"
@@ -444,9 +446,7 @@ class Classifier:
         return total_options
 
     def __init_classifier(self: Self, *, force_cpu: bool = False) -> EncoderClassifier:
-        run_opts: Optional[dict[str, Any]] = None
-        if not force_cpu:
-            run_opts = self.__get_run_opts()
+        run_opts = self.__get_run_opts(force_cpu=force_cpu)
 
         classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
             source="speechbrain/lang-id-voxlingua107-ecapa",
@@ -481,6 +481,7 @@ class Classifier:
         wav_file: WAVFile,
         segment: Segment,
         manager: Optional[Manager] = None,
+        retry_count: int = 0,
     ) -> Optional[Prediction]:
         result: bool = wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
@@ -521,9 +522,19 @@ class Classifier:
             return Prediction(prob)
 
         except RuntimeError as ex:
+
             if isinstance(ex, cuda.OutOfMemoryError):
+                if retry_count > MAX_RETRY_COUNT:
+                    msg = f"Exceeded retry amount of classify: {retry_count}/{MAX_RETRY_COUNT}"
+                    logger.error(msg)  # noqa: TRY400
+                    return None
                 self.__init_classifier(force_cpu=True)
-                return self.__classify(wav_file, segment, manager)
+                return self.__classify(
+                    wav_file=wav_file,
+                    segment=segment,
+                    manager=manager,
+                    retry_count=retry_count + 1,
+                )
 
             logger.exception("Classify file")
             return None
@@ -651,7 +662,10 @@ class Classifier:
         # return unknown language
         return (PredictionBest(0.0, Language.unknown()), 0.0)
 
-    def __get_run_opts(self: Self) -> Optional[dict[str, Any]]:
+    def __get_run_opts(self: Self, *, force_cpu: bool) -> Optional[dict[str, Any]]:
+        if force_cpu:
+            return {"device": "cpu"}
+
         if not cuda.is_available():
             return None
 
