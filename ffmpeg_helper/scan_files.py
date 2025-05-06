@@ -5,7 +5,7 @@ from typing import Optional
 from scan_helper import get_files_to_scan
 
 
-def scan_files(args: list[str]) -> list[Optional[str]]:
+def scan_files(args: list[Path]) -> list[Optional[str]]:
     files: list[Path] = get_files_to_scan(args)
     return [scan_file(file) for file in files]
 

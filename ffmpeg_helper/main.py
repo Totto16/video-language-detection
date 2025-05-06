@@ -53,10 +53,10 @@ if __name__ == "__main__":
 
     args = cast(AllParsedNameSpaces, parser.parse_args())
     try:
-        files: list[str] = args.files
+        files: list[Path] = [Path(file) for file in args.files]
         if len(files) == 0:
             print("No path given, using CWD")  # noqa: T201
-            files = [str(Path.cwd().absolute())]
+            files = [Path.cwd().absolute()]
 
         match args.subcommand:
             case "scan":

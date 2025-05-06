@@ -3,11 +3,9 @@ import subprocess
 from pathlib import Path
 
 
-def fix_chapters(to_process: list[str]) -> None:
-    for file in to_process:
+def fix_chapters(to_process: list[Path]) -> None:
+    for input_file in to_process:
         try:
-            input_file = Path(file)
-
             output: Path = input_file.parent / (
                 input_file.stem + "_output" + input_file.suffix
             )
