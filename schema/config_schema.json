@@ -73,6 +73,23 @@
                             "type": "null"
                         }
                     ]
+                },
+                "picker": {
+                    "anyOf": [
+                        {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/NoLanguagePickerConfig"
+                                },
+                                {
+                                    "$ref": "#/$defs/InteractiveLanguagePickerConfig"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
@@ -80,7 +97,8 @@
                 "parser",
                 "scanner",
                 "classifier",
-                "metadata"
+                "metadata",
+                "picker"
             ],
             "additionalProperties": false
         },
@@ -345,6 +363,32 @@
             },
             "required": [
                 "type"
+            ],
+            "additionalProperties": false
+        },
+        "NoLanguagePickerConfig": {
+            "type": "object",
+            "properties": {
+                "picker_type": {
+                    "type": "string",
+                    "const": "none"
+                }
+            },
+            "required": [
+                "picker_type"
+            ],
+            "additionalProperties": false
+        },
+        "InteractiveLanguagePickerConfig": {
+            "type": "object",
+            "properties": {
+                "picker_type": {
+                    "type": "string",
+                    "const": "interactive"
+                }
+            },
+            "required": [
+                "picker_type"
             ],
             "additionalProperties": false
         }
