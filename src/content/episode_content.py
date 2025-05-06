@@ -25,7 +25,7 @@ from content.general import (
     narrow_type,
 )
 from content.language import Language
-from content.metadata.metadata import HandlesType, MetadataHandle
+from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 from content.summary import Summary
 from helper.log import get_logger
@@ -107,9 +107,12 @@ class EpisodeContent(Content):
     def __get_handles(
         self: Self,
         handles: HandlesType,
-    ) -> Optional[tuple[MetadataHandle, MetadataHandle]]:
+    ) -> Optional[tuple[MetadataHandle, MetadataHandle] | SkipHandle]:
         if handles is None:
             return None
+
+        if isinstance(handles, SkipHandle):
+            return SkipHandle()
 
         if len(handles) != 2:
             msg = f"Length of handles is invalid, expected 2 but got {len(handles)}"
@@ -161,9 +164,13 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if current_handles is not None and scanner.should_scan_metadata(
-                        ScanType.rescan,
-                        self.metadata,
+                    if (
+                        current_handles is not None
+                        and not isinstance(current_handles, SkipHandle)
+                        and scanner.should_scan_metadata(
+                            ScanType.rescan,
+                            self.metadata,
+                        )
                     ):
                         series_handle, season_handle = current_handles
 
@@ -218,6 +225,7 @@ class EpisodeContent(Content):
         if (
             current_handles is not None
             and self.metadata is None
+            and not isinstance(current_handles, SkipHandle)
             and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
         ):
             series_handle, season_handle = current_handles

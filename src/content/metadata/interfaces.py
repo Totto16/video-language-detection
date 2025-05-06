@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional, Self, override
 
 from content.general import MissingOverrideError, SchemaType
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 
 
@@ -36,7 +36,7 @@ class Provider:
     def should_scan(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
-        metadata: Optional[MetadataHandle],  # noqa: ARG002
+        metadata: InternalMetadataType,  # noqa: ARG002
     ) -> bool:
         raise MissingOverrideError
 
@@ -76,7 +76,7 @@ class MissingProvider(Provider):
     def should_scan(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         return False
 

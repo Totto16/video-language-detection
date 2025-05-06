@@ -1,7 +1,7 @@
 from typing import Any, Optional, Self
 
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import InternalMetadataType, MetadataHandle
 from content.shared import ScanType
 
 
@@ -17,7 +17,7 @@ class MetadataScanner:
     def should_scan(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         return self.__provider.should_scan(scan_type, metadata)
 

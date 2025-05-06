@@ -17,7 +17,12 @@ from content.general import (
 )
 from content.language import Language
 from content.language_picker import LanguagePicker
-from content.metadata.metadata import HandlesType, MetadataHandle
+from content.metadata.metadata import (
+    HandlesType,
+    InternalMetadataType,
+    MetadataHandle,
+    SkipHandle,
+)
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanType
 from content.summary import Summary
@@ -87,7 +92,7 @@ class Scanner:
     def should_scan_metadata(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
-        metadata: Optional[MetadataHandle],  # noqa: ARG002
+        metadata: InternalMetadataType,  # noqa: ARG002
     ) -> bool:
         raise MissingOverrideError
 
@@ -107,7 +112,7 @@ CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
 class Content:
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
-    _metadata: Optional[MetadataHandle] = field(
+    _metadata: InternalMetadataType = field(
         metadata=alias("metadata"),
     )
 
@@ -127,15 +132,19 @@ class Content:
         return self.__scanned_file
 
     @property
-    def metadata(self: Self) -> Optional[MetadataHandle]:
+    def metadata(self: Self) -> InternalMetadataType:
         return self._metadata
 
     def _get_new_handles(self: Self, old_handles: HandlesType) -> HandlesType:
-        new_handles: HandlesType = None
-        if self.metadata is not None and old_handles is not None:
-            # Note: this is important, so that it's a copy
-            new_handles = list(old_handles)
-            new_handles.append(self.metadata)
+        if self.metadata is None or old_handles is None:
+            return None
+
+        if isinstance(self.metadata, SkipHandle) or isinstance(old_handles, SkipHandle):
+            return SkipHandle()
+
+        # Note: this is important, so that it's a copy
+        new_handles: list[MetadataHandle] = list(old_handles)
+        new_handles.append(self.metadata)
 
         return new_handles
 

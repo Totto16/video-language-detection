@@ -1,14 +1,12 @@
 from collections.abc import Iterable
 from enum import Enum
 from typing import (
-    Optional,
     Self,
 )
 
 from content.general import EpisodeDescription, SeasonDescription, SeriesDescription
 from content.language import Language
-from content.metadata.metadata import MetadataHandle
-from content.metadata.provider.tmbd import SkipHandle
+from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import MetadataKind
 
 CollectionDescription = str
@@ -42,11 +40,11 @@ LanguageDict = dict[Language, int]
 MetadataSubDict = dict[MetadataType, int]
 MetadataDict = dict[MetadataKind, MetadataSubDict]
 
-MetadataInput = tuple[MetadataKind, Optional[MetadataHandle | SkipHandle]]
+MetadataInput = tuple[MetadataKind, InternalMetadataType]
 
 
 def metadata_handle_to_type(
-    handle: Optional[MetadataHandle | SkipHandle],
+    handle: InternalMetadataType,
 ) -> MetadataType:
     if handle is None:
         return MetadataType.missing
@@ -125,7 +123,7 @@ class Summary:
     @staticmethod
     def construct_for_episode(
         language: Language,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
         description: EpisodeDescription,
         *,
         detailed: bool,
@@ -157,7 +155,7 @@ class Summary:
 
     @staticmethod
     def construct_for_season(
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
         description: SeasonDescription,
         episode_summaries: Iterable["Summary"],
         *,
@@ -190,7 +188,7 @@ class Summary:
 
     @staticmethod
     def construct_for_series(
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
         description: SeriesDescription,
         season_summaries: Iterable["Summary"],
         *,

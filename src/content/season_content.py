@@ -27,7 +27,11 @@ from content.general import (
     SeasonDescription,
     narrow_type,
 )
-from content.metadata.metadata import HandlesType, MetadataHandle
+from content.metadata.metadata import (
+    HandlesType,
+    InternalMetadataType,
+    SkipHandle,
+)
 from content.shared import ScanType
 from content.summary import Summary
 from helper.log import get_logger
@@ -108,9 +112,12 @@ class SeasonContent(Content):
     def __get_handle(
         self: Self,
         handles: HandlesType,
-    ) -> Optional[MetadataHandle]:
+    ) -> InternalMetadataType:
         if handles is None:
             return None
+
+        if isinstance(handles, SkipHandle):
+            return SkipHandle()
 
         if len(handles) != 1:
             msg = f"Length of handles is invalid, expected 1 but got {len(handles)}"
@@ -128,7 +135,7 @@ class SeasonContent(Content):
         parent_folders: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner, language_picker = callback.get_saved()
+        _, scanner, _ = callback.get_saved()
 
         series_handle = self.__get_handle(handles=handles)
 
@@ -136,6 +143,7 @@ class SeasonContent(Content):
             if (
                 series_handle is not None
                 and self.metadata is None
+                and not isinstance(series_handle, SkipHandle)
                 and scanner.should_scan_metadata(
                     ScanType.first_scan,
                     self.metadata,
@@ -163,9 +171,13 @@ class SeasonContent(Content):
                     raise TypeError(msg)
             return
 
-        if series_handle is not None and scanner.should_scan_metadata(
-            ScanType.rescan,
-            self.metadata,
+        if (
+            series_handle is not None
+            and not isinstance(series_handle, SkipHandle)
+            and scanner.should_scan_metadata(
+                ScanType.rescan,
+                self.metadata,
+            )
         ):
             self._metadata = scanner.metadata_scanner.get_season_metadata(
                 series_handle,

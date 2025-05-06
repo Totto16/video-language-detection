@@ -99,4 +99,11 @@ class MetadataHandle:
                 raise TypeError(msg)
 
 
-HandlesType = Optional[list[MetadataHandle]]
+# empty palceholder class
+class SkipHandle:
+    pass
+
+
+HandlesType = Optional[list[MetadataHandle] | SkipHandle]
+
+InternalMetadataType = Optional[MetadataHandle | SkipHandle]

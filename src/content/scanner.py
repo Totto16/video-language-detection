@@ -4,7 +4,7 @@ from typing import Annotated, Literal, Optional, Self, TypedDict, cast, override
 
 from content.base_class import LanguageScanner, Scanner
 from content.general import OneOf
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import InternalMetadataType
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
 
@@ -30,7 +30,7 @@ class StaticScanner(Scanner):
     def should_scan_metadata(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         if not self.__value:
             return False
@@ -193,7 +193,7 @@ class ConfigScanner(Scanner):
     def should_scan_metadata(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         should_scan_kind = self.__should_scan_kind(ScanKind.metadata)
 

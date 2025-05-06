@@ -10,7 +10,7 @@ from themoviedb.tmdb import TMDb
 
 from content.general import OneOf, SchemaType, get_schema
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import ScanType
 from helper.log import get_logger
 
@@ -75,11 +75,6 @@ class SkipMetadata:
     metadata_type: Literal["skip"]
 
 
-# emopty palceholder class
-class SkipHandle:
-    pass
-
-
 @dataclass
 class SeriesHandle:
     series_id: int
@@ -127,7 +122,7 @@ class TMDBProvider(Provider):
     def should_scan(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         if scan_type == ScanType.first_scan:
             return True

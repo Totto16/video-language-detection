@@ -8,7 +8,7 @@ from apischema import schema
 
 from content.general import SchemaType, get_schema
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import MetadataHandle
+from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 
 
@@ -42,7 +42,7 @@ class IMDBProvider(Provider):
     def should_scan(
         self: Self,
         scan_type: ScanType,
-        metadata: Optional[MetadataHandle],
+        metadata: InternalMetadataType,
     ) -> bool:
         return False
 
