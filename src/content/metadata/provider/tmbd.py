@@ -75,6 +75,30 @@ class SkipMetadata:
     metadata_type: Literal["skip"]
 
 
+# emopty palceholder class
+class SkipHandle:
+    pass
+
+
+@dataclass
+class SeriesHandle:
+    series_id: int
+
+
+@dataclass
+class SeasonHandle:
+    parent: SeriesHandle
+    season_number: int
+
+    def as_tuple(self: Self) -> tuple[int, int]:
+        return (self.parent.series_id, self.season_number)
+
+
+@dataclass
+class EpisodeHandle:
+    id: int
+
+
 MetadataData = Annotated[
     SkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
     OneOf,
@@ -123,12 +147,12 @@ class TMDBProvider(Provider):
     def __get_metadata_for_season(
         self: Self,
         series_data: Any,
-    ) -> Optional[int]:
+    ) -> Optional[SeriesHandle | SkipHandle]:
         if isinstance(series_data, SeriesMetadata):
-            return series_data.series_id
+            return SeriesHandle(series_id=series_data.series_id)
 
         if isinstance(series_data, SkipMetadata):
-            return None
+            return SkipHandle()
 
         msg = "Expected SeriesMetadata, but got other metadata data"
         logger.warning(msg)
@@ -139,16 +163,22 @@ class TMDBProvider(Provider):
         self: Self,
         series_data: Any,
         season_data: Any,
-    ) -> Optional[tuple[int, int]]:
+    ) -> Optional[SeasonHandle | SkipHandle]:
         series_id = self.__get_metadata_for_season(series_data)
         if series_id is None:
             return None
 
+        if isinstance(series_id, SkipHandle):
+            return SkipHandle()
+
         if isinstance(season_data, SeasonMetadata):
-            return (series_id, season_data.season_number)
+            return SeasonHandle(
+                parent=series_id,
+                season_number=season_data.season_number,
+            )
 
         if isinstance(season_data, SkipMetadata):
-            return None
+            return SkipHandle()
 
         msg = "Expected SeasonMetadata, but got other metadata data"
         logger.warning(msg)
@@ -208,8 +238,11 @@ class TMDBProvider(Provider):
         if series_metadata is None:
             return None
 
+        if isinstance(series_metadata, SkipHandle):
+            return SkipHandle
+
         try:
-            result = self.__client.season(series_metadata, season).details()
+            result = self.__client.season(series_metadata.series_id, season).details()
 
             if result.id is None:
                 return None
@@ -241,7 +274,10 @@ class TMDBProvider(Provider):
         if metadata_for_episode is None:
             return None
 
-        series_id, season_number = metadata_for_episode
+        if isinstance(metadata_for_episode, SkipHandle):
+            return SkipHandle
+
+        series_id, season_number = metadata_for_episode.as_tuple()
 
         try:
             result = self.__client.episode(series_id, season_number, episode).details()

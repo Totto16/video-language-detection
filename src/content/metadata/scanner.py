@@ -62,7 +62,7 @@ class MetadataScanner:
         season_handle: MetadataHandle,
         episode: int,
     ) -> Optional[MetadataHandle]:
-        provider_name = self.__provider.name
+        provider_name: str = self.__provider.name
         if series_handle.provider != provider_name:
             return None
 

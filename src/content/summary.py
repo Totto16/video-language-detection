@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from enum import Enum
 from typing import (
     Optional,
     Self,
@@ -7,6 +8,7 @@ from typing import (
 from content.general import EpisodeDescription, SeasonDescription, SeriesDescription
 from content.language import Language
 from content.metadata.metadata import MetadataHandle
+from content.metadata.provider.tmbd import SkipHandle
 from content.shared import MetadataKind
 
 CollectionDescription = str
@@ -24,11 +26,35 @@ IdentifierDescription = (
 )
 
 
+class MetadataType(str, Enum):
+    ok = "ok"
+    missing = "missing"
+    skipped = "skipped"
+
+    def __str__(self: Self) -> str:
+        return f"<MetadataType: {self.name}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 LanguageDict = dict[Language, int]
-MetadataSubDict = dict[bool, int]
+MetadataSubDict = dict[MetadataType, int]
 MetadataDict = dict[MetadataKind, MetadataSubDict]
 
-MetadataInput = tuple[MetadataKind, Optional[MetadataHandle]]
+MetadataInput = tuple[MetadataKind, Optional[MetadataHandle | SkipHandle]]
+
+
+def metadata_handle_to_type(
+    handle: Optional[MetadataHandle | SkipHandle],
+) -> MetadataType:
+    if handle is None:
+        return MetadataType.missing
+
+    if isinstance(handle, SkipHandle):
+        return MetadataType.skipped
+
+    return MetadataType.ok
 
 
 class Summary:
@@ -62,12 +88,16 @@ class Summary:
         def get_metadata_dict(metadata: MetadataInput) -> MetadataDict:
             dct: MetadataDict = {}
             kind, handle = metadata
-            dct[kind] = {True: 0, False: 0}
-            dct[kind][handle is not None] += 1
+            dct[kind] = {
+                MetadataType.ok: 0,
+                MetadataType.missing: 0,
+                MetadataType.skipped: 0,
+            }
+            dct[kind][metadata_handle_to_type(handle)] += 1
             return dct
 
         self.__metadata = Summary.__combine_metadata_dicts(
-            get_metadata_dict(metadata) for metadata in metadatas
+            get_metadata_dict(metadata=metadata) for metadata in metadatas
         )
 
         self.__duplicates = []
@@ -228,7 +258,11 @@ class Summary:
             dict1: MetadataSubDict,
             dict2: MetadataSubDict,
         ) -> MetadataSubDict:
-            final_dct: MetadataSubDict = {True: 0, False: 0}
+            final_dct: MetadataSubDict = {
+                MetadataType.ok: 0,
+                MetadataType.missing: 0,
+                MetadataType.skipped: 0,
+            }
             for key, value in dict1.items():
                 final_dct[key] += value
 
@@ -240,7 +274,11 @@ class Summary:
         for input_dict in inp:
             for key, value in input_dict.items():
                 if dct.get(key) is None:
-                    dct[key] = {True: 0, False: 0}
+                    dct[key] = {
+                        MetadataType.ok: 0,
+                        MetadataType.missing: 0,
+                        MetadataType.skipped: 0,
+                    }
                 dct[key] = combine_dicts(dct[key], value)
 
         return dct
