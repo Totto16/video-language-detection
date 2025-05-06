@@ -10,7 +10,6 @@ from typing import (
 
 from apischema import alias, schema
 
-from classifier import Language
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -25,6 +24,7 @@ from content.general import (
     ScannedFile,
     narrow_type,
 )
+from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle
 from content.shared import ScanType
 from content.summary import Summary

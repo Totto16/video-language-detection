@@ -4,8 +4,8 @@ from typing import (
     Self,
 )
 
-from classifier import Language
 from content.general import EpisodeDescription, SeasonDescription, SeriesDescription
+from content.language import Language
 from content.metadata.metadata import MetadataHandle
 from content.shared import MetadataKind
 

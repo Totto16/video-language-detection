@@ -81,9 +81,6 @@ class ConfigScannerDictTotal(TypedDict, total=True):
     # TODO: print progress option
 
 
-ConfigType = 0 | 1 | 2
-
-
 class ConfigScanner(Scanner):
     __start_position: tuple[int, int]
     __scan_amount: tuple[int, int]

@@ -19,7 +19,7 @@ from apischema.json_schema import (
 )
 from enlighten import Manager
 
-from classifier import Language
+from content.language import Language
 from content.metadata.metadata import HandlesType
 
 

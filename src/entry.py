@@ -9,8 +9,9 @@ from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
 
-from classifier import Classifier, Language
+from classifier import Classifier
 from content.base_class import LanguageScanner, Scanner
+from content.language import Language
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.log import LogLevel, setup_custom_logger
