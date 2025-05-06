@@ -20,6 +20,7 @@ wxpython = {version = "*", find-links="https://extras.wxpython.org/wxPython4/ext
 themoviedb = "*"
 sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python"}
 prompt-toolkit = "*"
+questionary = "*"
 
 [dev-packages]
 pylint = "*"
