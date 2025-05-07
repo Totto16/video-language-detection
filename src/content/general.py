@@ -338,6 +338,7 @@ EmitType = Literal["deserialize", "serialize"]
 
 SchemaType = MutableMapping[str, Any]
 
+
 def get_schema(
     any_type: Any,
     *,
@@ -395,3 +396,5 @@ def to_one_of(schema: dict[str, Any]) -> None:
 
 
 OneOf = schema(extra=to_one_of)
+
+Deprecated = schema(deprecated=True)

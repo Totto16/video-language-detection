@@ -14,7 +14,7 @@ def parse_int_safely(inp: str) -> Optional[int]:
 # TODO check for overflow of hours everywhere!
 
 
-@schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$", min=1, max=60 * 60 * 24)
+@schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$")
 class Timestamp:
     __delta: timedelta
 
@@ -54,11 +54,6 @@ class Timestamp:
         t = datetime.strptime(inp, "%H:%M:%S").astimezone()
         delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
         return Timestamp(delta)
-
-    @deserializer
-    @staticmethod
-    def deserialize_int(inp: int) -> "Timestamp":
-        return Timestamp.from_seconds(inp)
 
     def __str__(self: Self) -> str:
         return str(self.__delta)
@@ -201,3 +196,14 @@ class Timestamp:
 
         msg = f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
         raise TypeError(msg)
+
+
+@schema(min=1, max=60 * 60 * 24, deprecated=True)
+class TimestampFromSecond(Timestamp):
+    @deserializer
+    @staticmethod
+    def deserialize_int(inp: int) -> "Timestamp":
+        return Timestamp.from_seconds(inp)
+
+
+ConfigTimeStamp = TimestampFromSecond | Timestamp

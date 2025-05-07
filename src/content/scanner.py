@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Annotated, Literal, Optional, Self, TypedDict, cast, override
 
 from content.base_class import LanguageScanner, Scanner
-from content.general import OneOf
+from content.general import Deprecated, OneOf
 from content.metadata.metadata import InternalMetadataType
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
@@ -104,8 +104,8 @@ def to_advanced_scanner_postion_total(
 
 # TODO: is there a better way?
 class ConfigScannerDict(TypedDict, total=False):
-    start_position: int | AdvancedScannerPosition
-    scan_amount: int | AdvancedScannerPosition
+    start_position: Annotated[int, Deprecated] | AdvancedScannerPosition
+    scan_amount: Annotated[int, Deprecated] | AdvancedScannerPosition
     allow_abort: bool
     types: ScannerTypes
 

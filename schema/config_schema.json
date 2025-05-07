@@ -215,7 +215,8 @@
                 "start_position": {
                     "anyOf": [
                         {
-                            "type": "integer"
+                            "type": "integer",
+                            "deprecated": true
                         },
                         {
                             "$ref": "#/$defs/AdvancedScannerPosition"
@@ -225,7 +226,8 @@
                 "scan_amount": {
                     "anyOf": [
                         {
-                            "type": "integer"
+                            "type": "integer",
+                            "deprecated": true
                         },
                         {
                             "$ref": "#/$defs/AdvancedScannerPosition"

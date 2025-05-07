@@ -23,7 +23,7 @@ from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
-from helper.timestamp import Timestamp
+from helper.timestamp import ConfigTimeStamp, Timestamp
 from helper.translation import get_translator
 
 setup_global_logger()
@@ -349,7 +349,7 @@ def relative_path_str(path: Path) -> str:
 
 @dataclass()
 class ClassifierOptions:
-    segment_length: Optional[Timestamp]
+    segment_length: Optional[ConfigTimeStamp]
     accuracy_threshold: Optional[float]
     final_accuracy_threshold: Optional[float]
     minimum_scanned: Optional[float]
