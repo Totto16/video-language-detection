@@ -1,85 +1,127 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR ORGANIZATION
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# Copyright (C) 2023-2025 Totto16
+# License MIT
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.0\n"
-"POT-Creation-Date: 2023-08-22 23:41+0200\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"POT-Creation-Date: 2025-05-07 12:57+0200\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
-"X-Generator: Poedit 3.3.1\n"
 
-#: src/entry.py:146
+#: src/classifier.py:655
+msgid "Couldn't get Language of '{path}': Best was {best}"
+msgstr ""
+
+#: src/entry.py:176
 msgid "Detect video languages"
 msgstr ""
 
-#: src/entry.py:199
+#: src/entry.py:195
+msgid "The loglevel to use"
+msgstr ""
+
+#: src/entry.py:205
+msgid "Run the whole program in the terminal"
+msgstr ""
+
+#: src/entry.py:212 src/entry.py:236
+msgid "The config to use"
+msgstr ""
+
+#: src/entry.py:217
+msgid "Create schemas for config and the resulting data"
+msgstr ""
+
+#: src/entry.py:224
+msgid "The folder where to put the schemas"
+msgstr ""
+
+#: src/entry.py:229
+msgid "Run the whole program as GUI"
+msgstr ""
+
+#: src/entry.py:241
+msgid "Check the config for validity"
+msgstr ""
+
+#: src/entry.py:248
+msgid "The config to check"
+msgstr ""
+
+#: src/entry.py:261
+msgid "Successfully generated the schemas"
+msgstr ""
+
+#: src/entry.py:292
+msgid "Config '{config}' is not valid!"
+msgstr ""
+
+#: src/entry.py:296
+msgid "Config '{config}' is valid!"
+msgstr ""
+
+#: src/entry.py:303
 msgid "Ctrl + C pressed"
 msgstr ""
 
-#: src/main.py:64
-msgid "UNREACHABLE (not runnable in notebooks)"
-msgstr ""
-
-#: src/main.py:69
+#: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr ""
 
-#: src/main.py:71
+#: src/main.py:72
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr ""
+
+#: src/main.py:77
 msgid "Stage"
 msgstr ""
 
-#: src/main.py:75
+#: src/main.py:80
 msgid "Scanning"
 msgstr ""
 
-#: src/main.py:123
+#: src/main.py:130
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr ""
 
-#: src/main.py:159
+#: src/main.py:168
 msgid "series"
 msgstr ""
 
-#: src/main.py:161
+#: src/main.py:170
 msgid "seasons"
 msgstr ""
 
-#: src/main.py:163
+#: src/main.py:172
 msgid "episodes"
 msgstr ""
 
-#: src/main.py:165
+#: src/main.py:174
 msgid "tasks"
 msgstr ""
 
-#: src/main.py:167
+#: src/main.py:176
 msgid "folders"
 msgstr ""
 
-#: src/main.py:192
+#: src/main.py:201
 msgid "No Progressbar, on progress callback"
 msgstr ""
 
-#: src/main.py:206
+#: src/main.py:215
 msgid "No Progressbar, on progress finish"
 msgstr ""
 
-#: src/main.py:213
+#: src/main.py:222
 msgid "finished"
 msgstr ""
 
-#: src/main.py:245
+#: src/main.py:244
 msgid "Data not loadable from '{suffix}' file!"
 msgstr ""
 
-#: src/main.py:266
-msgid "Data not saveable from '{suffix}' file!"
+#: src/main.py:264
+msgid "Data not saveable to '{suffix}' file!"
 msgstr ""
 

@@ -1,12 +1,10 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR ORGANIZATION
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
+# Copyright (C) 2023-2025 Totto16
+# License MIT
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.0\n"
-"POT-Creation-Date: 2023-08-22 21:44+0200\n"
-"PO-Revision-Date: 2023-08-22 23:44+0200\n"
+"POT-Creation-Date: 2025-05-07 12:57+0200\n"
+"PO-Revision-Date: 2025-05-07 13:19+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: Deutsch\n"
 "Language: de\n"
@@ -15,72 +13,120 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: pygettext.py 1.5\n"
-"X-Generator: Poedit 3.3.1\n"
+"X-Generator: Poedit 3.4.4\n"
 
-#: src/entry.py:146
+#: src/classifier.py:655
+msgid "Couldn't get Language of '{path}': Best was {best}"
+msgstr "Konnte Sprache von '{path}' nicht bestimmen: Bestes Ergebnis war {best}"
+
+#: src/entry.py:176
 msgid "Detect video languages"
 msgstr "Video Sprachen erkennen"
 
-#: src/entry.py:199
+#: src/entry.py:195
+msgid "The loglevel to use"
+msgstr "Das Loglevel für die Applikation"
+
+#: src/entry.py:205
+msgid "Run the whole program in the terminal"
+msgstr "Starte das Programm in der Konsole"
+
+#: src/entry.py:212 src/entry.py:236
+msgid "The config to use"
+msgstr "Die Konfigurationsdatei, die benutzt werden soll"
+
+#: src/entry.py:217
+msgid "Create schemas for config and the resulting data"
+msgstr "Erstelle Schemata für die Konfigurationsdatei und die erstellten Daten"
+
+#: src/entry.py:224
+msgid "The folder where to put the schemas"
+msgstr "Der Ordner, in der die Schemata gespeichert werden"
+
+#: src/entry.py:229
+msgid "Run the whole program as GUI"
+msgstr "Starte das Programm als GUI"
+
+#: src/entry.py:241
+msgid "Check the config for validity"
+msgstr "Überprüfe die Konfigurationsdatei auf gültigkeit"
+
+#: src/entry.py:248
+msgid "The config to check"
+msgstr "Die Konfigurationsdatei, die überprüft werden soll"
+
+#: src/entry.py:261
+msgid "Successfully generated the schemas"
+msgstr "Schemata erfolgreich generiert"
+
+#: src/entry.py:292
+msgid "Config '{config}' is not valid!"
+msgstr "Die Konfigurationsdatei '{config}' ist ungültig!"
+
+#: src/entry.py:296
+msgid "Config '{config}' is valid!"
+msgstr "Die Konfigurationsdatei '{config}' ist gültig!"
+
+#: src/entry.py:303
 msgid "Ctrl + C pressed"
 msgstr "Strg + C gedrückt"
 
-#: src/main.py:65
-msgid "UNREACHABLE (not runnable in notebooks)"
-msgstr "UNERREICHBAR (nicht ausführbar in notebooks)"
-
-#: src/main.py:70
+#: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr "Video Sprachen Erkenner"
 
 #: src/main.py:72
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr "UNERREICHBAR (nicht ausführbar in notebooks)"
+
+#: src/main.py:77
 msgid "Stage"
 msgstr "Stufe"
 
-#: src/main.py:76
+#: src/main.py:80
 msgid "Scanning"
 msgstr "Scannen"
 
-#: src/main.py:125
+#: src/main.py:130
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr "Parse Fehler: Konnte Inhalt nicht von '{file}' parsen"
 
-#: src/main.py:161
+#: src/main.py:168
 msgid "series"
 msgstr "Serien"
 
-#: src/main.py:163
+#: src/main.py:170
 msgid "seasons"
 msgstr "Staffeln"
 
-#: src/main.py:165
+#: src/main.py:172
 msgid "episodes"
 msgstr "Episoden"
 
-#: src/main.py:167
+#: src/main.py:174
 msgid "tasks"
 msgstr "Aufgaben"
 
-#: src/main.py:169
+#: src/main.py:176
 msgid "folders"
 msgstr "Ordner"
 
-#: src/main.py:194
+#: src/main.py:201
 msgid "No Progressbar, on progress callback"
 msgstr "Keine Statusleiste, in 'progress callback'"
 
-#: src/main.py:208
+#: src/main.py:215
 msgid "No Progressbar, on progress finish"
 msgstr "Keine Statusleiste, in 'progress finish'"
 
-#: src/main.py:215
+#: src/main.py:222
 msgid "finished"
 msgstr "Fertig"
 
-#: src/main.py:247
+#: src/main.py:244
 msgid "Data not loadable from '{suffix}' file!"
 msgstr "Daten von '{suffix}' Dateien nicht ladbar!"
 
-#: src/main.py:268
-msgid "Data not saveable from '{suffix}' file!"
-msgstr "Daten nicht speicherbar nach '{suffix}' Dateien!"
+#: src/main.py:264
+msgid "Data not saveable to '{suffix}' file!"
+msgstr "Daten nicht speicherbar in eine '{suffix}' Datei!"
