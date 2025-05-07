@@ -9,7 +9,9 @@ from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast, override
 
+from prompt_toolkit.input import Input, create_input
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding.key_processor import KeyProcessor
 
 from classifier import Classifier
 from content.base_class import LanguageScanner, Scanner
@@ -134,6 +136,16 @@ def launch_tui(logger: Logger, config: ParsedConfig) -> None:
     language_picker: LanguagePicker = get_picker_from_config(config.picker)
 
     kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
+    input: Input = create_input()
+
+    key_processor = KeyProcessor(kb)
+
+    def process_keys() -> None:
+        key_processor.feed_multiple(input.read_keys())
+        key_processor.process_keys()
+
+    # TODO call from time to time!
+    process_keys()
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,
