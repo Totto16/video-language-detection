@@ -218,18 +218,7 @@
                             "type": "integer"
                         },
                         {
-                            "type": "array",
-                            "prefixItems": [
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "integer"
-                                }
-                            ],
-                            "items": false,
-                            "minItems": 2,
-                            "maxItems": 2
+                            "$ref": "#/$defs/AdvancedScannerPosition"
                         }
                     ]
                 },
@@ -239,18 +228,7 @@
                             "type": "integer"
                         },
                         {
-                            "type": "array",
-                            "prefixItems": [
-                                {
-                                    "type": "integer"
-                                },
-                                {
-                                    "type": "integer"
-                                }
-                            ],
-                            "items": false,
-                            "minItems": 2,
-                            "maxItems": 2
+                            "$ref": "#/$defs/AdvancedScannerPosition"
                         }
                     ]
                 },
@@ -259,6 +237,18 @@
                 },
                 "types": {
                     "$ref": "#/$defs/ScannerTypes"
+                }
+            },
+            "additionalProperties": false
+        },
+        "AdvancedScannerPosition": {
+            "type": "object",
+            "properties": {
+                "language": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "type": "integer"
                 }
             },
             "additionalProperties": false
