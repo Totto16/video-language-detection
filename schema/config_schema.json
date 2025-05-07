@@ -47,7 +47,7 @@
                 "classifier": {
                     "anyOf": [
                         {
-                            "$ref": "#/$defs/ClassifierOptionsParsed"
+                            "$ref": "#/$defs/ClassifierOptionsConfig"
                         },
                         {
                             "type": "null"
@@ -264,24 +264,43 @@
                 "none"
             ]
         },
-        "ClassifierOptionsParsed": {
+        "ClassifierOptionsConfig": {
             "type": "object",
             "properties": {
                 "segment_length": {
-                    "$ref": "#/$defs/Timestamp"
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/TimestampCompat"
+                        },
+                        {
+                            "$ref": "#/$defs/Timestamp"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 },
                 "accuracy_threshold": {
-                    "type": "number",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
                     "minimum": 0.0,
                     "maximum": 1.0
                 },
                 "final_accuracy_threshold": {
-                    "type": "number",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
                     "minimum": 0.0,
                     "maximum": 1.0
                 },
                 "minimum_scanned": {
-                    "type": "number"
+                    "type": [
+                        "number",
+                        "null"
+                    ]
                 },
                 "scan_until": {
                     "type": "number"
@@ -295,13 +314,14 @@
             ],
             "additionalProperties": false
         },
-        "Timestamp": {
-            "type": [
-                "string",
-                "integer"
-            ],
+        "TimestampCompat": {
+            "type": "integer",
             "minimum": 1,
             "maximum": 86400,
+            "deprecated": true
+        },
+        "Timestamp": {
+            "type": "string",
             "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
         },
         "TMDBMetadataConfig": {

@@ -344,34 +344,45 @@ def has_enough_memory() -> tuple[bool, float, float]:
 
 # TODO: relativate to the root path
 def relative_path_str(path: Path) -> str:
-    return str(path)
+    return str(object=path)
 
 
 @dataclass()
 class ClassifierOptions:
-    segment_length: Optional[ConfigTimeStamp]
-    accuracy_threshold: Optional[float]
-    final_accuracy_threshold: Optional[float]
-    minimum_scanned: Optional[float]
+    segment_length: Timestamp
+    accuracy_threshold: float
+    final_accuracy_threshold: float
+    minimum_scanned: float
     scan_until: Optional[float]
 
-
-@dataclass()
-class ClassifierOptionsParsed:
-    segment_length: Timestamp = field(metadata=schema())
-    accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
-    final_accuracy_threshold: float = field(metadata=schema(min=0.0, max=1.0))
-    minimum_scanned: float
-    scan_until: Optional[float] = field(metadata=none_as_undefined, default=None)
-
     @staticmethod
-    def default() -> "ClassifierOptionsParsed":
-        return ClassifierOptionsParsed(
+    def default() -> "ClassifierOptions":
+        return ClassifierOptions(
             segment_length=Timestamp.from_seconds(30),
             accuracy_threshold=0.95,
             final_accuracy_threshold=0.55,
             minimum_scanned=0.2,
             scan_until=None,
+        )
+
+
+@dataclass()
+class ClassifierOptionsConfig:
+    segment_length: Optional[ConfigTimeStamp] = field(metadata=schema())
+    accuracy_threshold: Optional[float] = field(metadata=schema(min=0.0, max=1.0))
+    final_accuracy_threshold: Optional[float] = field(metadata=schema(min=0.0, max=1.0))
+    minimum_scanned: Optional[float]
+    scan_until: Optional[float] = field(metadata=none_as_undefined, default=None)
+
+    @staticmethod
+    def default() -> "ClassifierOptionsConfig":
+        config_defaults = ClassifierOptions.default()
+        return ClassifierOptionsConfig(
+            segment_length=config_defaults.segment_length,
+            accuracy_threshold=config_defaults.accuracy_threshold,
+            final_accuracy_threshold=config_defaults.final_accuracy_threshold,
+            minimum_scanned=config_defaults.minimum_scanned,
+            scan_until=config_defaults.scan_until,
         )
 
 
@@ -381,12 +392,12 @@ def is_percentage(value: float) -> bool:
 
 class Classifier:
     __save_dir: Path
-    __options: ClassifierOptionsParsed
+    __options: ClassifierOptions
     __classifier: EncoderClassifier
 
     def __init__(
         self: Self,
-        options: Optional[ClassifierOptions] | ClassifierOptionsParsed = None,
+        options: Optional[ClassifierOptionsConfig] | ClassifierOptions = None,
     ) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
@@ -394,13 +405,17 @@ class Classifier:
 
     def __parse_options(
         self: Self,
-        options: Optional[ClassifierOptions] | ClassifierOptionsParsed,
-    ) -> ClassifierOptionsParsed:
-        total_options: ClassifierOptionsParsed = ClassifierOptionsParsed.default()
+        options: Optional[ClassifierOptionsConfig] | ClassifierOptions,
+    ) -> ClassifierOptions:
+        total_options: ClassifierOptions = ClassifierOptions.default()
 
         if options is not None:
             total_options.segment_length = (
-                options.segment_length
+                (
+                    options.segment_length
+                    if isinstance(options.segment_length, Timestamp)
+                    else options.segment_length.value
+                )
                 if options.segment_length is not None
                 else total_options.segment_length
             )

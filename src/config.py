@@ -7,7 +7,7 @@ from typing import Any, Optional
 import yaml
 from apischema import ValidationError, deserialize, schema
 
-from classifier import ClassifierOptionsParsed
+from classifier import ClassifierOptionsConfig
 from content.language_picker import (
     LanguagePickerConfig,
     NoLanguagePickerConfig,
@@ -63,7 +63,7 @@ class ParsedConfig:
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
-    classifier: ClassifierOptionsParsed
+    classifier: ClassifierOptionsConfig
     metadata: MetadataConfig
     picker: LanguagePickerConfig
 
@@ -76,7 +76,7 @@ class Config:
     general: Optional[GeneralConfig]
     parser: Optional[ParserConfig]
     scanner: Optional[ScannerConfig]
-    classifier: Optional[ClassifierOptionsParsed]
+    classifier: Optional[ClassifierOptionsConfig]
     metadata: Optional[MetadataConfig]
     picker: Optional[LanguagePickerConfig]
 
@@ -92,7 +92,7 @@ class Config:
                 exception_on_error=True,
             ),
             scanner=ConfigScannerConfig(scanner_type="config", config=None),
-            classifier=ClassifierOptionsParsed.default(),
+            classifier=ClassifierOptionsConfig.default(),
             metadata=MissingProviderMetadataConfig(type="none"),
             picker=NoLanguagePickerConfig(picker_type="none"),
         )

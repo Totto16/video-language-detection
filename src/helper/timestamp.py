@@ -199,11 +199,20 @@ class Timestamp:
 
 
 @schema(min=1, max=60 * 60 * 24, deprecated=True)
-class TimestampFromSecond(Timestamp):
+class TimestampCompat:
+    __value: Timestamp
+
+    def __init__(self: Self, value: Timestamp) -> None:
+        self.__value = value
+
+    @property
+    def value(self: Self) -> Timestamp:
+        return self.__value
+
     @deserializer
     @staticmethod
-    def deserialize_int(inp: int) -> "Timestamp":
-        return Timestamp.from_seconds(inp)
+    def deserialize_int(inp: int) -> "TimestampCompat":
+        return TimestampCompat(Timestamp.from_seconds(inp))
 
 
-ConfigTimeStamp = TimestampFromSecond | Timestamp
+ConfigTimeStamp = TimestampCompat | Timestamp
