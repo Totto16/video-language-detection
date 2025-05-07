@@ -26,7 +26,7 @@ from content.general import NameParser
 from content.scanner import (
     get_scanner_from_config,
 )
-from gui.main import launch
+from gui.main import launch_gui
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import generate_schemas, parse_contents
@@ -98,7 +98,7 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
-def main(config: ParsedConfig) -> None:
+def launch_tui(config: ParsedConfig) -> None:
     classifier = Classifier(config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
     metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
@@ -133,7 +133,7 @@ def main(config: ParsedConfig) -> None:
     logger.info(metadata_summary)
 
 
-SubCommand = Literal["run", "schema", "gui"]
+SubCommand = Literal["run", "schema", "gui", "config_check"]
 
 
 class ParsedArgNamespace:
@@ -156,10 +156,16 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     config: str
 
 
+class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["config_check"]
+    config: str
+
+
 AllParsedNameSpaces = (
     RunCommandParsedArgNamespace
     | SchemaCommandParsedArgNamespace
     | GuiCommandParsedArgNamespace
+    | ConfigCheckCommandParsedArgNamespace
 )
 
 _ = get_translator()
@@ -186,32 +192,60 @@ if __name__ == "__main__":
         default=loglevel_default,
         dest="level",
         type=lambda s: LogLevel.from_str(s) or cast(LogLevel, s.lower()),
+        help=_("The loglevel to use"),
     )
 
-    subparsers = parser.add_subparsers(required=True, dest="subcommand")
+    subparsers = parser.add_subparsers(
+        required=True,
+        dest="subcommand",
+    )
 
-    run_parser = subparsers.add_parser("run")
+    run_parser = subparsers.add_parser(
+        "run",
+        description=_("Run the whole program in the terminal"),
+    )
     run_parser.add_argument(
         "-c",
         "--config",
         dest="config",
         default="config.yaml",
+        help=_("The config to use"),
     )
 
-    schema_parser = subparsers.add_parser("schema")
+    schema_parser = subparsers.add_parser(
+        "schema",
+        description=_("Create schemas for config and the resulting data"),
+    )
     schema_parser.add_argument(
         "-s",
         "--schema_folder",
         dest="schema_folder",
         default="schema/",
+        help=_("The folder where to put the schemas"),
     )
 
-    gui_parser = subparsers.add_parser("gui")
+    gui_parser = subparsers.add_parser(
+        "gui",
+        description=_("Run the whole program as GUI"),
+    )
     gui_parser.add_argument(
         "-c",
         "--config",
         dest="config",
         default="config.yaml",
+        help=_("The config to use"),
+    )
+
+    config_check_parser = subparsers.add_parser(
+        "config_check",
+        description=_("Check the config for validity"),
+    )
+    config_check_parser.add_argument(
+        "-c",
+        "--config",
+        dest="config",
+        default="config.yaml",
+        help=_("The config to check"),
     )
 
     args = cast(AllParsedNameSpaces, parser.parse_args())
@@ -221,23 +255,46 @@ if __name__ == "__main__":
         match args.subcommand:
             case "schema":
                 args_schema = cast(SchemaCommandParsedArgNamespace, args)
+
                 generate_schemas(Path(args_schema.schema_folder))
+
+                logger.info(_("Successfully generated the schemas"))
                 sys.exit(0)
             case "gui":
                 args_gui = cast(GuiCommandParsedArgNamespace, args)
+
                 config = Path(args_gui.config)
-                launch(config)
+
+                launch_gui(config)
+
                 sys.exit(0)
             case "run":
                 args_run = cast(
                     RunCommandParsedArgNamespace,
                     args,
                 )
+
                 parsed_config = Config.load(Path(args_run.config))
                 if parsed_config is None:
                     sys.exit(1)
 
-                main(parsed_config)
+                launch_tui(parsed_config)
+
+                sys.exit(0)
+
+            case "config_check":
+                args_config_check = cast(ConfigCheckCommandParsedArgNamespace, args)
+
+                config = Path(args_config_check.config)
+                parsed_config = Config.load(config)
+                if parsed_config is None:
+                    logger.error(
+                        _("Config '{config}' is not valid!").format(config=config),
+                    )
+                    sys.exit(1)
+
+                logger.info(_("Config '{config}' is valid!").format(config=config))
+                sys.exit(0)
 
     except KeyboardInterrupt:
 
