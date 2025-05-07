@@ -21,6 +21,7 @@ themoviedb = "*"
 sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python"}
 prompt-toolkit = "*"
 questionary = "*"
+colorlog = "*"
 
 [dev-packages]
 pylint = "*"
