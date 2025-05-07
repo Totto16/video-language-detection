@@ -100,7 +100,7 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
-def launch_tui(config: ParsedConfig) -> None:
+def launch_tui(logger: Logger, config: ParsedConfig) -> None:
     classifier = Classifier(config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
     metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
@@ -172,7 +172,8 @@ AllParsedNameSpaces = (
 
 _ = get_translator()
 
-if __name__ == "__main__":
+
+def parse_args() -> AllParsedNameSpaces:
     parser = argparse.ArgumentParser(
         prog="video-language-detection",
         description=_("Detect video languages"),
@@ -257,53 +258,86 @@ if __name__ == "__main__":
         help=_("The config to check"),
     )
 
-    args = cast(AllParsedNameSpaces, parser.parse_args())
+    return cast(AllParsedNameSpaces, parser.parse_args())
+
+
+ExitCode = int
+
+
+def subcommand_schema(
+    logger: Logger,
+    args: SchemaCommandParsedArgNamespace,
+) -> ExitCode:
+    generate_schemas(Path(args.schema_folder))
+
+    logger.info(_("Successfully generated the schemas"))
+    return 0
+
+
+def subcommand_gui(
+    _logger: Logger,
+    args: GuiCommandParsedArgNamespace,
+) -> ExitCode:
+    config = Path(args.config)
+
+    launch_gui(config)
+
+    return 0
+
+
+def subcommand_run(
+    logger: Logger,
+    args: RunCommandParsedArgNamespace,
+) -> ExitCode:
+    parsed_config = Config.load(Path(args.config))
+    if parsed_config is None:
+        return 1
+
+    launch_tui(logger, parsed_config)
+
+    return 0
+
+
+def subcommand_config_check(
+    logger: Logger,
+    args: ConfigCheckCommandParsedArgNamespace,
+) -> ExitCode:
+    config = Path(args.config)
+    parsed_config = Config.load(config)
+    if parsed_config is None:
+        logger.error(
+            _("Config '{config}' is not valid!").format(config=config),
+        )
+        return 1
+
+    logger.info(_("Config '{config}' is valid!").format(config=config))
+    return 0
+
+
+def main() -> ExitCode:
+    args = parse_args()
     logger: Logger = setup_custom_logger(args.level)
 
     try:
         match args.subcommand:
             case "schema":
-                args_schema = cast(SchemaCommandParsedArgNamespace, args)
-
-                generate_schemas(Path(args_schema.schema_folder))
-
-                logger.info(_("Successfully generated the schemas"))
-                sys.exit(0)
-            case "gui":
-                args_gui = cast(GuiCommandParsedArgNamespace, args)
-
-                config = Path(args_gui.config)
-
-                launch_gui(config)
-
-                sys.exit(0)
-            case "run":
-                args_run = cast(
-                    RunCommandParsedArgNamespace,
-                    args,
+                return subcommand_schema(
+                    logger, cast(SchemaCommandParsedArgNamespace, args),
                 )
-
-                parsed_config = Config.load(Path(args_run.config))
-                if parsed_config is None:
-                    sys.exit(1)
-
-                launch_tui(parsed_config)
-
-                sys.exit(0)
-
+            case "gui":
+                return subcommand_gui(logger, cast(GuiCommandParsedArgNamespace, args))
+            case "run":
+                return subcommand_run(
+                    logger,
+                    cast(
+                        RunCommandParsedArgNamespace,
+                        args,
+                    ),
+                )
             case "config_check":
-                args_config_check = cast(ConfigCheckCommandParsedArgNamespace, args)
-
-                config = Path(args_config_check.config)
-                parsed_config = Config.load(config)
-                if parsed_config is None:
-                    logger.error(
-                        _("Config '{config}' is not valid!").format(config=config),
-                    )
-                    sys.exit(1)
-
-                logger.info(_("Config '{config}' is valid!").format(config=config))
-                sys.exit(0)
+                return subcommand_config_check(
+                    logger, cast(ConfigCheckCommandParsedArgNamespace, args),
+                )
 
     except KeyboardInterrupt:
 
@@ -312,3 +346,9 @@ if __name__ == "__main__":
             print(_("Ctrl + C pressed"))  # noqa: T201
 
         atexit.register(exit_handler)
+        return 0
+
+
+if __name__ == "__main__":
+    exit_code = main()
+    sys.exit(exit_code)
