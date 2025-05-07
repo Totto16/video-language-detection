@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "046bd70d30c0741875bb56970877e2123c40daefe59927ea81648772acc01f11"
+            "sha256": "5f06cd2e82f3c9491906de8973c3a107ef2ed570d3fc895a78b59d23e19cf55b"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -1211,6 +1211,13 @@
             "index": "pypi",
             "markers": "python_version >= '3.9'",
             "version": "==12.0.0"
+        },
+        "pyperclip": {
+            "hashes": [
+                "sha256:b7de0142ddc81bfc5c7507eea19da920b92252b548b96186caf94a5e2527d310"
+            ],
+            "index": "pypi",
+            "version": "==1.9.0"
         },
         "pysoundfile": {
             "hashes": [

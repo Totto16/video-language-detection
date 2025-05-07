@@ -6,7 +6,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Self, TypedDict, cast, override
 
-from prompt_toolkit.clipboard import Clipboard, ClipboardData, InMemoryClipboard
+import pyperclip
 from questionary import Choice, Question, Separator, select
 from questionary.prompts.common import FormattedText
 
@@ -108,10 +108,7 @@ def open_file(path: Path) -> None:
 
 
 def copy_to_clipboard(path: Path) -> None:
-    clipboard: Clipboard = InMemoryClipboard()
-
-    data: ClipboardData = ClipboardData(str(path.absolute()))
-    clipboard.set_data(data)
+    pyperclip.copy(str(path.absolute()))
 
 
 def play_notification_sound() -> None:
