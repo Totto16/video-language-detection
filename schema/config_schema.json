@@ -260,7 +260,8 @@
             "enum": [
                 "only_metadata",
                 "only_language",
-                "both"
+                "both",
+                "none"
             ]
         },
         "ClassifierOptionsParsed": {

@@ -63,6 +63,7 @@ class ScannerTypes(Enum):
     only_metadata = "only_metadata"
     only_language = "only_language"
     both = "both"
+    none = "none"
 
 
 # TODO: is there a better way?
@@ -189,6 +190,9 @@ class ConfigScanner(Scanner):
         self.__is_aborted = False
 
     def __is_type(self: Self, scan_kind: ScanKind) -> bool:
+        if self.__types == ScannerTypes.none:
+            return False
+
         if self.__types == ScannerTypes.both:
             return True
 
