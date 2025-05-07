@@ -7,7 +7,7 @@ from content.metadata.interfaces import (
     Provider,
 )
 from content.metadata.provider.imdb import IMDBMetadataConfig, IMDBProvider
-from content.metadata.provider.tmbd import TMDBMetadataConfig, TMDBProvider
+from content.metadata.provider.tmdb import TMDBMetadataConfig, TMDBProvider
 from content.metadata.scanner import MetadataScanner
 
 MetadataConfig = Annotated[
