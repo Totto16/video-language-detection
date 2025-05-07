@@ -205,7 +205,6 @@ class ConfigScanner(Scanner):
         if not self.__is_type(scan_kind):
             return False
 
-        # TODO: set somewhere, e.g. in gui
         if self.__is_aborted and self.__allow_abort:
             return False
 
@@ -249,6 +248,16 @@ class ConfigScanner(Scanner):
             scan_type,
             metadata,
         )
+
+    @property
+    def allow_abort(self: Self) -> bool:
+        return self.__allow_abort
+
+    def abort(self: Self) -> bool:
+        if self.__allow_abort:
+            self.__is_aborted = True
+
+        return self.__is_aborted
 
 
 @dataclass

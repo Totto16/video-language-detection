@@ -7,7 +7,9 @@ import re as regex
 import sys
 from logging import Logger
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, Self, cast, override
+from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast, override
+
+from prompt_toolkit.key_binding import KeyBindings
 
 from classifier import Classifier
 from content.base_class import LanguageScanner, Scanner
@@ -21,9 +23,10 @@ if TYPE_CHECKING:
     from content.base_class import Content
     from content.metadata.scanner import MetadataScanner
 
-from config import Config, ParsedConfig
+from config import Config, KeyBoardConfig, ParsedConfig
 from content.general import NameParser
 from content.scanner import (
+    ConfigScanner,
     get_scanner_from_config,
 )
 from gui.main import launch_gui
@@ -100,6 +103,22 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
+def get_keybindings(
+    logger: Logger,
+    kb_config: KeyBoardConfig,
+    scanner: Scanner,
+) -> KeyBindings:
+    kb = KeyBindings()
+
+    @kb.add(kb_config.abort.value)
+    def _abort_callback(_event: Any) -> None:
+        if isinstance(scanner, ConfigScanner) and scanner.allow_abort:
+            scanner.abort()
+            logger.info(_("Aborted scan"))
+
+    return kb
+
+
 def launch_tui(logger: Logger, config: ParsedConfig) -> None:
     classifier = Classifier(config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
@@ -113,6 +132,8 @@ def launch_tui(logger: Logger, config: ParsedConfig) -> None:
     )
 
     language_picker: LanguagePicker = get_picker_from_config(config.picker)
+
+    kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
 
     contents: list[Content] = parse_contents(
         config.parser.root_folder,
@@ -293,7 +314,7 @@ def subcommand_run(
     if parsed_config is None:
         return 1
 
-    launch_tui(logger, parsed_config)
+    launch_tui(logger, config=parsed_config)
 
     return 0
 
@@ -322,7 +343,8 @@ def main() -> ExitCode:
         match args.subcommand:
             case "schema":
                 return subcommand_schema(
-                    logger, cast(SchemaCommandParsedArgNamespace, args),
+                    logger,
+                    cast(SchemaCommandParsedArgNamespace, args),
                 )
             case "gui":
                 return subcommand_gui(logger, cast(GuiCommandParsedArgNamespace, args))
@@ -336,7 +358,8 @@ def main() -> ExitCode:
                 )
             case "config_check":
                 return subcommand_config_check(
-                    logger, cast(ConfigCheckCommandParsedArgNamespace, args),
+                    logger,
+                    cast(ConfigCheckCommandParsedArgNamespace, args),
                 )
 
     except KeyboardInterrupt:

@@ -1,11 +1,13 @@
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Self
 
 import yaml
-from apischema import ValidationError, deserialize, schema
+from apischema import ValidationError, deserialize, deserializer, schema, serializer
+from prompt_toolkit.keys import KEY_ALIASES, Keys
 
 from classifier import ClassifierOptionsConfig
 from content.language_picker import (
@@ -58,6 +60,84 @@ class ParserConfigParsed:
     exception_on_error: bool = field(metadata=schema(), default=True)
 
 
+def one_of_list(values: list[str]) -> Callable[[dict[str, Any]], None]:
+
+    def modify_schema(schema: dict[str, Any]) -> None:
+        schema["enum"] = values
+
+    return modify_schema
+
+
+def get_all_keys_with_aliases() -> list[str]:
+    result: list[str] = []
+
+    # add all values  + human readbale enum names
+    for key in Keys:
+        result.append(key.value)
+        result.append(key.name)
+
+    result.extend(KEY_ALIASES.keys())
+
+    return result
+
+
+@schema(extra=one_of_list(get_all_keys_with_aliases()))
+class CustomKey:
+    __underlying: Keys
+
+    def __init__(self: Self, key: Keys) -> None:
+        self.__underlying = key
+
+    @serializer
+    def serialize(self: Self) -> str:
+        return str(self)
+
+    @staticmethod
+    def __key_from_str(inp: str) -> Optional[Keys]:
+        # resolve aliases
+        for key, value in KEY_ALIASES.items():
+            if key.lower() == inp.lower():
+                inp = value.lower()
+
+        for key in Keys:
+            # resolve values
+            if key.value.lower() == inp.lower():
+                return key
+            # resolve humand readbale enum format
+            if key.name.lower() == inp.lower():
+                return key
+
+        return None
+
+    @deserializer
+    @staticmethod
+    def deserialize_str(inp: str) -> "CustomKey":
+        key = CustomKey.__key_from_str(inp)
+        if key is None:
+            msg = f"Deserialization error: invalid key string: {inp}"
+            raise TypeError(msg)
+        return CustomKey(key)
+
+    def __str__(self: Self) -> str:
+        return str(self.__underlying)
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__underlying)
+
+    @property
+    def value(self: Self) -> Keys:
+        return self.__underlying
+
+
+@dataclass
+class KeyBoardConfig:
+    abort: CustomKey
+
+    @staticmethod
+    def default() -> "KeyBoardConfig":
+        return KeyBoardConfig(abort=CustomKey(Keys.ControlG))
+
+
 @dataclass
 class ParsedConfig:
     general: GeneralConfigParsed
@@ -66,6 +146,7 @@ class ParsedConfig:
     classifier: ClassifierOptionsConfig
     metadata: MetadataConfig
     picker: LanguagePickerConfig
+    keybindings: KeyBoardConfig
 
 
 logger: Logger = get_logger()
@@ -79,6 +160,7 @@ class Config:
     classifier: Optional[ClassifierOptionsConfig]
     metadata: Optional[MetadataConfig]
     picker: Optional[LanguagePickerConfig]
+    keybindings: Optional[KeyBoardConfig]
 
     @staticmethod
     def __defaults() -> "ParsedConfig":
@@ -95,6 +177,7 @@ class Config:
             classifier=ClassifierOptionsConfig.default(),
             metadata=MissingProviderMetadataConfig(type="none"),
             picker=NoLanguagePickerConfig(picker_type="none"),
+            keybindings=KeyBoardConfig.default(),
         )
 
     @staticmethod
@@ -142,6 +225,10 @@ class Config:
         if config.picker is not None:
             parsed_picker = config.picker
 
+        parsed_keybindings = defaults.keybindings
+        if config.keybindings is not None:
+            parsed_keybindings = config.keybindings
+
         return ParsedConfig(
             general=parsed_general,
             parser=parsed_parser,
@@ -149,6 +236,7 @@ class Config:
             classifier=parsed_classifier,
             metadata=parsed_metadata,
             picker=parsed_picker,
+            keybindings=parsed_keybindings,
         )
 
     @staticmethod
