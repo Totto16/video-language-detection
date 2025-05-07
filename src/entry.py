@@ -31,6 +31,8 @@ from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import generate_schemas, parse_contents
 
+PROGRAM_VERSION: str = "2.5.1"
+
 
 class CustomNameParser(NameParser):
     __season_special_names: list[str]
@@ -193,6 +195,13 @@ if __name__ == "__main__":
         dest="level",
         type=lambda s: LogLevel.from_str(s) or cast(LogLevel, s.lower()),
         help=_("The loglevel to use"),
+    )
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {PROGRAM_VERSION}",
     )
 
     subparsers = parser.add_subparsers(

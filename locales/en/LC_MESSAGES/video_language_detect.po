@@ -2,7 +2,7 @@
 # License MIT
 msgid ""
 msgstr ""
-"Project-Id-Version: 2.5.0\n"
+"Project-Id-Version: 2.5.1\n"
 "POT-Creation-Date: 2025-05-07 12:57+0200\n"
 "PO-Revision-Date: 2025-05-07 13:10+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
