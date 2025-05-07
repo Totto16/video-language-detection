@@ -112,5 +112,6 @@ module = [
     "pynvml",
     "speechbrain.*",
     "themoviedb.*",
+    "pyperclip"
 ]
 follow_untyped_imports = true
