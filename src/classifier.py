@@ -1,10 +1,12 @@
 import gc
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, Optional, Self
+from types import TracebackType
+from typing import Any, Literal, Optional, Self, TypedDict, override
 
 import psutil
 import torchaudio
@@ -37,8 +39,6 @@ logger: Logger = get_logger()
 _ = get_translator()
 
 VOXLINGUA_SAMPLE_COUNT: int = 107
-
-MAX_RETRY_COUNT: int = 10
 
 
 class FileType(Enum):
@@ -390,10 +390,195 @@ def is_percentage(value: float) -> bool:
     return value >= 0.0 and value <= 1.0
 
 
+class RunOpts(TypedDict, total=False):
+    device: Literal["cuda", "cpu"]
+    data_parallel_count: int
+    data_parallel_backend: bool
+    distributed_launch: bool
+    distributed_backend: str
+    jit: str
+    jit_module_keys: Optional[str]
+    compule: str
+    compile_module_keys: str
+    compile_mode: str
+    compile_using_fullgraph: str
+    compile_using_dynamic_shape_tracing: str
+
+
+class AllocatorType(Enum):
+    cpu = "cpu"
+    gpu = " gpu"
+
+
+MAX_RETRY_COUNT_FOR_GPU: int = 5
+MAX_RETRY_COUNT: int = 10
+
+
+class ClassifierManager(AbstractContextManager[None]):
+    __type: AllocatorType
+    __classifier: EncoderClassifier
+    __retry_count: int
+    __failed_too_often: bool
+
+    def __init__(self: Self) -> None:
+        self.__init_type()
+        self.__init_classification()
+        self.__retry_count = 0
+        self.__failed_too_often = False
+
+    def __force_cpu(self: Self) -> None:
+        self.__type = AllocatorType.cpu
+
+    def __init_type(self: Self) -> None:
+        self.__type = AllocatorType.gpu if cuda.is_available() else AllocatorType.cpu
+
+    def __init_classifier(self: Self) -> None:
+        run_opts: Optional[RunOpts] = self.__get_run_opts()
+
+        classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
+            source="speechbrain/lang-id-voxlingua107-ecapa",
+            savedir="model",
+            run_opts=run_opts,
+        )
+        if classifier is None:
+            msg = "Couldn't initialize Classifier"
+            raise RuntimeError(msg)
+
+        classifier.hparams.label_encoder.expect_len(VOXLINGUA_SAMPLE_COUNT)
+
+        self.__classifier = classifier
+
+    def __init_classification(self: Self) -> None:
+        self.__check_audio_backends()
+        self.__check_ffprobe()
+        self.__init_classifier()
+
+    def __check_audio_backends(self: Self) -> None:
+        backends = torchaudio.list_audio_backends()
+        if len(backends) == 0:
+            msg = "Couldn't find any audio backends for torchaudio"
+            raise RuntimeError(msg)
+
+        logger.debug("Found audio backends: %s", str(backends))
+
+    def __check_ffprobe(self: Self) -> None:
+        is_ffprobe_present = ffprobe_check()
+        if not is_ffprobe_present:
+            msg = "FFProbe not installed"
+            raise RuntimeError(msg)
+
+    @property
+    def failed_too_often(self: Self) -> bool:
+        return self.__failed_too_often
+
+    @staticmethod
+    def clear_gpu_cache() -> None:
+        gc.collect()
+        cuda.empty_cache()
+
+    @staticmethod
+    def print_gpu_stat() -> None:
+        if not cuda.is_available():
+            return
+
+        ClassifierManager.clear_gpu_cache()
+
+        nvmlInit()
+        # TODO: support more than one
+        h = nvmlDeviceGetHandleByIndex(0)
+        info = nvmlDeviceGetMemoryInfo(h)
+        logger.info("GPU stats:")
+        logger.info("total : %s", naturalsize(info.total, binary=True))
+        logger.info("free : %s", naturalsize(info.free, binary=True))
+        logger.info("used : %s", naturalsize(info.used, binary=True))
+
+    def __get_run_opts(self: Self) -> Optional[RunOpts]:
+
+        if self.__type == AllocatorType.cpu:
+            return {"device": "cpu"}
+
+        ClassifierManager.clear_gpu_cache()
+
+        return {
+            "device": "cuda",
+            "data_parallel_count": -1,
+            "data_parallel_backend": True,
+            "distributed_launch": False,
+            "distributed_backend": "nccl",
+            "jit_module_keys": None,
+        }
+
+    @override
+    def __enter__(self: Self) -> None:
+        return None
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> bool:
+        if exc_val is not None:
+            if isinstance(exc_val, cuda.OutOfMemoryError):
+                if self.__retry_count >= MAX_RETRY_COUNT:
+                    msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
+                    logger.error(msg)
+                    self.__failed_too_often = True
+                    return True
+
+                if (
+                    self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
+                    and self.__type == AllocatorType.gpu
+                ):
+                    msg = "Switching the classifier to the cpu"
+                    logger.debug(msg)
+
+                    # reinitialize the classifier to use the cpu
+                    del self.__classifier
+                    self.__force_cpu()
+                    self.__init_classifier()
+
+                self.__retry_count = self.__retry_count + 1
+                return True
+
+            logger.exception("Classify file")
+            return False
+
+        self.__retry_count = 0
+        return False
+
+    def retry_manager(self: Self) -> Self:
+        return self
+
+    def perform_classification(
+        self: Self, audio_path: Path, savedir: Optional[Path],
+    ) -> list[tuple[str, float]]:
+        savedir_arg = str(savedir.absolute()) if savedir is not None else None
+
+        # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
+        wavs: Any = self.__classifier.load_audio(
+            str(audio_path.absolute()),
+            savedir=savedir_arg,
+        )
+
+        embeddings = self.__classifier.encode_batch(wavs, wav_lens=None)
+        out_prob = self.__classifier.mods.classifier(embeddings).squeeze(1)  # type: ignore[operator]
+
+        return [
+            (self.__classifier.hparams.label_encoder.decode_ndim(index), p)
+            for index, p in enumerate(out_prob.exp().tolist()[0])
+        ]
+
+    def __del__(self: Self) -> None:
+        if self.__type == AllocatorType.gpu:
+            ClassifierManager.clear_gpu_cache()
+
+
 class Classifier:
     __save_dir: Path
     __options: ClassifierOptions
-    __classifier: EncoderClassifier
+    __manager: ClassifierManager
 
     def __init__(
         self: Self,
@@ -401,7 +586,7 @@ class Classifier:
     ) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
-        self.__classifier = self.__init_classifier()
+        self.__manager = ClassifierManager()
 
     def __parse_options(
         self: Self,
@@ -460,43 +645,11 @@ class Classifier:
 
         return total_options
 
-    def __init_classifier(self: Self, *, force_cpu: bool = False) -> EncoderClassifier:
-        run_opts = self.__get_run_opts(force_cpu=force_cpu)
-
-        classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
-            source="speechbrain/lang-id-voxlingua107-ecapa",
-            savedir="model",
-            run_opts=run_opts,
-        )
-        if classifier is None:
-            msg = "Couldn't initialize Classifier"
-            raise RuntimeError(msg)
-
-        self.__check_audio_backends()
-        self.__check_ffprobe()
-
-        return classifier
-
-    def __check_audio_backends(self: Self) -> None:
-        backends = torchaudio.list_audio_backends()
-        if len(backends) == 0:
-            msg = "Couldn't find any audio backends for torchaudio"
-            raise RuntimeError(msg)
-
-        logger.debug("Found audio backends: %s", str(backends))
-
-    def __check_ffprobe(self: Self) -> None:
-        is_ffprobe_present = ffprobe_check()
-        if not is_ffprobe_present:
-            msg = "FFProbe not installed"
-            raise RuntimeError(msg)
-
     def __classify(
         self: Self,
         wav_file: WAVFile,
         segment: Segment,
         manager: Optional[Manager] = None,
-        retry_count: int = 0,
     ) -> Optional[Prediction]:
         result: bool = wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
@@ -507,80 +660,40 @@ class Classifier:
         if not result and wav_file.status != Status.ready:
             return None
 
-        # from: https://github.com/speechbrain/speechbrain/tree/develop/recipes/VoxLingua107/lang_id
-        wavs: Any = self.__classifier.load_audio(
-            str(wav_file.wav_path().absolute()),
-            savedir=str(self.__save_dir.absolute()),
-        )
+        # TODO: say to the manager, that we try to use the gpu, so that if we switched to the cpu in the previous run, it maybe now has enough gpu memory to switch back
 
-        try:
-            Classifier.clear_gpu_cache()
-
-            emb = self.__classifier.encode_batch(wavs, wav_lens=None)
-            out_prob = self.__classifier.mods.classifier(emb).squeeze(1)  # type: ignore[operator]
-
-            self.__classifier.hparams.label_encoder.expect_len(VOXLINGUA_SAMPLE_COUNT)
-
-            # NOTE:  ATTENTION - unsorted list
-            prob: list[tuple[float, Language]] = [
-                (
-                    p,
-                    Language.from_str_unsafe(
-                        self.__classifier.hparams.label_encoder.decode_ndim(index),
-                    ),
-                )
-                for index, p in enumerate(out_prob.exp().tolist()[0])
-            ]
-
-            Classifier.clear_gpu_cache()
-
-            return Prediction(prob)
-
-        except RuntimeError as ex:
-
-            if isinstance(ex, cuda.OutOfMemoryError):
-                if retry_count > MAX_RETRY_COUNT:
-                    msg = f"Exceeded retry amount of classify: {retry_count}/{MAX_RETRY_COUNT}"
-                    logger.error(msg)  # noqa: TRY400
-                    return None
-                self.__init_classifier(force_cpu=True)
-                return self.__classify(
-                    wav_file=wav_file,
-                    segment=segment,
-                    manager=manager,
-                    retry_count=retry_count + 1,
+        while not self.__manager.failed_too_often:
+            with self.__manager.retry_manager():
+                classifier_result = self.__manager.perform_classification(
+                    wav_file.wav_path(),
+                    self.__save_dir,
                 )
 
-            logger.exception("Classify file")
-            return None
+                # NOTE:  ATTENTION - unsorted list
+                prob: list[tuple[float, Language]] = [
+                    (
+                        p,
+                        Language.from_str_unsafe(
+                            language_str,
+                        ),
+                    )
+                    for language_str, p in classifier_result
+                ]
 
-    @staticmethod
-    def clear_gpu_cache() -> None:
-        gc.collect()
-        cuda.empty_cache()
+                return Prediction(prob)
 
-    @staticmethod
-    def print_gpu_stat() -> None:
-        if not cuda.is_available():
-            return
+        return None
 
-        Classifier.clear_gpu_cache()
-
-        nvmlInit()
-        h = nvmlDeviceGetHandleByIndex(0)
-        info = nvmlDeviceGetMemoryInfo(h)
-        logger.info("GPU stats:")
-        logger.info("total : %s", naturalsize(info.total, binary=True))
-        logger.info("free : %s", naturalsize(info.free, binary=True))
-        logger.info("used : %s", naturalsize(info.used, binary=True))
-
-    def predict(
+    def __predict(
         self: Self,
         wav_file: WAVFile,
         path: Path,
         language_picker: LanguagePicker,
-        manager: Optional[Manager] = None,
-    ) -> tuple[PredictionBest, float]:
+        manager: Optional[Manager],
+    ) -> Optional[tuple[PredictionBest, float]]:
+        if self.__manager.failed_too_often:
+            return None
+
         def get_segments(runtime: Timestamp) -> list[tuple[Segment, Timestamp]]:
             result: list[tuple[Segment, Timestamp]] = []
             current_timestamp: Timestamp = Timestamp.zero()
@@ -675,25 +788,21 @@ class Classifier:
         logger.error(msg)
 
         # return unknown language
-        return (PredictionBest(0.0, Language.unknown()), 0.0)
+        return None
 
-    def __get_run_opts(self: Self, *, force_cpu: bool) -> Optional[dict[str, Any]]:
-        if force_cpu:
-            return {"device": "cpu"}
+    def predict(
+        self: Self,
+        wav_file: WAVFile,
+        path: Path,
+        language_picker: LanguagePicker,
+        manager: Optional[Manager] = None,
+    ) -> tuple[PredictionBest, float]:
+        prediction = self.__predict(wav_file, path, language_picker, manager)
 
-        if not cuda.is_available():
-            return None
+        if prediction is None:
+            return (PredictionBest(0.0, Language.unknown()), 0.0)
 
-        Classifier.clear_gpu_cache()
-
-        return {
-            "device": "cuda",
-            "data_parallel_count": -1,
-            "data_parallel_backend": True,
-            "distributed_launch": False,
-            "distributed_backend": "nccl",
-            "jit_module_keys": None,
-        }
+        return prediction
 
     def __del__(self: Self) -> None:
         if self.__save_dir.exists():
