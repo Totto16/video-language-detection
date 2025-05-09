@@ -9,9 +9,9 @@ from content.language import Language
 from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import MetadataKind
 
-CollectionDescription = str
+type CollectionDescription = str
 
-IdentifierDescription = (
+type IdentifierDescription = (
     tuple[EpisodeDescription]
     | tuple[SeasonDescription, EpisodeDescription]
     | tuple[SeriesDescription, SeasonDescription, EpisodeDescription]
@@ -36,11 +36,11 @@ class MetadataType(str, Enum):
         return str(self)
 
 
-LanguageDict = dict[Language, int]
-MetadataSubDict = dict[MetadataType, int]
-MetadataDict = dict[MetadataKind, MetadataSubDict]
+type LanguageDict = dict[Language, int]
+type MetadataSubDict = dict[MetadataType, int]
+type MetadataDict = dict[MetadataKind, MetadataSubDict]
 
-MetadataInput = tuple[MetadataKind, InternalMetadataType]
+type MetadataInput = tuple[MetadataKind, InternalMetadataType]
 
 
 def metadata_handle_to_type(

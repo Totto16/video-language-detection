@@ -9,7 +9,7 @@ from typing import Literal, cast
 from fix_chapters import fix_chapters
 from scan_files import scan_files
 
-SubCommand = Literal["scan", "fix-chapter"]
+type SubCommand = Literal["scan", "fix-chapter"]
 
 
 class ParsedArgNamespace:
@@ -25,9 +25,7 @@ class FixChapterCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["fix-chapter"]
 
 
-AllParsedNameSpaces = (
-    ScanCommandParsedArgNamespace | FixChapterCommandParsedArgNamespace
-)
+type AllParsedNameSpaces = ScanCommandParsedArgNamespace | FixChapterCommandParsedArgNamespace
 
 
 if __name__ == "__main__":

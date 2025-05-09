@@ -30,7 +30,7 @@ from helper.log import get_logger
 
 logger: Logger = get_logger()
 
-ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
+type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
 
 class ContentDict(TypedDict):
@@ -105,7 +105,7 @@ class Scanner:
         return self.__metadata_scanner
 
 
-CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
+type CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
 
 
 @dataclass(slots=True, repr=True)

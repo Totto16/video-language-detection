@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, Optional, Self
 
 from apischema import alias, deserializer, schema, serialize, serializer
 
+from helper.apischema import AnnotatedOptional
+
 
 @dataclass(slots=True, repr=True)
 @schema()
@@ -18,8 +20,8 @@ def generate_provider_schema() -> Callable[[dict[str, Any]], None]:
         from content.metadata.provider.tmdb import TMDBProvider
 
         if TYPE_CHECKING:
-            from content.general import SchemaType
             from content.metadata.interfaces import Provider
+            from helper.apischema import SchemaType
 
         providers: list[type[Provider]] = [
             IMDBProvider,
@@ -106,6 +108,6 @@ class SkipHandle:
         return None
 
 
-HandlesType = Optional[list[MetadataHandle] | SkipHandle]
+type HandlesType = Optional[list[MetadataHandle] | SkipHandle]
 
-InternalMetadataType = Optional[MetadataHandle | SkipHandle]
+type InternalMetadataType = AnnotatedOptional[MetadataHandle | SkipHandle]

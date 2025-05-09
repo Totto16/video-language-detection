@@ -7,7 +7,7 @@ from typing import Optional, Self, TypedDict
 
 from content.language import Language
 
-PredictionType = list[tuple[float, Language]]
+type PredictionType = list[tuple[float, Language]]
 
 
 class LanguagePercentageDict(TypedDict):

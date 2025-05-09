@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Literal, Optional, Self, override
 
-from content.general import MissingOverrideError, SchemaType
+from content.general import MissingOverrideError
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
+from helper.apischema import SchemaType
 
 
 class Provider:

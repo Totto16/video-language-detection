@@ -158,7 +158,7 @@ def launch_tui(logger: Logger, config: ParsedConfig) -> None:
     logger.info(metadata_summary)
 
 
-SubCommand = Literal["run", "schema", "gui", "config_check"]
+type SubCommand = Literal["run", "schema", "gui", "config_check"]
 
 
 class ParsedArgNamespace:
@@ -186,7 +186,7 @@ class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     config: str
 
 
-AllParsedNameSpaces = (
+type AllParsedNameSpaces = (
     RunCommandParsedArgNamespace
     | SchemaCommandParsedArgNamespace
     | GuiCommandParsedArgNamespace
@@ -284,7 +284,7 @@ def parse_args() -> AllParsedNameSpaces:
     return cast(AllParsedNameSpaces, parser.parse_args())
 
 
-ExitCode = int
+type ExitCode = int
 
 
 def subcommand_schema(

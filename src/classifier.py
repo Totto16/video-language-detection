@@ -469,9 +469,9 @@ class AdvancedPercentage:
         )
 
 
-SimplePercentage = Annotated[float, schema(min=0.0, max=1.0)]
+type SimplePercentage = Annotated[float, schema(min=0.0, max=1.0)]
 
-Percentage = SimplePercentage | AdvancedPercentage
+type Percentage = SimplePercentage | AdvancedPercentage
 
 
 def to_advanced_percentage(

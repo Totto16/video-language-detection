@@ -3,10 +3,10 @@ from enum import Enum
 from typing import Annotated, Literal, Optional, Self, TypedDict, cast, override
 
 from content.base_class import LanguageScanner, Scanner
-from content.general import Deprecated, OneOf
 from content.metadata.metadata import InternalMetadataType
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
+from helper.apischema import Deprecated, OneOf
 
 
 class StaticScanner(Scanner):
@@ -103,9 +103,9 @@ def to_advanced_scanner_postion_total(
     }
 
 
-SimplePosition = Annotated[int, Deprecated]
+type SimplePosition = Annotated[int, Deprecated]
 
-Position = SimplePosition | AdvancedScannerPosition
+type Position = SimplePosition | AdvancedScannerPosition
 
 
 # TODO: is there a better way?
@@ -281,7 +281,7 @@ class ConfigScannerConfig:
     config: Optional[ConfigScannerDict]
 
 
-ScannerConfig = Annotated[
+type ScannerConfig = Annotated[
     FullScannerConfig | NoScannerConfig | ConfigScannerConfig,
     OneOf,
 ]

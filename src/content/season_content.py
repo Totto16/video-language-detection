@@ -25,7 +25,6 @@ from content.general import (
     NameParser,
     ScannedFile,
     SeasonDescription,
-    narrow_type,
 )
 from content.metadata.metadata import (
     HandlesType,
@@ -34,6 +33,7 @@ from content.metadata.metadata import (
 )
 from content.shared import ScanType
 from content.summary import Summary
+from helper.apischema import narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()

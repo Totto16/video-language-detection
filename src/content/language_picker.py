@@ -10,12 +10,10 @@ import pyperclip
 from questionary import Choice, Question, Separator, select
 from questionary.prompts.common import FormattedText
 
-from content.general import (
-    MissingOverrideError,
-    OneOf,
-)
+from content.general import MissingOverrideError
 from content.language import Language
 from content.prediction import Prediction, PredictionBest
+from helper.apischema import OneOf
 from helper.log import get_logger
 from helper.terminal import Terminal
 
@@ -80,7 +78,7 @@ class ManualSelectResult:
     selected: SelectedType
 
 
-SelectResult = PredictionBestSelectResult | ManualSelectResult
+type SelectResult = PredictionBestSelectResult | ManualSelectResult
 
 
 def construct_choice(title: FormattedText, value: SelectResult) -> Choice:
@@ -294,7 +292,7 @@ class InteractiveLanguagePickerConfig:
     config: Optional[InteractiveLanguagePickerDict]
 
 
-LanguagePickerConfig = Annotated[
+type LanguagePickerConfig = Annotated[
     NoLanguagePickerConfig | InteractiveLanguagePickerConfig,
     OneOf,
 ]

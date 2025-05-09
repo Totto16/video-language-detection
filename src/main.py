@@ -18,17 +18,15 @@ from content.episode_content import EpisodeContent
 from content.general import (
     Callback,
     ContentType,
-    EmitType,
     NameParser,
-    OneOf,
     ScannedFileType,
-    get_schema,
 )
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import content_from_scan
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
+from helper.apischema import EmitType, OneOf, get_schema
 from helper.constants import APP_NAME
 from helper.translation import get_translator
 
@@ -223,7 +221,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
 
-AllContent = Annotated[
+type AllContent = Annotated[
     EpisodeContent | SeasonContent | SeriesContent | CollectionContent,
     OneOf,
 ]

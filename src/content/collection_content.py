@@ -16,15 +16,11 @@ from content.base_class import (
     ContentDict,
     process_folder,
 )
-from content.general import (
-    Callback,
-    ContentType,
-    ScannedFile,
-    narrow_type,
-)
+from content.general import Callback, ContentType, ScannedFile
 from content.metadata.metadata import HandlesType
 from content.series_content import SeriesContent
 from content.summary import CollectionDescription, Summary
+from helper.apischema import narrow_type
 
 
 class CollectionContentDict(ContentDict):

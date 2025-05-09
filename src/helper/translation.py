@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Optional, cast
 
-SupportedLanguage = Literal["en", "de"]
+type SupportedLanguage = Literal["en", "de"]
 SUPPORTED_LANGUAGES: list[SupportedLanguage] = ["de", "en"]
 DEFAULT_LANGUAGE: SupportedLanguage = "en"
 
@@ -21,7 +21,7 @@ def get_current_language() -> SupportedLanguage:
     return DEFAULT_LANGUAGE
 
 
-TranslationFunction = Callable[[str], str]
+type TranslationFunction = Callable[[str], str]
 
 
 __global_translation: Optional[TranslationFunction] = None

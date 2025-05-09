@@ -215,4 +215,4 @@ class TimestampCompat:
         return TimestampCompat(Timestamp.from_seconds(inp))
 
 
-ConfigTimeStamp = TimestampCompat | Timestamp
+type ConfigTimeStamp = TimestampCompat | Timestamp

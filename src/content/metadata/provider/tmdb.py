@@ -8,10 +8,10 @@ from apischema.metadata import none_as_undefined
 from requests import HTTPError
 from themoviedb.tmdb import TMDb
 
-from content.general import OneOf, SchemaType, get_schema
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import ScanType
+from helper.apischema import OneOf, SchemaType, get_schema
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -94,7 +94,7 @@ class EpisodeHandle:
     id: int
 
 
-MetadataData = Annotated[
+type MetadataData = Annotated[
     SkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
     OneOf,
 ]

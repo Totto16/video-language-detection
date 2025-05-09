@@ -22,12 +22,12 @@ from content.general import (
     EpisodeDescription,
     NameParser,
     ScannedFile,
-    narrow_type,
 )
 from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 from content.summary import Summary
+from helper.apischema import AnnotatedOptional, narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -36,7 +36,7 @@ logger: Logger = get_logger()
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
-    metadata: Optional[MetadataHandle]
+    metadata: AnnotatedOptional[MetadataHandle]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))

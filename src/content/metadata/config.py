@@ -1,6 +1,5 @@
 from typing import Annotated, cast
 
-from content.general import OneOf
 from content.metadata.interfaces import (
     MissingProvider,
     MissingProviderMetadataConfig,
@@ -9,8 +8,9 @@ from content.metadata.interfaces import (
 from content.metadata.provider.imdb import IMDBMetadataConfig, IMDBProvider
 from content.metadata.provider.tmdb import TMDBMetadataConfig, TMDBProvider
 from content.metadata.scanner import MetadataScanner
+from helper.apischema import OneOf
 
-MetadataConfig = Annotated[
+type MetadataConfig = Annotated[
     TMDBMetadataConfig | IMDBMetadataConfig | MissingProviderMetadataConfig,
     OneOf,
 ]

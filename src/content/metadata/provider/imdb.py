@@ -6,10 +6,10 @@ from typing import Literal, Optional, Self, override
 
 from apischema import schema
 
-from content.general import SchemaType, get_schema
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
+from helper.apischema import SchemaType, get_schema
 
 
 @dataclass
