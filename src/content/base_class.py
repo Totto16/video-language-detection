@@ -57,7 +57,7 @@ class LanguageScanner:
         try:
             wav_file = WAVFile(scanned_file.path)
 
-            best, _ = self.__classifier.predict(
+            best = self.__classifier.predict(
                 wav_file,
                 scanned_file.path,
                 language_picker,

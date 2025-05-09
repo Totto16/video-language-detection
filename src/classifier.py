@@ -475,7 +475,8 @@ Percentage = SimplePercentage | AdvancedPercentage
 
 
 def to_advanced_percentage(
-    percentage: Percentage, description: str,
+    percentage: Percentage,
+    description: str,
 ) -> AdvancedPercentage:
     if isinstance(percentage, AdvancedPercentage):
         return percentage
@@ -487,11 +488,13 @@ def to_advanced_percentage(
 class AccuracySettingsDict(TypedDict, total=False):
     normal_threshold: Optional[Percentage]
     final_threshold: Optional[Percentage]
+    use_picker_at_end: Optional[bool]
 
 
 class AccuracySettingsDictTotal(TypedDict, total=True):
     normal_threshold: AdvancedPercentage
     final_threshold: AdvancedPercentage
+    use_picker_at_end: bool
 
 
 # TODO: is there a better way?
@@ -516,10 +519,12 @@ class ClassifierOptions:
         default_accuracy = AccuracySettingsDictTotal(
             normal_threshold=AdvancedPercentage(0.95, "normal_threshold"),
             final_threshold=AdvancedPercentage(0.75, "final_threshold"),
+            use_picker_at_end=True,
         )
 
         default_scan_config = ScanConfigDictTotal(
-            minimum=AdvancedPercentage(0.4, "minimum"), maximum=None,
+            minimum=AdvancedPercentage(0.4, "minimum"),
+            maximum=None,
         )
 
         return ClassifierOptions(
@@ -542,6 +547,7 @@ class ClassifierOptionsConfig:
         default_accuracy = AccuracySettingsDict(
             normal_threshold=config_defaults.accuracy["normal_threshold"],
             final_threshold=config_defaults.accuracy["final_threshold"],
+            use_picker_at_end=config_defaults.accuracy["use_picker_at_end"],
         )
 
         default_scan_config = ScanConfigDict(
@@ -788,6 +794,10 @@ class Classifier:
                         "final_threshold",
                     )
 
+                use_picker_at_end = options.accuracy.get("use_picker_at_end", None)
+                if use_picker_at_end is not None:
+                    total_options.accuracy["use_picker_at_end"] = use_picker_at_end
+
             if options.scan_config is not None:
                 minimum = options.scan_config.get("minimum", None)
                 if minimum is not None:
@@ -844,13 +854,13 @@ class Classifier:
 
         return None
 
-    def __predict(
+    def __predict_or_none(
         self: Self,
         wav_file: WAVFile,
         path: Path,
         language_picker: LanguagePicker,
         manager: Optional[Manager],
-    ) -> Optional[tuple[PredictionBest, float]]:
+    ) -> Optional[PredictionBest]:
         if self.__manager.failed_too_often:
             return None
 
@@ -894,7 +904,10 @@ class Classifier:
             bar.update(0, force=True)
 
         prediction: Prediction = Prediction()
-        for i, (segment, scanned_length) in enumerate(segments):
+
+        amount_scanned: float = 0.0
+
+        for segment, scanned_length in segments:
             local_prediction = self.__classify(wav_file, segment, manager)
             if local_prediction is not None:
                 prediction += local_prediction
@@ -902,51 +915,66 @@ class Classifier:
             if bar is not None:
                 bar.update()
 
-            amount_scanned: float = scanned_length / wav_file.runtime
+            amount_scanned = scanned_length / wav_file.runtime
 
             if amount_scanned < self.__options.scan_config["minimum"]:
+                # scan the next segment
                 continue
 
             if (
                 self.__options.scan_config["maximum"] is not None
                 and amount_scanned >= self.__options.scan_config["maximum"]
             ):
+                # go to the end, to check if the result is good enough
                 break
 
-            best: PredictionBest = prediction.get_best(MeanType.truncated)
-            if best.accuracy < self.__options.accuracy["normal_threshold"]:
+            best_local: PredictionBest = prediction.get_best(MeanType.truncated)
 
-                if i + 1 == len(segments):
-                    if best.accuracy < self.__options.accuracy["final_threshold"]:
-                        continue
-                else:
-                    continue
-
-            if best.language == Language.unknown():
+            if best_local.language == Language.unknown():
+                # scan the next segment
                 continue
 
-            if bar is not None:
-                bar.close(clear=True)
+            if best_local.accuracy >= self.__options.accuracy["normal_threshold"]:
+                # go to evaluation, if the result is good enough
+                break
 
-            return (best, amount_scanned)
+            # otherwise fall trough and
+            # scan the next segment
 
-        # END OF FOR LOOP
+        # END OF FOR LOOP (I hate python and significant whitespace, {} would be better)
 
         if bar is not None:
             bar.close(clear=True)
 
-        picked_language = language_picker.pick_language(path, prediction)
+        best: PredictionBest = prediction.get_best(MeanType.truncated)
 
-        if picked_language is not None:
-            return (PredictionBest(1.0, picked_language), 1.0)
+        maximum_to_scan: float = (
+            1.0
+            if self.__options.scan_config["maximum"] is None
+            else self.__options.scan_config["maximum"].value
+        )
 
-        best = prediction.get_best(MeanType.truncated)
+        if amount_scanned >= maximum_to_scan:
+            # use final treshold
+            if best.accuracy >= self.__options.accuracy["final_threshold"]:
+                return best
+
+            if self.__options.accuracy["use_picker_at_end"]:
+                picked_language = language_picker.pick_language(path, prediction)
+
+                if picked_language is not None:
+                    return PredictionBest(1.0, picked_language)
+
+            return None
+
+        # use normal treshold
+        if best.accuracy >= self.__options.accuracy["normal_threshold"]:
+            return best
 
         msg = _("Couldn't get Language of '{path}': Best was {best}").format(
             path=relative_path_str(path),
             best=str(best),
         )
-
         logger.error(msg)
 
         # return unknown language
@@ -958,11 +986,11 @@ class Classifier:
         path: Path,
         language_picker: LanguagePicker,
         manager: Optional[Manager] = None,
-    ) -> tuple[PredictionBest, float]:
-        prediction = self.__predict(wav_file, path, language_picker, manager)
+    ) -> PredictionBest:
+        prediction = self.__predict_or_none(wav_file, path, language_picker, manager)
 
         if prediction is None:
-            return (PredictionBest(0.0, Language.unknown()), 0.0)
+            return PredictionBest(0.0, Language.unknown())
 
         return prediction
 

@@ -361,6 +361,12 @@
                             "type": "null"
                         }
                     ]
+                },
+                "use_picker_at_end": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
                 }
             },
             "additionalProperties": false
