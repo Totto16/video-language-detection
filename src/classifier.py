@@ -1,17 +1,17 @@
 import gc
+import re
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, TypedDict, override
+from typing import Annotated, Any, Literal, Optional, Self, TypedDict, override
 
 import psutil
 import torchaudio
-from apischema import schema
-from apischema.metadata import none_as_undefined
+from apischema import deserializer, schema, serializer
 from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
@@ -25,7 +25,7 @@ from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
-from helper.timestamp import ConfigTimeStamp, Timestamp
+from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
 from helper.translation import get_translator
 
 setup_global_logger()
@@ -347,47 +347,213 @@ def relative_path_str(path: Path) -> str:
     return str(object=path)
 
 
+def is_percentage(value: float) -> bool:
+    return value >= 0.0 and value <= 1.0
+
+
+PERCENTAGE_PATTERN = r"^(\d{1,2})(?:\.(\d+))?%$"
+
+
+@schema(pattern=PERCENTAGE_PATTERN)
+class AdvancedPercentage:
+    __value: float
+
+    def __init__(self: Self, value: float, description: str = "") -> None:
+
+        option_name = "" if description == "" else f" '{description}'"
+
+        if not is_percentage(value):
+            msg = f"Option{option_name} has to be in percentage (0.0 - 1.0) but was: {value}"
+            raise RuntimeError(msg)
+        self.__value = value
+
+    @staticmethod
+    def safe_from_value(value: float) -> Optional["AdvancedPercentage"]:
+
+        if not is_percentage(value):
+            return None
+
+        return AdvancedPercentage(value)
+
+    @property
+    def value(self: Self) -> float:
+        return self.__value
+
+    @serializer
+    def serialize(self: Self) -> str:
+        return str(self)
+
+    @deserializer
+    @staticmethod
+    def deserialize_str(inp: str) -> "AdvancedPercentage":
+        match = re.match(PERCENTAGE_PATTERN, inp)
+
+        if match is None:
+            msg = f"Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the pattern {PERCENTAGE_PATTERN}"
+            raise TypeError(msg)
+
+        match_args = match.groups(default=None)
+
+        if len(match_args) != 2:
+            msg = "Implementation error for AdvancedPercentage: case 1"
+            raise TypeError(msg)
+
+        (match_arg1, match_arg2) = match_args
+
+        if match_arg1 is None:
+            msg = "Implementation error for AdvancedPercentage: case 2"
+            raise TypeError(msg)
+
+        match_int1 = parse_int_safely(match_arg1)
+        if match_int1 is None:
+            msg = "Implementation error for AdvancedPercentage: case 3"
+            raise TypeError(msg)
+
+        match_int2 = 0 if match_arg2 is None else parse_int_safely(match_arg2)
+        if match_int2 is None:
+            msg = "Implementation error for AdvancedPercentage: case 4"
+            raise TypeError(msg)
+
+        value: float = ((float(match_int2) / 100.0) + float(match_int1)) / 100.0
+
+        final_value = AdvancedPercentage.safe_from_value(value)
+
+        if final_value is None:
+            msg = f"Option has to be in percentage (0.0 - 1.0) but was: {value}"
+            raise TypeError(msg)
+
+        return final_value
+
+    def __str__(self: Self) -> str:
+        return f"{self.__value:.2%}"
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__value)
+
+    def __eq__(self: Self, value: object) -> bool:
+        if isinstance(value, AdvancedPercentage):
+            return self.__value == value.value
+
+        return False
+
+    def __ne__(self: Self, value: object) -> bool:
+        return not self.__eq__(value)
+
+    @staticmethod
+    def __get_value_for_comparions(value: object, comparions_desc: str) -> float:
+        if isinstance(value, AdvancedPercentage):
+            return value.value
+
+        if isinstance(value, float):
+            return value
+
+        msg = f"'{comparions_desc}' not supported between instances of 'AdvancedPercentage' and '{value.__class__.__name__}'"
+        raise TypeError(msg)
+
+    def __lt__(self: Self, value: object) -> bool:
+        return self.__value < AdvancedPercentage.__get_value_for_comparions(value, "<")
+
+    def __le__(self: Self, value: object) -> bool:
+        return self.__value <= AdvancedPercentage.__get_value_for_comparions(
+            value,
+            "<=",
+        )
+
+    def __gt__(self: Self, value: object) -> bool:
+        return self.__value > AdvancedPercentage.__get_value_for_comparions(value, ">")
+
+    def __ge__(self: Self, value: object) -> bool:
+        return self.__value >= AdvancedPercentage.__get_value_for_comparions(
+            value,
+            ">=",
+        )
+
+
+SimplePercentage = Annotated[float, schema(min=0.0, max=1.0)]
+
+Percentage = SimplePercentage | AdvancedPercentage
+
+
+def to_advanced_percentage(
+    percentage: Percentage, description: str,
+) -> AdvancedPercentage:
+    if isinstance(percentage, AdvancedPercentage):
+        return percentage
+
+    return AdvancedPercentage(percentage, description)
+
+
+# TODO: is there a better way?
+class AccuracySettingsDict(TypedDict, total=False):
+    normal_threshold: Optional[Percentage]
+    final_threshold: Optional[Percentage]
+
+
+class AccuracySettingsDictTotal(TypedDict, total=True):
+    normal_threshold: AdvancedPercentage
+    final_threshold: AdvancedPercentage
+
+
+# TODO: is there a better way?
+class ScanConfigDict(TypedDict, total=False):
+    minimum: Optional[Percentage]
+    maximum: Optional[Percentage]
+
+
+class ScanConfigDictTotal(TypedDict, total=True):
+    minimum: AdvancedPercentage
+    maximum: Optional[AdvancedPercentage]
+
+
 @dataclass()
 class ClassifierOptions:
     segment_length: Timestamp
-    accuracy_threshold: float
-    final_accuracy_threshold: float
-    minimum_scanned: float
-    scan_until: Optional[float]
+    accuracy: AccuracySettingsDictTotal
+    scan_config: ScanConfigDictTotal
 
     @staticmethod
     def default() -> "ClassifierOptions":
+        default_accuracy = AccuracySettingsDictTotal(
+            normal_threshold=AdvancedPercentage(0.95, "normal_threshold"),
+            final_threshold=AdvancedPercentage(0.75, "final_threshold"),
+        )
+
+        default_scan_config = ScanConfigDictTotal(
+            minimum=AdvancedPercentage(0.4, "minimum"), maximum=None,
+        )
+
         return ClassifierOptions(
             segment_length=Timestamp.from_seconds(30),
-            accuracy_threshold=0.95,
-            final_accuracy_threshold=0.55,
-            minimum_scanned=0.2,
-            scan_until=None,
+            accuracy=default_accuracy,
+            scan_config=default_scan_config,
         )
 
 
 @dataclass()
 class ClassifierOptionsConfig:
-    segment_length: Optional[ConfigTimeStamp] = field(metadata=schema())
-    accuracy_threshold: Optional[float] = field(metadata=schema(min=0.0, max=1.0))
-    final_accuracy_threshold: Optional[float] = field(metadata=schema(min=0.0, max=1.0))
-    minimum_scanned: Optional[float]
-    scan_until: Optional[float] = field(metadata=none_as_undefined, default=None)
+    segment_length: Optional[ConfigTimeStamp]
+    accuracy: Optional[AccuracySettingsDict]
+    scan_config: Optional[ScanConfigDict]
 
     @staticmethod
     def default() -> "ClassifierOptionsConfig":
-        config_defaults = ClassifierOptions.default()
-        return ClassifierOptionsConfig(
-            segment_length=config_defaults.segment_length,
-            accuracy_threshold=config_defaults.accuracy_threshold,
-            final_accuracy_threshold=config_defaults.final_accuracy_threshold,
-            minimum_scanned=config_defaults.minimum_scanned,
-            scan_until=config_defaults.scan_until,
+        config_defaults: ClassifierOptions = ClassifierOptions.default()
+
+        default_accuracy = AccuracySettingsDict(
+            normal_threshold=config_defaults.accuracy["normal_threshold"],
+            final_threshold=config_defaults.accuracy["final_threshold"],
         )
 
+        default_scan_config = ScanConfigDict(
+            minimum=config_defaults.scan_config["minimum"],
+            maximum=config_defaults.scan_config["maximum"],
+        )
 
-def is_percentage(value: float) -> bool:
-    return value >= 0.0 and value <= 1.0
+        return ClassifierOptionsConfig(
+            segment_length=config_defaults.segment_length,
+            accuracy=default_accuracy,
+            scan_config=default_scan_config,
+        )
 
 
 class RunOpts(TypedDict, total=False):
@@ -552,7 +718,9 @@ class ClassifierManager(AbstractContextManager[None]):
         return self
 
     def perform_classification(
-        self: Self, audio_path: Path, savedir: Optional[Path],
+        self: Self,
+        audio_path: Path,
+        savedir: Optional[Path],
     ) -> list[tuple[str, float]]:
         savedir_arg = str(savedir.absolute()) if savedir is not None else None
 
@@ -604,44 +772,36 @@ class Classifier:
                 if options.segment_length is not None
                 else total_options.segment_length
             )
-            total_options.accuracy_threshold = (
-                options.accuracy_threshold
-                if options.accuracy_threshold is not None
-                else total_options.accuracy_threshold
-            )
-            total_options.final_accuracy_threshold = (
-                options.final_accuracy_threshold
-                if options.final_accuracy_threshold is not None
-                else total_options.final_accuracy_threshold
-            )
-            total_options.minimum_scanned = (
-                options.minimum_scanned
-                if options.minimum_scanned is not None
-                else total_options.minimum_scanned
-            )
-            total_options.scan_until = (
-                options.scan_until
-                if options.scan_until is not None
-                else total_options.scan_until
-            )
 
-        if not is_percentage(total_options.accuracy_threshold):
-            msg = f"Option 'accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options.accuracy_threshold}"
-            raise RuntimeError(msg)
+            if options.accuracy is not None:
+                normal_threshold = options.accuracy.get("normal_threshold", None)
+                if normal_threshold is not None:
+                    total_options.accuracy["normal_threshold"] = to_advanced_percentage(
+                        normal_threshold,
+                        "normal_threshold",
+                    )
 
-        if not is_percentage(total_options.final_accuracy_threshold):
-            msg = f"Option 'final_accuracy_threshold' has to be in percentage (0.0 - 1.0) but was: {total_options.final_accuracy_threshold}"
-            raise RuntimeError(msg)
+                final_threshold = options.accuracy.get("final_threshold", None)
+                if final_threshold is not None:
+                    total_options.accuracy["final_threshold"] = to_advanced_percentage(
+                        final_threshold,
+                        "final_threshold",
+                    )
 
-        if not is_percentage(total_options.minimum_scanned):
-            msg = f"Option 'minimum_scanned' has to be in percentage (0.0 - 1.0) but was: {total_options.minimum_scanned}"
-            raise RuntimeError(msg)
+            if options.scan_config is not None:
+                minimum = options.scan_config.get("minimum", None)
+                if minimum is not None:
+                    total_options.scan_config["minimum"] = to_advanced_percentage(
+                        minimum,
+                        "minimum",
+                    )
 
-        if total_options.scan_until is not None and not is_percentage(
-            total_options.scan_until,
-        ):
-            msg = f"Option 'scan_until' has to be in percentage (0.0 - 1.0) but was: {total_options.scan_until}"
-            raise RuntimeError(msg)
+                maximum = options.scan_config.get("maximum", None)
+                if maximum is not None:
+                    total_options.scan_config["maximum"] = to_advanced_percentage(
+                        maximum,
+                        "maximum",
+                    )
 
         return total_options
 
@@ -712,9 +872,10 @@ class Classifier:
             return result
 
         # This guards for cases, where scanning is useless, e.g. when you want 20 % to be scanned, for a valid result, but scan until 10 %
-        scan_nothing = (
-            self.__options.scan_until is not None
-            and self.__options.scan_until < self.__options.minimum_scanned
+        scan_nothing: bool = (
+            self.__options.scan_config["maximum"] is not None
+            and self.__options.scan_config["maximum"]
+            < self.__options.scan_config["minimum"]
         )
 
         segments: list[tuple[Segment, Timestamp]] = (
@@ -743,19 +904,20 @@ class Classifier:
 
             amount_scanned: float = scanned_length / wav_file.runtime
 
-            if amount_scanned < self.__options.minimum_scanned:
+            if amount_scanned < self.__options.scan_config["minimum"]:
                 continue
 
             if (
-                self.__options.scan_until is not None
-                and amount_scanned >= self.__options.scan_until
+                self.__options.scan_config["maximum"] is not None
+                and amount_scanned >= self.__options.scan_config["maximum"]
             ):
                 break
 
             best: PredictionBest = prediction.get_best(MeanType.truncated)
-            if best.accuracy < self.__options.accuracy_threshold:
+            if best.accuracy < self.__options.accuracy["normal_threshold"]:
+
                 if i + 1 == len(segments):
-                    if best.accuracy < self.__options.final_accuracy_threshold:
+                    if best.accuracy < self.__options.accuracy["final_threshold"]:
                         continue
                 else:
                     continue

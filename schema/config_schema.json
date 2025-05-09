@@ -291,37 +291,31 @@
                         }
                     ]
                 },
-                "accuracy_threshold": {
-                    "type": [
-                        "number",
-                        "null"
-                    ],
-                    "minimum": 0.0,
-                    "maximum": 1.0
-                },
-                "final_accuracy_threshold": {
-                    "type": [
-                        "number",
-                        "null"
-                    ],
-                    "minimum": 0.0,
-                    "maximum": 1.0
-                },
-                "minimum_scanned": {
-                    "type": [
-                        "number",
-                        "null"
+                "accuracy": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/AccuracySettingsDict"
+                        },
+                        {
+                            "type": "null"
+                        }
                     ]
                 },
-                "scan_until": {
-                    "type": "number"
+                "scan_config": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/ScanConfigDict"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
                 "segment_length",
-                "accuracy_threshold",
-                "final_accuracy_threshold",
-                "minimum_scanned"
+                "accuracy",
+                "scan_config"
             ],
             "additionalProperties": false
         },
@@ -334,6 +328,82 @@
         "Timestamp": {
             "type": "string",
             "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
+        },
+        "AccuracySettingsDict": {
+            "type": "object",
+            "properties": {
+                "normal_threshold": {
+                    "anyOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "final_threshold": {
+                    "anyOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false
+        },
+        "AdvancedPercentage": {
+            "type": "string",
+            "pattern": "^(\\d{1,2})(?:\\.(\\d+))?%$"
+        },
+        "ScanConfigDict": {
+            "type": "object",
+            "properties": {
+                "minimum": {
+                    "anyOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "maximum": {
+                    "anyOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false
         },
         "TMDBMetadataConfig": {
             "type": "object",

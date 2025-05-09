@@ -103,10 +103,15 @@ def to_advanced_scanner_postion_total(
     }
 
 
+SimplePosition = Annotated[int, Deprecated]
+
+Position = SimplePosition | AdvancedScannerPosition
+
+
 # TODO: is there a better way?
 class ConfigScannerDict(TypedDict, total=False):
-    start_position: Annotated[int, Deprecated] | AdvancedScannerPosition
-    scan_amount: Annotated[int, Deprecated] | AdvancedScannerPosition
+    start_position: Position
+    scan_amount: Position
     allow_abort: bool
     types: ScannerTypes
 
