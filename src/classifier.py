@@ -352,7 +352,7 @@ def is_percentage(value: float) -> bool:
     return value >= 0.0 and value <= 1.0
 
 
-PERCENTAGE_PATTERN = r"^(\d{1,2})(?:\.(\d+))?%$"
+PERCENTAGE_PATTERN = r"^(\d{1,3})(?:\.(\d+))?%$"
 
 
 @schema(pattern=PERCENTAGE_PATTERN)
