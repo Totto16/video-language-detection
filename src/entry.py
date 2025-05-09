@@ -36,7 +36,7 @@ from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from main import generate_schemas, parse_contents
 
-PROGRAM_VERSION: str = "2.5.2"
+PROGRAM_VERSION: str = "2.5.3"
 
 
 class CustomNameParser(NameParser):
