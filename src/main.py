@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, TypedDict, ove
 from apischema import deserialize, serialize
 from enlighten import Justify, Manager, get_manager
 
-from config import Config
+from config import SchemaConfig
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -325,4 +325,8 @@ def generate_schemas(folder: Path) -> None:
         list[AllContent],
         emit_type="deserialize",
     )
-    generate_schema(folder / "config_schema.json", Config, emit_type="deserialize")
+    generate_schema(
+        folder / "config_schema.json",
+        SchemaConfig,
+        emit_type="deserialize",
+    )

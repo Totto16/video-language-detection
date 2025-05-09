@@ -3,12 +3,14 @@
 
 import argparse
 import atexit
+import json
 import re as regex
 import sys
 from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast, override
 
+from apischema import serialize
 from prompt_toolkit.key_binding import KeyBindings
 
 from classifier import Classifier
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
     from content.base_class import Content
     from content.metadata.scanner import MetadataScanner
 
-from config import Config, KeyBoardConfig, ParsedConfig
+from config import AdvancedConfig, FinalConfig, KeyBoardConfig
 from content.general import NameParser
 from content.scanner import (
     ConfigScanner,
@@ -119,7 +121,7 @@ def get_keybindings(
     return kb
 
 
-def launch_tui(logger: Logger, config: ParsedConfig) -> None:
+def launch_tui(logger: Logger, config: FinalConfig) -> None:
     classifier = Classifier(config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
     metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
@@ -312,7 +314,7 @@ def subcommand_run(
     logger: Logger,
     args: RunCommandParsedArgNamespace,
 ) -> ExitCode:
-    parsed_config = Config.load(Path(args.config))
+    parsed_config = AdvancedConfig.load_and_resolve(Path(args.config))
     if parsed_config is None:
         return 1
 
@@ -326,14 +328,24 @@ def subcommand_config_check(
     args: ConfigCheckCommandParsedArgNamespace,
 ) -> ExitCode:
     config = Path(args.config)
-    parsed_config = Config.load(config)
+    parsed_config = AdvancedConfig.load_and_resolve_with_info(config)
     if parsed_config is None:
         logger.error(
             _("Config '{config}' is not valid!").format(config=config),
         )
         return 1
 
+    final_config, info = parsed_config
+
     logger.info(_("Config '{config}' is valid!").format(config=config))
+    logger.info("Info about config: %s", info)
+
+    seriliazed_config: dict[str, Any] = serialize(
+        FinalConfig,
+        final_config,
+    )
+    logger.info("Printing final config as json:")
+    logger.info(json.dumps(seriliazed_config, indent=4))
     return 0
 
 

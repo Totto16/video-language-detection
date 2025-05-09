@@ -487,9 +487,9 @@ def to_advanced_percentage(
 
 # TODO: is there a better way?
 class AccuracySettingsDict(TypedDict, total=False):
-    normal_threshold: Annotated[Optional[Percentage], OneOf]
-    final_threshold: Annotated[Optional[Percentage], OneOf]
-    use_picker_at_end: Optional[bool]
+    normal_threshold: Percentage
+    final_threshold: Percentage
+    use_picker_at_end: bool
 
 
 class AccuracySettingsDictTotal(TypedDict, total=True):
@@ -500,8 +500,8 @@ class AccuracySettingsDictTotal(TypedDict, total=True):
 
 # TODO: is there a better way?
 class ScanConfigDict(TypedDict, total=False):
-    minimum: Annotated[Optional[Percentage], OneOf]
-    maximum: Annotated[Optional[Percentage], OneOf]
+    minimum: Percentage
+    maximum: Percentage
 
 
 class ScanConfigDictTotal(TypedDict, total=True):
@@ -553,8 +553,11 @@ class ClassifierOptionsConfig:
 
         default_scan_config = ScanConfigDict(
             minimum=config_defaults.scan_config["minimum"],
-            maximum=config_defaults.scan_config["maximum"],
         )
+
+        maximum = config_defaults.scan_config["maximum"]
+        if maximum is not None:
+            default_scan_config["maximum"] = maximum
 
         return ClassifierOptionsConfig(
             segment_length=config_defaults.segment_length,

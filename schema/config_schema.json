@@ -1,116 +1,65 @@
 {
-    "$ref": "#/$defs/Config",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/Config"
+        },
+        {
+            "$ref": "#/$defs/ConfigTemplate"
+        }
+    ],
     "$defs": {
         "Config": {
             "type": "object",
             "properties": {
                 "general": {
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/GeneralConfig"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
+                    "$ref": "#/$defs/GeneralConfig"
                 },
                 "parser": {
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/ParserConfig"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
+                    "$ref": "#/$defs/ParserConfig"
                 },
                 "scanner": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "$ref": "#/$defs/FullScannerConfig"
-                                },
-                                {
-                                    "$ref": "#/$defs/NoScannerConfig"
-                                },
-                                {
-                                    "$ref": "#/$defs/ConfigScannerConfig"
-                                }
-                            ]
+                            "$ref": "#/$defs/FullScannerConfig"
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/NoScannerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/ConfigScannerConfig"
                         }
                     ]
                 },
                 "classifier": {
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/ClassifierOptionsConfig"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
+                    "$ref": "#/$defs/ClassifierOptionsConfig"
                 },
                 "metadata": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "$ref": "#/$defs/TMDBMetadataConfig"
-                                },
-                                {
-                                    "$ref": "#/$defs/IMDBMetadataConfig"
-                                },
-                                {
-                                    "$ref": "#/$defs/MissingProviderMetadataConfig"
-                                }
-                            ]
+                            "$ref": "#/$defs/TMDBMetadataConfig"
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/IMDBMetadataConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/MissingProviderMetadataConfig"
                         }
                     ]
                 },
                 "picker": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "$ref": "#/$defs/NoLanguagePickerConfig"
-                                },
-                                {
-                                    "$ref": "#/$defs/InteractiveLanguagePickerConfig"
-                                }
-                            ]
+                            "$ref": "#/$defs/NoLanguagePickerConfig"
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/InteractiveLanguagePickerConfig"
                         }
                     ]
                 },
                 "keybindings": {
-                    "oneOf": [
-                        {
-                            "$ref": "#/$defs/KeyBoardConfig"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
+                    "$ref": "#/$defs/KeyBoardConfig"
                 }
             },
-            "required": [
-                "general",
-                "parser",
-                "scanner",
-                "classifier",
-                "metadata",
-                "picker",
-                "keybindings"
-            ],
             "additionalProperties": false
         },
         "GeneralConfig": {
@@ -335,46 +284,29 @@
                 "normal_threshold": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "type": "number",
-                                    "minimum": 0.0,
-                                    "maximum": 1.0
-                                },
-                                {
-                                    "$ref": "#/$defs/AdvancedPercentage"
-                                }
-                            ]
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/AdvancedPercentage"
                         }
                     ]
                 },
                 "final_threshold": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "type": "number",
-                                    "minimum": 0.0,
-                                    "maximum": 1.0
-                                },
-                                {
-                                    "$ref": "#/$defs/AdvancedPercentage"
-                                }
-                            ]
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/AdvancedPercentage"
                         }
                     ]
                 },
                 "use_picker_at_end": {
-                    "type": [
-                        "boolean",
-                        "null"
-                    ]
+                    "type": "boolean"
                 }
             },
             "additionalProperties": false
@@ -896,6 +828,41 @@
                 "s-c-home",
                 "s-c-end"
             ]
+        },
+        "ConfigTemplate": {
+            "type": "object",
+            "properties": {
+                "templates": {
+                    "$ref": "#/$defs/ConfigTemplates"
+                }
+            },
+            "required": [
+                "templates"
+            ],
+            "additionalProperties": false
+        },
+        "ConfigTemplates": {
+            "type": "object",
+            "properties": {
+                "default": {
+                    "$ref": "#/$defs/Config"
+                },
+                "names": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/Config"
+                    }
+                },
+                "use": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "default",
+                "names",
+                "use"
+            ],
+            "additionalProperties": false
         }
     },
     "$schema": "http://json-schema.org/draft/2020-12/schema#"

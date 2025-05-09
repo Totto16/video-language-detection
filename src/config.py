@@ -7,6 +7,7 @@ from typing import Annotated, Any, Optional, Self
 
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
+from apischema.metadata import none_as_undefined
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
 from classifier import ClassifierOptionsConfig
@@ -140,7 +141,7 @@ class KeyBoardConfig:
 
 
 @dataclass
-class ParsedConfig:
+class FinalConfig:
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
@@ -155,17 +156,38 @@ logger: Logger = get_logger()
 
 @dataclass
 class Config:
-    general: Annotated[Optional[GeneralConfig], OneOf]
-    parser: Annotated[Optional[ParserConfig], OneOf]
-    scanner: Annotated[Optional[ScannerConfig], OneOf]
-    classifier: Annotated[Optional[ClassifierOptionsConfig], OneOf]
-    metadata: Annotated[Optional[MetadataConfig], OneOf]
-    picker: Annotated[Optional[LanguagePickerConfig], OneOf]
-    keybindings: Annotated[Optional[KeyBoardConfig], OneOf]
+    general: Annotated[Optional[GeneralConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    parser: Annotated[Optional[ParserConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    scanner: Annotated[Optional[ScannerConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    classifier: Annotated[Optional[ClassifierOptionsConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    metadata: Annotated[Optional[MetadataConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    picker: Annotated[Optional[LanguagePickerConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    keybindings: Annotated[Optional[KeyBoardConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
 
     @staticmethod
-    def __defaults() -> "ParsedConfig":
-        return ParsedConfig(
+    def __defaults() -> "FinalConfig":
+        return FinalConfig(
             general=GeneralConfigParsed(target_file=Path("data.json")),
             parser=ParserConfigParsed(
                 root_folder=Path.cwd(),
@@ -182,7 +204,7 @@ class Config:
         )
 
     @staticmethod
-    def fill_defaults(config: "Config") -> ParsedConfig:
+    def fill_defaults(config: "Config") -> FinalConfig:
         defaults = Config.__defaults()
 
         # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
@@ -230,7 +252,7 @@ class Config:
         if config.keybindings is not None:
             parsed_keybindings = config.keybindings
 
-        return ParsedConfig(
+        return FinalConfig(
             general=parsed_general,
             parser=parsed_parser,
             scanner=parsed_scanner,
@@ -240,8 +262,30 @@ class Config:
             keybindings=parsed_keybindings,
         )
 
+
+@dataclass
+class ConfigTemplates:
+    default: Config
+    names: dict[str, Config]
+    use: str
+
+
+@dataclass
+class ConfigTemplate:
+    templates: ConfigTemplates
+
+
+InternalConfig = Config | ConfigTemplate
+
+
+SchemaConfig = Annotated[InternalConfig, OneOf]
+
+
+@dataclass
+class AdvancedConfig:
+
     @staticmethod
-    def load(config_file: Path) -> Optional[ParsedConfig]:
+    def __load(config_file: Path) -> Optional[InternalConfig]:
         if config_file.exists():
             with config_file.open(mode="r") as file:
                 suffix: str = config_file.suffix[1:]
@@ -255,12 +299,10 @@ class Config:
                         msg = f"Config not loadable from '{suffix}' file!"
                         raise RuntimeError(msg)
                 try:
-                    parsed_dict: Config = deserialize(
-                        Config,
+                    parsed_dict: InternalConfig = deserialize(
+                        SchemaConfig,
                         loaded_dict,
                     )
-
-                    return Config.fill_defaults(parsed_dict)
                 except ValidationError as err:
                     msg = f"The config file {config_file} is invalid"
                     logger.error(msg=msg)  # noqa: TRY400
@@ -273,7 +315,136 @@ class Config:
                         logger.error(msg)  # noqa: TRY400
 
                     return None
+                else:
+                    # python is funky xD, leaking variables as desired pattern xD
+                    return parsed_dict
 
         msg = f"The config file {config_file} was not found"
         logger.error(msg)
         return None
+
+    @staticmethod
+    def __merge_template(
+        default_raw: FinalConfig,
+        template: Config,
+    ) -> Optional[FinalConfig]:
+        defaults = default_raw
+
+        # TODO this is done manually atm, it can be done more automated
+        parsed_general = defaults.general
+        if template.general is not None:
+            parsed_general = GeneralConfigParsed(
+                target_file=Path(template.general.target_file),
+            )
+
+        parsed_parser = defaults.parser
+        if template.parser is not None:
+            parsed_parser = ParserConfigParsed(
+                root_folder=Path(template.parser.root_folder),
+                special=(
+                    template.parser.special
+                    if template.parser.special is not None
+                    else defaults.parser.special
+                ),
+                video_formats=template.parser.video_formats,
+                ignore_files=template.parser.ignore_files,
+                exception_on_error=(
+                    template.parser.exception_on_error
+                    if template.parser.exception_on_error is not None
+                    else defaults.parser.exception_on_error
+                ),
+            )
+
+        parsed_scanner = defaults.scanner
+        if template.scanner is not None:
+            parsed_scanner = template.scanner
+
+        parsed_classifier = defaults.classifier
+        if template.classifier is not None:
+            parsed_classifier = template.classifier
+
+        parsed_metadata = defaults.metadata
+        if template.metadata is not None:
+            parsed_metadata = template.metadata
+
+        parsed_picker = defaults.picker
+        if template.picker is not None:
+            parsed_picker = template.picker
+
+        parsed_keybindings = defaults.keybindings
+        if template.keybindings is not None:
+            parsed_keybindings = template.keybindings
+
+        return FinalConfig(
+            general=parsed_general,
+            parser=parsed_parser,
+            scanner=parsed_scanner,
+            classifier=parsed_classifier,
+            metadata=parsed_metadata,
+            picker=parsed_picker,
+            keybindings=parsed_keybindings,
+        )
+
+    @staticmethod
+    def __resolve_advance_config(
+        config: ConfigTemplate,
+    ) -> Optional[tuple[FinalConfig, str]]:
+        templates = config.templates
+
+        all_names: dict[str, Config] = templates.names
+        if len(all_names) == 0:
+            msg = "No template defined, define at least one template"
+            raise TypeError(msg)
+
+        default = Config.fill_defaults(templates.default)
+
+        name_to_use = templates.use
+
+        config_to_use = all_names.get(name_to_use)
+
+        if config_to_use is None:
+            msg = f"No template with name {name_to_use}, please add one"
+            raise TypeError(msg)
+
+        final_config = AdvancedConfig.__merge_template(default, config_to_use)
+
+        if final_config is None:
+            return None
+
+        return (
+            final_config,
+            f"merging default config and user provided config '{name_to_use}'",
+        )
+
+    @staticmethod
+    def load_and_resolve_with_info(
+        config_file: Path,
+    ) -> Optional[tuple[FinalConfig, str]]:
+        config = AdvancedConfig.__load(config_file)
+
+        if config is None:
+            return None
+
+        if isinstance(config, Config):
+            final_config = Config.fill_defaults(config)
+            return (final_config, "Normal Config")
+
+        resolved_config = AdvancedConfig.__resolve_advance_config(config)
+
+        if resolved_config is None:
+            return None
+
+        merged_config, msg = resolved_config
+
+        return (merged_config, f"Templated Config created by {msg}")
+
+    @staticmethod
+    def load_and_resolve(
+        config_file: Path,
+    ) -> Optional[FinalConfig]:
+        res = AdvancedConfig.load_and_resolve_with_info(config_file)
+
+        if res is None:
+            return None
+
+        return res[0]
