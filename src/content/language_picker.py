@@ -292,7 +292,7 @@ class InteractiveLanguagePickerConfig:
     config: Optional[InteractiveLanguagePickerDict]
 
 
-type LanguagePickerConfig = Annotated[
+LanguagePickerConfig = Annotated[
     NoLanguagePickerConfig | InteractiveLanguagePickerConfig,
     OneOf,
 ]

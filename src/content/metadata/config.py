@@ -10,7 +10,7 @@ from content.metadata.provider.tmdb import TMDBMetadataConfig, TMDBProvider
 from content.metadata.scanner import MetadataScanner
 from helper.apischema import OneOf
 
-type MetadataConfig = Annotated[
+MetadataConfig = Annotated[
     TMDBMetadataConfig | IMDBMetadataConfig | MissingProviderMetadataConfig,
     OneOf,
 ]

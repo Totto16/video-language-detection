@@ -5,7 +5,7 @@
             "type": "object",
             "properties": {
                 "general": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/GeneralConfig"
                         },
@@ -15,7 +15,7 @@
                     ]
                 },
                 "parser": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/ParserConfig"
                         },
@@ -25,7 +25,7 @@
                     ]
                 },
                 "scanner": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "oneOf": [
                                 {
@@ -45,7 +45,7 @@
                     ]
                 },
                 "classifier": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/ClassifierOptionsConfig"
                         },
@@ -55,7 +55,7 @@
                     ]
                 },
                 "metadata": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "oneOf": [
                                 {
@@ -75,7 +75,7 @@
                     ]
                 },
                 "picker": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "oneOf": [
                                 {
@@ -92,7 +92,7 @@
                     ]
                 },
                 "keybindings": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/KeyBoardConfig"
                         },

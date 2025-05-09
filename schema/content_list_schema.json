@@ -28,7 +28,7 @@
                     "$ref": "#/$defs/ScannedFile"
                 },
                 "metadata": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/MetadataHandle"
                         },
@@ -394,7 +394,7 @@
                     "$ref": "#/$defs/ScannedFile"
                 },
                 "metadata": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/MetadataHandle"
                         },
@@ -446,7 +446,7 @@
                     "$ref": "#/$defs/ScannedFile"
                 },
                 "metadata": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/MetadataHandle"
                         },
@@ -502,7 +502,7 @@
                     "$ref": "#/$defs/ScannedFile"
                 },
                 "metadata": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/MetadataHandle"
                         },

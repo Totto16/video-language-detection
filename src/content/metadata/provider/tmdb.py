@@ -94,7 +94,7 @@ class EpisodeHandle:
     id: int
 
 
-type MetadataData = Annotated[
+MetadataData = Annotated[
     SkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
     OneOf,
 ]

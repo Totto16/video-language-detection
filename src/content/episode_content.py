@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
 from typing import (
+    Annotated,
     Literal,
     Optional,
     Self,
@@ -27,7 +28,7 @@ from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 from content.summary import Summary
-from helper.apischema import AnnotatedOptional, narrow_type
+from helper.apischema import OneOf, narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -36,7 +37,7 @@ logger: Logger = get_logger()
 class EpisodeContentDict(ContentDict):
     description: EpisodeDescription
     language: Language
-    metadata: AnnotatedOptional[MetadataHandle]
+    metadata: Annotated[Optional[MetadataHandle], OneOf]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))

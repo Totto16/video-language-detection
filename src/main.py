@@ -221,7 +221,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
 
-type AllContent = Annotated[
+AllContent = Annotated[
     EpisodeContent | SeasonContent | SeriesContent | CollectionContent,
     OneOf,
 ]

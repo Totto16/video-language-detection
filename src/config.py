@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional, Self
+from typing import Annotated, Any, Optional, Self
 
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
@@ -17,6 +17,7 @@ from content.language_picker import (
 from content.metadata.config import MetadataConfig
 from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
+from helper.apischema import OneOf
 from helper.log import get_logger
 
 
@@ -154,13 +155,13 @@ logger: Logger = get_logger()
 
 @dataclass
 class Config:
-    general: Optional[GeneralConfig]
-    parser: Optional[ParserConfig]
-    scanner: Optional[ScannerConfig]
-    classifier: Optional[ClassifierOptionsConfig]
-    metadata: Optional[MetadataConfig]
-    picker: Optional[LanguagePickerConfig]
-    keybindings: Optional[KeyBoardConfig]
+    general: Annotated[Optional[GeneralConfig], OneOf]
+    parser: Annotated[Optional[ParserConfig], OneOf]
+    scanner: Annotated[Optional[ScannerConfig], OneOf]
+    classifier: Annotated[Optional[ClassifierOptionsConfig], OneOf]
+    metadata: Annotated[Optional[MetadataConfig], OneOf]
+    picker: Annotated[Optional[LanguagePickerConfig], OneOf]
+    keybindings: Annotated[Optional[KeyBoardConfig], OneOf]
 
     @staticmethod
     def __defaults() -> "ParsedConfig":

@@ -9,7 +9,7 @@ from content.language import Language
 from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import MetadataKind
 
-type CollectionDescription = str
+CollectionDescription = str
 
 type IdentifierDescription = (
     tuple[EpisodeDescription]

@@ -1,11 +1,10 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Self
 
 from apischema import alias, deserializer, schema, serialize, serializer
 
-from helper.apischema import AnnotatedOptional
-
+from helper.apischema import OneOf
 
 @dataclass(slots=True, repr=True)
 @schema()
@@ -110,4 +109,4 @@ class SkipHandle:
 
 type HandlesType = Optional[list[MetadataHandle] | SkipHandle]
 
-type InternalMetadataType = AnnotatedOptional[MetadataHandle | SkipHandle]
+InternalMetadataType = Annotated[Optional[MetadataHandle | SkipHandle], OneOf]

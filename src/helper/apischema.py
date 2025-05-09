@@ -78,5 +78,3 @@ def to_one_of(schema: dict[str, Any]) -> None:
 OneOf = schema(extra=to_one_of)
 
 Deprecated = schema(deprecated=True)
-
-type AnnotatedOptional[T] = Annotated[Optional[T], OneOf]
