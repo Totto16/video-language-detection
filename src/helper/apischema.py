@@ -1,6 +1,5 @@
 from collections.abc import Callable, Mapping, MutableMapping
 from typing import (
-    Annotated,
     Any,
     Literal,
     Optional,

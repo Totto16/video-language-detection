@@ -2,14 +2,14 @@
 
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Self, override
+from typing import Annotated, Literal, Optional, Self, override
 
 from apischema import schema
 
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
-from helper.apischema import SchemaType, get_schema
+from helper.apischema import OneOf, SchemaType, get_schema
 
 
 @dataclass
@@ -20,7 +20,7 @@ class IMDBConfig:
 @dataclass
 class IMDBMetadataConfig:
     type: Literal["imdb"]
-    config: Optional[IMDBConfig]
+    config: Annotated[Optional[IMDBConfig], OneOf]
 
 
 @dataclass

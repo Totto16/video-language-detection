@@ -289,7 +289,7 @@ class NoLanguagePickerConfig:
 @dataclass
 class InteractiveLanguagePickerConfig:
     picker_type: Literal["interactive"]
-    config: Optional[InteractiveLanguagePickerDict]
+    config: Annotated[Optional[InteractiveLanguagePickerDict], OneOf]
 
 
 LanguagePickerConfig = Annotated[

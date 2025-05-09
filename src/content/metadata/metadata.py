@@ -6,6 +6,7 @@ from apischema import alias, deserializer, schema, serialize, serializer
 
 from helper.apischema import OneOf
 
+
 @dataclass(slots=True, repr=True)
 @schema()
 class MetadataHandleHelper:

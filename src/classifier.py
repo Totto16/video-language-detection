@@ -23,6 +23,7 @@ from torch import cuda
 from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
+from helper.apischema import OneOf
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
 from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
@@ -471,7 +472,7 @@ class AdvancedPercentage:
 
 SimplePercentage = Annotated[float, schema(min=0.0, max=1.0)]
 
-Percentage = SimplePercentage | AdvancedPercentage
+Percentage = Annotated[SimplePercentage | AdvancedPercentage, OneOf]
 
 
 def to_advanced_percentage(
@@ -486,8 +487,8 @@ def to_advanced_percentage(
 
 # TODO: is there a better way?
 class AccuracySettingsDict(TypedDict, total=False):
-    normal_threshold: Optional[Percentage]
-    final_threshold: Optional[Percentage]
+    normal_threshold: Annotated[Optional[Percentage], OneOf]
+    final_threshold: Annotated[Optional[Percentage], OneOf]
     use_picker_at_end: Optional[bool]
 
 
@@ -499,8 +500,8 @@ class AccuracySettingsDictTotal(TypedDict, total=True):
 
 # TODO: is there a better way?
 class ScanConfigDict(TypedDict, total=False):
-    minimum: Optional[Percentage]
-    maximum: Optional[Percentage]
+    minimum: Annotated[Optional[Percentage], OneOf]
+    maximum: Annotated[Optional[Percentage], OneOf]
 
 
 class ScanConfigDictTotal(TypedDict, total=True):
@@ -536,9 +537,9 @@ class ClassifierOptions:
 
 @dataclass()
 class ClassifierOptionsConfig:
-    segment_length: Optional[ConfigTimeStamp]
-    accuracy: Optional[AccuracySettingsDict]
-    scan_config: Optional[ScanConfigDict]
+    segment_length: Annotated[Optional[ConfigTimeStamp], OneOf]
+    accuracy: Annotated[Optional[AccuracySettingsDict], OneOf]
+    scan_config: Annotated[Optional[ScanConfigDict], OneOf]
 
     @staticmethod
     def default() -> "ClassifierOptionsConfig":

@@ -204,7 +204,7 @@
                     "const": "config"
                 },
                 "config": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/ConfigScannerDict"
                         },
@@ -224,7 +224,7 @@
             "type": "object",
             "properties": {
                 "start_position": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "type": "integer",
                             "deprecated": true
@@ -235,7 +235,7 @@
                     ]
                 },
                 "scan_amount": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "type": "integer",
                             "deprecated": true
@@ -279,7 +279,7 @@
             "type": "object",
             "properties": {
                 "segment_length": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/TimestampCompat"
                         },
@@ -292,7 +292,7 @@
                     ]
                 },
                 "accuracy": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/AccuracySettingsDict"
                         },
@@ -302,7 +302,7 @@
                     ]
                 },
                 "scan_config": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/ScanConfigDict"
                         },
@@ -333,14 +333,18 @@
             "type": "object",
             "properties": {
                 "normal_threshold": {
-                    "anyOf": [
+                    "oneOf": [
                         {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0
-                        },
-                        {
-                            "$ref": "#/$defs/AdvancedPercentage"
+                            "oneOf": [
+                                {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0
+                                },
+                                {
+                                    "$ref": "#/$defs/AdvancedPercentage"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -348,14 +352,18 @@
                     ]
                 },
                 "final_threshold": {
-                    "anyOf": [
+                    "oneOf": [
                         {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0
-                        },
-                        {
-                            "$ref": "#/$defs/AdvancedPercentage"
+                            "oneOf": [
+                                {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0
+                                },
+                                {
+                                    "$ref": "#/$defs/AdvancedPercentage"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -379,14 +387,18 @@
             "type": "object",
             "properties": {
                 "minimum": {
-                    "anyOf": [
+                    "oneOf": [
                         {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0
-                        },
-                        {
-                            "$ref": "#/$defs/AdvancedPercentage"
+                            "oneOf": [
+                                {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0
+                                },
+                                {
+                                    "$ref": "#/$defs/AdvancedPercentage"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -394,14 +406,18 @@
                     ]
                 },
                 "maximum": {
-                    "anyOf": [
+                    "oneOf": [
                         {
-                            "type": "number",
-                            "minimum": 0.0,
-                            "maximum": 1.0
-                        },
-                        {
-                            "$ref": "#/$defs/AdvancedPercentage"
+                            "oneOf": [
+                                {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 1.0
+                                },
+                                {
+                                    "$ref": "#/$defs/AdvancedPercentage"
+                                }
+                            ]
                         },
                         {
                             "type": "null"
@@ -419,7 +435,7 @@
                     "const": "tmdb"
                 },
                 "config": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/TMDBConfig"
                         },
@@ -461,7 +477,7 @@
                     "const": "imdb"
                 },
                 "config": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/IMDBConfig"
                         },
@@ -523,7 +539,7 @@
                     "const": "interactive"
                 },
                 "config": {
-                    "anyOf": [
+                    "oneOf": [
                         {
                             "$ref": "#/$defs/InteractiveLanguagePickerDict"
                         },

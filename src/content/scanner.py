@@ -105,7 +105,7 @@ def to_advanced_scanner_postion_total(
 
 SimplePosition = Annotated[int, Deprecated]
 
-Position = SimplePosition | AdvancedScannerPosition
+Position = Annotated[SimplePosition | AdvancedScannerPosition, OneOf]
 
 
 # TODO: is there a better way?
@@ -278,7 +278,7 @@ class NoScannerConfig:
 @dataclass
 class ConfigScannerConfig:
     scanner_type: Literal["config"]
-    config: Optional[ConfigScannerDict]
+    config: Annotated[Optional[ConfigScannerDict], OneOf]
 
 
 ScannerConfig = Annotated[

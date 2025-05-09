@@ -27,7 +27,7 @@ class TMDBConfig:
 @dataclass
 class TMDBMetadataConfig:
     type: Literal["tmdb"]
-    config: Optional[TMDBConfig]
+    config: Annotated[Optional[TMDBConfig], OneOf]
 
 
 @dataclass
