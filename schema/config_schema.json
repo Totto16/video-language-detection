@@ -850,12 +850,35 @@
                             "description": "Get the name of the config template to use from the cli"
                         }
                     ]
+                },
+                "settings": {
+                    "$ref": "#/$defs/ConfigTemplateSettings"
+                },
+                "aliases": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             },
             "required": [
                 "default",
-                "names",
-                "use"
+                "names"
+            ],
+            "additionalProperties": false
+        },
+        "ConfigTemplateSettings": {
+            "type": "object",
+            "properties": {
+                "prefer_cli_template": {
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "prefer_cli_template"
             ],
             "additionalProperties": false
         }

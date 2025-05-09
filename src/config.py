@@ -270,10 +270,26 @@ UseFromCLI = Annotated[
 
 
 @dataclass
+class ConfigTemplateSettings:
+    prefer_cli_template: Optional[bool]
+
+
+@dataclass
 class ConfigTemplates:
     default: Config
     names: dict[str, Config]
-    use: str | UseFromCLI
+    use: Optional[str | UseFromCLI] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    settings: Optional[ConfigTemplateSettings] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    aliases: Optional[dict[str, str]] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
 
 
 @dataclass
@@ -392,32 +408,69 @@ class AdvancedConfig:
         )
 
     @staticmethod
+    def __resolve_config_to_use(
+        templates: ConfigTemplates,
+        cli_name_to_use: Optional[str],
+    ) -> tuple[Config, str]:
+        all_names: dict[str, Config] = templates.names
+        if len(all_names) == 0:
+            msg = "No template defined, define at least one template"
+            raise TypeError(msg)
+
+        name_to_use = templates.use
+
+        # if no name is provided in the config, we try to use the cli one
+        if name_to_use is None or (isinstance(name_to_use, bool) and name_to_use):
+            if cli_name_to_use is None:
+                msg = "Specified to get the template name from cli, but the cli didn't provide any value"
+                raise TypeError(msg)
+            name_to_use = cli_name_to_use
+
+        # if the settings say, that the cli one is prefered, we use that one, if it is set
+        if (
+            templates.settings is not None
+            and templates.settings.prefer_cli_template
+            and cli_name_to_use is not None
+        ):
+            name_to_use = cli_name_to_use
+
+        config_to_use: Optional[Config] = None
+
+        aliases: dict[str, str] = {} if templates.aliases is None else templates.aliases
+
+        while True:
+            temp_config = all_names.get(name_to_use)
+
+            # if the current name is present, we use that config
+            if temp_config is not None:
+                config_to_use = temp_config
+                break
+
+            # we try to look up an alias, if we find one we repeat the loop, so that redirecting aliases are allowed
+            temp_name = aliases.get(name_to_use)
+            if temp_name is not None:
+                name_to_use = temp_name
+                continue
+
+            # otherwise we can't find the name in the conigd ands also no alias, so raise an error
+            msg = f"No template or alias with name '{name_to_use}' was found"
+            raise TypeError(msg)
+
+        return (config_to_use, name_to_use)
+
+    @staticmethod
     def __resolve_advance_config(
         config: ConfigTemplate,
         cli_name_to_use: Optional[str],
     ) -> Optional[tuple[FinalConfig, str]]:
         templates = config.templates
 
-        all_names: dict[str, Config] = templates.names
-        if len(all_names) == 0:
-            msg = "No template defined, define at least one template"
-            raise TypeError(msg)
-
         default = Config.fill_defaults(templates.default)
 
-        name_to_use = templates.use
-
-        if isinstance(name_to_use, bool) and name_to_use:
-            if cli_name_to_use is None:
-                msg = "Specified to get the template name from cli, but the cli didn#t provide any value"
-                raise TypeError(msg)
-            name_to_use = cli_name_to_use
-
-        config_to_use = all_names.get(name_to_use)
-
-        if config_to_use is None:
-            msg = f"No template with name {name_to_use}, please add one"
-            raise TypeError(msg)
+        config_to_use, name_used = AdvancedConfig.__resolve_config_to_use(
+            templates,
+            cli_name_to_use,
+        )
 
         final_config = AdvancedConfig.__merge_template(default, config_to_use)
 
@@ -426,7 +479,7 @@ class AdvancedConfig:
 
         return (
             final_config,
-            f"merging default config and user provided config '{name_to_use}'",
+            f"merging default config and user provided config '{name_used}'",
         )
 
     @staticmethod
