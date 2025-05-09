@@ -171,6 +171,7 @@ class ParsedArgNamespace:
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["run"]
     config: str
+    config_to_use: Optional[str]
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
@@ -186,6 +187,7 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
 class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["config_check"]
     config: str
+    config_to_use: Optional[str]
 
 
 type AllParsedNameSpaces = (
@@ -246,6 +248,15 @@ def parse_args() -> AllParsedNameSpaces:
         default="config.yaml",
         help=_("The config to use"),
     )
+    run_parser.add_argument(
+        "-t",
+        "--template",
+        dest="config_to_use",
+        default=None,
+        help=_(
+            "The config template to use, if the config specifies, to use the cli one",
+        ),
+    )
 
     schema_parser = subparsers.add_parser(
         "schema",
@@ -282,6 +293,15 @@ def parse_args() -> AllParsedNameSpaces:
         default="config.yaml",
         help=_("The config to check"),
     )
+    config_check_parser.add_argument(
+        "-t",
+        "--template",
+        dest="config_to_use",
+        default=None,
+        help=_(
+            "The config template to use, if the config specifies, to use the cli one",
+        ),
+    )
 
     return cast(AllParsedNameSpaces, parser.parse_args())
 
@@ -314,7 +334,10 @@ def subcommand_run(
     logger: Logger,
     args: RunCommandParsedArgNamespace,
 ) -> ExitCode:
-    parsed_config = AdvancedConfig.load_and_resolve(Path(args.config))
+    parsed_config = AdvancedConfig.load_and_resolve(
+        Path(args.config),
+        args.config_to_use,
+    )
     if parsed_config is None:
         return 1
 
@@ -328,7 +351,10 @@ def subcommand_config_check(
     args: ConfigCheckCommandParsedArgNamespace,
 ) -> ExitCode:
     config = Path(args.config)
-    parsed_config = AdvancedConfig.load_and_resolve_with_info(config)
+    parsed_config = AdvancedConfig.load_and_resolve_with_info(
+        config,
+        args.config_to_use,
+    )
     if parsed_config is None:
         logger.error(
             _("Config '{config}' is not valid!").format(config=config),

@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Annotated, Any, Optional, Self
+from typing import Annotated, Any, Literal, Optional, Self
 
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
@@ -263,11 +263,17 @@ class Config:
         )
 
 
+UseFromCLI = Annotated[
+    Literal[True],
+    schema(description="Get the name of the config template to use from the cli"),
+]
+
+
 @dataclass
 class ConfigTemplates:
     default: Config
     names: dict[str, Config]
-    use: str
+    use: str | UseFromCLI
 
 
 @dataclass
@@ -388,6 +394,7 @@ class AdvancedConfig:
     @staticmethod
     def __resolve_advance_config(
         config: ConfigTemplate,
+        cli_name_to_use: Optional[str],
     ) -> Optional[tuple[FinalConfig, str]]:
         templates = config.templates
 
@@ -399,6 +406,12 @@ class AdvancedConfig:
         default = Config.fill_defaults(templates.default)
 
         name_to_use = templates.use
+
+        if isinstance(name_to_use, bool) and name_to_use:
+            if cli_name_to_use is None:
+                msg = "Specified to get the template name from cli, but the cli didn#t provide any value"
+                raise TypeError(msg)
+            name_to_use = cli_name_to_use
 
         config_to_use = all_names.get(name_to_use)
 
@@ -419,6 +432,7 @@ class AdvancedConfig:
     @staticmethod
     def load_and_resolve_with_info(
         config_file: Path,
+        cli_name_to_use: Optional[str],
     ) -> Optional[tuple[FinalConfig, str]]:
         config = AdvancedConfig.__load(config_file)
 
@@ -429,7 +443,10 @@ class AdvancedConfig:
             final_config = Config.fill_defaults(config)
             return (final_config, "Normal Config")
 
-        resolved_config = AdvancedConfig.__resolve_advance_config(config)
+        resolved_config = AdvancedConfig.__resolve_advance_config(
+            config,
+            cli_name_to_use,
+        )
 
         if resolved_config is None:
             return None
@@ -441,8 +458,9 @@ class AdvancedConfig:
     @staticmethod
     def load_and_resolve(
         config_file: Path,
+        cli_name_to_use: Optional[str],
     ) -> Optional[FinalConfig]:
-        res = AdvancedConfig.load_and_resolve_with_info(config_file)
+        res = AdvancedConfig.load_and_resolve_with_info(config_file, cli_name_to_use)
 
         if res is None:
             return None

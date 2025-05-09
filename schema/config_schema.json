@@ -321,38 +321,24 @@
                 "minimum": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "type": "number",
-                                    "minimum": 0.0,
-                                    "maximum": 1.0
-                                },
-                                {
-                                    "$ref": "#/$defs/AdvancedPercentage"
-                                }
-                            ]
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/AdvancedPercentage"
                         }
                     ]
                 },
                 "maximum": {
                     "oneOf": [
                         {
-                            "oneOf": [
-                                {
-                                    "type": "number",
-                                    "minimum": 0.0,
-                                    "maximum": 1.0
-                                },
-                                {
-                                    "$ref": "#/$defs/AdvancedPercentage"
-                                }
-                            ]
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
                         },
                         {
-                            "type": "null"
+                            "$ref": "#/$defs/AdvancedPercentage"
                         }
                     ]
                 }
@@ -854,7 +840,16 @@
                     }
                 },
                 "use": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "boolean",
+                            "const": true,
+                            "description": "Get the name of the config template to use from the cli"
+                        }
+                    ]
                 }
             },
             "required": [
