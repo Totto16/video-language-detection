@@ -753,6 +753,19 @@ class ClassifierManager(AbstractContextManager[None]):
             ClassifierManager.clear_gpu_cache()
 
 
+class PredictionFailReason(Enum):
+    failed_too_often = "failed_too_often"
+    pick_failed = "pick_failed"
+    normal_threshold_failed = "normal_threshold_failed"
+    final_threshold_failed = "final_threshold_failed"
+
+
+@dataclass
+class PredictionFail:
+    reason: PredictionFailReason
+    best: Optional[PredictionBest]
+
+
 class Classifier:
     __save_dir: Path
     __options: ClassifierOptions
@@ -858,15 +871,15 @@ class Classifier:
 
         return None
 
-    def __predict_or_none(
+    def predict(
         self: Self,
         wav_file: WAVFile,
         path: Path,
         language_picker: LanguagePicker,
         manager: Optional[Manager],
-    ) -> Optional[PredictionBest]:
+    ) -> PredictionBest | PredictionFail:
         if self.__manager.failed_too_often:
-            return None
+            return PredictionFail(PredictionFailReason.failed_too_often, None)
 
         def get_segments(runtime: Timestamp) -> list[tuple[Segment, Timestamp]]:
             result: list[tuple[Segment, Timestamp]] = []
@@ -969,7 +982,9 @@ class Classifier:
                 if picked_language is not None:
                     return PredictionBest(1.0, picked_language)
 
-            return None
+                return PredictionFail(PredictionFailReason.pick_failed, best)
+
+            return PredictionFail(PredictionFailReason.final_threshold_failed, best)
 
         # use normal treshold
         if best.accuracy >= self.__options.accuracy["normal_threshold"]:
@@ -981,22 +996,7 @@ class Classifier:
         )
         logger.error(msg)
 
-        # return unknown language
-        return None
-
-    def predict(
-        self: Self,
-        wav_file: WAVFile,
-        path: Path,
-        language_picker: LanguagePicker,
-        manager: Optional[Manager] = None,
-    ) -> PredictionBest:
-        prediction = self.__predict_or_none(wav_file, path, language_picker, manager)
-
-        if prediction is None:
-            return PredictionBest(0.0, Language.unknown())
-
-        return prediction
+        return PredictionFail(PredictionFailReason.normal_threshold_failed, best)
 
     def __del__(self: Self) -> None:
         if self.__save_dir.exists():

@@ -156,8 +156,11 @@ def launch_tui(logger: Logger, config: FinalConfig) -> None:
         content.summary() for content in contents
     )
 
+    scan_summary = language_scanner.summary_manager.get_summary()
+
     logger.info(language_summary)
     logger.info(metadata_summary)
+    logger.info(scan_summary)
 
 
 type SubCommand = Literal["run", "schema", "gui", "config_check"]

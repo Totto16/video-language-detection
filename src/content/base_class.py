@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict
+from typing import Any, Optional, Self, TypedDict, override
 
 from apischema import alias
 from enlighten import Manager
 
-from classifier import Classifier, FileMetadataError, WAVFile
+from classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from content.general import (
     Callback,
     ContentType,
@@ -24,6 +25,7 @@ from content.metadata.metadata import (
     SkipHandle,
 )
 from content.metadata.scanner import MetadataScanner
+from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
 from helper.log import get_logger
@@ -38,14 +40,119 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
+class SummaryResult:
+    __file: ScannedFile
+    __value: bool
+
+    def __init__(self: Self, file: ScannedFile, *, value: bool) -> None:
+        self.__file = file
+        self.__value = value
+
+    def get_reason_as_str(self: Self) -> str:
+        raise MissingOverrideError
+
+    @property
+    def file(self: Self) -> ScannedFile:
+        return self.__file
+
+    @property
+    def value(self: Self) -> bool:
+        return self.__value
+
+
+type ScanSummary = dict[bool, int]
+
+
+class SuccessSummaryManager:
+    __results: list[SummaryResult]
+
+    def __init__(self: Self) -> None:
+        self.__results = []
+
+    def add(self: Self, result: SummaryResult) -> None:
+        self.__results.append(result)
+
+    def get_summary(self: Self) -> ScanSummary:
+        summary: ScanSummary = {True: 0, False: 0}
+        for result in self.__results:
+            summary[result.value] = summary[result.value] + 1
+
+        return summary
+
+
+class FailReason(Enum):
+    exception = " exception"
+    scan_failure = "scan_failure"
+
+
+class FailedFor(SummaryResult):
+    __reason: FailReason
+
+    def __init__(self: Self, reason: FailReason, file: ScannedFile) -> None:
+        super().__init__(file, value=False)
+        self.__reason = reason
+
+    @override
+    def get_reason_as_str(self: Self) -> str:
+        return f"Scan failed with reason: {self.__reason!s}"
+
+    @property
+    def reason(self: Self) -> FailReason:
+        return self.__reason
+
+
+class FailedForWithLanguage(FailedFor):
+    __best: Optional[PredictionBest]
+    __reason: PredictionFailReason
+
+    def __init__(
+        self: Self,
+        best: Optional[PredictionBest],
+        reason: PredictionFailReason,
+        file: ScannedFile,
+    ) -> None:
+        super().__init__(FailReason.scan_failure, file)
+        self.__best = best
+        self.__reason = reason
+
+    @override
+    def get_reason_as_str(self: Self) -> str:
+        if self.__best is None:
+            return f"Scan failed with language reason: {self.__reason!s}"
+
+        return f"Scan failed with language reason: {self.__reason!s} and the best language was {self.__best.language} with {self.__best.accuracy:.2%}"
+
+    @property
+    def best(self: Self) -> Optional[PredictionBest]:
+        return self.__best
+
+
+class SuccessFor(SummaryResult):
+    __success_rate: float
+
+    def __init__(self: Self, success_rate: float, file: ScannedFile) -> None:
+        super().__init__(file, value=True)
+        self.__success_rate = success_rate
+
+    @override
+    def get_reason_as_str(self: Self) -> str:
+        return "Scan was successful"
+
+    @property
+    def success_rat(self: Self) -> float:
+        return self.__success_rate
+
+
 class LanguageScanner:
     __classifier: Classifier
+    __summary_manager: SuccessSummaryManager
 
     def __init__(
         self: Self,
         classifier: Classifier,
     ) -> None:
         self.__classifier = classifier
+        self.__summary_manager = SuccessSummaryManager()
 
     def get_language(
         self: Self,
@@ -57,18 +164,35 @@ class LanguageScanner:
         try:
             wav_file = WAVFile(scanned_file.path)
 
-            best = self.__classifier.predict(
+            prediction_result = self.__classifier.predict(
                 wav_file,
                 scanned_file.path,
                 language_picker,
                 manager,
             )
+
+            if isinstance(prediction_result, PredictionBest):
+                self.__summary_manager.add(
+                    SuccessFor(prediction_result.accuracy, scanned_file),
+                )
+                return prediction_result.language
+
+            self.__summary_manager.add(
+                FailedForWithLanguage(
+                    prediction_result.best,
+                    prediction_result.reason,
+                    scanned_file,
+                ),
+            )
+            return Language.unknown()
         except FileMetadataError:
             logger.exception("Get Language")
+            self.__summary_manager.add(FailedFor(FailReason.exception, scanned_file))
             return Language.unknown()
-        else:
-            # python is funky xD, leaking variables as desired pattern xD
-            return best.language
+
+    @property
+    def summary_manager(self: Self) -> SuccessSummaryManager:
+        return self.__summary_manager
 
 
 class Scanner:

@@ -321,7 +321,7 @@ class AdvancedConfig:
                         msg = f"Config not loadable from '{suffix}' file!"
                         raise RuntimeError(msg)
                 try:
-                    parsed_dict: InternalConfig = deserialize(
+                    return deserialize(
                         SchemaConfig,
                         loaded_dict,
                     )
@@ -337,12 +337,9 @@ class AdvancedConfig:
                         logger.error(msg)  # noqa: TRY400
 
                     return None
-                else:
-                    # python is funky xD, leaking variables as desired pattern xD
-                    return parsed_dict
 
         msg = f"The config file {config_file} was not found"
-        logger.error(msg)
+        logger.error(msg=msg)
         return None
 
     @staticmethod
