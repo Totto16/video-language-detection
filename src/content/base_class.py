@@ -51,6 +51,12 @@ class SummaryResult:
     def get_reason_as_str(self: Self) -> str:
         raise MissingOverrideError
 
+    def get_reason_identifier(self: Self) -> str:
+        raise MissingOverrideError
+
+    def get_language(self: Self) -> Language:
+        raise MissingOverrideError
+
     @property
     def file(self: Self) -> ScannedFile:
         return self.__file
@@ -61,6 +67,12 @@ class SummaryResult:
 
 
 type ScanSummary = dict[bool, int]
+
+
+@dataclass
+class ScanSummaryDetailed:
+    success: dict[Language, int]
+    failure: dict[str, int]
 
 
 class SuccessSummaryManager:
@@ -75,7 +87,28 @@ class SuccessSummaryManager:
     def get_summary(self: Self) -> ScanSummary:
         summary: ScanSummary = {True: 0, False: 0}
         for result in self.__results:
-            summary[result.value] = summary[result.value] + 1
+            summary[result.value] += 1
+
+        return summary
+
+    def get_detailed_summary(self: Self) -> ScanSummaryDetailed:
+        summary: ScanSummaryDetailed = ScanSummaryDetailed(success={}, failure={})
+        for result in self.__results:
+            if result.value:
+                language = result.get_language()
+
+                if summary.success.get(language) is None:
+                    summary.success[language] = 0
+
+                summary.success[language] += 1
+
+            else:
+                reason_identifer = result.get_reason_identifier()
+
+                if summary.failure.get(reason_identifer) is None:
+                    summary.failure[reason_identifer] = 0
+
+                summary.failure[reason_identifer] += 1
 
         return summary
 
@@ -95,6 +128,15 @@ class FailedFor(SummaryResult):
     @override
     def get_reason_as_str(self: Self) -> str:
         return f"Scan failed with reason: {self.__reason!s}"
+
+    @override
+    def get_reason_identifier(self: Self) -> str:
+        return str(self.__reason)
+
+    @override
+    def get_language(self: Self) -> Language:
+        msg = "Failed summaries can't access the language"
+        raise RuntimeError(msg)
 
     @property
     def reason(self: Self) -> FailReason:
@@ -122,25 +164,38 @@ class FailedForWithLanguage(FailedFor):
 
         return f"Scan failed with language reason: {self.__reason!s} and the best language was {self.__best.language} with {self.__best.accuracy:.2%}"
 
+    @override
+    def get_reason_identifier(self: Self) -> str:
+        return str(self.__reason)
+
     @property
     def best(self: Self) -> Optional[PredictionBest]:
         return self.__best
 
 
 class SuccessFor(SummaryResult):
-    __success_rate: float
+    __best: PredictionBest
 
-    def __init__(self: Self, success_rate: float, file: ScannedFile) -> None:
+    def __init__(self: Self, best: PredictionBest, file: ScannedFile) -> None:
         super().__init__(file, value=True)
-        self.__success_rate = success_rate
+        self.__best = best
 
     @override
     def get_reason_as_str(self: Self) -> str:
         return "Scan was successful"
 
+    @override
+    def get_reason_identifier(self: Self) -> str:
+        msg = "Succesful summaries can't access the reason identifier"
+        raise RuntimeError(msg)
+
+    @override
+    def get_language(self: Self) -> Language:
+        return self.__best.language
+
     @property
-    def success_rat(self: Self) -> float:
-        return self.__success_rate
+    def best(self: Self) -> PredictionBest:
+        return self.__best
 
 
 class LanguageScanner:
@@ -173,7 +228,7 @@ class LanguageScanner:
 
             if isinstance(prediction_result, PredictionBest):
                 self.__summary_manager.add(
-                    SuccessFor(prediction_result.accuracy, scanned_file),
+                    SuccessFor(prediction_result, scanned_file),
                 )
                 return prediction_result.language
 

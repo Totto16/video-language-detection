@@ -156,7 +156,7 @@ def launch_tui(logger: Logger, config: FinalConfig) -> None:
         content.summary() for content in contents
     )
 
-    scan_summary = language_scanner.summary_manager.get_summary()
+    scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
     logger.info(language_summary)
     logger.info(metadata_summary)
