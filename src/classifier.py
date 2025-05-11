@@ -217,24 +217,21 @@ class WAVFile:
             else _options
         )
 
-        value: tuple[Status, FileType, bool] = (
-            self.__status,
-            self.__type,
-            force_recreation,
-        )
+        if force_recreation:
+            return self.__convert_to_wav(options, manager)
+
+        value: tuple[Status, FileType] = (self.__status, self.__type)
 
         match value:
-            case (Status.ready, _, False):
+            case (Status.ready, _):
                 return False
-            case (_, FileType.wav, _):
+            case (_, FileType.wav):
                 return False
-            case (Status.raw, _, False):
-                return self.__convert_to_wav(options, manager)
-            case (_, _, True):
+            case (Status.raw, _):
                 return self.__convert_to_wav(options, manager)
             case _:
-                assert_never(value)
-
+                assert_never(value[0])
+                assert_never(value[1])
     @property
     def status(self: Self) -> Status:
         return self.__status
@@ -337,7 +334,8 @@ class WAVFile:
                     raise RuntimeError(msg)
                 return self.__tmp_file
             case _:
-                assert_never(value)
+                assert_never(value[0])
+                assert_never(value[1])
 
     def __del__(self: Self) -> None:
         if self.__tmp_file is not None and self.__tmp_file.exists():
