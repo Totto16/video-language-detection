@@ -65,7 +65,7 @@ class EpisodeContent(Content):
             scanned_file,
             None,
             description,
-            Language.unknown(),
+            Language.get_default(),
         )
 
     @property
@@ -141,7 +141,7 @@ class EpisodeContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
 
             if not is_outdated:
-                if self.__language == Language.unknown() or self._metadata is None:
+                if Language.is_default_value(self.__language) or self._metadata is None:
                     callback.start(
                         (2, 2, 0),
                         self.scanned_file.path.name,
@@ -149,11 +149,10 @@ class EpisodeContent(Content):
                         characteristic,
                     )
 
-                    if (
-                        self.__language == Language.unknown()
-                        and scanner.should_scan_language(ScanType.rescan)
-                    ):
-                        self.__language = scanner.language_scanner.get_language(
+                    if Language.is_default_value(
+                        self.__language,
+                    ) and scanner.should_scan_language(ScanType.rescan):
+                        self.__language = scanner.language_scanner.get_language_or_default(
                             self.scanned_file,
                             language_picker,
                             manager=manager,
@@ -211,7 +210,7 @@ class EpisodeContent(Content):
         )
 
         if scanner.should_scan_language(ScanType.first_scan):
-            self.__language = scanner.language_scanner.get_language(
+            self.__language = scanner.language_scanner.get_language_or_default(
                 self.scanned_file,
                 language_picker,
                 manager=manager,

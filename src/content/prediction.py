@@ -110,10 +110,10 @@ class Prediction:
     def get_best(
         self: Self,
         mean_type: MeanType = MeanType.arithmetic,
-    ) -> PredictionBest:
+    ) -> Optional[PredictionBest]:
         best_list: list[PredictionBest] = self.get_best_list(mean_type)
         if len(best_list) == 0:
-            return PredictionBest(0.0, Language.unknown())
+            return None
 
         return best_list[0]
 

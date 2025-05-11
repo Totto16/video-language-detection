@@ -758,6 +758,7 @@ class PredictionFailReason(Enum):
     pick_failed = "pick_failed"
     normal_threshold_failed = "normal_threshold_failed"
     final_threshold_failed = "final_threshold_failed"
+    no_best_available = "no_best_available"
 
 
 @dataclass
@@ -945,9 +946,11 @@ class Classifier:
                 # go to the end, to check if the result is good enough
                 break
 
-            best_local: PredictionBest = prediction.get_best(MeanType.truncated)
+            best_local: Optional[PredictionBest] = prediction.get_best(
+                MeanType.truncated,
+            )
 
-            if best_local.language == Language.unknown():
+            if best_local is None or Language.is_default_value(best_local.language):
                 # scan the next segment
                 continue
 
@@ -963,7 +966,10 @@ class Classifier:
         if bar is not None:
             bar.close(clear=True)
 
-        best: PredictionBest = prediction.get_best(MeanType.truncated)
+        best: Optional[PredictionBest] = prediction.get_best(MeanType.truncated)
+
+        if best is None:
+            return PredictionFail(PredictionFailReason.no_best_available, best)
 
         maximum_to_scan: float = (
             1.0

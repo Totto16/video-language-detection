@@ -215,7 +215,7 @@ class LanguageScanner:
         language_picker: LanguagePicker,
         *,
         manager: Optional[Manager] = None,
-    ) -> Language:
+    ) -> Optional[Language]:
         try:
             wav_file = WAVFile(scanned_file.path)
 
@@ -239,11 +239,25 @@ class LanguageScanner:
                     scanned_file,
                 ),
             )
-            return Language.unknown()
+            return None  # noqa: TRY300
         except FileMetadataError:
             logger.exception("Get Language")
             self.__summary_manager.add(FailedFor(FailReason.exception, scanned_file))
-            return Language.unknown()
+            return None
+
+    def get_language_or_default(
+        self: Self,
+        scanned_file: ScannedFile,
+        language_picker: LanguagePicker,
+        *,
+        manager: Optional[Manager] = None,
+    ) -> Language:
+        language = self.get_language(scanned_file, language_picker, manager=manager)
+
+        if language is None:
+            return Language.get_default()
+
+        return language
 
     @property
     def summary_manager(self: Self) -> SuccessSummaryManager:

@@ -244,11 +244,8 @@ class ScannedFile:
 class NameParser:
     __language: Language
 
-    def __init__(
-        self: Self,
-        language: Language = Language.unknown(),  # noqa: B008
-    ) -> None:
-        self.__language = language
+    def __init__(self: Self, language: Optional[Language]) -> None:
+        self.__language = language if language is not None else Language.get_default()
 
     @property
     def language(self: Self) -> Language:
@@ -324,4 +321,3 @@ def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:
         return ls.index(item)
     except ValueError:
         return None
-

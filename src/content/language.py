@@ -24,9 +24,25 @@ class Language:
 
         return lan
 
+    # this is for episodes, that have no real language, for some special episods of some tv series
     @staticmethod
-    def unknown() -> "Language":
+    def no_language() -> "Language":
+        return Language("no_lang", "No Language")
+
+    # TODO: get all languages somehow, from teh classifiere, that supports them all
+
+    # note this is an implementation detail, that shoudl not leak
+    @staticmethod
+    def __unknown() -> "Language":
         return Language("un", "Unknown")
+
+    @staticmethod
+    def get_default() -> "Language":
+        return Language.__unknown()
+
+    @staticmethod
+    def is_default_value(language: "Language") -> bool:
+        return language == Language.__unknown()
 
     def __str__(self: Self) -> str:
         return self.long
