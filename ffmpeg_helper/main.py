@@ -4,7 +4,7 @@
 import argparse
 import atexit
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, assert_never, cast
 
 from fix_chapters import fix_chapters
 from scan_files import scan_files
