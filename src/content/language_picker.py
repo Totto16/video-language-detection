@@ -70,6 +70,41 @@ class InteractiveLanguagePickerDictTotal(TypedDict, total=True):
     play_sound: bool
 
 
+def resolve_interactive_config(
+    config: Optional[InteractiveLanguagePickerDict],
+) -> InteractiveLanguagePickerDictTotal:
+    defaults: InteractiveLanguagePickerDictTotal = {
+        "entries_to_show": 10,
+        "show_full_list": False,
+        "play_sound": True,
+    }
+
+    loaded_dict: Optional[InteractiveLanguagePickerDict] = config
+    result: InteractiveLanguagePickerDictTotal = defaults
+
+    if loaded_dict is not None:
+        result["entries_to_show"] = loaded_dict.get(
+            "entries_to_show",
+            defaults["entries_to_show"],
+        )
+
+        result["show_full_list"] = loaded_dict.get(
+            "show_full_list",
+            defaults["show_full_list"],
+        )
+
+        result["play_sound"] = loaded_dict.get(
+            "play_sound",
+            defaults["play_sound"],
+        )
+    else:
+        result["entries_to_show"] = defaults["entries_to_show"]
+        result["show_full_list"] = defaults["show_full_list"]
+        result["play_sound"] = defaults["play_sound"]
+
+    return result
+
+
 @dataclass()
 class PredictionBestSelectResult:
     select_result_type: Literal["prediction_best"]
@@ -128,46 +163,15 @@ def play_notification_sound() -> None:
 logger: Logger = get_logger()
 
 
+INCREASE_STEP_FOR_SELECTOR: int = 5
+
+
 class InteractiveLanguagePicker(LanguagePicker):
-    __entries_to_show: int
-    __show_full_list: bool
-    __play_sound: bool
+    __config: InteractiveLanguagePickerDictTotal
 
-    def __init__(
-        self: Self,
-        *,
-        config: Optional[InteractiveLanguagePickerDict] = None,
-    ) -> None:
+    def __init__(self: Self, *, config: InteractiveLanguagePickerDictTotal) -> None:
         super().__init__()
-
-        loaded_dict: Optional[InteractiveLanguagePickerDict] = config
-        if loaded_dict is not None:
-            self.__entries_to_show = loaded_dict.get(
-                "entries_to_show",
-                self.__defaults["entries_to_show"],
-            )
-
-            self.__show_full_list = loaded_dict.get(
-                "show_full_list",
-                self.__defaults["show_full_list"],
-            )
-
-            self.__play_sound = loaded_dict.get(
-                "play_sound",
-                self.__defaults["play_sound"],
-            )
-        else:
-            self.__entries_to_show = self.__defaults["entries_to_show"]
-            self.__show_full_list = self.__defaults["show_full_list"]
-            self.__play_sound = self.__defaults["play_sound"]
-
-    @property
-    def __defaults(self: Self) -> InteractiveLanguagePickerDictTotal:
-        return {
-            "entries_to_show": 10,
-            "show_full_list": False,
-            "play_sound": True,
-        }
+        self.__config = config
 
     def __get_manual_choices(
         self: Self,
@@ -224,7 +228,8 @@ class InteractiveLanguagePicker(LanguagePicker):
 
     def __get_prediction_choices(
         self: Self,
-        prediction: Prediction,
+        best_list: list[PredictionBest],
+        length_to_use: int,
     ) -> list[Choice]:
 
         def format_choice(index: int, value: PredictionBest) -> Choice:
@@ -241,16 +246,10 @@ class InteractiveLanguagePicker(LanguagePicker):
                 value=PredictionBestSelectResult("prediction_best", value),
             )
 
-        best_list = prediction.get_best_list()
-
-        items_count: int = (
-            len(best_list) if self.__show_full_list else self.__entries_to_show
-        )
-
         result: list[Choice] = [
             format_choice(i, best)
             for i, best in enumerate(best_list)
-            if i < items_count
+            if i < length_to_use
         ]
 
         return result
@@ -258,12 +257,13 @@ class InteractiveLanguagePicker(LanguagePicker):
     def __get_choices(
         self: Self,
         path: Path,
-        prediction: Prediction,
+        best_list: list[PredictionBest],
+        length_to_use: int,
     ) -> list[Choice]:
 
         result: list[Choice] = []
 
-        prediction_choices = self.__get_prediction_choices(prediction)
+        prediction_choices = self.__get_prediction_choices(best_list, length_to_use)
         result.extend(prediction_choices)
 
         result.append(Separator())
@@ -280,11 +280,22 @@ class InteractiveLanguagePicker(LanguagePicker):
         prediction: Prediction,
     ) -> Optional[Language]:
         with Terminal.clear_block(clear_on_entry=False):
-            if self.__play_sound:
+            if self.__config["play_sound"]:
                 play_notification_sound()
 
+            best_list: list[PredictionBest] = prediction.get_best_list()
+            length_to_use: int = (
+                len(best_list)
+                if self.__config["show_full_list"]
+                else self.__config["entries_to_show"]
+            )
+
             while True:
-                choices = self.__get_choices(path, prediction)
+                choices = self.__get_choices(
+                    path,
+                    best_list,
+                    length_to_use,
+                )
 
                 question = select(
                     "Select the desired option:",
@@ -327,8 +338,10 @@ class InteractiveLanguagePicker(LanguagePicker):
                             case SelectedType.unknown:
                                 return Language.get_default()
                             case SelectedType.more:
-                                ##TODO: change settings
-                                pass
+                                length_to_use = min(
+                                    len(best_list),
+                                    length_to_use + INCREASE_STEP_FOR_SELECTOR,
+                                )
                                 # fall trough and run the loop again
                             case _:
                                 assert_never(manual_value.selected)
@@ -364,6 +377,7 @@ def get_picker_from_config(
         case "none":
             return NoLanguagePicker()
         case "interactive":
-            return InteractiveLanguagePicker(
-                config=cast(InteractiveLanguagePickerConfig, config).config,
+            resolved_config = resolve_interactive_config(
+                cast(InteractiveLanguagePickerConfig, config).config,
             )
+            return InteractiveLanguagePicker(config=resolved_config)
