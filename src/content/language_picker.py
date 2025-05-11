@@ -80,6 +80,8 @@ class SelectedType(Enum):
     open = "open"
     no_language = "no_language"
     copy = " copy"
+    more = "more"
+    unknown = "unknown"
 
 
 @dataclass()
@@ -167,9 +169,61 @@ class InteractiveLanguagePicker(LanguagePicker):
             "play_sound": True,
         }
 
-    def __get_choices(
+    def __get_manual_choices(
         self: Self,
         path: Path,
+    ) -> list[Choice]:
+        result: list[Choice] = []
+
+        result.append(
+            construct_choice(
+                title=[
+                    ("fg:ansiblue", "[open]"),
+                    ("fg:ansigreen", " '"),
+                    ("", f"{path}"),
+                    ("fg:ansigreen", "'"),
+                ],
+                value=ManualSelectResult("manual", SelectedType.open),
+            ),
+        )
+
+        result.append(
+            construct_choice(
+                title=[
+                    ("fg:ansiblue", "[copy path]"),
+                    ("fg:ansigreen", " '"),
+                    ("", f"{path}"),
+                    ("fg:ansigreen", "'"),
+                ],
+                value=ManualSelectResult("manual", SelectedType.copy),
+            ),
+        )
+
+        result.append(
+            construct_choice(
+                title=[("fg:ansiblue", "[more]")],
+                value=ManualSelectResult("manual", SelectedType.more),
+            ),
+        )
+
+        result.append(
+            construct_choice(
+                title=[("fg:ansiblue", "[unknown language]")],
+                value=ManualSelectResult("manual", SelectedType.unknown),
+            ),
+        )
+
+        result.append(
+            construct_choice(
+                title=[("fg:ansiblue", "[no language]")],
+                value=ManualSelectResult("manual", SelectedType.no_language),
+            ),
+        )
+
+        return result
+
+    def __get_prediction_choices(
+        self: Self,
         prediction: Prediction,
     ) -> list[Choice]:
 
@@ -199,38 +253,23 @@ class InteractiveLanguagePicker(LanguagePicker):
             if i < items_count
         ]
 
+        return result
+
+    def __get_choices(
+        self: Self,
+        path: Path,
+        prediction: Prediction,
+    ) -> list[Choice]:
+
+        result: list[Choice] = []
+
+        prediction_choices = self.__get_prediction_choices(prediction)
+        result.extend(prediction_choices)
+
         result.append(Separator())
 
-        result.append(
-            construct_choice(
-                title=[
-                    ("fg:ansiblue", "[open]"),
-                    ("fg:ansigreen", " '"),
-                    ("", f"{path}"),
-                    ("fg:ansigreen", "'"),
-                ],
-                value=ManualSelectResult("manual", SelectedType.open),
-            ),
-        )
-
-        result.append(
-            construct_choice(
-                title=[
-                    ("fg:ansiblue", "[copy path]"),
-                    ("fg:ansigreen", " '"),
-                    ("", f"{path}"),
-                    ("fg:ansigreen", "'"),
-                ],
-                value=ManualSelectResult("manual", SelectedType.copy),
-            ),
-        )
-
-        result.append(
-            construct_choice(
-                title=[("fg:ansiblue", "[no language]")],
-                value=ManualSelectResult("manual", SelectedType.no_language),
-            ),
-        )
+        manual_choices = self.__get_manual_choices(path)
+        result.extend(manual_choices)
 
         return result
 
@@ -241,19 +280,18 @@ class InteractiveLanguagePicker(LanguagePicker):
         prediction: Prediction,
     ) -> Optional[Language]:
         with Terminal.clear_block(clear_on_entry=False):
-
-            choices = self.__get_choices(path, prediction)
-
-            question = select(
-                "Select the desired option:",
-                choices=choices,
-                default=choices[0],
-            )
-
             if self.__play_sound:
                 play_notification_sound()
 
             while True:
+                choices = self.__get_choices(path, prediction)
+
+                question = select(
+                    "Select the desired option:",
+                    choices=choices,
+                    default=choices[0],
+                )
+
                 result = ask_question(question)
                 if result is None:
                     continue
@@ -285,7 +323,13 @@ class InteractiveLanguagePicker(LanguagePicker):
                                     logger.warning(cb_err_msg)
                                 # fall trough and run the loop again
                             case SelectedType.no_language:
-                                return None
+                                return Language.no_language()
+                            case SelectedType.unknown:
+                                return Language.get_default()
+                            case SelectedType.more:
+                                ##TODO: change settings
+                                pass
+                                # fall trough and run the loop again
                             case _:
                                 assert_never(manual_value.selected)
                     case "prediction_best":
