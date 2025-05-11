@@ -7,7 +7,16 @@ from logging import Logger
 from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
-from typing import Annotated, Any, Literal, Optional, Self, TypedDict, override
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Optional,
+    Self,
+    TypedDict,
+    assert_never,
+    override,
+)
 
 import psutil
 import torchaudio
@@ -208,7 +217,13 @@ class WAVFile:
             else _options
         )
 
-        match (self.__status, self.__type, force_recreation):
+        value: tuple[Status, FileType, bool] = (
+            self.__status,
+            self.__type,
+            force_recreation,
+        )
+
+        match value:
             case (Status.ready, _, False):
                 return False
             case (_, FileType.wav, _):
@@ -217,9 +232,8 @@ class WAVFile:
                 return self.__convert_to_wav(options, manager)
             case (_, _, True):
                 return self.__convert_to_wav(options, manager)
-            case _:  # stupid mypy
-                msg = "UNREACHABLE"
-                raise RuntimeError(msg)
+            case _:
+                assert_never(value)
 
     @property
     def status(self: Self) -> Status:
@@ -310,7 +324,8 @@ class WAVFile:
         return True
 
     def wav_path(self: Self) -> Path:
-        match (self.__status, self.__type):
+        value = (self.__status, self.__type)
+        match value:
             case (_, FileType.wav):
                 return self.__file
             case (Status.raw, _):
@@ -321,9 +336,8 @@ class WAVFile:
                     msg = "Not converted correctly, temp file is missing"
                     raise RuntimeError(msg)
                 return self.__tmp_file
-            case _:  # stupid mypy
-                msg = "UNREACHABLE"
-                raise RuntimeError(msg)
+            case _:
+                assert_never(value)
 
     def __del__(self: Self) -> None:
         if self.__tmp_file is not None and self.__tmp_file.exists():

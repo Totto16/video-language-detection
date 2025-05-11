@@ -1,4 +1,4 @@
-from typing import Annotated, cast
+from typing import Annotated, assert_never, cast
 
 from content.metadata.interfaces import (
     MissingProvider,
@@ -33,6 +33,8 @@ def __get_provider(config: MetadataConfig) -> Provider:
 
         case "none":
             return MissingProvider()
+        case _:
+            assert_never(config.type)
 
 
 def get_metadata_scanner_from_config(config: MetadataConfig) -> MetadataScanner:

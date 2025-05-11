@@ -4,7 +4,17 @@ from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Self, TypedDict, cast, override
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Optional,
+    Self,
+    TypedDict,
+    assert_never,
+    cast,
+    override,
+)
 
 import pyperclip
 from questionary import Choice, Question, Separator, select
@@ -276,9 +286,14 @@ class InteractiveLanguagePicker(LanguagePicker):
                                 # fall trough and run the loop again
                             case SelectedType.no_language:
                                 return None
+                            case _:
+                                assert_never(manual_value.selected)
                     case "prediction_best":
                         prediction_value = cast(PredictionBestSelectResult, result)
                         return prediction_value.value.language
+
+                    case _:
+                        assert_never(result.select_result_type)
 
 
 @dataclass

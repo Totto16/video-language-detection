@@ -61,6 +61,8 @@ if __name__ == "__main__":
                 scan_files(files)
             case "fix-chapter":
                 fix_chapters(files)
+            case _:
+                assert_never(args.subcommand)
 
     except KeyboardInterrupt:
 

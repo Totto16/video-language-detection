@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import reduce
 from math import floor
-from typing import Optional, Self, TypedDict
+from typing import Optional, Self, TypedDict, assert_never
 
 from content.language import Language
 
@@ -77,6 +77,8 @@ def get_mean(
                 new_values,
                 normalize_percents=normalize_percents,
             )
+        case _:
+            assert_never(mean_type)
 
 
 class Prediction:

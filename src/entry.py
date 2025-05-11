@@ -8,7 +8,7 @@ import re as regex
 import sys
 from logging import Logger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast, override
+from typing import TYPE_CHECKING, Any, Literal, Optional, Self, assert_never, cast, override
 
 from apischema import serialize
 from prompt_toolkit.key_binding import KeyBindings
@@ -404,6 +404,8 @@ def main() -> ExitCode:
                     logger,
                     cast(ConfigCheckCommandParsedArgNamespace, args),
                 )
+            case _:
+                assert_never(args.subcommand)
 
     except KeyboardInterrupt:
 

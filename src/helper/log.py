@@ -3,7 +3,7 @@ import os
 import sys
 from enum import Enum
 from logging import Logger, StreamHandler, getLogger
-from typing import Optional, Self
+from typing import Optional, Self, assert_never
 from warnings import filterwarnings
 
 import colorlog
@@ -27,9 +27,9 @@ class LogLevel(Enum):
 
         return None
 
-    @property
-    def underlying(self: Self) -> int:
-        match self:
+    @staticmethod
+    def __underlying_impl(value: "LogLevel") -> int:
+        match value:
             case LogLevel.CRITICAL:
                 return logging.CRITICAL
             case LogLevel.ERROR:
@@ -42,9 +42,12 @@ class LogLevel(Enum):
                 return logging.DEBUG
             case LogLevel.NOTSET:
                 return logging.NOTSET
-            case _:  # mypy is stupid in match statements :(
-                msg = "UNREACHABLE!"
-                raise RuntimeError(msg)
+            case _:
+                assert_never(value)
+
+    @property
+    def underlying(self: Self) -> int:
+        return LogLevel.__underlying_impl(self)
 
     def __str__(self: Self) -> str:
         return str(self.name).lower()
