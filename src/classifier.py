@@ -308,7 +308,8 @@ class WAVFile:
         try:
             ffmpeg_proc.execute()
         except FFmpegError:
-            logger.exception("FFmpeg exception")
+            msg = f"FFmpeg exception in file {self.__file.absolute()}"
+            logger.exception(msg)
             if bar is not None:
                 bar.close(clear=True)
             return False
