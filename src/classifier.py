@@ -35,6 +35,7 @@ from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
+from helper.result import Result
 from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
 from helper.translation import get_translator
 
@@ -109,6 +110,9 @@ class FileMetadataError(ValueError):
     pass
 
 
+InfoResult = Result[tuple[FileType, Status, Timestamp], str]
+
+
 class WAVFile:
     __tmp_file: Optional[Path]
     __file: Path
@@ -121,17 +125,17 @@ class WAVFile:
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
-        info, err = self.__get_info()
-        if info is None:
-            raise FileMetadataError(err)
-        _type, status, runtime = info
+        info = self.__get_info()
+        if info.is_err():
+            raise FileMetadataError(info.get_err())
+        _type, status, runtime = info.get_ok()
         self.__type = _type
         self.__status = status
         self.__runtime = runtime
 
     def __get_info(
         self: Self,
-    ) -> tuple[Optional[tuple[FileType, Status, Timestamp]], str]:
+    ) -> InfoResult:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
             with Path("error.log").open(mode="a") as f:
@@ -142,7 +146,7 @@ class WAVFile:
             )
             logger.error(err_msg)
 
-            return None, err_msg
+            return InfoResult.err(err_msg)
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
@@ -156,7 +160,7 @@ class WAVFile:
             duration = video_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return None, "No video duration was found"
+                    return InfoResult.err("No video duration was found")
 
                 duration = file_duration
 
@@ -165,15 +169,17 @@ class WAVFile:
 
             # only one audio stream supported atm
             if len(audio_streams) == 1:
-                return (
-                    FileType.video,
-                    Status.raw,
-                    Timestamp.from_seconds(duration),
-                ), ""
+                return InfoResult.ok(
+                    (
+                        FileType.video,
+                        Status.raw,
+                        Timestamp.from_seconds(duration),
+                    ),
+                )
 
             if len(audio_streams) == 0:
                 err_msg = "Got a Video with no Audio Stream, aborting"
-                return None, err_msg
+                return InfoResult.err(err_msg)
 
             msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting"
             raise RuntimeError(msg)
@@ -189,24 +195,28 @@ class WAVFile:
             duration = audio_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return None, "No audio duration was found"
+                    return InfoResult.err("No audio duration was found")
 
                 duration = file_duration
 
             if audio_streams[0].codec() == "pcm_s16le":
-                return (
-                    FileType.wav,
-                    Status.ready,
+                return InfoResult.ok(
+                    (
+                        FileType.wav,
+                        Status.ready,
+                        Timestamp.from_seconds(duration),
+                    ),
+                )
+
+            return InfoResult.ok(
+                (
+                    FileType.audio,
+                    Status.raw,
                     Timestamp.from_seconds(duration),
-                ), ""
+                ),
+            )
 
-            return (
-                FileType.audio,
-                Status.raw,
-                Timestamp.from_seconds(duration),
-            ), ""
-
-        return None, "Unknown media type, not video or audio"
+        return InfoResult.err("Unknown media type, not video or audio")
 
     @property
     def runtime(self: Self) -> Timestamp:
