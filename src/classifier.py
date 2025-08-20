@@ -148,9 +148,9 @@ class WAVFile:
 
         if metadata.is_video():
             video_streams = metadata.video_streams()
-            # multiple video makes no sense
-            if len(video_streams) > 1:
-                msg = "Multiple Video Streams are not supported"
+            # only one video stream supported
+            if len(video_streams) != 1:
+                msg = f"Only One Video Stream supported, but got {len(video_streams)}"
                 raise RuntimeError(msg)
 
             duration = video_streams[0].duration_seconds()
@@ -160,17 +160,31 @@ class WAVFile:
 
                 duration = file_duration
 
-            return (
-                FileType.video,
-                Status.raw,
-                Timestamp.from_seconds(duration),
-            ), ""
+            # check if we have enough audio streams
+            audio_streams = metadata.audio_streams()
+
+            # only one audio stream supported atm
+            if len(audio_streams) == 1:
+                return (
+                    FileType.video,
+                    Status.raw,
+                    Timestamp.from_seconds(duration),
+                ), ""
+
+            if len(audio_streams) == 0:
+                err_msg = "Got a Video with no Audio Stream, aborting"
+                return None, err_msg
+
+            msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting"
+            raise RuntimeError(msg)
 
         if metadata.is_audio():
             audio_streams = metadata.audio_streams()
-            # TODO: multiple audio streams can happen and shouldn't be a problem ! also every episode should hav an array of streams, with language etc!
-            if len(audio_streams) > 1:
-                return None, "multiple audio streams are not supported atm"
+
+            # only one audio stream supported atm
+            if len(audio_streams) != 1:
+                msg = f"Only One Audio Stream supported, but got {len(audio_streams)}"
+                raise RuntimeError(msg)
 
             duration = audio_streams[0].duration_seconds()
             if duration is None:
@@ -232,6 +246,7 @@ class WAVFile:
             case _:
                 assert_never(value[0])
                 assert_never(value[1])
+
     @property
     def status(self: Self) -> Status:
         return self.__status
@@ -271,30 +286,33 @@ class WAVFile:
         if self.__tmp_file.exists():
             self.__tmp_file.unlink(missing_ok=True)
 
-        ffmpeg_options: dict[str, Any] = {}
+        output_options: dict[str, Any] = {}
 
         if options.segment.start is not None and self.runtime >= options.segment.start:
-            ffmpeg_options["ss"] = str(options.segment.start)
+            output_options["ss"] = str(options.segment.start)
 
         # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
-        ffmpeg_options = {
-            **ffmpeg_options,
-            "acodec": "pcm_s16le",
+        output_options = {
+            **output_options,
+            # mapping options
+            "map": "0:a:0",  # first input stream -> audio -> first (audio) stream
+            # audio options
+            "codec:a": "pcm_s16le",
             "ar": options.bitrate,
-            "ac": 1,
-            "stats_period": 0.1,  # in seconds
+            "ac": 1,  # number of output channels
         }
 
         if options.segment.end is not None and self.runtime >= options.segment.end:
-            ffmpeg_options["to"] = str(options.segment.end)
+            output_options["to"] = str(options.segment.end)
 
         input_options: dict[str, Any] = {}
 
         ffmpeg_proc: FFmpeg = (
             FFmpeg()
             .option("y")
+            .option("stats_period", 0.1)  # in seconds
             .input(str(self.__file.absolute()), input_options)
-            .output(str(self.__tmp_file.absolute()), ffmpeg_options)
+            .output(str(self.__tmp_file.absolute()), output_options)
         )
 
         def progress_report(progress: Progress) -> None:
@@ -940,8 +958,11 @@ class Classifier:
 
         for segment, scanned_length in segments:
             local_prediction = self.__classify(wav_file, segment, manager)
-            if local_prediction is not None:
-                prediction += local_prediction
+
+            if local_prediction is None:
+                return PredictionFail(PredictionFailReason.no_best_available, best=None)
+
+            prediction += local_prediction
 
             if bar is not None:
                 bar.update()
