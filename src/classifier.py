@@ -1,5 +1,6 @@
 import gc
 import re
+import tempfile
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
@@ -52,8 +53,11 @@ _ = get_translator()
 VOXLINGUA_SAMPLE_COUNT: int = 107
 
 
+class WavFile:
+    pass
+
+
 class FileType(Enum):
-    wav = "wav"
     video = "video"
     audio = "audio"
 
@@ -64,19 +68,29 @@ class FileType(Enum):
         return str(self)
 
 
-class Status(Enum):
+class ConversionStatus(Enum):
     ready = "ready"
     raw = "raw"
 
     def __str__(self: Self) -> str:
-        return f"<Status: {self.name}>"
+        return f"<ConversionStatus: {self.name}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
 
 
 @dataclass
+class FileAnnotation:
+    type: FileType
+    status: ConversionStatus
+
+
+type FileStatus = WavFile | FileAnnotation
+
+
+@dataclass
 class Segment:
+    index: int
     start: Optional[Timestamp]
     end: Optional[Timestamp]
 
@@ -110,32 +124,80 @@ class FileMetadataError(ValueError):
     pass
 
 
-InfoResult = Result[tuple[FileType, Status, Timestamp], str]
+class OriginalWavFileManager(AbstractContextManager[Path]):
+    __file: Path
+
+    def __init__(self: Self, file: Path) -> None:
+        self.__file = file
+
+    @override
+    def __enter__(self: Self) -> Path:
+        return self.__file
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        return False
+
+
+class GeneratedWavFileManager(AbstractContextManager[Path]):
+    __file: Path
+    __released: bool
+
+    def __init__(self: Self, file: Path) -> None:
+        self.__file = file
+        self.__released = False
+
+    @override
+    def __enter__(self: Self) -> Path:
+        return self.__file
+
+    def release(self: Self) -> "GeneratedWavFileManager":
+        self.__released = True
+        return GeneratedWavFileManager(self.__file)
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        if self.__released:
+            return False
+
+        if self.__file.exists():
+            self.__file.unlink(missing_ok=True)
+        return False
+
+
+WAVFile__InfoResult = Result[tuple[FileStatus, Timestamp], str]
+WavFile__WavFileResult = Result[AbstractContextManager[Path], tuple[()]]
 
 
 class WAVFile:
-    __tmp_file: Optional[Path]
     __file: Path
-    __type: FileType
-    __status: Status
+    __status: FileStatus
     __runtime: Timestamp
 
     def __init__(self: Self, file: Path) -> None:
-        self.__tmp_file = None
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
         info = self.__get_info()
         if info.is_err():
             raise FileMetadataError(info.get_err())
-        _type, status, runtime = info.get_ok()
-        self.__type = _type
+        status, runtime = info.get_ok()
         self.__status = status
         self.__runtime = runtime
 
     def __get_info(
         self: Self,
-    ) -> InfoResult:
+    ) -> WAVFile__InfoResult:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
             with Path("error.log").open(mode="a") as f:
@@ -146,7 +208,7 @@ class WAVFile:
             )
             logger.error(err_msg)
 
-            return InfoResult.err(err_msg)
+            return WAVFile__InfoResult.err(err_msg)
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
@@ -160,7 +222,7 @@ class WAVFile:
             duration = video_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return InfoResult.err("No video duration was found")
+                    return WAVFile__InfoResult.err("No video duration was found")
 
                 duration = file_duration
 
@@ -169,17 +231,18 @@ class WAVFile:
 
             # only one audio stream supported atm
             if len(audio_streams) == 1:
-                return InfoResult.ok(
+                return WAVFile__InfoResult.ok(
                     (
-                        FileType.video,
-                        Status.raw,
+                        FileAnnotation(
+                            type=FileType.video, status=ConversionStatus.raw,
+                        ),
                         Timestamp.from_seconds(duration),
                     ),
                 )
 
             if len(audio_streams) == 0:
                 err_msg = "Got a Video with no Audio Stream, aborting"
-                return InfoResult.err(err_msg)
+                return WAVFile__InfoResult.err(err_msg)
 
             msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting"
             raise RuntimeError(msg)
@@ -195,28 +258,26 @@ class WAVFile:
             duration = audio_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return InfoResult.err("No audio duration was found")
+                    return WAVFile__InfoResult.err("No audio duration was found")
 
                 duration = file_duration
 
             if audio_streams[0].codec() == "pcm_s16le":
-                return InfoResult.ok(
+                return WAVFile__InfoResult.ok(
                     (
-                        FileType.wav,
-                        Status.ready,
+                        WavFile(),
                         Timestamp.from_seconds(duration),
                     ),
                 )
 
-            return InfoResult.ok(
+            return WAVFile__InfoResult.ok(
                 (
-                    FileType.audio,
-                    Status.raw,
+                    FileAnnotation(type=FileType.audio, status=ConversionStatus.raw),
                     Timestamp.from_seconds(duration),
                 ),
             )
 
-        return InfoResult.err("Unknown media type, not video or audio")
+        return WAVFile__InfoResult.err("Unknown media type, not video or audio")
 
     @property
     def runtime(self: Self) -> Timestamp:
@@ -224,48 +285,47 @@ class WAVFile:
 
     def create_wav_file(
         self: Self,
-        _options: Optional[WAVOptions] = None,
+        options: WAVOptions,
         *,
         force_recreation: bool = False,
         manager: Optional[Manager] = None,
-    ) -> bool:
-        options: WAVOptions = (
-            WAVOptions(
-                bitrate=16000,
-                segment=Segment(
-                    start=None,
-                    end=Timestamp.from_minutes(10.0),
-                ),
-            )
-            if _options is None
-            else _options
-        )
+    ) -> WavFile__WavFileResult:
 
         if force_recreation:
             return self.__convert_to_wav(options, manager)
 
-        value: tuple[Status, FileType] = (self.__status, self.__type)
-
-        match value:
-            case (Status.ready, _):
-                return False
-            case (_, FileType.wav):
-                return False
-            case (Status.raw, _):
-                return self.__convert_to_wav(options, manager)
+        match self.__status:
+            case WavFile():
+                return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
+            case FileAnnotation(_, status):
+                match status:
+                    case ConversionStatus.ready:
+                        msg = "File already converted"
+                        raise RuntimeError(msg)
+                    case ConversionStatus.raw:
+                        return self.__convert_to_wav(options, manager)
             case _:
-                assert_never(value[0])
-                assert_never(value[1])
+                assert_never(self.__status)
 
-    @property
-    def status(self: Self) -> Status:
-        return self.__status
+    def __get_temp_file_manager(self: Self, index: int) -> GeneratedWavFileManager:
+        tmp_file_managed = tempfile.NamedTemporaryFile(  # noqa: SIM115
+            delete=False,
+            suffix=f".{self.__file.stem}_{index}.wav",
+        )
+
+        tmp_file_path = Path(tmp_file_managed.name)
+        tmp_file_managed.close()
+
+        return GeneratedWavFileManager(tmp_file_path)
 
     def __convert_to_wav(
         self: Self,
         options: WAVOptions,
         manager: Optional[Manager] = None,
-    ) -> bool:
+    ) -> WavFile__WavFileResult:
+        if isinstance(self.__status, WavFile):
+            return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
+
         bar: Optional[Any] = None
 
         if not options.segment.is_valid:
@@ -287,88 +347,71 @@ class WAVFile:
             )
             bar.update(Timestamp.zero(), force=True)
 
-        temp_dir: Path = Path("/tmp") / "video_lang_detect"  # noqa: S108
-        if not temp_dir.exists():
-            temp_dir.mkdir(parents=True)
+        wav_manager = self.__get_temp_file_manager(options.segment.index)
 
-        self.__tmp_file = temp_dir / (self.__file.stem + ".wav")
+        with wav_manager as tmp_file:
 
-        if self.__tmp_file.exists():
-            self.__tmp_file.unlink(missing_ok=True)
+            output_options: dict[str, Any] = {}
 
-        output_options: dict[str, Any] = {}
+            if (
+                options.segment.start is not None
+                and self.runtime >= options.segment.start
+            ):
+                output_options["ss"] = str(options.segment.start)
 
-        if options.segment.start is not None and self.runtime >= options.segment.start:
-            output_options["ss"] = str(options.segment.start)
+            # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
+            output_options = {
+                **output_options,
+                # mapping options
+                "map": "0:a:0",  # first input stream -> audio -> first (audio) stream
+                # audio options
+                "codec:a": "pcm_s16le",
+                "ar": options.bitrate,
+                "ac": 1,  # number of output channels
+            }
 
-        # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
-        output_options = {
-            **output_options,
-            # mapping options
-            "map": "0:a:0",  # first input stream -> audio -> first (audio) stream
-            # audio options
-            "codec:a": "pcm_s16le",
-            "ar": options.bitrate,
-            "ac": 1,  # number of output channels
-        }
+            if options.segment.end is not None and self.runtime >= options.segment.end:
+                output_options["to"] = str(options.segment.end)
 
-        if options.segment.end is not None and self.runtime >= options.segment.end:
-            output_options["to"] = str(options.segment.end)
+            input_options: dict[str, Any] = {}
 
-        input_options: dict[str, Any] = {}
+            ffmpeg_proc: FFmpeg = (
+                FFmpeg()
+                .option("y")
+                .option("stats_period", 0.1)  # in seconds
+                .input(str(self.__file.absolute()), input_options)
+                .output(str(tmp_file.absolute()), output_options)
+            )
 
-        ffmpeg_proc: FFmpeg = (
-            FFmpeg()
-            .option("y")
-            .option("stats_period", 0.1)  # in seconds
-            .input(str(self.__file.absolute()), input_options)
-            .output(str(self.__tmp_file.absolute()), output_options)
-        )
+            def progress_report(progress: Progress) -> None:
+                nonlocal elapsed_time
+                if bar is not None:
+                    delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
+                    bar.update(delta_time)
+                    elapsed_time += progress.time
 
-        def progress_report(progress: Progress) -> None:
-            nonlocal elapsed_time
-            if bar is not None:
-                delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
-                bar.update(delta_time)
-                elapsed_time += progress.time
+            ffmpeg_proc.on("progress", progress_report)
+            try:
+                ffmpeg_proc.execute()
+            except FFmpegError:
+                msg = f"FFmpeg exception in file {self.__file.absolute()}"
+                logger.exception(msg)
+                if bar is not None:
+                    bar.close(clear=True)
+                return WavFile__WavFileResult.err(error=())
 
-        ffmpeg_proc.on("progress", progress_report)
-        try:
-            ffmpeg_proc.execute()
-        except FFmpegError:
-            msg = f"FFmpeg exception in file {self.__file.absolute()}"
-            logger.exception(msg)
+            match self.__status:
+                case FileAnnotation(type_, _):
+                    self.__status = FileAnnotation(
+                        type=type_, status=ConversionStatus.ready,
+                    )
+                case _:
+                    assert_never(self.__status)
+
             if bar is not None:
                 bar.close(clear=True)
-            return False
 
-        self.__status = Status.ready
-
-        if bar is not None:
-            bar.close(clear=True)
-
-        return True
-
-    def wav_path(self: Self) -> Path:
-        value = (self.__status, self.__type)
-        match value:
-            case (_, FileType.wav):
-                return self.__file
-            case (Status.raw, _):
-                msg = "Not converted"
-                raise RuntimeError(msg)
-            case (Status.ready, _):
-                if self.__tmp_file is None:
-                    msg = "Not converted correctly, temp file is missing"
-                    raise RuntimeError(msg)
-                return self.__tmp_file
-            case _:
-                assert_never(value[0])
-                assert_never(value[1])
-
-    def __del__(self: Self) -> None:
-        if self.__tmp_file is not None and self.__tmp_file.exists():
-            self.__tmp_file.unlink(missing_ok=True)
+            return WavFile__WavFileResult.ok(wav_manager.release())
 
 
 def has_enough_memory() -> tuple[bool, float, float]:
@@ -880,38 +923,40 @@ class Classifier:
         segment: Segment,
         manager: Optional[Manager] = None,
     ) -> Optional[Prediction]:
-        result: bool = wav_file.create_wav_file(
+        result: WavFile__WavFileResult = wav_file.create_wav_file(
             WAVOptions(bitrate=16000, segment=segment),
             force_recreation=True,
             manager=manager,
         )
 
-        if not result and wav_file.status != Status.ready:
+        if result.is_err():
             return None
 
-        # TODO: say to the manager, that we try to use the gpu, so that if we switched to the cpu in the previous run, it maybe now has enough gpu memory to switch back
+        with result.get_ok() as wav_path:
 
-        while not self.__manager.failed_too_often:
-            with self.__manager.retry_manager():
-                classifier_result = self.__manager.perform_classification(
-                    wav_file.wav_path(),
-                    self.__save_dir,
-                )
+            # TODO: say to the manager, that we try to use the gpu, so that if we switched to the cpu in the previous run, it maybe now has enough gpu memory to switch back
 
-                # NOTE:  ATTENTION - unsorted list
-                prob: list[tuple[float, Language]] = [
-                    (
-                        p,
-                        Language.from_str_unsafe(
-                            language_str,
-                        ),
+            while not self.__manager.failed_too_often:
+                with self.__manager.retry_manager():
+                    classifier_result = self.__manager.perform_classification(
+                        wav_path,
+                        self.__save_dir,
                     )
-                    for language_str, p in classifier_result
-                ]
 
-                return Prediction(prob)
+                    # NOTE:  ATTENTION - unsorted list
+                    prob: list[tuple[float, Language]] = [
+                        (
+                            p,
+                            Language.from_str_unsafe(
+                                language_str,
+                            ),
+                        )
+                        for language_str, p in classifier_result
+                    ]
 
-        return None
+                    return Prediction(prob)
+
+            return None
 
     def predict(
         self: Self,
@@ -927,13 +972,19 @@ class Classifier:
             result: list[tuple[Segment, Timestamp]] = []
             current_timestamp: Timestamp = Timestamp.zero()
 
+            index: int = 0
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
                     if current_timestamp + self.__options.segment_length > runtime
                     else current_timestamp + self.__options.segment_length
                 )
-                segment: Segment = Segment(current_timestamp, end)
+                segment: Segment = Segment(
+                    index=index,
+                    start=current_timestamp,
+                    end=end,
+                )
+                index = index + 1
                 result.append((segment, end if end is not None else runtime))
                 # ATTENTION: don't use +=, since that doesn't create a new object!
                 current_timestamp = current_timestamp + self.__options.segment_length
