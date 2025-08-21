@@ -234,17 +234,18 @@ class WAVFile:
                 return WAVFile__InfoResult.ok(
                     (
                         FileAnnotation(
-                            type=FileType.video, status=ConversionStatus.raw,
+                            type=FileType.video,
+                            status=ConversionStatus.raw,
                         ),
                         Timestamp.from_seconds(duration),
                     ),
                 )
 
             if len(audio_streams) == 0:
-                err_msg = "Got a Video with no Audio Stream, aborting"
+                err_msg = f"Got a Video with no Audio Stream, aborting: '{self.__file}'"
                 return WAVFile__InfoResult.err(err_msg)
 
-            msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting"
+            msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting: '{self.__file}'"
             raise RuntimeError(msg)
 
         if metadata.is_audio():
@@ -252,7 +253,7 @@ class WAVFile:
 
             # only one audio stream supported atm
             if len(audio_streams) != 1:
-                msg = f"Only One Audio Stream supported, but got {len(audio_streams)}"
+                msg = f"Only One Audio Stream supported, but got {len(audio_streams)}: '{self.__file}'"
                 raise RuntimeError(msg)
 
             duration = audio_streams[0].duration_seconds()
@@ -403,7 +404,8 @@ class WAVFile:
             match self.__status:
                 case FileAnnotation(type_, _):
                     self.__status = FileAnnotation(
-                        type=type_, status=ConversionStatus.ready,
+                        type=type_,
+                        status=ConversionStatus.ready,
                     )
                 case _:
                     assert_never(self.__status)
