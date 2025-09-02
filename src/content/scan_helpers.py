@@ -48,49 +48,49 @@ def content_from_scan(
         if len(parents) == 4:
             if file_type == ScannedFileType.folder:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting 4 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting 4: '{file_path}",
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting 3: '{file_path}",
                 )
 
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting 3 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting 3: '{file_path}",
                 )
 
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting: 2: '{file_path}",
                 )
 
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting: 2 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting: 2: '{file_path}",
                 )
 
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting: 1: '{file_path}",
                 )
 
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and top_is_collection:
             if file_type == ScannedFileType.file:
                 raise_inner(
-                    f"Not expected file type {file_type} with the received nesting: 1 - {file_path}!",
+                    f"Not expected file type {file_type} with the received nesting: 1: '{file_path}",
                 )
 
             return CollectionContent.from_path(file_path, scanned_file)
