@@ -26,8 +26,8 @@ templates:
                 - mp4
                 - mkv
                 - avi
-            trailer:
-                - tvshow-trailer.mp4
+            trailer_names:
+                - tvshow-trailer
             ignore_files:
                 - metadata
                 - extrafanart

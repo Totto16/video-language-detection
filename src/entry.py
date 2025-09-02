@@ -153,7 +153,7 @@ def launch_tui(logger: Logger, config: FinalConfig) -> None:
         {
             "ignore_files": config.parser.ignore_files,
             "video_formats": config.parser.video_formats,
-            "trailer": config.parser.trailer,
+            "trailer_names": config.parser.trailer_names,
             "parse_error_is_exception": config.parser.exception_on_error,
         },
         config.general.target_file,

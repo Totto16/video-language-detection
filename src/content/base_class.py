@@ -354,6 +354,7 @@ class Content:
         *,
         handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
+        trailer_names: list[str],  # noqa: ARG002
         rescan: bool = False,  # noqa: ARG002
     ) -> None:
         raise MissingOverrideError
@@ -365,6 +366,7 @@ def process_folder(
     *,
     handles: HandlesType,
     parent_folders: list[str],
+    trailer_names: list[str],
     parent_type: Optional[ContentType] = None,
     rescan: Optional[list[Content]] = None,
 ) -> list[Content]:
@@ -397,6 +399,7 @@ def process_folder(
                 file_type,
                 handles,
                 parent_folders_temp,
+                trailer_names=trailer_names,
             )
             value = (
                 result.type if result is not None else None,
@@ -428,6 +431,7 @@ def process_folder(
             file_type,
             handles,
             parent_folders_temp,
+            trailer_names=trailer_names,
             rescan=is_rescan,
         )
 

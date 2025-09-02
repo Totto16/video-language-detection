@@ -40,7 +40,7 @@ _ = get_translator()
 class ContentOptions(TypedDict):
     ignore_files: list[str]
     video_formats: list[str]
-    trailer: list[str]
+    trailer_names: list[str]
     parse_error_is_exception: bool
 
 
@@ -115,14 +115,16 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         handles: HandlesType,
         parent_folders: list[str],
         *,
+        trailer_names: list[str],
         rescan: Optional[Content] = None,
     ) -> Optional[Content]:
         if rescan is None:
             content: Optional[Content] = content_from_scan(
                 file_path,
                 file_type,
-                parent_folders,
+                parent_folders=parent_folders,
                 name_parser=self.__name_parser,
+                trailer_names=trailer_names,
             )
             if content is None:
                 if self.__options["parse_error_is_exception"]:
@@ -137,6 +139,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
                 callback=self,
                 handles=handles,
                 parent_folders=parent_folders,
+                trailer_names=trailer_names,
             )
 
             return content
@@ -146,6 +149,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             handles=handles,
             parent_folders=parent_folders,
             rescan=True,
+            trailer_names=trailer_names,
         )
 
         return None
@@ -280,6 +284,7 @@ def parse_contents(
             callback=callback,
             handles=[],
             parent_folders=[],
+            trailer_names=options["trailer_names"],
         )
 
         save_to_file(save_file, contents)
@@ -293,6 +298,7 @@ def parse_contents(
         handles=[],
         rescan=contents,
         parent_folders=[],
+        trailer_names=options["trailer_names"],
     )
 
     save_to_file(save_file, new_contents)

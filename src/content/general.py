@@ -272,6 +272,7 @@ class Callback[C, CT, RT]:
         handles: HandlesType,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         *,
+        trailer_names: list[str],  # noqa: ARG002
         rescan: Optional[C] = None,  # noqa: ARG002
     ) -> Optional[C]:
         return None

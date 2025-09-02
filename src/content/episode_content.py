@@ -129,6 +129,7 @@ class EpisodeContent(Content):
         *,
         handles: HandlesType,
         parent_folders: list[str],
+        trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
         manager, scanner, language_picker = callback.get_saved()

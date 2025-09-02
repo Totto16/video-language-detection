@@ -40,7 +40,7 @@ class ParserConfig:
         default_factory=list,
         metadata=schema(min_items=1, unique=True),
     )
-    trailer: list[str] = field(
+    trailer_names: list[str] = field(
         default_factory=list,
         metadata=schema(),
     )
@@ -59,7 +59,7 @@ class ParserConfigParsed:
         default_factory=list,
         metadata=schema(min_items=1, unique=True),
     )
-    trailer: list[str] = field(
+    trailer_names: list[str] = field(
         default_factory=list,
         metadata=schema(),
     )
@@ -201,7 +201,7 @@ class Config:
                 root_folder=Path.cwd(),
                 special=[],
                 video_formats=["mp4"],
-                trailer=[],
+                trailer_names=[],
                 ignore_files=[],
                 exception_on_error=True,
             ),
@@ -233,7 +233,7 @@ class Config:
                     else defaults.parser.special
                 ),
                 video_formats=config.parser.video_formats,
-                trailer=config.parser.trailer,
+                trailer_names=config.parser.trailer_names,
                 ignore_files=config.parser.ignore_files,
                 exception_on_error=(
                     config.parser.exception_on_error
@@ -376,7 +376,7 @@ class AdvancedConfig:
                     else defaults.parser.special
                 ),
                 video_formats=template.parser.video_formats,
-                trailer=template.parser.trailer,
+                trailer_names=template.parser.trailer_names,
                 ignore_files=template.parser.ignore_files,
                 exception_on_error=(
                     template.parser.exception_on_error

@@ -133,6 +133,7 @@ class SeasonContent(Content):
         *,
         handles: HandlesType,
         parent_folders: list[str],
+        trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
         _, scanner, _ = callback.get_saved()
@@ -162,6 +163,7 @@ class SeasonContent(Content):
                 handles=new_handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
+                trailer_names=trailer_names,
             )
             for content in contents:
                 if isinstance(content, EpisodeContent):
@@ -193,6 +195,7 @@ class SeasonContent(Content):
             handles=new_handles,
             parent_folders=[*parent_folders, self.scanned_file.path.name],
             parent_type=self.type,
+            trailer_names=trailer_names,
             rescan=cast(list[Content], self.__episodes),
         )
 

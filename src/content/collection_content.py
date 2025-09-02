@@ -67,6 +67,7 @@ class CollectionContent(Content):
         *,
         handles: HandlesType,
         parent_folders: list[str],
+        trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
         if not rescan:
@@ -76,6 +77,7 @@ class CollectionContent(Content):
                 handles=handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
                 parent_type=self.type,
+                trailer_names=trailer_names,
             )
             for content in contents:
                 if isinstance(content, SeriesContent):
@@ -91,6 +93,7 @@ class CollectionContent(Content):
                 callback=callback,
                 handles=handles,
                 parent_folders=[*parent_folders, self.scanned_file.path.name],
+                trailer_names=trailer_names,
                 parent_type=self.type,
                 rescan=cast(list[Content], self.__series),
             )

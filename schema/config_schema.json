@@ -98,7 +98,7 @@
                     "uniqueItems": true,
                     "default": []
                 },
-                "trailer": {
+                "trailer_names": {
                     "type": "array",
                     "items": {
                         "type": "string"

@@ -20,11 +20,19 @@ from helper.log import get_logger
 logger: Logger = get_logger()
 
 
+def is_trailer_file(file_path: Path, *, trailer_names: list[str]) -> bool:
+    name = file_path.stem
+
+    return name in trailer_names
+
+
 def content_from_scan(
     file_path: Path,
     file_type: ScannedFileType,
+    *,
     parent_folders: list[str],
     name_parser: NameParser,
+    trailer_names: list[str],
 ) -> Optional[Content]:
     scanned_file: ScannedFile = ScannedFile.from_scan(
         file_path,
@@ -47,6 +55,7 @@ def content_from_scan(
     try:
         if len(parents) == 4:
             if file_type == ScannedFileType.folder:
+                # folder in collection / series / season
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting 4: '{file_path}",
                 )
@@ -54,6 +63,7 @@ def content_from_scan(
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and not top_is_collection:
             if file_type == ScannedFileType.folder:
+                # folder in series / season
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting 3: '{file_path}",
                 )
@@ -61,6 +71,10 @@ def content_from_scan(
             return EpisodeContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 3 and top_is_collection:
             if file_type == ScannedFileType.file:
+                # file in collection / series
+                if is_trailer_file(file_path, trailer_names=trailer_names):
+                    return None
+
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting 3: '{file_path}",
                 )
@@ -68,6 +82,10 @@ def content_from_scan(
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and not top_is_collection:
             if file_type == ScannedFileType.file:
+                # file in series
+                if is_trailer_file(file_path, trailer_names=trailer_names):
+                    return None
+
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 2: '{file_path}",
                 )
@@ -75,6 +93,7 @@ def content_from_scan(
             return SeasonContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 2 and top_is_collection:
             if file_type == ScannedFileType.file:
+                # file in collection
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 2: '{file_path}",
                 )
@@ -82,6 +101,7 @@ def content_from_scan(
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and not top_is_collection:
             if file_type == ScannedFileType.file:
+                # file in root
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 1: '{file_path}",
                 )
@@ -89,6 +109,7 @@ def content_from_scan(
             return SeriesContent.from_path(file_path, scanned_file, name_parser)
         if len(parents) == 1 and top_is_collection:
             if file_type == ScannedFileType.file:
+                # file in root
                 raise_inner(
                     f"Not expected file type {file_type} with the received nesting: 1: '{file_path}",
                 )
