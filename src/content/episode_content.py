@@ -152,10 +152,12 @@ class EpisodeContent(Content):
                     if Language.is_default_value(
                         self.__language,
                     ) and scanner.should_scan_language(ScanType.rescan):
-                        self.__language = scanner.language_scanner.get_language_or_default(
-                            self.scanned_file,
-                            language_picker,
-                            manager=manager,
+                        self.__language = (
+                            scanner.language_scanner.get_language_or_default(
+                                self.scanned_file,
+                                language_picker,
+                                manager=manager,
+                            )
                         )
 
                     callback.progress(
@@ -215,6 +217,9 @@ class EpisodeContent(Content):
                 language_picker,
                 manager=manager,
             )
+        else:
+            # reset the language, when the file changes
+            self.__language = Language.get_default()
 
         callback.progress(
             self.scanned_file.path.name,
@@ -235,6 +240,9 @@ class EpisodeContent(Content):
                 season_handle,
                 self.description.episode,
             )
+        else:
+            # don't need new metadata for changed files
+            pass
 
         callback.progress(
             self.scanned_file.path.name,
