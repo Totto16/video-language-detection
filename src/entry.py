@@ -8,7 +8,16 @@ import re as regex
 import sys
 from logging import Logger
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Optional, Self, assert_never, cast, override
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Optional,
+    Self,
+    assert_never,
+    cast,
+    override,
+)
 
 from apischema import serialize
 from prompt_toolkit.key_binding import KeyBindings
@@ -144,6 +153,7 @@ def launch_tui(logger: Logger, config: FinalConfig) -> None:
         {
             "ignore_files": config.parser.ignore_files,
             "video_formats": config.parser.video_formats,
+            "trailer": config.parser.trailer,
             "parse_error_is_exception": config.parser.exception_on_error,
         },
         config.general.target_file,

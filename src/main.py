@@ -40,6 +40,7 @@ _ = get_translator()
 class ContentOptions(TypedDict):
     ignore_files: list[str]
     video_formats: list[str]
+    trailer: list[str]
     parse_error_is_exception: bool
 
 
