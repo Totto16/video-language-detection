@@ -122,6 +122,10 @@ class EpisodeContent(Content):
 
         return (handles[0], handles[1])
 
+    def __reset_metadata_of_file(self: Self) -> None:
+        self.__language = Language.get_default()
+        # note, reset other metadata here, once new one is added
+
     @override
     def scan(
         self: Self,
@@ -142,8 +146,7 @@ class EpisodeContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
 
             if is_outdated:
-                # reset the language, when the file changes
-                self.__language = Language.get_default()
+                self.__reset_metadata_of_file()
             else:
                 if Language.is_default_value(self.__language) or self._metadata is None:
                     callback.start(
@@ -223,8 +226,7 @@ class EpisodeContent(Content):
                 manager=manager,
             )
         else:
-            # reset the language, when the file changes
-            self.__language = Language.get_default()
+            self.__reset_metadata_of_file()
 
         callback.progress(
             self.scanned_file.path.name,
