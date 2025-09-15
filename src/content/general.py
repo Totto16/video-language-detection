@@ -176,7 +176,7 @@ class Stats:
             with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)
             return with_checksum.checksum != self.checksum
 
-        msg = "Outdated state fpr directories is not correctly reported by mtime or similar stats, so it isn't possible"
+        msg = "Outdated state for directories is not correctly reported by mtime or similar stats, so it isn't possible"
         raise RuntimeError(msg)
 
 
