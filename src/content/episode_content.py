@@ -144,10 +144,7 @@ class EpisodeContent(Content):
 
         if rescan:
             is_outdated: bool = self.scanned_file.is_outdated(manager)
-
-            if is_outdated:
-                self.__reset_metadata_of_file()
-            else:
+            if not is_outdated:
                 if Language.is_default_value(self.__language) or self._metadata is None:
                     callback.start(
                         (2, 2, 0),
@@ -203,7 +200,7 @@ class EpisodeContent(Content):
                     )
                 return
 
-            return
+            self.__reset_metadata_of_file()
 
         callback.start(
             (3, 3, 0),
