@@ -4,6 +4,12 @@
             "$ref": "#/$defs/Config"
         },
         {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/Config"
+            }
+        },
+        {
             "$ref": "#/$defs/ConfigTemplate"
         }
     ],
@@ -11,6 +17,9 @@
         "Config": {
             "type": "object",
             "properties": {
+                "config_name": {
+                    "type": "string"
+                },
                 "general": {
                     "$ref": "#/$defs/GeneralConfig"
                 },
@@ -60,6 +69,9 @@
                     "$ref": "#/$defs/KeyBoardConfig"
                 }
             },
+            "required": [
+                "config_name"
+            ],
             "additionalProperties": false
         },
         "GeneralConfig": {
@@ -837,8 +849,18 @@
         "ConfigTemplates": {
             "type": "object",
             "properties": {
-                "default": {
-                    "$ref": "#/$defs/Config"
+                "defaults": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/$defs/Config"
+                            }
+                        },
+                        {
+                            "$ref": "#/$defs/Config"
+                        }
+                    ]
                 },
                 "names": {
                     "type": "object",
@@ -869,7 +891,7 @@
                 }
             },
             "required": [
-                "default",
+                "defaults",
                 "names"
             ],
             "additionalProperties": false
