@@ -1,0 +1,10 @@
+make sha256 of file fixed, so that renames are NOT allowed!
+
+- scan video details, and refresh on chnages, e.g. 190*1080 and audio tyope and quality, sub tracks and other possible things, multipel audios etc
+- have 16/9 (Aspect ratio) and p, alias 1080p or something else
+- see tinymedia manager. has xxxp (1080p), aspect ratio (16:9) vide codec, e.g. h264, video bitrate, audio, aac 2ch,  file size
+
+
+ -have "linked" content and normal conmtent, normal content is everything, linked is schlefaz, that has auto mainatin link basaed on sha256sum, figure out how to do that and also conan, mappings from 1110 to s32e01 and also the same with schlefaz, make special catergory for tataort, as that require special things!
+
+- deduplciate schlefaz and conan!
