@@ -23,6 +23,7 @@ from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.constants import APP_NAME
+from helper.python import protected
 from helper.translation import get_translator
 from helper.types import assert_never
 
@@ -233,6 +234,11 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__status_bar.update(stage=_("finished"))
         self.__manager.stop()
 
+    @property
+    @protected
+    def name_parser(self: Self) -> NameParser:
+        return self.__name_parser
+
 
 class NormalContentCallback(ContentCallback):
     @override
@@ -251,7 +257,7 @@ class NormalContentCallback(ContentCallback):
                 file_path,
                 file_type,
                 parent_folders=parent_folders,
-                name_parser=self.__name_parser,
+                name_parser=self.name_parser,
                 trailer_names=trailer_names,
             )
             if content is None:
