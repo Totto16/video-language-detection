@@ -239,6 +239,11 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     def name_parser(self: Self) -> NameParser:
         return self.__name_parser
 
+    @property
+    @protected
+    def options(self: Self) -> ContentOptions:
+        return self.__options
+
 
 class NormalContentCallback(ContentCallback):
     @override
@@ -261,7 +266,7 @@ class NormalContentCallback(ContentCallback):
                 trailer_names=trailer_names,
             )
             if content is None:
-                if self.__options["parse_error_is_exception"]:
+                if self.options["parse_error_is_exception"]:
                     msg = _("Parse Error: Couldn't parse content from '{file}'").format(
                         file=file_path,
                     )
