@@ -23,7 +23,6 @@ from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.constants import APP_NAME
-from helper.python import protected
 from helper.translation import get_translator
 from helper.types import assert_never
 
@@ -235,12 +234,10 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
     @property
-    @protected
     def name_parser(self: Self) -> NameParser:
         return self.__name_parser
 
     @property
-    @protected
     def options(self: Self) -> ContentOptions:
         return self.__options
 
