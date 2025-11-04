@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Optional, Self
 
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
-from apischema.metadata import none_as_undefined
+from apischema.metadata import none_as_undefined, required
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
 from classifier import ClassifierOptionsConfig
@@ -166,8 +166,7 @@ logger: Logger = get_logger()
 
 
 @dataclass
-class Config:
-    config_name: str
+class ConfigGeneric:
     general: Annotated[Optional[GeneralConfig], OneOf] = field(
         default=None,
         metadata=none_as_undefined,
@@ -290,6 +289,16 @@ class Config:
         return results
 
 
+@dataclass
+class TemplateConfig(ConfigGeneric):
+    pass
+
+
+@dataclass
+class Config(ConfigGeneric):
+    config_name: str = field(metadata=required, default="<ERROR>")
+
+
 UseFromCLI = Annotated[
     Literal[True],
     schema(description="Get the name of the config template to use from the cli"),
@@ -304,7 +313,7 @@ class ConfigTemplateSettings:
 @dataclass
 class ConfigTemplates:
     defaults: list[Config] | Config
-    names: dict[str, Config]
+    names: dict[str, TemplateConfig]
     use: Optional[str | UseFromCLI] = field(
         default=None,
         metadata=none_as_undefined,
@@ -380,12 +389,12 @@ class AdvancedConfig:
     @staticmethod
     def __merge_templates(
         defaults_raw: list[FinalConfig],
-        template: Config,
+        template: TemplateConfig,
     ) -> AdvancedConfig__MergeResult:
 
         def merge_template(
             default_raw: FinalConfig,
-            template: Config,
+            template: TemplateConfig,
         ) -> Optional[FinalConfig]:
             defaults = default_raw
 
@@ -461,11 +470,11 @@ class AdvancedConfig:
         return AdvancedConfig__MergeResult.ok(results)
 
     @staticmethod
-    def __resolve_config_to_use(
+    def __resolve_template_to_use(
         templates: ConfigTemplates,
         cli_name_to_use: Optional[str],
-    ) -> tuple[Config, str]:
-        all_names: dict[str, Config] = templates.names
+    ) -> tuple[TemplateConfig, str]:
+        all_names: dict[str, TemplateConfig] = templates.names
         if len(all_names) == 0:
             msg = "No template defined, define at least one template"
             raise TypeError(msg)
@@ -487,7 +496,7 @@ class AdvancedConfig:
         ):
             name_to_use = cli_name_to_use
 
-        config_to_use: Optional[Config] = None
+        template_to_use: Optional[TemplateConfig] = None
 
         aliases: dict[str, str] = {} if templates.aliases is None else templates.aliases
 
@@ -496,7 +505,7 @@ class AdvancedConfig:
 
             # if the current name is present, we use that config
             if temp_config is not None:
-                config_to_use = temp_config
+                template_to_use = temp_config
                 break
 
             # we try to look up an alias, if we find one we repeat the loop, so that redirecting aliases are allowed
@@ -509,7 +518,7 @@ class AdvancedConfig:
             msg = f"No template or alias with name '{name_to_use}' was found"
             raise TypeError(msg)
 
-        return (config_to_use, name_to_use)
+        return (template_to_use, name_to_use)
 
     @staticmethod
     def __resolve_advance_config(
@@ -520,12 +529,12 @@ class AdvancedConfig:
 
         defaults: list[FinalConfig] = Config.fill_defaults(templates.defaults)
 
-        config_to_use, name_used = AdvancedConfig.__resolve_config_to_use(
+        template_to_use, name_used = AdvancedConfig.__resolve_template_to_use(
             templates,
             cli_name_to_use,
         )
 
-        final_configs = AdvancedConfig.__merge_templates(defaults, config_to_use)
+        final_configs = AdvancedConfig.__merge_templates(defaults, template_to_use)
 
         if final_configs.is_err():
             return AdvancedConfig__ResolveAdvancedConfig.err(

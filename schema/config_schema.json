@@ -17,9 +17,6 @@
         "Config": {
             "type": "object",
             "properties": {
-                "config_name": {
-                    "type": "string"
-                },
                 "general": {
                     "$ref": "#/$defs/GeneralConfig"
                 },
@@ -67,6 +64,9 @@
                 },
                 "keybindings": {
                     "$ref": "#/$defs/KeyBoardConfig"
+                },
+                "config_name": {
+                    "type": "string"
                 }
             },
             "required": [
@@ -865,7 +865,7 @@
                 "names": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/$defs/Config"
+                        "$ref": "#/$defs/TemplateConfig"
                     }
                 },
                 "use": {
@@ -894,6 +894,60 @@
                 "defaults",
                 "names"
             ],
+            "additionalProperties": false
+        },
+        "TemplateConfig": {
+            "type": "object",
+            "properties": {
+                "general": {
+                    "$ref": "#/$defs/GeneralConfig"
+                },
+                "parser": {
+                    "$ref": "#/$defs/ParserConfig"
+                },
+                "scanner": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/FullScannerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/NoScannerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/ConfigScannerConfig"
+                        }
+                    ]
+                },
+                "classifier": {
+                    "$ref": "#/$defs/ClassifierOptionsConfig"
+                },
+                "metadata": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/TMDBMetadataConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/IMDBMetadataConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/MissingProviderMetadataConfig"
+                        }
+                    ]
+                },
+                "picker": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/NoLanguagePickerConfig"
+                        },
+                        {
+                            "$ref": "#/$defs/InteractiveLanguagePickerConfig"
+                        }
+                    ]
+                },
+                "keybindings": {
+                    "$ref": "#/$defs/KeyBoardConfig"
+                }
+            },
             "additionalProperties": false
         },
         "ConfigTemplateSettings": {
