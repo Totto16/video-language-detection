@@ -5,6 +5,7 @@ from typing import Any, Optional, Self, TypedDict, override
 from apischema import deserialize, serialize
 from enlighten import Justify, Manager, get_manager
 
+from config import ConfigType
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -23,6 +24,7 @@ from content.metadata.metadata import HandlesType
 from content.scan_helpers import content_from_scan
 from helper.constants import APP_NAME
 from helper.translation import get_translator
+from helper.types import assert_never
 
 _ = get_translator()
 
@@ -94,7 +96,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         name_parser: NameParser,
         scanner: Scanner,
         language_picker: LanguagePicker,
-        general_info: str,
+        general_info: list[str],
     ) -> None:
         super().__init__()
 
@@ -116,7 +118,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
             stage=_("Scanning"),
-            info=general_info,
+            info=" ".join(general_info),
             autorefresh=True,
             min_delta=0.5,
         )
@@ -274,47 +276,60 @@ def parse_contents(
     scanner: Scanner,
     language_picker: LanguagePicker,
     all_content_type: AnyType,
-    general_info: str,
+    general_info: list[str],
+    config_type: ConfigType,
 ) -> list[Content]:
-    callback = ContentCallback(
-        options=options,
-        name_parser=name_parser,
-        scanner=scanner,
-        language_picker=language_picker,
-        general_info=general_info,
-    )
 
-    if not save_file.exists():
-        contents: list[Content] = process_folder(
-            root_folder,
-            callback=callback,
-            handles=[],
-            parent_folders=[],
-            trailer_names=options["trailer_names"],
-        )
+    match config_type:
+        case ConfigType.normal:
+            callback = ContentCallback(
+                options=options,
+                name_parser=name_parser,
+                scanner=scanner,
+                language_picker=language_picker,
+                general_info=general_info,
+            )
 
-        save_to_file(
-            file_path=save_file,
-            contents=contents,
-            serialize_type=all_content_type,
-        )
+            if not save_file.exists():
+                contents: list[Content] = process_folder(
+                    root_folder,
+                    callback=callback,
+                    handles=[],
+                    parent_folders=[],
+                    trailer_names=options["trailer_names"],
+                )
 
-        return contents
+                save_to_file(
+                    file_path=save_file,
+                    contents=contents,
+                    serialize_type=all_content_type,
+                )
 
-    contents = load_from_file(file_path=save_file, serialize_type=all_content_type)
-    new_contents: list[Content] = process_folder(
-        root_folder,
-        callback=callback,
-        handles=[],
-        rescan=contents,
-        parent_folders=[],
-        trailer_names=options["trailer_names"],
-    )
+                return contents
 
-    save_to_file(
-        file_path=save_file,
-        contents=new_contents,
-        serialize_type=all_content_type,
-    )
+            contents = load_from_file(
+                file_path=save_file, serialize_type=all_content_type,
+            )
+            new_contents: list[Content] = process_folder(
+                root_folder,
+                callback=callback,
+                handles=[],
+                rescan=contents,
+                parent_folders=[],
+                trailer_names=options["trailer_names"],
+            )
 
-    return new_contents
+            save_to_file(
+                file_path=save_file,
+                contents=new_contents,
+                serialize_type=all_content_type,
+            )
+
+            return new_contents
+
+        case ConfigType.numerated:
+            return []
+        case ConfigType.symlinked:
+            return []
+        case _:
+            assert_never(config_type)  # noqa: RET503

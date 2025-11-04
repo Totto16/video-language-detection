@@ -69,11 +69,19 @@ def launch_tui(
     # this is also unnecessary complicated for a tui app, do this in the gui instead
     _kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
 
-    general_info: str = (
-        f"Config: {config.config_name}"
-        if config_paramaters is None
-        else f"Config: {config.config_name} {config_paramaters[0]+1} / {config_paramaters[1]}"
-    )
+    general_info: list[str] = [
+        x
+        for x in [
+            f"Config: {config.config_name}",
+            (
+                None
+                if config_paramaters is None
+                else f"{config_paramaters[0]+1} / {config_paramaters[1]}"
+            ),
+            f"Config type: {config.config_type!s}",
+        ]
+        if x is not None
+    ]
 
     contents: list[Content] = parse_contents(
         root_folder=config.parser.root_folder,
@@ -89,6 +97,7 @@ def launch_tui(
         language_picker=language_picker,
         all_content_type=all_content_type,
         general_info=general_info,
+        config_type=config.config_type,
     )
 
     language_summary, metadata_summary = Summary.combine_summaries(
