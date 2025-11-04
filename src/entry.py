@@ -29,7 +29,7 @@ from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from helper.tui import launch_tui
 from main import AllContent, generate_schemas
-from special.tatort import TatortOptions, process_tatort
+
 
 PROGRAM_VERSION: str = "2.5.3"
 
@@ -100,9 +100,7 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
-type SubCommand = Literal["run", "schema", "gui", "config_check", "special"]
-
-type SpecialName = Literal["tatort", "schlefaz", "conan"]
+type SubCommand = Literal["run", "schema", "gui", "config_check"]
 
 
 class ParsedArgNamespace:
@@ -132,17 +130,11 @@ class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     config_to_use: Optional[str]
 
 
-class SpecialCommandParsedArgNamespace(ParsedArgNamespace):
-    subcommand: Literal["special"]
-    special_name: SpecialName
-
-
 type AllParsedNameSpaces = (
     RunCommandParsedArgNamespace
     | SchemaCommandParsedArgNamespace
     | GuiCommandParsedArgNamespace
     | ConfigCheckCommandParsedArgNamespace
-    | SpecialCommandParsedArgNamespace
 )
 
 _ = get_translator()
@@ -251,25 +243,6 @@ def parse_args() -> AllParsedNameSpaces:
         ),
     )
 
-    special_parser = subparsers.add_parser(
-        "special",
-        description=_("Run special things for special categories"),
-    )
-
-    special_choices: list[SpecialName] = [
-        "tatort",
-        "schlefaz",
-        "conan",
-    ]
-
-    special_parser.add_argument(
-        "special_name",
-        choices=special_choices,
-        default=None,
-        type=lambda s: cast(SpecialName, s.lower()),
-        help=_("The special type to use"),
-    )
-
     return cast(AllParsedNameSpaces, parser.parse_args())
 
 
@@ -349,47 +322,6 @@ def subcommand_config_check(
     return 0
 
 
-def subcommand_special_tatort(logger: Logger) -> ExitCode:
-    # constants: TatortOptions = TatortOptions(
-    #    root=Path("/media/totto/Totto_4/Tatort bk/"),
-    #    target_file=Path("data/tatort.json"),
-    # )
-    # TODO
-    options = cast(TatortOptions, None)
-    process_tatort(logger=logger, options=options)
-
-    return 0
-
-
-def subcommand_special_conan(logger: Logger) -> ExitCode:
-    logger.error("TODO")
-    return 1
-
-
-def subcommand_special_schlefaz(logger: Logger) -> ExitCode:
-    logger.error("TODO")
-    return 1
-
-
-def subcommand_special(
-    logger: Logger,
-    args: SpecialCommandParsedArgNamespace,
-) -> ExitCode:
-    match args.special_name:
-        case "tatort":
-            return subcommand_special_tatort(
-                logger,
-            )
-        case "conan":
-            return subcommand_special_conan(logger)
-        case "schlefaz":
-            return subcommand_special_schlefaz(
-                logger,
-            )
-        case _:
-            assert_never(args.special_name)
-
-
 def main() -> ExitCode:
     args = parse_args()
     logger: Logger = setup_custom_logger(args.level)
@@ -415,11 +347,6 @@ def main() -> ExitCode:
                 return subcommand_config_check(
                     logger,
                     cast(ConfigCheckCommandParsedArgNamespace, args),
-                )
-            case "special":
-                return subcommand_special(
-                    logger,
-                    cast(SpecialCommandParsedArgNamespace, args),
                 )
             case _:
                 assert_never(args.subcommand)
