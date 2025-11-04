@@ -36,6 +36,7 @@ class ContentType(str, Enum):
     season = "season"
     episode = "episode"
     collection = "collection"
+    numerated = "numerated"
 
     def __str__(self: Self) -> str:
         return f"<ContentType: {self.name}>"
@@ -69,6 +70,20 @@ class EpisodeDescription:
         return (
             f"<Episode season: {self.season} episode: {self.episode} name: {self.name}>"
         )
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass(slots=True, repr=True)
+class NumeratedDescription:
+    name: str
+    season: int = field(metadata=schema(min=0))
+    episode: int = field(metadata=schema(min=1))
+    number: int = field(metadata=schema(min=1))
+
+    def __str__(self: Self) -> str:
+        return f"<Episode season: {self.season} episode: {self.episode} name: {self.name} number: {self.number}>"
 
     def __repr__(self: Self) -> str:
         return str(self)

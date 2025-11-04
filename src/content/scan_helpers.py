@@ -13,6 +13,7 @@ from content.general import (
     ScannedFile,
     ScannedFileType,
 )
+from content.numerated_content import NumeratedContent
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.log import get_logger
@@ -26,7 +27,7 @@ def is_trailer_file(file_path: Path, *, trailer_names: list[str]) -> bool:
     return name in trailer_names
 
 
-def content_from_scan(
+def normal_content_from_scan(
     file_path: Path,
     file_type: ScannedFileType,
     *,
@@ -123,3 +124,20 @@ def content_from_scan(
     except Exception:
         logger.exception("Content scan")
         return None
+
+
+def numerated_content_from_scan(
+    file_path: Path,
+    file_type: ScannedFileType,
+    *,
+    parent_folders: list[str],
+    name_parser: NameParser,
+    trailer_names: list[str],
+) -> Optional[Content]:
+    scanned_file: ScannedFile = ScannedFile.from_scan(
+        file_path,
+        file_type,
+        parent_folders,
+    )
+
+    return NumeratedContent.from_path(file_path, scanned_file, name_parser)

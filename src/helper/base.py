@@ -21,7 +21,7 @@ from content.general import (
 )
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
-from content.scan_helpers import content_from_scan
+from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.constants import APP_NAME
 from helper.translation import get_translator
 from helper.types import assert_never
@@ -116,7 +116,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         if len(general_info) > 0:
             info_parts: list[tuple[str, str]] = [
-                (f"info_{i}", general_info[i]) for i in range(0, len(general_info))
+                (f"info_{i}", general_info[i]) for i in range(len(general_info))
             ]
             info_kw = dict(info_parts)
             info_str = "{fill}".join(f"{{{x[0]}}}" for x in info_parts) + "{fill}"
@@ -161,53 +161,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
                 return True
 
         return False
-
-    @override
-    def process(
-        self: Self,
-        file_path: Path,
-        file_type: ScannedFileType,
-        handles: HandlesType,
-        parent_folders: list[str],
-        *,
-        trailer_names: list[str],
-        rescan: Optional[Content] = None,
-    ) -> Optional[Content]:
-        if rescan is None:
-            content: Optional[Content] = content_from_scan(
-                file_path,
-                file_type,
-                parent_folders=parent_folders,
-                name_parser=self.__name_parser,
-                trailer_names=trailer_names,
-            )
-            if content is None:
-                if self.__options["parse_error_is_exception"]:
-                    msg = _("Parse Error: Couldn't parse content from '{file}'").format(
-                        file=file_path,
-                    )
-                    raise RuntimeError(msg)
-
-                return None
-
-            content.scan(
-                callback=self,
-                handles=handles,
-                parent_folders=parent_folders,
-                trailer_names=trailer_names,
-            )
-
-            return content
-
-        rescan.scan(
-            callback=self,
-            handles=handles,
-            parent_folders=parent_folders,
-            rescan=True,
-            trailer_names=trailer_names,
-        )
-
-        return None
 
     @override
     def start(
@@ -281,6 +234,108 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__manager.stop()
 
 
+class NormalContentCallback(ContentCallback):
+    @override
+    def process(
+        self: Self,
+        file_path: Path,
+        file_type: ScannedFileType,
+        handles: HandlesType,
+        parent_folders: list[str],
+        *,
+        trailer_names: list[str],
+        rescan: Optional[Content] = None,
+    ) -> Optional[Content]:
+        if rescan is None:
+            content: Optional[Content] = normal_content_from_scan(
+                file_path,
+                file_type,
+                parent_folders=parent_folders,
+                name_parser=self.__name_parser,
+                trailer_names=trailer_names,
+            )
+            if content is None:
+                if self.__options["parse_error_is_exception"]:
+                    msg = _("Parse Error: Couldn't parse content from '{file}'").format(
+                        file=file_path,
+                    )
+                    raise RuntimeError(msg)
+
+                return None
+
+            content.scan(
+                callback=self,
+                handles=handles,
+                parent_folders=parent_folders,
+                trailer_names=trailer_names,
+            )
+
+            return content
+
+        rescan.scan(
+            callback=self,
+            handles=handles,
+            parent_folders=parent_folders,
+            rescan=True,
+            trailer_names=trailer_names,
+        )
+
+        return None
+
+
+class NumeratedContentCallback(ContentCallback):
+    @override
+    def process(
+        self: Self,
+        file_path: Path,
+        file_type: ScannedFileType,
+        handles: HandlesType,
+        parent_folders: list[str],
+        *,
+        trailer_names: list[str],
+        rescan: Optional[Content] = None,
+    ) -> Optional[Content]:
+        if rescan is None:
+            content: Optional[Content] = numerated_content_from_scan(
+                file_path,
+                file_type,
+                parent_folders=parent_folders,
+                name_parser=self.__name_parser,
+                trailer_names=trailer_names,
+            )
+            if content is None:
+                if self.__options["parse_error_is_exception"]:
+                    msg = _("Parse Error: Couldn't parse content from '{file}'").format(
+                        file=file_path,
+                    )
+                    raise RuntimeError(msg)
+
+                return None
+
+            content.scan(
+                callback=self,
+                handles=handles,
+                parent_folders=parent_folders,
+                trailer_names=trailer_names,
+            )
+
+            return content
+
+        rescan.scan(
+            callback=self,
+            handles=handles,
+            parent_folders=parent_folders,
+            rescan=True,
+            trailer_names=trailer_names,
+        )
+
+        return None
+
+
+class SymlinkedContentCallback(ContentCallback):
+    pass
+
+
 def parse_contents(
     root_folder: Path,
     options: ContentOptions,
@@ -293,57 +348,70 @@ def parse_contents(
     config_type: ConfigType,
 ) -> list[Content]:
 
+    callback: ContentCallback
+
     match config_type:
         case ConfigType.normal:
-            callback = ContentCallback(
+            callback = NormalContentCallback(
                 options=options,
                 name_parser=name_parser,
                 scanner=scanner,
                 language_picker=language_picker,
                 general_info=general_info,
             )
-
-            if not save_file.exists():
-                contents: list[Content] = process_folder(
-                    root_folder,
-                    callback=callback,
-                    handles=[],
-                    parent_folders=[],
-                    trailer_names=options["trailer_names"],
-                )
-
-                save_to_file(
-                    file_path=save_file,
-                    contents=contents,
-                    serialize_type=all_content_type,
-                )
-
-                return contents
-
-            contents = load_from_file(
-                file_path=save_file,
-                serialize_type=all_content_type,
-            )
-            new_contents: list[Content] = process_folder(
-                root_folder,
-                callback=callback,
-                handles=[],
-                rescan=contents,
-                parent_folders=[],
-                trailer_names=options["trailer_names"],
-            )
-
-            save_to_file(
-                file_path=save_file,
-                contents=new_contents,
-                serialize_type=all_content_type,
-            )
-
-            return new_contents
-
         case ConfigType.numerated:
-            return []
+            callback = NumeratedContentCallback(
+                options=options,
+                name_parser=name_parser,
+                scanner=scanner,
+                language_picker=language_picker,
+                general_info=general_info,
+            )
         case ConfigType.symlinked:
-            return []
+            callback = SymlinkedContentCallback(
+                options=options,
+                name_parser=name_parser,
+                scanner=scanner,
+                language_picker=language_picker,
+                general_info=general_info,
+            )
         case _:
-            assert_never(config_type)  # noqa: RET503
+            assert_never(config_type)
+
+    if not save_file.exists():
+        contents: list[Content] = process_folder(
+            root_folder,
+            callback=callback,
+            handles=[],
+            parent_folders=[],
+            trailer_names=options["trailer_names"],
+        )
+
+        save_to_file(
+            file_path=save_file,
+            contents=contents,
+            serialize_type=all_content_type,
+        )
+
+        return contents
+
+    contents = load_from_file(
+        file_path=save_file,
+        serialize_type=all_content_type,
+    )
+    new_contents: list[Content] = process_folder(
+        root_folder,
+        callback=callback,
+        handles=[],
+        rescan=contents,
+        parent_folders=[],
+        trailer_names=options["trailer_names"],
+    )
+
+    save_to_file(
+        file_path=save_file,
+        contents=new_contents,
+        serialize_type=all_content_type,
+    )
+
+    return new_contents
