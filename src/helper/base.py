@@ -110,17 +110,30 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             raise TypeError(msg)
 
         self.__manager = manager
+
+        info_str: str = ""
+        info_kw: dict[str, str] = {}
+
+        if len(general_info) > 0:
+            info_parts: list[tuple[str, str]] = [
+                (f"info_{i}", general_info[i]) for i in range(0, len(general_info))
+            ]
+            info_kw = dict(info_parts)
+            info_str = "{fill}".join(f"{{{x[0]}}}" for x in info_parts) + "{fill}"
+
         self.__status_bar = self.__manager.status_bar(
             status_format=APP_NAME
             + "{fill}"
             + _("Stage")
-            + ": {stage}{fill}{info}{fill}{elapsed}",
+            + ": {stage}{fill}"
+            + info_str
+            + "{elapsed}",
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
             stage=_("Scanning"),
-            info=" ".join(general_info),
             autorefresh=True,
             min_delta=0.5,
+            **info_kw,
         )
         self.__language_picker = language_picker
 
@@ -308,7 +321,8 @@ def parse_contents(
                 return contents
 
             contents = load_from_file(
-                file_path=save_file, serialize_type=all_content_type,
+                file_path=save_file,
+                serialize_type=all_content_type,
             )
             new_contents: list[Content] = process_folder(
                 root_folder,

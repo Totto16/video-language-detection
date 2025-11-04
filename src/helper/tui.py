@@ -76,9 +76,9 @@ def launch_tui(
             (
                 None
                 if config_paramaters is None
-                else f"{config_paramaters[0]+1} / {config_paramaters[1]}"
+                else f"Config progress: {config_paramaters[0]+1} / {config_paramaters[1]}"
             ),
-            f"Config type: {config.config_type!s}",
+            f"Config type: {config.config_type.value}",
         ]
         if x is not None
     ]
