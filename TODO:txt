@@ -8,3 +8,13 @@ make sha256 of file fixed, so that renames are NOT allowed!
  -have "linked" content and normal conmtent, normal content is everything, linked is schlefaz, that has auto mainatin link basaed on sha256sum, figure out how to do that and also conan, mappings from 1110 to s32e01 and also the same with schlefaz, make special catergory for tataort, as that require special things!
 
 - deduplciate schlefaz and conan!
+
+
+-make thre categories, normal, schlefaz and conan symlinking, and also tatort like soap opera (gzsz etc)
+
+- make webapp,. instead of gui, fetch json and make ui
+
+- check files before doing eopisode checking, so that we have a state, that can't be chnaged in the fs systenm
+
+
+- symlink config
