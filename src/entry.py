@@ -9,7 +9,6 @@ import sys
 from logging import Logger
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     Literal,
     Optional,
@@ -20,30 +19,17 @@ from typing import (
 )
 
 from apischema import serialize
-from prompt_toolkit.key_binding import KeyBindings
 
-from classifier import Classifier
-from content.base_class import LanguageScanner, Scanner
-from content.language import Language
-from content.language_picker import LanguagePicker, get_picker_from_config
-from content.metadata.config import get_metadata_scanner_from_config
-from content.summary import Summary
-from helper.log import LogLevel, setup_custom_logger
-
-if TYPE_CHECKING:
-    from content.base_class import Content
-    from content.metadata.scanner import MetadataScanner
-
-from config import AdvancedConfig, FinalConfig, KeyBoardConfig
+from config import AdvancedConfig, FinalConfig
 from content.general import NameParser
-from content.scanner import (
-    ConfigScanner,
-    get_scanner_from_config,
-)
+from content.language import Language
 from gui.main import launch_gui
+from helper.log import LogLevel, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
-from main import generate_schemas, parse_contents
+from helper.tui import launch_tui
+from main import AllContent, generate_schemas
+from special.tatort import TatortOptions, process_tatort
 
 PROGRAM_VERSION: str = "2.5.3"
 
@@ -112,65 +98,6 @@ class CustomNameParser(NameParser):
             return None
 
         return (name, year)
-
-
-def get_keybindings(
-    logger: Logger,
-    kb_config: KeyBoardConfig,
-    scanner: Scanner,
-) -> KeyBindings:
-    kb = KeyBindings()
-
-    @kb.add(kb_config.abort.value)
-    def _abort_callback(_event: Any) -> None:
-        if isinstance(scanner, ConfigScanner) and scanner.allow_abort:
-            scanner.abort()
-            logger.info(_("Aborted scan"))
-
-    return kb
-
-
-def launch_tui(logger: Logger, config: FinalConfig) -> None:
-    classifier = Classifier(config.classifier)
-    language_scanner = LanguageScanner(classifier=classifier)
-    metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
-        config.metadata,
-    )
-    scanner: Scanner = get_scanner_from_config(
-        config.scanner,
-        language_scanner,
-        metadata_scanner,
-    )
-
-    language_picker: LanguagePicker = get_picker_from_config(config.picker)
-
-    # TODO: this doesn't work atm
-    # this is also unnecessary complicated for a tui app, do this in the gui instead
-    _kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
-
-    contents: list[Content] = parse_contents(
-        config.parser.root_folder,
-        {
-            "ignore_files": config.parser.ignore_files,
-            "video_formats": config.parser.video_formats,
-            "trailer_names": config.parser.trailer_names,
-            "parse_error_is_exception": config.parser.exception_on_error,
-        },
-        config.general.target_file,
-        name_parser=CustomNameParser(config.parser.special),
-        scanner=scanner,
-        language_picker=language_picker,
-    )
-
-    language_summary, metadata_summary = Summary.combine_summaries(
-        content.summary() for content in contents
-    )
-
-    scan_summary = language_scanner.summary_manager.get_detailed_summary()
-
-    logger.info(language_summary)
-    logger.info(metadata_summary)
-    logger.info(scan_summary)
 
 
 type SubCommand = Literal["run", "schema", "gui", "config_check", "special"]
@@ -381,7 +308,14 @@ def subcommand_run(
     if parsed_config is None:
         return 1
 
-    launch_tui(logger, config=parsed_config)
+    name_parser = CustomNameParser(season_special_names=parsed_config.parser.special)
+
+    launch_tui(
+        logger=logger,
+        config=parsed_config,
+        name_parser=name_parser,
+        all_content_type=AllContent,
+    )
 
     return 0
 
@@ -416,8 +350,15 @@ def subcommand_config_check(
 
 
 def subcommand_special_tatort(logger: Logger) -> ExitCode:
-    logger.error("TODO")
-    return 1
+    # constants: TatortOptions = TatortOptions(
+    #    root=Path("/media/totto/Totto_4/Tatort bk/"),
+    #    target_file=Path("data/tatort.json"),
+    # )
+    # TODO
+    options = cast(TatortOptions, None)
+    process_tatort(logger=logger, options=options)
+
+    return 0
 
 
 def subcommand_special_conan(logger: Logger) -> ExitCode:
