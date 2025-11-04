@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import Enum
 from logging import Logger
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Self
@@ -150,9 +151,16 @@ class KeyBoardConfig:
         return KeyBoardConfig(abort=CustomKey(Keys.ControlG))
 
 
+class ConfigType(Enum):
+    normal = "normal"
+    numerated = "numerated"
+    symlinked = "symlinked"
+
+
 @dataclass
 class FinalConfig:
     config_name: str
+    config_type: ConfigType
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
@@ -200,6 +208,7 @@ class ConfigGeneric:
     def __defaults() -> "FinalConfig":
         return FinalConfig(
             config_name="<None>",
+            config_type=ConfigType.normal,
             general=GeneralConfigParsed(target_file=Path("data.json")),
             parser=ParserConfigParsed(
                 root_folder=Path.cwd(),
@@ -220,7 +229,7 @@ class ConfigGeneric:
     def fill_defaults(configs: "Config | list[Config]") -> list[FinalConfig]:
 
         def fill_one_default(config: "Config") -> FinalConfig:
-            defaults = Config.__defaults()
+            defaults = Config.__defaults()  # noqa: SLF001
 
             # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
             parsed_general = defaults.general
@@ -270,6 +279,7 @@ class ConfigGeneric:
 
             return FinalConfig(
                 config_name=config.config_name,
+                config_type=config.config_type,
                 general=parsed_general,
                 parser=parsed_parser,
                 scanner=parsed_scanner,
@@ -297,6 +307,7 @@ class TemplateConfig(ConfigGeneric):
 @dataclass
 class Config(ConfigGeneric):
     config_name: str = field(metadata=required, default="<ERROR>")
+    config_type: ConfigType = field(metadata=required, default=ConfigType.normal)
 
 
 UseFromCLI = Annotated[
@@ -446,6 +457,7 @@ class AdvancedConfig:
 
             return FinalConfig(
                 config_name=defaults.config_name,
+                config_type=defaults.config_type,
                 general=parsed_general,
                 parser=parsed_parser,
                 scanner=parsed_scanner,

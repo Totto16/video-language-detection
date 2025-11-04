@@ -67,10 +67,14 @@
                 },
                 "config_name": {
                     "type": "string"
+                },
+                "config_type": {
+                    "$ref": "#/$defs/ConfigType"
                 }
             },
             "required": [
-                "config_name"
+                "config_name",
+                "config_type"
             ],
             "additionalProperties": false
         },
@@ -832,6 +836,14 @@
                 "s-c-right",
                 "s-c-home",
                 "s-c-end"
+            ]
+        },
+        "ConfigType": {
+            "type": "string",
+            "enum": [
+                "normal",
+                "numerated",
+                "symlinked"
             ]
         },
         "ConfigTemplate": {

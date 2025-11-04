@@ -9,9 +9,6 @@ make sha256 of file fixed, so that renames are NOT allowed!
 
 - deduplciate schlefaz and conan!
 
-
--make thre categories, normal, schlefaz and conan symlinking, and also tatort like soap opera (gzsz etc)
-
 - make webapp,. instead of gui, fetch json and make ui
 
 - check files before doing eopisode checking, so that we have a state, that can't be chnaged in the fs systenm
