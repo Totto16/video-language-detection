@@ -20,6 +20,8 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.log import get_logger
+from helper.result import Result
+from helper.types import assert_never
 
 
 @dataclass
@@ -150,6 +152,7 @@ class KeyBoardConfig:
 
 @dataclass
 class FinalConfig:
+    config_name: str
     general: GeneralConfigParsed
     parser: ParserConfigParsed
     scanner: ScannerConfig
@@ -164,6 +167,7 @@ logger: Logger = get_logger()
 
 @dataclass
 class Config:
+    config_name: str
     general: Annotated[Optional[GeneralConfig], OneOf] = field(
         default=None,
         metadata=none_as_undefined,
@@ -196,6 +200,7 @@ class Config:
     @staticmethod
     def __defaults() -> "FinalConfig":
         return FinalConfig(
+            config_name="<None>",
             general=GeneralConfigParsed(target_file=Path("data.json")),
             parser=ParserConfigParsed(
                 root_folder=Path.cwd(),
@@ -213,64 +218,76 @@ class Config:
         )
 
     @staticmethod
-    def fill_defaults(config: "Config") -> FinalConfig:
-        defaults = Config.__defaults()
+    def fill_defaults(configs: "Config | list[Config]") -> list[FinalConfig]:
 
-        # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
-        parsed_general = defaults.general
-        if config.general is not None:
-            parsed_general = GeneralConfigParsed(
-                target_file=Path(config.general.target_file),
+        def fill_one_default(config: "Config") -> FinalConfig:
+            defaults = Config.__defaults()
+
+            # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
+            parsed_general = defaults.general
+            if config.general is not None:
+                parsed_general = GeneralConfigParsed(
+                    target_file=Path(config.general.target_file),
+                )
+
+            parsed_parser = defaults.parser
+            if config.parser is not None:
+                parsed_parser = ParserConfigParsed(
+                    root_folder=Path(config.parser.root_folder),
+                    special=(
+                        config.parser.special
+                        if config.parser.special is not None
+                        else defaults.parser.special
+                    ),
+                    video_formats=config.parser.video_formats,
+                    trailer_names=config.parser.trailer_names,
+                    ignore_files=config.parser.ignore_files,
+                    exception_on_error=(
+                        config.parser.exception_on_error
+                        if config.parser.exception_on_error is not None
+                        else defaults.parser.exception_on_error
+                    ),
+                )
+
+            parsed_scanner = defaults.scanner
+            if config.scanner is not None:
+                parsed_scanner = config.scanner
+
+            parsed_classifier = defaults.classifier
+            if config.classifier is not None:
+                parsed_classifier = config.classifier
+
+            parsed_metadata = defaults.metadata
+            if config.metadata is not None:
+                parsed_metadata = config.metadata
+
+            parsed_picker = defaults.picker
+            if config.picker is not None:
+                parsed_picker = config.picker
+
+            parsed_keybindings = defaults.keybindings
+            if config.keybindings is not None:
+                parsed_keybindings = config.keybindings
+
+            return FinalConfig(
+                config_name=config.config_name,
+                general=parsed_general,
+                parser=parsed_parser,
+                scanner=parsed_scanner,
+                classifier=parsed_classifier,
+                metadata=parsed_metadata,
+                picker=parsed_picker,
+                keybindings=parsed_keybindings,
             )
 
-        parsed_parser = defaults.parser
-        if config.parser is not None:
-            parsed_parser = ParserConfigParsed(
-                root_folder=Path(config.parser.root_folder),
-                special=(
-                    config.parser.special
-                    if config.parser.special is not None
-                    else defaults.parser.special
-                ),
-                video_formats=config.parser.video_formats,
-                trailer_names=config.parser.trailer_names,
-                ignore_files=config.parser.ignore_files,
-                exception_on_error=(
-                    config.parser.exception_on_error
-                    if config.parser.exception_on_error is not None
-                    else defaults.parser.exception_on_error
-                ),
-            )
+        results: list[FinalConfig] = []
 
-        parsed_scanner = defaults.scanner
-        if config.scanner is not None:
-            parsed_scanner = config.scanner
+        if isinstance(configs, list):
+            results.extend(fill_one_default(config) for config in configs)
+        else:
+            results.append(fill_one_default(configs))
 
-        parsed_classifier = defaults.classifier
-        if config.classifier is not None:
-            parsed_classifier = config.classifier
-
-        parsed_metadata = defaults.metadata
-        if config.metadata is not None:
-            parsed_metadata = config.metadata
-
-        parsed_picker = defaults.picker
-        if config.picker is not None:
-            parsed_picker = config.picker
-
-        parsed_keybindings = defaults.keybindings
-        if config.keybindings is not None:
-            parsed_keybindings = config.keybindings
-
-        return FinalConfig(
-            general=parsed_general,
-            parser=parsed_parser,
-            scanner=parsed_scanner,
-            classifier=parsed_classifier,
-            metadata=parsed_metadata,
-            picker=parsed_picker,
-            keybindings=parsed_keybindings,
-        )
+        return results
 
 
 UseFromCLI = Annotated[
@@ -286,7 +303,7 @@ class ConfigTemplateSettings:
 
 @dataclass
 class ConfigTemplates:
-    default: Config
+    defaults: list[Config] | Config
     names: dict[str, Config]
     use: Optional[str | UseFromCLI] = field(
         default=None,
@@ -307,10 +324,18 @@ class ConfigTemplate:
     templates: ConfigTemplates
 
 
-InternalConfig = Config | ConfigTemplate
+InternalConfig = Config | list[Config] | ConfigTemplate
 
 
 SchemaConfig = Annotated[InternalConfig, OneOf]
+
+AdvancedConfig__MergeResult = Result[list[FinalConfig], str]
+
+AdvancedConfig__ResolveAdvancedConfig = Result[tuple[list[FinalConfig], str], str]
+
+AdvancedConfig__LoadAndResolveWithInfo = Result[tuple[list[FinalConfig], str], str]
+
+AdvancedConfig__LoadAndResolve = Result[list[FinalConfig], str]
 
 
 @dataclass
@@ -353,67 +378,87 @@ class AdvancedConfig:
         return None
 
     @staticmethod
-    def __merge_template(
-        default_raw: FinalConfig,
+    def __merge_templates(
+        defaults_raw: list[FinalConfig],
         template: Config,
-    ) -> Optional[FinalConfig]:
-        defaults = default_raw
+    ) -> AdvancedConfig__MergeResult:
 
-        # TODO this is done manually atm, it can be done more automated
-        parsed_general = defaults.general
-        if template.general is not None:
-            parsed_general = GeneralConfigParsed(
-                target_file=Path(template.general.target_file),
+        def merge_template(
+            default_raw: FinalConfig,
+            template: Config,
+        ) -> Optional[FinalConfig]:
+            defaults = default_raw
+
+            # TODO this is done manually atm, it can be done more automated
+            parsed_general = defaults.general
+            if template.general is not None:
+                parsed_general = GeneralConfigParsed(
+                    target_file=Path(template.general.target_file),
+                )
+
+            parsed_parser = defaults.parser
+            if template.parser is not None:
+                parsed_parser = ParserConfigParsed(
+                    root_folder=Path(template.parser.root_folder),
+                    special=(
+                        template.parser.special
+                        if template.parser.special is not None
+                        else defaults.parser.special
+                    ),
+                    video_formats=template.parser.video_formats,
+                    trailer_names=template.parser.trailer_names,
+                    ignore_files=template.parser.ignore_files,
+                    exception_on_error=(
+                        template.parser.exception_on_error
+                        if template.parser.exception_on_error is not None
+                        else defaults.parser.exception_on_error
+                    ),
+                )
+
+            parsed_scanner = defaults.scanner
+            if template.scanner is not None:
+                parsed_scanner = template.scanner
+
+            parsed_classifier = defaults.classifier
+            if template.classifier is not None:
+                parsed_classifier = template.classifier
+
+            parsed_metadata = defaults.metadata
+            if template.metadata is not None:
+                parsed_metadata = template.metadata
+
+            parsed_picker = defaults.picker
+            if template.picker is not None:
+                parsed_picker = template.picker
+
+            parsed_keybindings = defaults.keybindings
+            if template.keybindings is not None:
+                parsed_keybindings = template.keybindings
+
+            return FinalConfig(
+                config_name=defaults.config_name,
+                general=parsed_general,
+                parser=parsed_parser,
+                scanner=parsed_scanner,
+                classifier=parsed_classifier,
+                metadata=parsed_metadata,
+                picker=parsed_picker,
+                keybindings=parsed_keybindings,
             )
 
-        parsed_parser = defaults.parser
-        if template.parser is not None:
-            parsed_parser = ParserConfigParsed(
-                root_folder=Path(template.parser.root_folder),
-                special=(
-                    template.parser.special
-                    if template.parser.special is not None
-                    else defaults.parser.special
-                ),
-                video_formats=template.parser.video_formats,
-                trailer_names=template.parser.trailer_names,
-                ignore_files=template.parser.ignore_files,
-                exception_on_error=(
-                    template.parser.exception_on_error
-                    if template.parser.exception_on_error is not None
-                    else defaults.parser.exception_on_error
-                ),
+        results: list[FinalConfig] = []
+
+        for default_raw in defaults_raw:
+            result: Optional[FinalConfig] = merge_template(
+                default_raw=default_raw,
+                template=template,
             )
+            if result is None:
+                return AdvancedConfig__MergeResult.err(default_raw.config_name)
 
-        parsed_scanner = defaults.scanner
-        if template.scanner is not None:
-            parsed_scanner = template.scanner
+            results.append(result)
 
-        parsed_classifier = defaults.classifier
-        if template.classifier is not None:
-            parsed_classifier = template.classifier
-
-        parsed_metadata = defaults.metadata
-        if template.metadata is not None:
-            parsed_metadata = template.metadata
-
-        parsed_picker = defaults.picker
-        if template.picker is not None:
-            parsed_picker = template.picker
-
-        parsed_keybindings = defaults.keybindings
-        if template.keybindings is not None:
-            parsed_keybindings = template.keybindings
-
-        return FinalConfig(
-            general=parsed_general,
-            parser=parsed_parser,
-            scanner=parsed_scanner,
-            classifier=parsed_classifier,
-            metadata=parsed_metadata,
-            picker=parsed_picker,
-            keybindings=parsed_keybindings,
-        )
+        return AdvancedConfig__MergeResult.ok(results)
 
     @staticmethod
     def __resolve_config_to_use(
@@ -470,60 +515,77 @@ class AdvancedConfig:
     def __resolve_advance_config(
         config: ConfigTemplate,
         cli_name_to_use: Optional[str],
-    ) -> Optional[tuple[FinalConfig, str]]:
+    ) -> AdvancedConfig__ResolveAdvancedConfig:
         templates = config.templates
 
-        default = Config.fill_defaults(templates.default)
+        defaults: list[FinalConfig] = Config.fill_defaults(templates.defaults)
 
         config_to_use, name_used = AdvancedConfig.__resolve_config_to_use(
             templates,
             cli_name_to_use,
         )
 
-        final_config = AdvancedConfig.__merge_template(default, config_to_use)
+        final_configs = AdvancedConfig.__merge_templates(defaults, config_to_use)
 
-        if final_config is None:
-            return None
+        if final_configs.is_err():
+            return AdvancedConfig__ResolveAdvancedConfig.err(
+                f"Error in config '{final_configs.get_err()}'",
+            )
 
-        return (
-            final_config,
-            f"merging default config and user provided config '{name_used}'",
+        return AdvancedConfig__ResolveAdvancedConfig.ok(
+            (
+                final_configs.get_ok(),
+                f"merging default config and user provided config '{name_used}'",
+            ),
         )
 
     @staticmethod
     def load_and_resolve_with_info(
         config_file: Path,
         cli_name_to_use: Optional[str],
-    ) -> Optional[tuple[FinalConfig, str]]:
+    ) -> AdvancedConfig__LoadAndResolveWithInfo:
         config = AdvancedConfig.__load(config_file)
 
         if config is None:
-            return None
-
+            return AdvancedConfig__LoadAndResolveWithInfo.err("No config loaded")
         if isinstance(config, Config):
             final_config = Config.fill_defaults(config)
-            return (final_config, "Normal Config")
+            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+                (final_config, "Normal Config"),
+            )
+        if isinstance(config, list):
+            final_config = Config.fill_defaults(config)
+            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+                (final_config, "Normal Configs"),
+            )
+        if isinstance(config, ConfigTemplate):
+            resolved_config: Result[tuple[list[FinalConfig], str], str] = (
+                AdvancedConfig.__resolve_advance_config(
+                    config,
+                    cli_name_to_use,
+                )
+            )
 
-        resolved_config = AdvancedConfig.__resolve_advance_config(
-            config,
-            cli_name_to_use,
-        )
+            if resolved_config.is_err():
+                return AdvancedConfig__LoadAndResolveWithInfo.err(
+                    resolved_config.get_err(),
+                )
 
-        if resolved_config is None:
-            return None
+            merged_config, msg = resolved_config.get_ok()
 
-        merged_config, msg = resolved_config
-
-        return (merged_config, f"Templated Config created by {msg}")
+            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+                (merged_config, f"Templated Config created by {msg}"),
+            )
+        assert_never(config)  # noqa: RET503
 
     @staticmethod
     def load_and_resolve(
         config_file: Path,
         cli_name_to_use: Optional[str],
-    ) -> Optional[FinalConfig]:
+    ) -> AdvancedConfig__LoadAndResolve:
         res = AdvancedConfig.load_and_resolve_with_info(config_file, cli_name_to_use)
 
-        if res is None:
-            return None
+        if res.is_err():
+            return AdvancedConfig__LoadAndResolve.err(res.get_err())
 
-        return res[0]
+        return AdvancedConfig__LoadAndResolve.ok(res.get_ok()[0])

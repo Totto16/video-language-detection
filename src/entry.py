@@ -30,7 +30,6 @@ from helper.translation import get_translator
 from helper.tui import launch_tui
 from main import AllContent, generate_schemas
 
-
 PROGRAM_VERSION: str = "2.5.3"
 
 
@@ -278,17 +277,30 @@ def subcommand_run(
         Path(args.config),
         args.config_to_use,
     )
-    if parsed_config is None:
+    if parsed_config.is_err():
+        logger.error("error while parsing config: %s", parsed_config.get_err())
         return 1
 
-    name_parser = CustomNameParser(season_special_names=parsed_config.parser.special)
+    configs = parsed_config.get_ok()
 
-    launch_tui(
-        logger=logger,
-        config=parsed_config,
-        name_parser=name_parser,
-        all_content_type=AllContent,
-    )
+    if len(configs) == 0:
+        logger.error("parsing returned 0 configs")
+        return 1
+
+    for index, config in enumerate(configs):
+        name_parser = CustomNameParser(season_special_names=config.parser.special)
+
+        config_paramaters: Optional[tuple[int, int]] = (
+            None if len(configs) == 1 else (index, len(configs))
+        )
+
+        launch_tui(
+            logger=logger,
+            config=config,
+            name_parser=name_parser,
+            all_content_type=AllContent,
+            config_paramaters=config_paramaters,
+        )
 
     return 0
 
@@ -302,23 +314,26 @@ def subcommand_config_check(
         config,
         args.config_to_use,
     )
-    if parsed_config is None:
+    if parsed_config.is_err():
         logger.error(
-            _("Config '{config}' is not valid!").format(config=config),
+            _("Config '{config}' is not valid: {err}").format(
+                config=config,
+                err=parsed_config.get_err(),
+            ),
         )
         return 1
 
-    final_config, info = parsed_config
+    final_config, info = parsed_config.get_ok()
 
     logger.info(_("Config '{config}' is valid!").format(config=config))
     logger.info("Info about config: %s", info)
 
-    seriliazed_config: dict[str, Any] = serialize(
+    serialized_config: dict[str, Any] = serialize(
         FinalConfig,
         final_config,
     )
     logger.info("Printing final config as json:")
-    logger.info(json.dumps(seriliazed_config, indent=4))
+    logger.info(json.dumps(serialized_config, indent=4))
     return 0
 
 

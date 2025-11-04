@@ -94,6 +94,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         name_parser: NameParser,
         scanner: Scanner,
         language_picker: LanguagePicker,
+        general_info: str,
     ) -> None:
         super().__init__()
 
@@ -108,10 +109,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         self.__manager = manager
         self.__status_bar = self.__manager.status_bar(
-            status_format=APP_NAME + "{fill}" + _("Stage") + ": {stage}{fill}{elapsed}",
+            status_format=APP_NAME
+            + "{fill}"
+            + _("Stage")
+            + ": {stage}{fill}{info}{fill}{elapsed}",
             color="bold_underline_bright_white_on_blue",
             justify=Justify.CENTER,
             stage=_("Scanning"),
+            info=general_info,
             autorefresh=True,
             min_delta=0.5,
         )
@@ -269,12 +274,14 @@ def parse_contents(
     scanner: Scanner,
     language_picker: LanguagePicker,
     all_content_type: AnyType,
+    general_info: str,
 ) -> list[Content]:
     callback = ContentCallback(
         options=options,
         name_parser=name_parser,
         scanner=scanner,
         language_picker=language_picker,
+        general_info=general_info,
     )
 
     if not save_file.exists():

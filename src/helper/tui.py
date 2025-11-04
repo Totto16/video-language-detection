@@ -2,6 +2,7 @@ from logging import Logger
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
 )
 
 from prompt_toolkit.key_binding import KeyBindings
@@ -49,6 +50,7 @@ def launch_tui(
     config: FinalConfig,
     name_parser: NameParser,
     all_content_type: AnyType,
+    config_paramaters: Optional[tuple[int, int]],
 ) -> None:
     classifier = Classifier(config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
@@ -67,6 +69,12 @@ def launch_tui(
     # this is also unnecessary complicated for a tui app, do this in the gui instead
     _kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
 
+    general_info: str = (
+        f"Config: {config.config_name}"
+        if config_paramaters is None
+        else f"Config: {config.config_name} {config_paramaters[0]+1} / {config_paramaters[1]}"
+    )
+
     contents: list[Content] = parse_contents(
         root_folder=config.parser.root_folder,
         options={
@@ -80,6 +88,7 @@ def launch_tui(
         scanner=scanner,
         language_picker=language_picker,
         all_content_type=all_content_type,
+        general_info=general_info,
     )
 
     language_summary, metadata_summary = Summary.combine_summaries(
