@@ -3,125 +3,134 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2025-05-07 12:57+0200\n"
+"POT-Creation-Date: 2025-11-04 20:19+0100\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 
-#: src/classifier.py:655
+
+#: src/classifier.py:1096
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr ""
 
-#: src/entry.py:176
+#: src/entry.py:145
 msgid "Detect video languages"
 msgstr ""
 
-#: src/entry.py:195
+#: src/entry.py:164
 msgid "The loglevel to use"
 msgstr ""
 
-#: src/entry.py:205
+#: src/entry.py:181
 msgid "Run the whole program in the terminal"
 msgstr ""
 
-#: src/entry.py:212 src/entry.py:236
+#: src/entry.py:188 src/entry.py:221
 msgid "The config to use"
 msgstr ""
 
-#: src/entry.py:217
+#: src/entry.py:195 src/entry.py:240
+msgid "The config template to use, if the config specifies, to use the cli one"
+msgstr ""
+
+#: src/entry.py:202
 msgid "Create schemas for config and the resulting data"
 msgstr ""
 
-#: src/entry.py:224
+#: src/entry.py:209
 msgid "The folder where to put the schemas"
 msgstr ""
 
-#: src/entry.py:229
+#: src/entry.py:214
 msgid "Run the whole program as GUI"
 msgstr ""
 
-#: src/entry.py:241
+#: src/entry.py:226
 msgid "Check the config for validity"
 msgstr ""
 
-#: src/entry.py:248
+#: src/entry.py:233
 msgid "The config to check"
 msgstr ""
 
-#: src/entry.py:261
+#: src/entry.py:257
 msgid "Successfully generated the schemas"
 msgstr ""
 
-#: src/entry.py:292
-msgid "Config '{config}' is not valid!"
+#: src/entry.py:319
+msgid "Config '{config}' is not valid: {err}"
 msgstr ""
 
-#: src/entry.py:296
+#: src/entry.py:328
 msgid "Config '{config}' is valid!"
 msgstr ""
 
-#: src/entry.py:303
+#: src/entry.py:373
 msgid "Ctrl + C pressed"
+msgstr ""
+
+#: src/helper/base.py:52
+msgid "Data not saveable to '{suffix}' file!"
+msgstr ""
+
+#: src/helper/base.py:71
+msgid "Data not loadable from '{suffix}' file!"
+msgstr ""
+
+#: src/helper/base.py:107
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr ""
+
+#: src/helper/base.py:114
+msgid "Stage"
+msgstr ""
+
+#: src/helper/base.py:118
+msgid "Scanning"
+msgstr ""
+
+#: src/helper/base.py:171
+msgid "Parse Error: Couldn't parse content from '{file}'"
+msgstr ""
+
+#: src/helper/base.py:211
+msgid "series"
+msgstr ""
+
+#: src/helper/base.py:213
+msgid "seasons"
+msgstr ""
+
+#: src/helper/base.py:215
+msgid "episodes"
+msgstr ""
+
+#: src/helper/base.py:217
+msgid "tasks"
+msgstr ""
+
+#: src/helper/base.py:219
+msgid "folders"
+msgstr ""
+
+#: src/helper/base.py:244
+msgid "No Progressbar, on progress callback"
+msgstr ""
+
+#: src/helper/base.py:258
+msgid "No Progressbar, on progress finish"
+msgstr ""
+
+#: src/helper/base.py:265
+msgid "finished"
 msgstr ""
 
 #: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr ""
 
-#: src/main.py:72
-msgid "UNREACHABLE (not runnable in notebooks)"
-msgstr ""
-
-#: src/main.py:77
-msgid "Stage"
-msgstr ""
-
-#: src/main.py:80
-msgid "Scanning"
-msgstr ""
-
-#: src/main.py:130
-msgid "Parse Error: Couldn't parse content from '{file}'"
-msgstr ""
-
-#: src/main.py:168
-msgid "series"
-msgstr ""
-
-#: src/main.py:170
-msgid "seasons"
-msgstr ""
-
-#: src/main.py:172
-msgid "episodes"
-msgstr ""
-
-#: src/main.py:174
-msgid "tasks"
-msgstr ""
-
-#: src/main.py:176
-msgid "folders"
-msgstr ""
-
-#: src/main.py:201
-msgid "No Progressbar, on progress callback"
-msgstr ""
-
-#: src/main.py:215
-msgid "No Progressbar, on progress finish"
-msgstr ""
-
-#: src/main.py:222
-msgid "finished"
-msgstr ""
-
-#: src/main.py:244
-msgid "Data not loadable from '{suffix}' file!"
-msgstr ""
-
-#: src/main.py:264
-msgid "Data not saveable to '{suffix}' file!"
+#: src/helper/tui.py:43
+msgid "Aborted scan"
 msgstr ""
 

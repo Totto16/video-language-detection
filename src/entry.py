@@ -193,7 +193,7 @@ def parse_args() -> AllParsedNameSpaces:
         dest="config_to_use",
         default=None,
         help=_(
-            "The config template to use, if the config specifies, to use the cli one",
+            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
         ),
     )
 
@@ -238,7 +238,7 @@ def parse_args() -> AllParsedNameSpaces:
         dest="config_to_use",
         default=None,
         help=_(
-            "The config template to use, if the config specifies, to use the cli one",
+            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
         ),
     )
 

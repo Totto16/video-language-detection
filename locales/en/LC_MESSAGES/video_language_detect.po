@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2025-05-07 12:57+0200\n"
-"PO-Revision-Date: 2025-05-07 13:10+0200\n"
+"POT-Creation-Date: 2025-11-04 20:19+0100\n"
+"PO-Revision-Date: 2025-11-04 20:25+0100\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -13,121 +13,128 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: pygettext.py 1.5\n"
-"X-Generator: Poedit 3.4.4\n"
+"X-Generator: Poedit 3.8\n"
 
-#: src/classifier.py:655
+#: src/classifier.py:1096
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr "Couldn't get Language of '{path}': Best was {best}"
 
-#: src/entry.py:176
+#: src/entry.py:145
 msgid "Detect video languages"
 msgstr "Detect video languages"
 
-#: src/entry.py:195
+#: src/entry.py:164
 msgid "The loglevel to use"
 msgstr "The loglevel to use"
 
-#: src/entry.py:205
+#: src/entry.py:181
 msgid "Run the whole program in the terminal"
 msgstr "Run the whole program in the terminal"
 
-#: src/entry.py:212 src/entry.py:236
+#: src/entry.py:188 src/entry.py:221
 msgid "The config to use"
 msgstr "The config to use"
 
-#: src/entry.py:217
+#: src/entry.py:195 src/entry.py:240
+msgid "The config template to use, if the config specifies, to use the cli one"
+msgstr "The config template to use, if the config specifies, to use the cli one"
+
+#: src/entry.py:202
 msgid "Create schemas for config and the resulting data"
 msgstr "Create schemas for config and the resulting data"
 
-#: src/entry.py:224
+#: src/entry.py:209
 msgid "The folder where to put the schemas"
 msgstr "The folder where to put the schemas"
 
-#: src/entry.py:229
+#: src/entry.py:214
 msgid "Run the whole program as GUI"
 msgstr "Run the whole program as GUI"
 
-#: src/entry.py:241
+#: src/entry.py:226
 msgid "Check the config for validity"
 msgstr "Check the config for validity"
 
-#: src/entry.py:248
+#: src/entry.py:233
 msgid "The config to check"
 msgstr "The config to check"
 
-#: src/entry.py:261
+#: src/entry.py:257
 msgid "Successfully generated the schemas"
 msgstr "Successfully generated the schemas"
 
-#: src/entry.py:292
-msgid "Config '{config}' is not valid!"
-msgstr "Config '{config}' is not valid!"
+#: src/entry.py:319
+msgid "Config '{config}' is not valid: {err}"
+msgstr "Config '{config}' is not valid: {err}"
 
-#: src/entry.py:296
+#: src/entry.py:328
 msgid "Config '{config}' is valid!"
 msgstr "Config '{config}' is valid!"
 
-#: src/entry.py:303
+#: src/entry.py:373
 msgid "Ctrl + C pressed"
 msgstr "Ctrl + C pressed"
+
+#: src/helper/base.py:52
+msgid "Data not saveable to '{suffix}' file!"
+msgstr "Data not saveable to '{suffix}' file!"
+
+#: src/helper/base.py:71
+msgid "Data not loadable from '{suffix}' file!"
+msgstr "Data not loadable from '{suffix}' file!"
+
+#: src/helper/base.py:107
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr "UNREACHABLE (not runnable in notebooks)"
+
+#: src/helper/base.py:114
+msgid "Stage"
+msgstr "Stage"
+
+#: src/helper/base.py:118
+msgid "Scanning"
+msgstr "Scanning"
+
+#: src/helper/base.py:171
+msgid "Parse Error: Couldn't parse content from '{file}'"
+msgstr "Parse Error: Couldn't parse content from '{file}'"
+
+#: src/helper/base.py:211
+msgid "series"
+msgstr "series"
+
+#: src/helper/base.py:213
+msgid "seasons"
+msgstr "seasons"
+
+#: src/helper/base.py:215
+msgid "episodes"
+msgstr "episodes"
+
+#: src/helper/base.py:217
+msgid "tasks"
+msgstr "tasks"
+
+#: src/helper/base.py:219
+msgid "folders"
+msgstr "folders"
+
+#: src/helper/base.py:244
+msgid "No Progressbar, on progress callback"
+msgstr "No Progressbar, on progress callback"
+
+#: src/helper/base.py:258
+msgid "No Progressbar, on progress finish"
+msgstr "No Progressbar, on progress finish"
+
+#: src/helper/base.py:265
+msgid "finished"
+msgstr "finished"
 
 #: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr "Video Language Detector"
 
-#: src/main.py:72
-msgid "UNREACHABLE (not runnable in notebooks)"
-msgstr "UNREACHABLE (not runnable in notebooks)"
-
-#: src/main.py:77
-msgid "Stage"
-msgstr "Stage"
-
-#: src/main.py:80
-msgid "Scanning"
-msgstr "Scanning"
-
-#: src/main.py:130
-msgid "Parse Error: Couldn't parse content from '{file}'"
-msgstr "Parse Error: Couldn't parse content from '{file}'"
-
-#: src/main.py:168
-msgid "series"
-msgstr "series"
-
-#: src/main.py:170
-msgid "seasons"
-msgstr "seasons"
-
-#: src/main.py:172
-msgid "episodes"
-msgstr "episodes"
-
-#: src/main.py:174
-msgid "tasks"
-msgstr "tasks"
-
-#: src/main.py:176
-msgid "folders"
-msgstr "folders"
-
-#: src/main.py:201
-msgid "No Progressbar, on progress callback"
-msgstr "No Progressbar, on progress callback"
-
-#: src/main.py:215
-msgid "No Progressbar, on progress finish"
-msgstr "No Progressbar, on progress finish"
-
-#: src/main.py:222
-msgid "finished"
-msgstr "finished"
-
-#: src/main.py:244
-msgid "Data not loadable from '{suffix}' file!"
-msgstr "Data not loadable from '{suffix}' file!"
-
-#: src/main.py:264
-#| msgid "Data not saveable from '{suffix}' file!"
-msgid "Data not saveable to '{suffix}' file!"
-msgstr "Data not saveable to '{suffix}' file!"
+#: src/helper/tui.py:43
+msgid "Aborted scan"
+msgstr "Aborted scan"
