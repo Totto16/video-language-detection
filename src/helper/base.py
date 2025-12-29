@@ -308,11 +308,11 @@ class NumeratedContentCallback(ContentCallback):
                 file_path,
                 file_type,
                 parent_folders=parent_folders,
-                name_parser=self.__name_parser,
+                name_parser=self.name_parser,
                 trailer_names=trailer_names,
             )
             if content is None:
-                if self.__options["parse_error_is_exception"]:
+                if self.options["parse_error_is_exception"]:
                     msg = _("Parse Error: Couldn't parse content from '{file}'").format(
                         file=file_path,
                     )
