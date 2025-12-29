@@ -18,7 +18,7 @@ apischema = "*"
 pysoundfile = "*"
 wxpython = {version = "*", find-links="https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-24.04/"}
 themoviedb = "*"
-sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python"}
+sentencepiece = {git = "https://github.com/google/sentencepiece", subdirectory = "python", ref="13394e10a2e7b8a6912cf087681f77c96f9f6020"}
 prompt-toolkit = "*"
 questionary = "*"
 colorlog = "*"
