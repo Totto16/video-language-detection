@@ -27,14 +27,14 @@ from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
 from humanize import naturalsize
-from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
-from torch import cuda
+
 
 from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.ffprobe import ffprobe, ffprobe_check
+from helper.gpu import GPU, GPUErrors
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
 from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
@@ -597,6 +597,7 @@ class ScanConfigDictTotal(TypedDict, total=True):
 
 @dataclass()
 class ClassifierOptions:
+    ##TODO: allow detection, detect gpu gddr ram and select best length based on kbit/s
     segment_length: Timestamp
     accuracy: AccuracySettingsDictTotal
     scan_config: ScanConfigDictTotal
@@ -653,7 +654,7 @@ class ClassifierOptionsConfig:
 
 
 class RunOpts(TypedDict, total=False):
-    device: Literal["cuda", "cpu"]
+    device: Literal["cpu"] | str  ## can be "cuda:<index>"
     data_parallel_count: int
     data_parallel_backend: bool
     distributed_launch: bool
@@ -672,12 +673,32 @@ class AllocatorType(Enum):
     gpu = " gpu"
 
 
+class Allocator:
+    type: AllocatorType
+
+    def __init__(self: Self, type_: AllocatorType) -> None:
+        self.type = type_
+
+
+class CPUAllocator(Allocator):
+    def __init__(self) -> None:
+        super().__init__(type_=AllocatorType.cpu)
+
+
+class GPUAllocator(Allocator):
+    gpu: GPU
+
+    def __init__(self, gpu: GPU) -> None:
+        super().__init__(type_=AllocatorType.gpu)
+        self.gpu = gpu
+
+
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 
 
 class ClassifierManager(AbstractContextManager[None]):
-    __type: AllocatorType
+    __allocator: CPUAllocator | GPUAllocator
     __classifier: EncoderClassifier
     __retry_count: int
     __failed_too_often: bool
@@ -689,10 +710,17 @@ class ClassifierManager(AbstractContextManager[None]):
         self.__failed_too_often = False
 
     def __force_cpu(self: Self) -> None:
-        self.__type = AllocatorType.cpu
+        self.__type = CPUAllocator()
 
     def __init_type(self: Self) -> None:
-        self.__type = AllocatorType.gpu if cuda.is_available() else AllocatorType.cpu
+
+        gpu_result = GPU.get_best(use_integrated=False)
+
+        if gpu_result.is_err():
+            logger.warning("Got GPU error: %s", gpu_result.get_err())
+            self.__type = CPUAllocator()
+        else:
+            self.__type = GPUAllocator(gpu_result.get_ok())
 
     def __init_classifier(self: Self) -> None:
         run_opts: Optional[RunOpts] = self.__get_run_opts()
@@ -733,26 +761,9 @@ class ClassifierManager(AbstractContextManager[None]):
     def failed_too_often(self: Self) -> bool:
         return self.__failed_too_often
 
-    @staticmethod
-    def clear_gpu_cache() -> None:
+    def clear_cache(self: Self) -> None:
         gc.collect()
-        cuda.empty_cache()
-
-    @staticmethod
-    def print_gpu_stat() -> None:
-        if not cuda.is_available():
-            return
-
-        ClassifierManager.clear_gpu_cache()
-
-        nvmlInit()
-        # TODO: support more than one
-        h = nvmlDeviceGetHandleByIndex(0)
-        info = nvmlDeviceGetMemoryInfo(h)
-        logger.info("GPU stats:")
-        logger.info("total : %s", naturalsize(info.total, binary=True))
-        logger.info("free : %s", naturalsize(info.free, binary=True))
-        logger.info("used : %s", naturalsize(info.used, binary=True))
+        self.gpu.empty_cache()
 
     def __get_run_opts(self: Self) -> Optional[RunOpts]:
 
@@ -762,7 +773,7 @@ class ClassifierManager(AbstractContextManager[None]):
         ClassifierManager.clear_gpu_cache()
 
         return {
-            "device": "cuda",
+            "device": self.gpu.device_name_for_torch(),
             "data_parallel_count": -1,
             "data_parallel_backend": True,
             "distributed_launch": False,
@@ -782,27 +793,28 @@ class ClassifierManager(AbstractContextManager[None]):
         _exc_tb: Optional[TracebackType],
     ) -> bool:
         if exc_val is not None:
-            if isinstance(exc_val, cuda.OutOfMemoryError):
-                if self.__retry_count >= MAX_RETRY_COUNT:
-                    msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
-                    logger.error(msg)
-                    self.__failed_too_often = True
+            for GPUError in GPUErrors:
+                if isinstance(exc_val, GPUError):
+                    if self.__retry_count >= MAX_RETRY_COUNT:
+                        msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
+                        logger.error(msg)
+                        self.__failed_too_often = True
+                        return True
+
+                    if (
+                        self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
+                        and self.__type == AllocatorType.gpu
+                    ):
+                        msg = "Switching the classifier to the cpu"
+                        logger.debug(msg)
+
+                        # reinitialize the classifier to use the cpu
+                        del self.__classifier
+                        self.__force_cpu()
+                        self.__init_classifier()
+
+                    self.__retry_count = self.__retry_count + 1
                     return True
-
-                if (
-                    self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
-                    and self.__type == AllocatorType.gpu
-                ):
-                    msg = "Switching the classifier to the cpu"
-                    logger.debug(msg)
-
-                    # reinitialize the classifier to use the cpu
-                    del self.__classifier
-                    self.__force_cpu()
-                    self.__init_classifier()
-
-                self.__retry_count = self.__retry_count + 1
-                return True
 
             logger.exception("Classify file")
             return False

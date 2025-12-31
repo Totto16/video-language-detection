@@ -10,7 +10,6 @@ torch = "*"
 speechbrain = "*"
 python-ffmpeg = "*"
 pyyaml = "*"
-pynvml = "*"
 humanize = "*"
 enlighten = "*"
 psutil = "*"
@@ -23,6 +22,15 @@ prompt-toolkit = "*"
 questionary = "*"
 colorlog = "*"
 pyperclip = "*"
+
+## generic opencl
+pyopencl = "*"
+siphash24 = "*"
+
+##nvidia gpu
+nvidia-ml-py = "*"
+##amd gpu
+amdsmi = "*"
 
 [dev-packages]
 pylint = "*"
