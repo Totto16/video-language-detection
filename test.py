@@ -45,6 +45,9 @@ def list_gpus_opencl():
 
             # Memory info
             vram_mb = device.global_mem_size // (1024 * 1024)
+            
+            # CL_DEVICE_MAX_COMPUTE_UNITS
+            cu = device.max_compute_units
 
             # This is the most reliable flag for iGPU vs dGPU
             unified = device.host_unified_memory
@@ -81,6 +84,8 @@ def list_gpus_opencl():
 ## print(list_gpus_opencl())
 
 
+
+
 from amdsmi import *
 
 try:
@@ -103,6 +108,7 @@ try:
             name = info["market_name"]
 
             print(name, info)
+            print(info["num_compute_units"])
 
 except AmdSmiException as e:
     print(e)

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Self
+from typing import Optional, Self, cast
 import pynvml
 from torch import cuda
 from helper.result import Result
@@ -24,6 +24,8 @@ class GPUVendor(Enum):
 class Device:
     vendor: Optional[GPUVendor]
     type: GPUType
+    memory_amount: Optional[int]  # bigger is better
+    num_compute_units: Optional[int]  # bigger is better
 
 
 GetDevicesResult = Result[list[Device], str]
@@ -54,7 +56,12 @@ def list_gpus_linux() -> GetDevicesResult:
                     else GPUType.dedicated
                 )
 
-                device: Device = Device(vendor, type_)
+                device: Device = Device(
+                    vendor=vendor,
+                    type=type_,
+                    memory_amount=None,
+                    num_compute_units=None,
+                )
                 devices.append(device)
 
         return GetDevicesResult.ok(devices)
@@ -67,15 +74,35 @@ def list_gpus_linux() -> GetDevicesResult:
         return GetDevicesResult.err(str(err))
 
 
+class nvmlMemoryPy:
+    total: int
+    free: int
+    used: int
+
+
 def list_gpus_nvidia() -> GetDevicesResult:
     try:
         pynvml.nvmlInit()
         devices: list[Device] = []
 
         for i in range(pynvml.nvmlDeviceGetCount()):
-            _handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
 
-            device: Device = Device(vendor=GPUVendor.nvidia, type=GPUType.dedicated)
+            num_compute_units = pynvml.nvmlDeviceGetNumGpuCores(handle)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+
+            memory_amount: Optional[int] = None
+            if isinstance(mem_info, pynvml.c_nvmlMemory_t) or isinstance(
+                mem_info, pynvml.c_nvmlMemory_v2_t
+            ):
+                memory_amount = cast(nvmlMemoryPy, mem_info).total
+
+            device: Device = Device(
+                vendor=GPUVendor.nvidia,
+                type=GPUType.dedicated,
+                memory_amount=memory_amount,
+                num_compute_units=num_compute_units,
+            )
             devices.append(device)
 
         pynvml.nvmlShutdown()
