@@ -346,22 +346,19 @@ def main() -> ExitCode:
             case "schema":
                 return subcommand_schema(
                     logger,
-                    cast(SchemaCommandParsedArgNamespace, args),
+                    args,
                 )
             case "gui":
-                return subcommand_gui(logger, cast(GuiCommandParsedArgNamespace, args))
+                return subcommand_gui(logger, args)
             case "run":
                 return subcommand_run(
                     logger,
-                    cast(
-                        RunCommandParsedArgNamespace,
-                        args,
-                    ),
+                    args,
                 )
             case "config_check":
                 return subcommand_config_check(
                     logger,
-                    cast(ConfigCheckCommandParsedArgNamespace, args),
+                    args,
                 )
             case _:
                 assert_never(args.subcommand)

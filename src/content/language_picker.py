@@ -315,7 +315,7 @@ class InteractiveLanguagePicker(LanguagePicker):
 
                 match result.select_result_type:
                     case "manual":
-                        manual_value = cast(ManualSelectResult, result)
+                        manual_value = result
                         match manual_value.selected:
                             case SelectedType.open:
                                 try:
@@ -346,7 +346,7 @@ class InteractiveLanguagePicker(LanguagePicker):
                             case _:
                                 assert_never(manual_value.selected)
                     case "prediction_best":
-                        prediction_value = cast(PredictionBestSelectResult, result)
+                        prediction_value = result
                         return prediction_value.value.language
 
                     case _:

@@ -1,6 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated, Literal, Optional, Self, TypedDict, assert_never, cast, override
+from typing import (
+    Annotated,
+    Literal,
+    Optional,
+    Self,
+    TypedDict,
+    assert_never,
+    cast,
+    override,
+)
 
 from content.base_class import LanguageScanner, Scanner
 from content.metadata.metadata import InternalMetadataType
@@ -297,7 +306,7 @@ def get_scanner_from_config(
             return ConfigScanner(
                 language_scanner=language_scanner,
                 metadata_scanner=metadata_scanner,
-                config=cast(ConfigScannerConfig, config).config,
+                config=config.config,
             )
         case "full":
             return FullScanner(

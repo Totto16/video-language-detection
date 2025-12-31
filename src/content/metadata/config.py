@@ -19,13 +19,13 @@ MetadataConfig = Annotated[
 def __get_provider(config: MetadataConfig) -> Provider:
     match config.type:
         case "imdb":
-            cfg1 = cast(IMDBMetadataConfig, config).config
+            cfg1 = config.config
             if cfg1 is not None:
                 return IMDBProvider(config=cfg1)
 
             return MissingProvider()
         case "tmdb":
-            cfg2 = cast(TMDBMetadataConfig, config).config
+            cfg2 = config.config
             if cfg2 is not None:
                 return TMDBProvider(config=cfg2)
 
