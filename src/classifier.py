@@ -14,6 +14,7 @@ from typing import (
     Literal,
     Optional,
     Self,
+    TypeIs,
     TypedDict,
     assert_never,
     override,
@@ -693,6 +694,10 @@ class GPUAllocator(Allocator):
         self.gpu = gpu
 
 
+def is_cpu_allocator(allocator: GPUAllocator | CPUAllocator) -> TypeIs[CPUAllocator]:
+    return allocator.type == AllocatorType.cpu
+
+
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 
@@ -710,7 +715,7 @@ class ClassifierManager(AbstractContextManager[None]):
         self.__failed_too_often = False
 
     def __force_cpu(self: Self) -> None:
-        self.__type = CPUAllocator()
+        self.__allocator = CPUAllocator()
 
     def __init_type(self: Self) -> None:
 
@@ -718,9 +723,9 @@ class ClassifierManager(AbstractContextManager[None]):
 
         if gpu_result.is_err():
             logger.warning("Got GPU error: %s", gpu_result.get_err())
-            self.__type = CPUAllocator()
+            self.__allocator = CPUAllocator()
         else:
-            self.__type = GPUAllocator(gpu_result.get_ok())
+            self.__allocator = GPUAllocator(gpu_result.get_ok())
 
     def __init_classifier(self: Self) -> None:
         run_opts: Optional[RunOpts] = self.__get_run_opts()
@@ -767,10 +772,12 @@ class ClassifierManager(AbstractContextManager[None]):
 
     def __get_run_opts(self: Self) -> Optional[RunOpts]:
 
-        if self.__type == AllocatorType.cpu:
+        if is_cpu_allocator(self.__allocator):
             return {"device": "cpu"}
 
-        ClassifierManager.clear_gpu_cache()
+        gpu = self.__allocator.gpu
+
+        gpu.empty_cache()
 
         return {
             "device": self.gpu.device_name_for_torch(),

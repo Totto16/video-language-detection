@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Self, cast
+from functools import cmp_to_key
+from typing import Optional, Self, cast, override
 import pynvml
 from torch import cuda
+from content.general import MissingOverrideError
 from helper.result import Result
 import subprocess
 import sys
@@ -26,7 +28,7 @@ class GPUVendor(Enum):
 
 
 @dataclass
-class Device:
+class GPUDevice:
     unique_id: str
     origin: str
     vendor: GPUVendor
@@ -36,7 +38,7 @@ class Device:
     num_compute_units: Optional[int]  # bigger is better
 
 
-GetDevicesResult = Result[list[Device], str]
+GetDevicesResult = Result[list[GPUDevice], str]
 
 
 def list_gpus_linux() -> GetDevicesResult:
@@ -45,7 +47,7 @@ def list_gpus_linux() -> GetDevicesResult:
 
     try:
         result = subprocess.check_output(["lspci", "-nn"]).decode()
-        devices: list[Device] = []
+        devices: list[GPUDevice] = []
 
         for line in result.splitlines():
 
@@ -65,7 +67,7 @@ def list_gpus_linux() -> GetDevicesResult:
                 if vendor is None:
                     continue
 
-                device: Device = Device(
+                device: GPUDevice = GPUDevice(
                     unique_id=unique_id,
                     origin="lspci",
                     vendor=vendor,
@@ -94,7 +96,7 @@ class nvmlMemoryPy:
 def list_gpus_nvidia() -> GetDevicesResult:
     try:
         pynvml.nvmlInit()
-        devices: list[Device] = []
+        devices: list[GPUDevice] = []
 
         for i in range(pynvml.nvmlDeviceGetCount()):
             handle = pynvml.nvmlDeviceGetHandleByIndex(i)
@@ -110,7 +112,7 @@ def list_gpus_nvidia() -> GetDevicesResult:
 
             unique_id: str = str(pynvml.nvmlDeviceGetUUID(handle))
 
-            device: Device = Device(
+            device: GPUDevice = GPUDevice(
                 unique_id=unique_id,
                 origin="nvml",
                 vendor=GPUVendor.nvidia,
@@ -157,7 +159,7 @@ def list_gpus_amd() -> GetDevicesResult:
 
     try:
         amdsmi_interface.amdsmi_init()
-        devices: list[Device] = []
+        devices: list[GPUDevice] = []
 
         for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
 
@@ -179,7 +181,7 @@ def list_gpus_amd() -> GetDevicesResult:
 
             gpu_type = get_gpu_type(processor_handle)
 
-            device: Device = Device(
+            device: GPUDevice = GPUDevice(
                 unique_id=unique_id,
                 origin="amdsmi",
                 vendor=GPUVendor.nvidia,
@@ -210,7 +212,7 @@ def list_gpus_native() -> GetDevicesResult:
     ]
 
     fails: list[str] = []
-    devices: list[Device] = []
+    devices: list[GPUDevice] = []
 
     for name, fun in methods:
         result = fun()
@@ -230,9 +232,9 @@ def list_gpus_native() -> GetDevicesResult:
 
 def list_gpus_opencl() -> GetDevicesResult:
 
-    def has_id(id: str) -> Callable[[Device], bool]:
+    def has_id(id: str) -> Callable[[GPUDevice], bool]:
 
-        def has_id_impl(device: Device) -> bool:
+        def has_id_impl(device: GPUDevice) -> bool:
             return device.unique_id == id
 
         return has_id_impl
@@ -264,7 +266,7 @@ def list_gpus_opencl() -> GetDevicesResult:
         return unique_id
 
     try:
-        devices: list[Device] = []
+        devices: list[GPUDevice] = []
 
         # on my pc, amd has two platform with the exact name and the same devices (maybe because of my amdgpu and rocm drivers??, but here we filter unique devices to occur only once)
         for platform in opencl.get_platforms():
@@ -299,7 +301,7 @@ def list_gpus_opencl() -> GetDevicesResult:
 
                 type_: GPUType = GPUType.integrated if unified else GPUType.dedicated
 
-                device_to_add: Device = Device(
+                device_to_add: GPUDevice = GPUDevice(
                     unique_id=unique_id,
                     origin="opencl",
                     vendor=vendor,
@@ -341,47 +343,122 @@ GpuGetResult = Result["GPU", str]
 
 
 class GPU:
-    type: GPUType
-    vendor: GPUVendor
+    device: GPUDevice
 
-    def __init__(self: Self, type_: GPUType, vendor: GPUVendor) -> None:
-        self.type = type_
-        self.vendor = vendor
+    def __init__(self: Self, device: GPUDevice) -> None:
+        self.device = device
 
     @staticmethod
     def get_best(*, use_integrated: bool = False) -> GpuGetResult:
+        devices_res = get_devices()
 
-        devices = get_devices()
+        if devices_res.is_err():
+            return GpuGetResult.err(devices_res.get_err())
+
+        devices = devices_res.get_ok()
+
+        if not use_integrated:
+
+            def remove_integrated_devices(device: GPUDevice) -> bool:
+                return device.type != GPUType.integrated
+
+            devices = list(filter(remove_integrated_devices, devices))
+
+        if len(devices) == 0:
+            return GpuGetResult.err("No suitable devices found")
+
+        CU_MULT = 10**18
+
+        def get_device_score(device: GPUDevice) -> int:
+            if device.num_compute_units is None:
+                if device.memory_amount is None:
+                    return 0
+
+                return device.memory_amount
+
+            if device.memory_amount is None:
+                return device.num_compute_units * CU_MULT
+
+            return (device.num_compute_units * CU_MULT) + device.memory_amount
+
+        def get_best_device(device1: GPUDevice, device2: GPUDevice) -> int:
+
+            if device1.type != device2.type:
+                return -1 if device1.type == GPUType.integrated else 1
+
+            device1_score = get_device_score(device1)
+            device2_score = get_device_score(device2)
+
+            return device2_score - device1_score
+
+        devices.sort(key=cmp_to_key(get_best_device))
+
+        device = devices[0]
+
+        return GpuGetResult.ok(GPU.from_device(device))
+
+    @staticmethod
+    def from_device(device: GPUDevice) -> GPU:
+        match device.vendor:
+            case GPUVendor.nvidia:
+                return NvidiaGPU(device)
+            case GPUVendor.amd:
+                return AmdGPU(device)
+            case GPUVendor.intel:
+                raise RuntimeError("Intel gpus not supported atm")
+            case _:
+                raise RuntimeError("unknown gpu vendor")
+
+    def empty_cache(self: Self) -> None:
+        raise MissingOverrideError
+
+    def device_name_for_torch(self: Self) -> str:
+        raise MissingOverrideError
 
 
 class NvidiaGPU(GPU):
 
-    @staticmethod
-    def print_gpu_stat() -> None:
-        if not cuda.is_available():
-            return
+    def __init__(self: Self, device: GPUDevice) -> None:
+        assert device.vendor == GPUVendor.nvidia
+        super().__init__(device)
 
-        ClassifierManager.clear_gpu_cache()
+        pynvml.nvmlInit()
+        # cuda.is_available()
 
-        nvmlInit()
-        # TODO: support more than one
-        h = pynvml.nvmlDeviceGetHandleByIndex(0)
-        info = pynvml.nvmlDeviceGetMemoryInfo(h)
-        logger.info("GPU stats:")
-        logger.info("total : %s", naturalsize(info.total, binary=True))
-        logger.info("free : %s", naturalsize(info.free, binary=True))
-        logger.info("used : %s", naturalsize(info.used, binary=True))
-
-    def empty_cache():
+    @override
+    def empty_cache(self: Self) -> None:
         cuda.empty_cache()
 
-    def device_name_for_torch():
+    @override
+    def device_name_for_torch(self: Self) -> str:
         return f"cuda:{index}"
 
+    def __del__(self: Self) -> None:
+        pynvml.nvmlShutdown()
 
-# cuda.is_available()
 
-GPUErrors: list[RuntimeError] = [
+class AmdGPU(GPU):
+
+    def __init__(self: Self, device: GPUDevice) -> None:
+        assert device.vendor == GPUVendor.amd
+        super().__init__(device)
+
+        amdsmi_interface.amdsmi_init()
+
+    @override
+    def empty_cache(self: Self) -> None:
+        # TODO
+        pass
+
+    @override
+    def device_name_for_torch(self: Self) -> str:
+        return f"amd:{index}"
+
+    def __del__(self: Self) -> None:
+        amdsmi.amdsmi_shut_down()
+
+
+GPUErrors: list[Exception] = [
     cuda.OutOfMemoryError,
     amdsmi_exception.AmdSmiException,
 ]
