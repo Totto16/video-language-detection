@@ -38,6 +38,7 @@ def list_gpus_opencl():
     gpus = []
 
     for platform in cl.get_platforms():
+        print(platform.name)
         for device in platform.get_devices(device_type=cl.device_type.GPU):
 
             vendor = device.vendor.strip()
@@ -45,9 +46,10 @@ def list_gpus_opencl():
 
             # Memory info
             vram_mb = device.global_mem_size // (1024 * 1024)
-            
-            # CL_DEVICE_MAX_COMPUTE_UNITS
+
             cu = device.max_compute_units
+            
+            unique_id = device.extensions
 
             # This is the most reliable flag for iGPU vs dGPU
             unified = device.host_unified_memory
@@ -74,46 +76,64 @@ def list_gpus_opencl():
                     "type": gpu_type,
                     "vram_mb": vram_mb,
                     "host_unified_memory": unified,
-                    "platform": platform.name.strip(),
+                    "cu": cu,
+                    "unique_id": unique_id
                 }
             )
 
+        break
     return gpus
 
 
-## print(list_gpus_opencl())
-
-
+print(list_gpus_opencl())
 
 
 from amdsmi import *
 
-try:
-    amdsmi_init()
 
-    num_of_GPUs = len(amdsmi_get_processor_handles())
-    if num_of_GPUs == 0:
-        print("No GPUs on machine")
-
-    devices = amdsmi_get_processor_handles()
-    if len(devices) == 0:
-        print("No GPUs on machine")
-    else:
-        for processor_handle in devices:
-            print(amdsmi_get_gpu_device_uuid(processor_handle))
-            type_of_GPU = amdsmi_get_processor_type(processor_handle)
-            print(type_of_GPU)
-            info = amdsmi_get_gpu_asic_info(processor_handle=processor_handle)
-
-            name = info["market_name"]
-
-            print(name, info)
-            print(info["num_compute_units"])
-
-except AmdSmiException as e:
-    print(e)
-finally:
+def amd_fn():
     try:
-        amdsmi_shut_down()
+        amdsmi_init()
+
+        num_of_GPUs = len(amdsmi_get_processor_handles())
+        if num_of_GPUs == 0:
+            print("No GPUs on machine")
+
+        devices = amdsmi_get_processor_handles()
+        if len(devices) == 0:
+            print("No GPUs on machine")
+        else:
+            for processor_handle in devices:
+                print()
+                print()
+                print(amdsmi_get_gpu_device_uuid(processor_handle))
+                info = amdsmi_get_gpu_asic_info(processor_handle=processor_handle)
+
+                name = info["market_name"]
+
+                print(name, info)
+                print(info["num_compute_units"])
+
+                asic = amdsmi_get_gpu_asic_info(processor_handle)
+                print(asic)
+                vram = amdsmi_get_gpu_vram_info(processor_handle)
+                print(vram)
+                power = amdsmi_get_power_cap_info(processor_handle)
+                print(power)
+                try:
+                    print("PCI")
+                    print(amdsmi_get_gpu_bdf_id(processor_handle))
+                    print(amdsmi_get_gpu_pci_bandwidth(processor_handle))
+
+                    bus = amdsmi_get_pcie_info(processor_handle)
+                    print(bus)
+                except Exception:
+                    print("NO PCIE")
+
     except AmdSmiException as e:
         print(e)
+    finally:
+        try:
+            amdsmi_shut_down()
+        except AmdSmiException as e:
+            print(e)

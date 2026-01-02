@@ -378,6 +378,6 @@ def get_picker_from_config(
             return NoLanguagePicker()
         case "interactive":
             resolved_config = resolve_interactive_config(
-                cast(InteractiveLanguagePickerConfig, config).config,
+                config.config,
             )
             return InteractiveLanguagePicker(config=resolved_config)
