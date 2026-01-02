@@ -4,10 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-torchvision = "*"
-torch = "*"
 #see: https://github.com/speechbrain/speechbrain/pull/2996
-speechbrain =  {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
+# once this has a release, use it
+speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
 python-ffmpeg = "*"
 pyyaml = "*"
 enlighten = "*"
@@ -27,9 +26,18 @@ pyopencl = "*"
 siphash24 = "*"
 
 ##nvidia gpu
+[nvidia]
 nvidia-ml-py = "*"
+torchvision = {version = "*", index="https://download.pytorch.org/whl/cu130/"}
+torch = {version = "*", index="https://download.pytorch.org/whl/cu130/"}
+
 ##amd gpu
+[amd]
 amdsmi = "*"
+torchvision = {version = "*", index="https://download.pytorch.org/whl/rocm6.4/"}
+torch = {version = "*", index="https://download.pytorch.org/whl/rocm6.4/"}
+
+## usage: pipenv install --categories "packages,packages-dev,amd"
 
 [dev-packages]
 pylint = "*"
