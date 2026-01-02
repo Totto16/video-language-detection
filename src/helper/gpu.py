@@ -6,12 +6,10 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cmp_to_key
 from typing import Optional, Self, assert_never, cast, override
+import torch
 
-import amdsmi.amdsmi_wrapper as amdsmi
-import pynvml
 import pyopencl as opencl
-from amdsmi import amdsmi_exception, amdsmi_interface
-from torch import cuda
+
 
 from content.general import MissingOverrideError
 from helper.result import Result
@@ -96,141 +94,155 @@ class NvmlMemoryPy:
 
 def list_gpus_nvidia() -> GetDevicesResult:
     try:
-        pynvml.nvmlInit()
-        devices: list[GPUDevice] = []
+        import pynvml  # type: ignore[import-not-found]  # noqa: PLC0415
 
-        for i in range(pynvml.nvmlDeviceGetCount()):
-            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        try:
+            pynvml.nvmlInit()
+            devices: list[GPUDevice] = []
 
-            num_compute_units = pynvml.nvmlDeviceGetNumGpuCores(handle)
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            for i in range(pynvml.nvmlDeviceGetCount()):
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
 
-            memory_amount: Optional[int] = None
-            if isinstance(mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t)):
-                memory_amount = cast(NvmlMemoryPy, mem_info).total
+                num_compute_units = pynvml.nvmlDeviceGetNumGpuCores(handle)
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
 
-            unique_id: str = str(pynvml.nvmlDeviceGetUUID(handle))
+                memory_amount: Optional[int] = None
+                if isinstance(
+                    mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t)
+                ):
+                    memory_amount = cast(NvmlMemoryPy, mem_info).total
 
-            device: GPUDevice = GPUDevice(
-                unique_id=unique_id,
-                origin="nvml",
-                vendor=GPUVendor.nvidia,
-                type=GPUType.dedicated,
-                memory_amount=memory_amount,
-                num_compute_units=num_compute_units,
-            )
-            devices.append(device)
+                unique_id: str = str(pynvml.nvmlDeviceGetUUID(handle))
 
-        return GetDevicesResult.ok(devices)
+                device: GPUDevice = GPUDevice(
+                    unique_id=unique_id,
+                    origin="nvml",
+                    vendor=GPUVendor.nvidia,
+                    type=GPUType.dedicated,
+                    memory_amount=memory_amount,
+                    num_compute_units=num_compute_units,
+                )
+                devices.append(device)
 
-    except pynvml.NVMLError as err:
-        return GetDevicesResult.err(str(err))
-    except Exception as err:  # noqa:  BLE001
-        return GetDevicesResult.err(str(err))
-    finally:
-        with contextlib.suppress(Exception):
-            # this can fail, but here we just ignore it
-            pynvml.nvmlShutdown()
+            return GetDevicesResult.ok(devices)
 
-
-# currently not in the source code, but the correct value for this
-AMDSMI_VRAM_TYPE_DDR5 = amdsmi.AMDSMI_VRAM_TYPE_DDR4 + 1
+        except pynvml.NVMLError as err:
+            return GetDevicesResult.err(str(err))
+        except Exception as err:  # noqa:  BLE001
+            return GetDevicesResult.err(str(err))
+        finally:
+            with contextlib.suppress(Exception):
+                # this can fail, but here we just ignore it
+                pynvml.nvmlShutdown()
+    except ImportError:
+        return GetDevicesResult.err("not build with nvidia support")
 
 
 def list_gpus_amd() -> GetDevicesResult:
 
-    def get_gpu_type_by_ex(
-        processor_handle: amdsmi_interface.processor_handle,
-    ) -> GPUType:
-        try:
-
-            # these fail on integrated devices!
-            _id = amdsmi.amdsmi_get_gpu_bdf_id(processor_handle)
-            _pci_bw = amdsmi_interface.amdsmi_get_gpu_pci_bandwidth(processor_handle)
-
-            _bus = amdsmi_interface.amdsmi_get_pcie_info(processor_handle)
-            return GPUType.dedicated  # noqa: TRY300
-        except amdsmi_exception.AmdSmiException:
-            return GPUType.integrated
-
-    def get_gpu_type_by_vram_type(
-        processor_handle: amdsmi_interface.processor_handle,
-    ) -> GPUType:
-        vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
-
-        vram_type: int = vram["vram_type"]
-
-        if (
-            vram_type >= amdsmi.AMDSMI_VRAM_TYPE_GDDR1
-            and vram_type <= amdsmi.AMDSMI_VRAM_TYPE_GDDR7
-        ):
-            return GPUType.dedicated
-
-        if (
-            vram_type >= amdsmi.AMDSMI_VRAM_TYPE_DDR2
-            and vram_type <= AMDSMI_VRAM_TYPE_DDR5
-        ):
-            return GPUType.integrated
-
-        msg = f"unrecognized vram type: {vram_type}"
-        raise RuntimeError(msg)
-
-    def get_gpu_type(
-        processor_handle: amdsmi_interface.processor_handle,
-    ) -> GPUType:
-        type1 = get_gpu_type_by_ex(processor_handle)
-        type2 = get_gpu_type_by_vram_type(processor_handle)
-
-        if type1 != type2:
-            msg = "failed to detect the gpu type consistently"
-            raise RuntimeError(msg)
-
-        return type1
-
     try:
-        amdsmi_interface.amdsmi_init()
-        devices: list[GPUDevice] = []
+        import amdsmi.amdsmi_wrapper as amdsmi
+        from amdsmi import amdsmi_exception, amdsmi_interface
 
-        for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
+        # currently not in the source code, but the correct value for this
+        AMDSMI_VRAM_TYPE_DDR5 = amdsmi.AMDSMI_VRAM_TYPE_DDR4 + 1
 
-            unique_id: str = amdsmi_interface.amdsmi_get_gpu_device_uuid(
-                processor_handle,
-            )
+        def get_gpu_type_by_ex(
+            processor_handle: amdsmi_interface.processor_handle,
+        ) -> GPUType:
+            try:
 
-            info = amdsmi_interface.amdsmi_get_gpu_asic_info(
-                processor_handle=processor_handle,
-            )
+                # these fail on integrated devices!
+                _id = amdsmi.amdsmi_get_gpu_bdf_id(processor_handle)
+                _pci_bw = amdsmi_interface.amdsmi_get_gpu_pci_bandwidth(
+                    processor_handle
+                )
 
-            num_compute_units: int = info["num_compute_units"]
+                _bus = amdsmi_interface.amdsmi_get_pcie_info(processor_handle)
+                return GPUType.dedicated  # noqa: TRY300
+            except amdsmi_exception.AmdSmiException:
+                return GPUType.integrated
 
+        def get_gpu_type_by_vram_type(
+            processor_handle: amdsmi_interface.processor_handle,
+        ) -> GPUType:
             vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
 
-            vram_size_mb: int = vram["vram_size"]
+            vram_type: int = vram["vram_type"]
 
-            memory_amount = vram_size_mb * 1024 * 1024
+            if (
+                vram_type >= amdsmi.AMDSMI_VRAM_TYPE_GDDR1
+                and vram_type <= amdsmi.AMDSMI_VRAM_TYPE_GDDR7
+            ):
+                return GPUType.dedicated
 
-            gpu_type = get_gpu_type(processor_handle)
+            if (
+                vram_type >= amdsmi.AMDSMI_VRAM_TYPE_DDR2
+                and vram_type <= AMDSMI_VRAM_TYPE_DDR5
+            ):
+                return GPUType.integrated
 
-            device: GPUDevice = GPUDevice(
-                unique_id=unique_id,
-                origin="amdsmi",
-                vendor=GPUVendor.nvidia,
-                type=gpu_type,
-                memory_amount=memory_amount,
-                num_compute_units=num_compute_units,
-            )
-            devices.append(device)
+            msg = f"unrecognized vram type: {vram_type}"
+            raise RuntimeError(msg)
 
-        return GetDevicesResult.ok(devices)
+        def get_gpu_type(
+            processor_handle: amdsmi_interface.processor_handle,
+        ) -> GPUType:
+            type1 = get_gpu_type_by_ex(processor_handle)
+            type2 = get_gpu_type_by_vram_type(processor_handle)
 
-    except amdsmi_exception.AmdSmiException as err:
-        return GetDevicesResult.err(str(err))
-    except Exception as err:  # noqa:  BLE001
-        return GetDevicesResult.err(str(err))
-    finally:
-        with contextlib.suppress(Exception):
-            # this can fail, but here we just ignore it
-            amdsmi.amdsmi_shut_down()
+            if type1 != type2:
+                msg = "failed to detect the gpu type consistently"
+                raise RuntimeError(msg)
+
+            return type1
+
+        try:
+            amdsmi_interface.amdsmi_init()
+            devices: list[GPUDevice] = []
+
+            for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
+
+                unique_id: str = amdsmi_interface.amdsmi_get_gpu_device_uuid(
+                    processor_handle,
+                )
+
+                info = amdsmi_interface.amdsmi_get_gpu_asic_info(
+                    processor_handle=processor_handle,
+                )
+
+                num_compute_units: int = info["num_compute_units"]
+
+                vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
+
+                vram_size_mb: int = vram["vram_size"]
+
+                memory_amount = vram_size_mb * 1024 * 1024
+
+                gpu_type = get_gpu_type(processor_handle)
+
+                device: GPUDevice = GPUDevice(
+                    unique_id=unique_id,
+                    origin="amdsmi",
+                    vendor=GPUVendor.nvidia,
+                    type=gpu_type,
+                    memory_amount=memory_amount,
+                    num_compute_units=num_compute_units,
+                )
+                devices.append(device)
+
+            return GetDevicesResult.ok(devices)
+
+        except amdsmi_exception.AmdSmiException as err:
+            return GetDevicesResult.err(str(err))
+        except Exception as err:  # noqa:  BLE001
+            return GetDevicesResult.err(str(err))
+        finally:
+            with contextlib.suppress(Exception):
+                # this can fail, but here we just ignore it
+                amdsmi.amdsmi_shut_down()
+    except ImportError:
+        return GetDevicesResult.err("not build with amd support")
 
 
 def list_gpus_native() -> GetDevicesResult:
@@ -348,6 +360,9 @@ def list_gpus_opencl() -> GetDevicesResult:
 
 
 def get_devices() -> GetDevicesResult:
+    print(list_gpus_native())
+    print(list_gpus_opencl())
+    print(list_gpus_linux())
 
     ## try best detection methods in order, if no one succeeds, return an error
     methods: list[tuple[str, Callable[[], GetDevicesResult]]] = [
@@ -426,6 +441,9 @@ class GPU:
 
             device = devices[0]
 
+            if not torch.cuda.is_available():
+                GpuGetResult.err("Cuda not available")
+
             return GpuGetResult.ok(GPU.from_device(device))
 
         except Exception as err:  # noqa:  BLE001
@@ -435,9 +453,6 @@ class GPU:
     def from_device(device: GPUDevice) -> "GPU":
         match device.vendor:
             case GPUVendor.nvidia:
-                if not cuda.is_available():
-                    msg = "Cuda not available"
-                    raise RuntimeError(msg)
                 return NvidiaGPU(device)
             case GPUVendor.amd:
                 return AmdGPU(device)
@@ -447,14 +462,38 @@ class GPU:
             case _:
                 assert_never(device.vendor)
 
+    def set_default_device(self: Self, device: torch.device) -> None:
+        torch.set_default_device(device=device)
+        torch.cuda.set_device(device=device)
+
     @property
     def device(self: Self) -> GPUDevice:
         return self.__device
 
     def empty_cache(self: Self) -> None:
-        raise MissingOverrideError
+        torch.cuda.empty_cache()
 
-    def device_name_for_torch(self: Self) -> str:
+    def torch_device(self: Self) -> Optional[torch.device]:
+        index = self.get_index()
+        if index is None:
+            return None
+        return torch.device(type="cuda", index=index)
+
+    def get_index(self: Self) -> Optional[int]:
+
+        for i in range(torch.cuda.device_count()):
+            print("  Name:", torch.cuda.get_device_name(i))
+            print("  Capability:", torch.cuda.get_device_capability(i))
+            print(
+                "  Memory (GB):",
+                round(torch.cuda.get_device_properties(i).total_memory / 1e9, 2),
+            )
+
+        return None
+
+    def is_eq_to_torch_device(
+        self: Self, torch_device: torch.device
+    ) -> bool:  # noqa: ARG002
         raise MissingOverrideError
 
 
@@ -466,18 +505,9 @@ class NvidiaGPU(GPU):
             raise RuntimeError(msg)
         super().__init__(device)
 
-        pynvml.nvmlInit()
-
     @override
-    def empty_cache(self: Self) -> None:
-        cuda.empty_cache()
-
-    @override
-    def device_name_for_torch(self: Self) -> str:
-        return f"cuda:{self.device.unique_id}"
-
-    def __del__(self: Self) -> None:
-        pynvml.nvmlShutdown()
+    def is_eq_to_torch_device(self: Self, torch_device: torch.device) -> bool:
+        return torch_device == self.device.unique_id
 
 
 class AmdGPU(GPU):
@@ -488,22 +518,6 @@ class AmdGPU(GPU):
             raise RuntimeError(msg)
         super().__init__(device)
 
-        amdsmi_interface.amdsmi_init()
-
     @override
-    def empty_cache(self: Self) -> None:
-        # TODO
-        pass
-
-    @override
-    def device_name_for_torch(self: Self) -> str:
-        return f"amd:{self.device.unique_id}"
-
-    def __del__(self: Self) -> None:
-        amdsmi.amdsmi_shut_down()
-
-
-GPUErrors: list[type] = [
-    cuda.OutOfMemoryError,
-    amdsmi_exception.AmdSmiException,
-]
+    def is_eq_to_torch_device(self: Self, torch_device: torch.device) -> bool:
+        return torch_device == self.device.unique_id

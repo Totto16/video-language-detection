@@ -8,6 +8,7 @@ from logging import Logger
 from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
+import torch
 from typing import (
     Annotated,
     Any,
@@ -33,7 +34,7 @@ from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.ffprobe import ffprobe, ffprobe_check
-from helper.gpu import GPU, GPUErrors
+from helper.gpu import GPU
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
 from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
@@ -653,7 +654,7 @@ class ClassifierOptionsConfig:
 
 
 class RunOpts(TypedDict, total=False):
-    device: Literal["cpu"] | str  ## can be "cuda:<index>"
+    device: torch.device | str
     data_parallel_count: int
     data_parallel_backend: bool
     distributed_launch: bool
@@ -779,14 +780,23 @@ class ClassifierManager(AbstractContextManager[None]):
 
         gpu = self.__allocator.gpu
 
-        return {
-            "device": gpu.device_name_for_torch(),
+        device = gpu.torch_device()
+
+        if device is None:
+            raise RuntimeError("Gpu found, but not usable in torch")
+
+        gpu.set_default_device(device)
+
+        run_ops: RunOpts = {
+            "device": device,
             "data_parallel_count": -1,
             "data_parallel_backend": True,
             "distributed_launch": False,
             "distributed_backend": "nccl",
             "jit_module_keys": None,
         }
+
+        return run_ops
 
     @override
     def __enter__(self: Self) -> None:
@@ -800,28 +810,28 @@ class ClassifierManager(AbstractContextManager[None]):
         _exc_tb: Optional[TracebackType],
     ) -> bool:
         if exc_val is not None:
-            for GPUError in GPUErrors:
-                if isinstance(exc_val, GPUError):
-                    if self.__retry_count >= MAX_RETRY_COUNT:
-                        msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
-                        logger.error(msg)
-                        self.__failed_too_often = True
-                        return True
 
-                    if (
-                        self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
-                        and self.__allocator.type == AllocatorType.gpu
-                    ):
-                        msg = "Switching the classifier to the cpu"
-                        logger.debug(msg)
-
-                        # reinitialize the classifier to use the cpu
-                        del self.__classifier
-                        self.__force_cpu()
-                        self.__init_classifier()
-
-                    self.__retry_count = self.__retry_count + 1
+            if isinstance(exc_val, torch.cuda.OutOfMemoryError):
+                if self.__retry_count >= MAX_RETRY_COUNT:
+                    msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
+                    logger.error(msg)
+                    self.__failed_too_often = True
                     return True
+
+                if (
+                    self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
+                    and self.__allocator.type == AllocatorType.gpu
+                ):
+                    msg = "Switching the classifier to the cpu"
+                    logger.debug(msg)
+
+                    # reinitialize the classifier to use the cpu
+                    del self.__classifier
+                    self.__force_cpu()
+                    self.__init_classifier()
+
+                self.__retry_count = self.__retry_count + 1
+                return True
 
             logger.exception("Classify file")
             return False
