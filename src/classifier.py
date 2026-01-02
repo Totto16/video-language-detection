@@ -768,19 +768,21 @@ class ClassifierManager(AbstractContextManager[None]):
 
     def clear_cache(self: Self) -> None:
         gc.collect()
-        self.gpu.empty_cache()
+
+        if not is_cpu_allocator(self.__allocator):
+            self.__allocator.gpu.empty_cache()
 
     def __get_run_opts(self: Self) -> Optional[RunOpts]:
+
+        self.clear_cache()
 
         if is_cpu_allocator(self.__allocator):
             return {"device": "cpu"}
 
         gpu = self.__allocator.gpu
 
-        gpu.empty_cache()
-
         return {
-            "device": self.gpu.device_name_for_torch(),
+            "device": gpu.device_name_for_torch(),
             "data_parallel_count": -1,
             "data_parallel_backend": True,
             "distributed_launch": False,
@@ -810,7 +812,7 @@ class ClassifierManager(AbstractContextManager[None]):
 
                     if (
                         self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
-                        and self.__type == AllocatorType.gpu
+                        and self.__allocator.type == AllocatorType.gpu
                     ):
                         msg = "Switching the classifier to the cpu"
                         logger.debug(msg)
@@ -854,8 +856,7 @@ class ClassifierManager(AbstractContextManager[None]):
         ]
 
     def __del__(self: Self) -> None:
-        if self.__type == AllocatorType.gpu:
-            ClassifierManager.clear_gpu_cache()
+        self.clear_cache()
 
 
 class PredictionFailReason(Enum):

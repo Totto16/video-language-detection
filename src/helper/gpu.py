@@ -343,64 +343,70 @@ GpuGetResult = Result["GPU", str]
 
 
 class GPU:
-    device: GPUDevice
+    __device: GPUDevice
 
     def __init__(self: Self, device: GPUDevice) -> None:
-        self.device = device
+        self.__device = device
 
     @staticmethod
     def get_best(*, use_integrated: bool = False) -> GpuGetResult:
-        devices_res = get_devices()
+        try:
+            devices_res = get_devices()
 
-        if devices_res.is_err():
-            return GpuGetResult.err(devices_res.get_err())
+            if devices_res.is_err():
+                return GpuGetResult.err(devices_res.get_err())
 
-        devices = devices_res.get_ok()
+            devices = devices_res.get_ok()
 
-        if not use_integrated:
+            if not use_integrated:
 
-            def remove_integrated_devices(device: GPUDevice) -> bool:
-                return device.type != GPUType.integrated
+                def remove_integrated_devices(device: GPUDevice) -> bool:
+                    return device.type != GPUType.integrated
 
-            devices = list(filter(remove_integrated_devices, devices))
+                devices = list(filter(remove_integrated_devices, devices))
 
-        if len(devices) == 0:
-            return GpuGetResult.err("No suitable devices found")
+            if len(devices) == 0:
+                return GpuGetResult.err("No suitable devices found")
 
-        CU_MULT = 10**18
+            CU_MULT = 10**18
 
-        def get_device_score(device: GPUDevice) -> int:
-            if device.num_compute_units is None:
+            def get_device_score(device: GPUDevice) -> int:
+                if device.num_compute_units is None:
+                    if device.memory_amount is None:
+                        return 0
+
+                    return device.memory_amount
+
                 if device.memory_amount is None:
-                    return 0
+                    return device.num_compute_units * CU_MULT
 
-                return device.memory_amount
+                return (device.num_compute_units * CU_MULT) + device.memory_amount
 
-            if device.memory_amount is None:
-                return device.num_compute_units * CU_MULT
+            def get_best_device(device1: GPUDevice, device2: GPUDevice) -> int:
 
-            return (device.num_compute_units * CU_MULT) + device.memory_amount
+                if device1.type != device2.type:
+                    return -1 if device1.type == GPUType.integrated else 1
 
-        def get_best_device(device1: GPUDevice, device2: GPUDevice) -> int:
+                device1_score = get_device_score(device1)
+                device2_score = get_device_score(device2)
 
-            if device1.type != device2.type:
-                return -1 if device1.type == GPUType.integrated else 1
+                return device2_score - device1_score
 
-            device1_score = get_device_score(device1)
-            device2_score = get_device_score(device2)
+            devices.sort(key=cmp_to_key(get_best_device))
 
-            return device2_score - device1_score
+            device = devices[0]
 
-        devices.sort(key=cmp_to_key(get_best_device))
+            return GpuGetResult.ok(GPU.from_device(device))
 
-        device = devices[0]
-
-        return GpuGetResult.ok(GPU.from_device(device))
+        except Exception as err:
+            return GpuGetResult.err(str(err))
 
     @staticmethod
     def from_device(device: GPUDevice) -> GPU:
         match device.vendor:
             case GPUVendor.nvidia:
+                if not cuda.is_available():
+                    raise RuntimeError("Cuda not available")
                 return NvidiaGPU(device)
             case GPUVendor.amd:
                 return AmdGPU(device)
@@ -423,7 +429,6 @@ class NvidiaGPU(GPU):
         super().__init__(device)
 
         pynvml.nvmlInit()
-        # cuda.is_available()
 
     @override
     def empty_cache(self: Self) -> None:
@@ -431,7 +436,7 @@ class NvidiaGPU(GPU):
 
     @override
     def device_name_for_torch(self: Self) -> str:
-        return f"cuda:{index}"
+        return f"cuda:{self.__device.unique_id}"
 
     def __del__(self: Self) -> None:
         pynvml.nvmlShutdown()
@@ -452,13 +457,13 @@ class AmdGPU(GPU):
 
     @override
     def device_name_for_torch(self: Self) -> str:
-        return f"amd:{index}"
+        return f"amd:{self.__device.unique_id}"
 
     def __del__(self: Self) -> None:
         amdsmi.amdsmi_shut_down()
 
 
-GPUErrors: list[Exception] = [
+GPUErrors: list[type] = [
     cuda.OutOfMemoryError,
     amdsmi_exception.AmdSmiException,
 ]
