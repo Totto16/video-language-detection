@@ -4,13 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-torchaudio = "<2.9"
 torchvision = "*"
 torch = "*"
-#TODO. migrate to not using torchaudio and the custom speechbrain implementation to replace removed apis in trochaudio 2.9
-# see: https://github.com/pytorch/audio/issues/3902
-# and: https://github.com/speechbrain/speechbrain/pull/2989
-speechbrain = "1.0.3"
+#see: https://github.com/speechbrain/speechbrain/pull/2996
+speechbrain =  {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
 python-ffmpeg = "*"
 pyyaml = "*"
 enlighten = "*"

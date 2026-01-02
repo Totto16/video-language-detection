@@ -21,7 +21,7 @@ from typing import (
 )
 
 import psutil
-import torchaudio
+from speechbrain.dataio import audio_io
 from apischema import deserializer, schema, serializer
 from enlighten import Manager
 from ffmpeg.errors import FFmpegError
@@ -747,7 +747,7 @@ class ClassifierManager(AbstractContextManager[None]):
         self.__init_classifier()
 
     def __check_audio_backends(self: Self) -> None:
-        backends = torchaudio.list_audio_backends()
+        backends = audio_io.list_audio_backends()
         if len(backends) == 0:
             msg = "Couldn't find any audio backends for torchaudio"
             raise RuntimeError(msg)
