@@ -133,28 +133,59 @@ def list_gpus_nvidia() -> GetDevicesResult:
             pynvml.nvmlShutdown()
 
 
+# currently not in the source code, but the correct value for this
+AMDSMI_VRAM_TYPE_DDR5 = amdsmi.AMDSMI_VRAM_TYPE_DDR4 + 1
+
+
 def list_gpus_amd() -> GetDevicesResult:
 
-    def get_gpu_type(
+    def get_gpu_type_by_ex(
         processor_handle: amdsmi_interface.processor_handle,
     ) -> GPUType:
         try:
 
+            # these fail on integrated devices!
             _id = amdsmi.amdsmi_get_gpu_bdf_id(processor_handle)
             _pci_bw = amdsmi_interface.amdsmi_get_gpu_pci_bandwidth(processor_handle)
 
             _bus = amdsmi_interface.amdsmi_get_pcie_info(processor_handle)
-
-            vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
-
-            vram_type: int = vram["vram_type"]
-
-            ## TODO AMDSMI_VRAM_TYPE_GDDR6
-            ## TODO amdsmi_vram_type_t__enumvalues
-
             return GPUType.dedicated  # noqa: TRY300
         except amdsmi_exception.AmdSmiException:
             return GPUType.integrated
+
+    def get_gpu_type_by_vram_type(
+        processor_handle: amdsmi_interface.processor_handle,
+    ) -> GPUType:
+        vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
+
+        vram_type: int = vram["vram_type"]
+
+        if (
+            vram_type >= amdsmi.AMDSMI_VRAM_TYPE_GDDR1
+            and vram_type <= amdsmi.AMDSMI_VRAM_TYPE_GDDR7
+        ):
+            return GPUType.dedicated
+
+        if (
+            vram_type >= amdsmi.AMDSMI_VRAM_TYPE_DDR2
+            and vram_type <= AMDSMI_VRAM_TYPE_DDR5
+        ):
+            return GPUType.integrated
+
+        msg = f"unrecognized vram type: {vram_type}"
+        raise RuntimeError(msg)
+
+    def get_gpu_type(
+        processor_handle: amdsmi_interface.processor_handle,
+    ) -> GPUType:
+        type1 = get_gpu_type_by_ex(processor_handle)
+        type2 = get_gpu_type_by_vram_type(processor_handle)
+
+        if type1 != type2:
+            msg = "failed to detect the gpu type consistently"
+            raise RuntimeError(msg)
+
+        return type1
 
     try:
         amdsmi_interface.amdsmi_init()
