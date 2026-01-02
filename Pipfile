@@ -39,14 +39,15 @@ siphash24 = "*"
 ##nvidia gpu
 [nvidia]
 nvidia-ml-py = "*"
-torchvision = {version = "*", index="torch-nvidia"}
-torch = {version = "*", index="torch-nvidia"}
+torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
 ##amd gpu
 [amd]
 amdsmi = "*"
-torchvision = {version = "*", index="torch-amd"}
-torch = {version = "*", index="torch-amd"}
+torchvision = {version = "==0.25.0.dev20260102", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "==2.11.0.dev20260101", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+triton-rocm = {version = "==3.6.0+git9844da95", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
 ## usage: pipenv install --categories "packages,packages-dev,amd"
 
