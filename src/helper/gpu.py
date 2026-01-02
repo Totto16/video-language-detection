@@ -416,6 +416,10 @@ class GPU:
             case _:
                 assert_never(device.vendor)
 
+    @property
+    def device(self: Self) -> GPUDevice:
+        return self.__device
+
     def empty_cache(self: Self) -> None:
         raise MissingOverrideError
 
@@ -439,7 +443,7 @@ class NvidiaGPU(GPU):
 
     @override
     def device_name_for_torch(self: Self) -> str:
-        return f"cuda:{self.__device.unique_id}"
+        return f"cuda:{self.device.unique_id}"
 
     def __del__(self: Self) -> None:
         pynvml.nvmlShutdown()
@@ -462,7 +466,7 @@ class AmdGPU(GPU):
 
     @override
     def device_name_for_torch(self: Self) -> str:
-        return f"amd:{self.__device.unique_id}"
+        return f"amd:{self.device.unique_id}"
 
     def __del__(self: Self) -> None:
         amdsmi.amdsmi_shut_down()
