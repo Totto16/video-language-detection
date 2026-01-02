@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cmp_to_key
-from typing import Optional, Self, cast, override
+from typing import Optional, Self, assert_never, cast, override
 
 import amdsmi.amdsmi_wrapper as amdsmi
 import pynvml
@@ -414,8 +414,7 @@ class GPU:
                 msg = "Intel gpus not supported atm"
                 raise RuntimeError(msg)
             case _:
-                msg = "unknown gpu vendor"
-                raise RuntimeError(msg)
+                assert_never(device.vendor)
 
     def empty_cache(self: Self) -> None:
         raise MissingOverrideError

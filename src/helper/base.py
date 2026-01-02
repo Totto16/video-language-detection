@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, override
+from typing import Any, Optional, Self, TypedDict, assert_never, override
 
 from apischema import deserialize, serialize
 from enlighten import Justify, Manager, get_manager
@@ -24,7 +24,6 @@ from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.constants import APP_NAME
 from helper.translation import get_translator
-from helper.types import assert_never
 
 _ = get_translator()
 

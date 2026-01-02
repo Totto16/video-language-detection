@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Self
+from typing import Annotated, Any, Literal, Optional, Self, assert_never
 
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
@@ -22,7 +22,6 @@ from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.log import get_logger
 from helper.result import Result
-from helper.types import assert_never
 
 
 @dataclass
