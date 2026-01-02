@@ -136,7 +136,7 @@ def ffprobe_check() -> bool:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
     try:
         with Path(os.devnull).open(mode="w") as temp_file:
-            subprocess.check_call(  # noqa: S603
+            subprocess.check_call(
                 ["ffprobe", "-h"],  # noqa: S607
                 stdout=temp_file,
                 stderr=temp_file,
@@ -151,7 +151,7 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
     try:
         with Path(os.devnull).open(mode="w") as temp_file:
-            subprocess.check_call(  # noqa: S603
+            subprocess.check_call(
                 ["ffprobe", "-h"],  # noqa: S607
                 stdout=temp_file,
                 stderr=temp_file,

@@ -1,4 +1,4 @@
-from typing import Annotated, assert_never, cast
+from typing import Annotated, assert_never
 
 from content.metadata.interfaces import (
     MissingProvider,

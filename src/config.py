@@ -597,7 +597,7 @@ class AdvancedConfig:
             return AdvancedConfig__LoadAndResolveWithInfo.ok(
                 (merged_config, f"Templated Config created by {msg}"),
             )
-        assert_never(config)  # noqa: RET503
+        assert_never(config)
 
     @staticmethod
     def load_and_resolve(

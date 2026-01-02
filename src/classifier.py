@@ -14,8 +14,8 @@ from typing import (
     Literal,
     Optional,
     Self,
-    TypeIs,
     TypedDict,
+    TypeIs,
     assert_never,
     override,
 )
@@ -27,8 +27,6 @@ from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
-from humanize import naturalsize
-
 
 from content.language import Language
 from content.language_picker import LanguagePicker

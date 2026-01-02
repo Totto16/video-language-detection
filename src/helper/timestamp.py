@@ -124,6 +124,10 @@ class Timestamp:
 
         return False
 
+    def __hash__(self: Self) -> int:
+        msg = "HashNotImplemented"
+        raise RuntimeError(msg)
+
     def __ne__(self: Self, value: object) -> bool:
         return not self.__eq__(value)
 

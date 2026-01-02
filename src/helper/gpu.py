@@ -1,19 +1,20 @@
+import contextlib
+import subprocess
+import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cmp_to_key
 from typing import Optional, Self, cast, override
+
+import amdsmi.amdsmi_wrapper as amdsmi
 import pynvml
+import pyopencl as opencl
+from amdsmi import amdsmi_exception, amdsmi_interface
 from torch import cuda
+
 from content.general import MissingOverrideError
 from helper.result import Result
-import subprocess
-import sys
-from collections.abc import Callable
-import amdsmi.amdsmi_wrapper as amdsmi
-import amdsmi.amdsmi_interface as amdsmi_interface
-import amdsmi.amdsmi_exception as amdsmi_exception
-import contextlib
-import pyopencl as opencl
 
 
 class GPUType(Enum):
@@ -46,7 +47,7 @@ def list_gpus_linux() -> GetDevicesResult:
         return GetDevicesResult.err(f"Not supported on {sys.platform}")
 
     try:
-        result = subprocess.check_output(["lspci", "-nn"]).decode()
+        result = subprocess.check_output(["lspci", "-nn"]).decode()  # noqa: S607
         devices: list[GPUDevice] = []
 
         for line in result.splitlines():
@@ -83,11 +84,11 @@ def list_gpus_linux() -> GetDevicesResult:
         return GetDevicesResult.err(str(err))
     except subprocess.SubprocessError as err:
         return GetDevicesResult.err(str(err))
-    except Exception as err:
+    except Exception as err:  # noqa:  BLE001
         return GetDevicesResult.err(str(err))
 
 
-class nvmlMemoryPy:
+class NvmlMemoryPy:
     total: int
     free: int
     used: int
@@ -105,10 +106,8 @@ def list_gpus_nvidia() -> GetDevicesResult:
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
 
             memory_amount: Optional[int] = None
-            if isinstance(mem_info, pynvml.c_nvmlMemory_t) or isinstance(
-                mem_info, pynvml.c_nvmlMemory_v2_t
-            ):
-                memory_amount = cast(nvmlMemoryPy, mem_info).total
+            if isinstance(mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t)):
+                memory_amount = cast(NvmlMemoryPy, mem_info).total
 
             unique_id: str = str(pynvml.nvmlDeviceGetUUID(handle))
 
@@ -126,7 +125,7 @@ def list_gpus_nvidia() -> GetDevicesResult:
 
     except pynvml.NVMLError as err:
         return GetDevicesResult.err(str(err))
-    except Exception as err:
+    except Exception as err:  # noqa:  BLE001
         return GetDevicesResult.err(str(err))
     finally:
         with contextlib.suppress(Exception):
@@ -153,7 +152,7 @@ def list_gpus_amd() -> GetDevicesResult:
             ## TODO AMDSMI_VRAM_TYPE_GDDR6
             ## TODO amdsmi_vram_type_t__enumvalues
 
-            return GPUType.dedicated
+            return GPUType.dedicated  # noqa: TRY300
         except amdsmi_exception.AmdSmiException:
             return GPUType.integrated
 
@@ -164,11 +163,11 @@ def list_gpus_amd() -> GetDevicesResult:
         for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
 
             unique_id: str = amdsmi_interface.amdsmi_get_gpu_device_uuid(
-                processor_handle
+                processor_handle,
             )
 
             info = amdsmi_interface.amdsmi_get_gpu_asic_info(
-                processor_handle=processor_handle
+                processor_handle=processor_handle,
             )
 
             num_compute_units: int = info["num_compute_units"]
@@ -195,7 +194,7 @@ def list_gpus_amd() -> GetDevicesResult:
 
     except amdsmi_exception.AmdSmiException as err:
         return GetDevicesResult.err(str(err))
-    except Exception as err:
+    except Exception as err:  # noqa:  BLE001
         return GetDevicesResult.err(str(err))
     finally:
         with contextlib.suppress(Exception):
@@ -224,7 +223,7 @@ def list_gpus_native() -> GetDevicesResult:
 
     if len(devices) == 0:
         return GetDevicesResult.err(
-            f"All gpu detection methods failed: {", ".join(fails)}"
+            f"All gpu detection methods failed: {", ".join(fails)}",
         )
 
     return GetDevicesResult.ok(devices)
@@ -232,10 +231,10 @@ def list_gpus_native() -> GetDevicesResult:
 
 def list_gpus_opencl() -> GetDevicesResult:
 
-    def has_id(id: str) -> Callable[[GPUDevice], bool]:
+    def has_id(dev_id: str) -> Callable[[GPUDevice], bool]:
 
         def has_id_impl(device: GPUDevice) -> bool:
-            return device.unique_id == id
+            return device.unique_id == dev_id
 
         return has_id_impl
 
@@ -248,22 +247,22 @@ def list_gpus_opencl() -> GetDevicesResult:
             or "cl_amd_device_attribute_query" in device.extensions
         ):
             if vendor != GPUVendor.amd:
+                msg = "device has amd query extensions, but not recognized as amd!"
                 raise RuntimeError(
-                    "device has amd query extensions, but not recognized as amd!"
+                    msg,
                 )
 
             topology = str(device.topology_amd)
         elif "cl_nv_device_attribute_query" in device.extensions:
             if vendor != GPUVendor.nvidia:
+                msg = "device has nvidia query extensions, but not recognized as amd!"
                 raise RuntimeError(
-                    "device has nvidia query extensions, but not recognized as amd!"
+                    msg,
                 )
 
             topology = f"{device.pci_domain_id_nv}_{device.pci_slot_id_nv}_{device.pci_bus_id_nv}"
 
-        unique_id = f"{device.type}_{str(vendor)}_{device.name}_{topology}"
-
-        return unique_id
+        return f"{device.type}_{vendor!s}_{device.name}_{topology}"
 
     try:
         devices: list[GPUDevice] = []
@@ -313,7 +312,7 @@ def list_gpus_opencl() -> GetDevicesResult:
 
         return GetDevicesResult.ok(devices)
 
-    except Exception as err:
+    except Exception as err:  # noqa:  BLE001
         return GetDevicesResult.err(str(err))
 
 
@@ -368,7 +367,7 @@ class GPU:
             if len(devices) == 0:
                 return GpuGetResult.err("No suitable devices found")
 
-            CU_MULT = 10**18
+            cu_mult = 10**18
 
             def get_device_score(device: GPUDevice) -> int:
                 if device.num_compute_units is None:
@@ -378,9 +377,9 @@ class GPU:
                     return device.memory_amount
 
                 if device.memory_amount is None:
-                    return device.num_compute_units * CU_MULT
+                    return device.num_compute_units * cu_mult
 
-                return (device.num_compute_units * CU_MULT) + device.memory_amount
+                return (device.num_compute_units * cu_mult) + device.memory_amount
 
             def get_best_device(device1: GPUDevice, device2: GPUDevice) -> int:
 
@@ -398,22 +397,25 @@ class GPU:
 
             return GpuGetResult.ok(GPU.from_device(device))
 
-        except Exception as err:
+        except Exception as err:  # noqa:  BLE001
             return GpuGetResult.err(str(err))
 
     @staticmethod
-    def from_device(device: GPUDevice) -> GPU:
+    def from_device(device: GPUDevice) -> "GPU":
         match device.vendor:
             case GPUVendor.nvidia:
                 if not cuda.is_available():
-                    raise RuntimeError("Cuda not available")
+                    msg = "Cuda not available"
+                    raise RuntimeError(msg)
                 return NvidiaGPU(device)
             case GPUVendor.amd:
                 return AmdGPU(device)
             case GPUVendor.intel:
-                raise RuntimeError("Intel gpus not supported atm")
+                msg = "Intel gpus not supported atm"
+                raise RuntimeError(msg)
             case _:
-                raise RuntimeError("unknown gpu vendor")
+                msg = "unknown gpu vendor"
+                raise RuntimeError(msg)
 
     def empty_cache(self: Self) -> None:
         raise MissingOverrideError
@@ -425,7 +427,9 @@ class GPU:
 class NvidiaGPU(GPU):
 
     def __init__(self: Self, device: GPUDevice) -> None:
-        assert device.vendor == GPUVendor.nvidia
+        if device.vendor != GPUVendor.nvidia:
+            msg = "Tried to initialize nvidia gpu with wrong device"
+            raise RuntimeError(msg)
         super().__init__(device)
 
         pynvml.nvmlInit()
@@ -445,7 +449,9 @@ class NvidiaGPU(GPU):
 class AmdGPU(GPU):
 
     def __init__(self: Self, device: GPUDevice) -> None:
-        assert device.vendor == GPUVendor.amd
+        if device.vendor != GPUVendor.amd:
+            msg = "Tried to initialize amd gpu with wrong device"
+            raise RuntimeError(msg)
         super().__init__(device)
 
         amdsmi_interface.amdsmi_init()

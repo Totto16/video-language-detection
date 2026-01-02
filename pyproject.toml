@@ -26,6 +26,7 @@ ignore = [
     "PLR0911", # => too-many-return-statements
     "PLR0912", # => too-many-branches 
     "UP007",   # => non-pep604-annotation  (Union[a,b] => a|b is fine, but i like Optional[a] better then a|None)
+    "UP045",   # => same as above
     "ANN401",  # => any-type 
     "D",       # pydocstyle => I don't use doc strings atm. 
     "C90",     # mccabe => complexity isn't of concern atm.
@@ -113,6 +114,6 @@ module = [
     "speechbrain.*",
     "themoviedb.*",
     "pyperclip",
-    "amdsmi.*"
+    "amdsmi.*",
 ]
 follow_untyped_imports = true
