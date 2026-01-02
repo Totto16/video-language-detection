@@ -17,7 +17,6 @@ name = "torch-amd"
 [packages]
 #see: https://github.com/speechbrain/speechbrain/pull/2996
 # once this has a release, use it
-speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
 python-ffmpeg = "*"
 pyyaml = "*"
 enlighten = "*"
@@ -42,12 +41,17 @@ nvidia-ml-py = "*"
 torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
+speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
+
 ##amd gpu
 [amd]
 amdsmi = "*"
-torchvision = {version = "==0.25.0.dev20260102", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "==2.11.0.dev20260101", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "==0.25.0.dev20260102+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "==2.11.0.dev20260101+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchaudio = {version = "==2.10.0.dev20260102+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 triton-rocm = {version = "==3.6.0+git9844da95", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+
+speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
 
 ## usage: pipenv install --categories "packages,packages-dev,amd"
 
