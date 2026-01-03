@@ -540,6 +540,12 @@ class TorchDevice:
     index: int
 
 
+@dataclass
+class AvailableMemory:
+    available: int
+    total: int
+
+
 GpuGetResult = Result["GPU", str]
 
 
@@ -664,15 +670,15 @@ class GPU:
     ) -> bool:
         raise MissingOverrideError
 
-    def get_available_memory(self: Self) -> int:
+    def get_available_memory(self: Self) -> AvailableMemory:
         torch_device = self.torch_device()
 
         if torch_device is None:
             msg = "GPU found, but not usable in torch"
             raise RuntimeError(msg)
 
-        free, _total = torch.cuda.mem_get_info(torch_device)
-        return free
+        free, total = torch.cuda.mem_get_info(torch_device)
+        return AvailableMemory(available=free, total=total)
 
 
 class NvidiaGPU(GPU):

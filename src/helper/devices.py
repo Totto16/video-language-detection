@@ -5,7 +5,7 @@ from typing import Optional, Self, TypeIs
 import psutil
 import torch
 
-from helper.gpu import GPU
+from helper.gpu import GPU, AvailableMemory
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -98,9 +98,11 @@ class DeviceManager:
     def type(self: Self) -> AllocatorType:
         return self.__device_allocator.type
 
-    def get_available_memory(self: Self) -> int:
+    def get_available_memory(self: Self) -> AvailableMemory:
         if is_cpu_allocator(self.__device_allocator):
-            return psutil.virtual_memory().available
+            memory = psutil.virtual_memory()
+
+            return AvailableMemory(available=memory.available, total=memory.total)
 
         gpu = self.__device_allocator.gpu
         return gpu.get_available_memory()

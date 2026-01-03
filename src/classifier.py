@@ -39,6 +39,7 @@ from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
+from helper.gpu import AvailableMemory
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
 from helper.timestamp import (
@@ -913,6 +914,13 @@ def to_advanced_percentage(
     return AdvancedPercentage(percentage, description)
 
 
+def get_percentage_value(percentage: Percentage) -> float:
+    if isinstance(percentage, AdvancedPercentage):
+        return percentage.value
+
+    return percentage
+
+
 # TODO: is there a better way?
 class AccuracySettingsDict(TypedDict, total=False):
     normal_threshold: Percentage
@@ -1154,7 +1162,9 @@ class ClassifierManager(AbstractContextManager[None]):
             case "manual":
                 return batch_settings.amount
             case "auto":
-                available_memory: int = self.__device_manager.get_available_memory()
+                available_memory: AvailableMemory = (
+                    self.__device_manager.get_available_memory()
+                )
 
                 memory_pattern = self.__model.memory_pattern
                 if memory_pattern is None:
@@ -1168,9 +1178,29 @@ class ClassifierManager(AbstractContextManager[None]):
                     msg = f"No memory_pattern for model {self.__model.name} defined, use the following derived:\n{memory_pattern.to_constructor_str()}"
                     raise RuntimeError(msg)
 
-                keep_perc = to_advanced_percentage(batch_settings.keep_free, "")
+                target_fullness: float = get_percentage_value(
+                    batch_settings.target_fullness
+                )
 
-                usable_memory = round(available_memory * (1.0 - keep_perc.value))
+                target_used_memory: int = round(
+                    available_memory.total * target_fullness,
+                )
+
+                currently_used_memory: int = (
+                    available_memory.total - available_memory.available
+                )
+
+                available_memory_for_us: int = (
+                    target_used_memory - currently_used_memory
+                )
+
+                if available_memory_for_us < 0:
+                    msg = f"The auto batch settings resolved to a memory, that is not available, increase or decrease some paramaters: {batch_settings!s}"
+                    raise RuntimeError(msg)
+
+                keep_perc: float = get_percentage_value(batch_settings.keep_free)
+
+                usable_memory: int = round(available_memory_for_us * (1.0 - keep_perc))
 
                 seconds = memory_pattern.get_seconds_for_memory_amount(
                     memory_amount=usable_memory,
@@ -1180,7 +1210,15 @@ class ClassifierManager(AbstractContextManager[None]):
                     msg = "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"
                     raise RuntimeError(msg)
 
-                return Timestamp.from_seconds(seconds=seconds)
+                result: Timestamp = Timestamp.from_seconds(seconds=seconds)
+
+                logger.debug(
+                    "Resolved auto batch settings to timestamp: %s -> %s",
+                    str(batch_settings),
+                    str(result),
+                )
+
+                return result
             case _:
                 assert_never(batch_settings.batch_type)
 
@@ -1265,11 +1303,11 @@ class ClassifierManager(AbstractContextManager[None]):
                     minutes * (1.0 - percentage_decrease)
                 )
             case "auto":
-                keep_free_perc = to_advanced_percentage(
-                    self.__batch_settings.keep_free, ""
+                keep_free_perc = get_percentage_value(
+                    self.__batch_settings.keep_free,
                 )
                 self.__batch_settings.keep_free = to_advanced_percentage(
-                    keep_free_perc.value * (1.0 + percentage_decrease),
+                    keep_free_perc * (1.0 + percentage_decrease),
                     "",
                 )
 
