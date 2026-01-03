@@ -236,6 +236,9 @@ voxlingua107_ecapa_model: Model = Model(
     sample_count=107,
     source="speechbrain/lang-id-voxlingua107-ecapa",
     bitrate=16000,
+    memory_pattern=MemoryPatternLinear(
+        coeffs=LinearCoeffs(c=121287679.99999952, m=12845499.313230773),
+    ),
 )
 
 
