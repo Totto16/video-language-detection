@@ -45,6 +45,7 @@ class ContentType(str, Enum):
         return str(self)
 
 
+#TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
 class MissingOverrideError(RuntimeError):
     pass
 

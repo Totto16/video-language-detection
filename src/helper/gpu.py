@@ -114,7 +114,8 @@ def list_gpus_nvidia() -> GetDevicesResult:
 
                 memory_amount: Optional[int] = None
                 if isinstance(
-                    mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t),
+                    mem_info,
+                    (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t),
                 ):
                     memory_amount = cast(NvmlMemoryPy, mem_info).total
 
@@ -619,6 +620,13 @@ class GPU:
 
     def set_default_device(self: Self, device: torch.device) -> None:
         torch.set_default_device(device=device)
+        self.set_default_cuda_device(device=device)
+
+    def set_default_cuda_device(self: Self, device: torch.device) -> None:
+        if device.type != "cuda":
+            msg = "Tried to set a non cuda device as default cuda device!"
+            raise RuntimeError(msg)
+
         torch.cuda.set_device(device=device)
 
     @property

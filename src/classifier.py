@@ -15,7 +15,7 @@ from typing import (
     Optional,
     Self,
     TypedDict,
-    TypeIs,
+    Union,
     assert_never,
     override,
 )
@@ -33,8 +33,8 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
+from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
-from helper.gpu import GPU
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
 from helper.timestamp import (
@@ -619,7 +619,7 @@ class AutoBatchSettings:
         )
 
 
-BatchSettings = ManualBatchSettings | AutoBatchSettings
+type BatchSettings = ManualBatchSettings | AutoBatchSettings
 
 
 @dataclass()
@@ -696,64 +696,28 @@ class RunOpts(TypedDict, total=False):
     compile_using_dynamic_shape_tracing: str
 
 
-class AllocatorType(Enum):
-    cpu = "cpu"
-    gpu = " gpu"
-
-
-class Allocator:
-    type: AllocatorType
-
-    def __init__(self: Self, type_: AllocatorType) -> None:
-        self.type = type_
-
-
-class CPUAllocator(Allocator):
-    def __init__(self) -> None:
-        super().__init__(type_=AllocatorType.cpu)
-
-
-class GPUAllocator(Allocator):
-    gpu: GPU
-
-    def __init__(self, gpu: GPU) -> None:
-        super().__init__(type_=AllocatorType.gpu)
-        self.gpu = gpu
-
-
-def is_cpu_allocator(allocator: GPUAllocator | CPUAllocator) -> TypeIs[CPUAllocator]:
-    return allocator.type == AllocatorType.cpu
-
-
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 
 
 class ClassifierManager(AbstractContextManager[None]):
-    __allocator: CPUAllocator | GPUAllocator
+    __device_manager: DeviceManager
+    __batch_settings: BatchSettings
+    __segment_length: Timestamp
     __classifier: EncoderClassifier
     __retry_count: int
     __failed_too_often: bool
 
-    def __init__(self: Self) -> None:
-        self.__init_type()
+    def __init__(
+        self: Self,
+        device_manager: DeviceManager,
+        batch_settings: BatchSettings,
+    ) -> None:
+        self.__device_manager = device_manager
+        self.__batch_settings = batch_settings
         self.__init_classification()
         self.__retry_count = 0
         self.__failed_too_often = False
-
-    def __force_cpu(self: Self) -> None:
-        self.__allocator = CPUAllocator()
-
-    def __init_type(self: Self) -> None:
-        self.__allocator = CPUAllocator()
-
-        gpu_result = GPU.get_best(use_integrated=False)
-
-        if gpu_result.is_err():
-            logger.warning("Got GPU error: %s", gpu_result.get_err())
-            self.__allocator = CPUAllocator()
-        else:
-            self.__allocator = GPUAllocator(gpu_result.get_ok())
 
     def __init_classifier(self: Self) -> None:
         run_opts: Optional[RunOpts] = self.__get_run_opts()
@@ -797,46 +761,37 @@ class ClassifierManager(AbstractContextManager[None]):
     def clear_cache(self: Self) -> None:
         gc.collect()
 
-        if not is_cpu_allocator(self.__allocator):
-            self.__allocator.gpu.empty_cache()
+        self.__device_manager.clear_device_cache()
 
     def __get_run_opts(self: Self) -> Optional[RunOpts]:
 
         self.clear_cache()
 
-        if is_cpu_allocator(self.__allocator):
-            return {"device": torch.device(device="cpu")}
-
-        gpu = self.__allocator.gpu
-
-        device = gpu.torch_device()
+        device = self.__device_manager.get_torch_device()
 
         if device is None:
             msg = "GPU found, but not usable in torch"
             raise RuntimeError(msg)
 
-        """ not possible, as speechbrain uses some hardcoded cpu device wrongly in the code:
-        ```python
-        zero = torch.zeros(1, device=self.device_inp)
-        fbank_matrix = torch.max(
-            zero, torch.min(left_side, right_side)
-        ).transpose(0, 1)
-        ```
-        this uses cpu and default allocated tensors, so this fails :(
-        note, device_inp is hardcoded to cpu, and caN#t be set
-        see: speechbrain/processing/features.py:642
-        """
-
-        # gpu.set_default_device(device)  # noqa: ERA001
-
-        run_ops: RunOpts = {
-            "device": device,
-            "data_parallel_count": -1,
-            "data_parallel_backend": True,
-            "distributed_launch": False,
-            "distributed_backend": "nccl",
-            "jit_module_keys": None,
-        }
+        run_ops: RunOpts
+        if device.type == "cpu":
+            run_ops = {
+                "device": device,
+            }
+            self.__batch_settings.fsdsd
+        elif device.type == "cuda":
+            run_ops = {
+                "device": device,
+                "data_parallel_count": -1,
+                "data_parallel_backend": True,
+                "distributed_launch": False,
+                "distributed_backend": "nccl",
+                "jit_module_keys": None,
+            }
+            self.__batch_settings.fsdsd
+        else:
+            msg = f"Not supported torch device: '{device}'"
+            raise RuntimeError(msg)
 
         return run_ops
 
@@ -862,17 +817,18 @@ class ClassifierManager(AbstractContextManager[None]):
 
                 if (
                     self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
-                    and self.__allocator.type == AllocatorType.gpu
+                    and self.__device_manager.type == AllocatorType.gpu
                 ):
                     msg = "Switching the classifier to the cpu"
                     logger.debug(msg)
 
                     # reinitialize the classifier to use the cpu
                     del self.__classifier
-                    self.__force_cpu()
+                    self.__device_manager.force_cpu()
                     self.__init_classifier()
 
                 self.__retry_count = self.__retry_count + 1
+                self.__decrease_batch_size()
                 return True
 
             logger.exception("Classify file")
@@ -908,6 +864,15 @@ class ClassifierManager(AbstractContextManager[None]):
     def __del__(self: Self) -> None:
         self.clear_cache()
 
+    def __decrease_batch_size(self: Self) -> None:
+        # TODO
+        pass
+
+    @property
+    def segment_length(self: Self) -> Timestamp:
+        # TODO
+        return Timestamp.from_seconds(30)
+
 
 class PredictionFailReason(Enum):
     failed_too_often = "failed_too_often"
@@ -927,17 +892,18 @@ class Classifier:
     __save_dir: Path
     __options: ClassifierOptions
     __manager: ClassifierManager
-    __segment_length: Timestamp
 
     def __init__(
         self: Self,
+        device_manager: DeviceManager,
         options: Optional[ClassifierOptionsConfig] | ClassifierOptions = None,
     ) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
-        self.__manager = ClassifierManager()
-        # TODO. resolve actual segment length, by using the batch options!
-        self.__segment_length = Timestamp.from_seconds(30)
+        self.__manager = ClassifierManager(
+            device_manager=device_manager,
+            batch_settings=self.__options.batch_settings,
+        )
 
     def __parse_options(
         self: Self,
@@ -1060,12 +1026,15 @@ class Classifier:
             result: list[tuple[Segment, Timestamp]] = []
             current_timestamp: Timestamp = Timestamp.zero()
 
+            # this is cached here, so that it doesn't change in the middle, as the manager can change it (in case of oom e.g.)
+            segment_length: Timestamp = self.__manager.segment_length
+
             index: int = 0
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
-                    if current_timestamp + self.__segment_length > runtime
-                    else current_timestamp + self.__segment_length
+                    if current_timestamp + segment_length > runtime
+                    else current_timestamp + segment_length
                 )
                 segment: Segment = Segment(
                     index=index,
@@ -1075,7 +1044,7 @@ class Classifier:
                 index = index + 1
                 result.append((segment, end if end is not None else runtime))
                 # ATTENTION: don't use +=, since that doesn't create a new object!
-                current_timestamp = current_timestamp + self.__segment_length
+                current_timestamp = current_timestamp + segment_length
 
             return result
 

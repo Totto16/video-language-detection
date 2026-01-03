@@ -13,6 +13,7 @@ from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.base import AnyType, parse_contents
+from helper.devices import DeviceManager
 
 if TYPE_CHECKING:
     from content.base_class import Content
@@ -52,7 +53,8 @@ def launch_tui(
     all_content_type: AnyType,
     config_paramaters: Optional[tuple[int, int]],
 ) -> None:
-    classifier = Classifier(config.classifier)
+    device_manager: DeviceManager = DeviceManager()
+    classifier = Classifier(device_manager=device_manager, options=config.classifier)
     language_scanner = LanguageScanner(classifier=classifier)
     metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
         config.metadata,
