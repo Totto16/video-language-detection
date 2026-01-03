@@ -5,14 +5,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from functools import cmp_to_key
-from typing import Optional, Self, assert_never, cast, override
-import torch
+from typing import Any, Optional, Self, assert_never, cast, override
 
 import pyopencl as opencl
-
+import torch
 
 from content.general import MissingOverrideError
 from helper.result import Result
+from helper.timestamp import parse_int_safely
 
 
 class GPUType(Enum):
@@ -28,6 +28,7 @@ class GPUVendor(Enum):
 
 @dataclass
 class GPUDevice:
+    name: str
     unique_id: str
     origin: str
     vendor: GPUVendor
@@ -63,10 +64,13 @@ def list_gpus_linux() -> GetDevicesResult:
 
                 unique_id = line.split(" ")[0]
 
+                name = line[len(unique_id) + 1 :]
+
                 if vendor is None:
                     continue
 
                 device: GPUDevice = GPUDevice(
+                    name=name,
                     unique_id=unique_id,
                     origin="lspci",
                     vendor=vendor,
@@ -94,7 +98,7 @@ class NvmlMemoryPy:
 
 def list_gpus_nvidia() -> GetDevicesResult:
     try:
-        import pynvml  # type: ignore[import-not-found]  # noqa: PLC0415
+        import pynvml  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
 
         try:
             pynvml.nvmlInit()
@@ -103,18 +107,21 @@ def list_gpus_nvidia() -> GetDevicesResult:
             for i in range(pynvml.nvmlDeviceGetCount()):
                 handle = pynvml.nvmlDeviceGetHandleByIndex(i)
 
+                name: str = pynvml.nvmlDeviceGetName(handle)
+
                 num_compute_units = pynvml.nvmlDeviceGetNumGpuCores(handle)
                 mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
 
                 memory_amount: Optional[int] = None
                 if isinstance(
-                    mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t)
+                    mem_info, (pynvml.c_nvmlMemory_t, pynvml.c_nvmlMemory_v2_t),
                 ):
                     memory_amount = cast(NvmlMemoryPy, mem_info).total
 
                 unique_id: str = str(pynvml.nvmlDeviceGetUUID(handle))
 
                 device: GPUDevice = GPUDevice(
+                    name=name,
                     unique_id=unique_id,
                     origin="nvml",
                     vendor=GPUVendor.nvidia,
@@ -138,14 +145,64 @@ def list_gpus_nvidia() -> GetDevicesResult:
         return GetDevicesResult.err("not build with nvidia support")
 
 
+@dataclass
+class DeviceTopologyAmdSmi:
+    domain: int
+    bus: int
+    device: int
+    function: int
+
+    def to_str(self: Self) -> str:
+        return f"{self.domain:04x}:{self.bus:02x}:{self.device:02x}.{self.function:x}"
+
+    @staticmethod
+    def from_str(topology: str) -> Optional["DeviceTopologyAmdSmi"]:
+        parsed = topology.split(":")
+        if (len(parsed)) != 3:
+            return None
+
+        domain = parse_int_safely(parsed[0], 16)
+        bus = parse_int_safely(parsed[1], 16)
+
+        if domain is None or bus is None:
+            return None
+
+        parsed2 = parsed[2].split(".")
+
+        device: Optional[int] = None
+        function: Optional[int] = None
+
+        if len(parsed2) == 1:
+            device = parse_int_safely(parsed2[0], 16)
+            function = 0
+        elif len(parsed2) == 2:
+            device = parse_int_safely(parsed2[0], 16)
+            function = parse_int_safely(parsed2[1], 16)
+        else:
+            return None
+
+        if device is None or function is None:
+            return None
+
+        return DeviceTopologyAmdSmi(
+            domain=domain,
+            bus=bus,
+            device=device,
+            function=function,
+        )
+
+
 def list_gpus_amd() -> GetDevicesResult:
 
     try:
-        import amdsmi.amdsmi_wrapper as amdsmi
-        from amdsmi import amdsmi_exception, amdsmi_interface
+        import amdsmi.amdsmi_wrapper as amdsmi  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
+        from amdsmi import (  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
+            amdsmi_exception,
+            amdsmi_interface,
+        )
 
         # currently not in the source code, but the correct value for this
-        AMDSMI_VRAM_TYPE_DDR5 = amdsmi.AMDSMI_VRAM_TYPE_DDR4 + 1
+        amdsmi_vram_type_ddr5 = amdsmi.AMDSMI_VRAM_TYPE_DDR4 + 1
 
         def get_gpu_type_by_ex(
             processor_handle: amdsmi_interface.processor_handle,
@@ -153,9 +210,8 @@ def list_gpus_amd() -> GetDevicesResult:
             try:
 
                 # these fail on integrated devices!
-                _id = amdsmi.amdsmi_get_gpu_bdf_id(processor_handle)
                 _pci_bw = amdsmi_interface.amdsmi_get_gpu_pci_bandwidth(
-                    processor_handle
+                    processor_handle,
                 )
 
                 _bus = amdsmi_interface.amdsmi_get_pcie_info(processor_handle)
@@ -178,7 +234,7 @@ def list_gpus_amd() -> GetDevicesResult:
 
             if (
                 vram_type >= amdsmi.AMDSMI_VRAM_TYPE_DDR2
-                and vram_type <= AMDSMI_VRAM_TYPE_DDR5
+                and vram_type <= amdsmi_vram_type_ddr5
             ):
                 return GPUType.integrated
 
@@ -197,19 +253,47 @@ def list_gpus_amd() -> GetDevicesResult:
 
             return type1
 
+        def get_gpu_topology(
+            processor_handle: amdsmi_interface.processor_handle,
+        ) -> DeviceTopologyAmdSmi:
+            # see: https://rocm.docs.amd.com/projects/amdsmi/en/latest/reference/amdsmi-py-api.html#amdsmi-get-gpu-device-bdf
+            # BDFID = ((DOMAIN & 0xffffffff) << 32) | ((BUS & 0xff) << 8) | ((DEVICE & 0x1f) <<3 ) | (FUNCTION & 0x7)  # noqa: ERA001
+
+            # [64:32]  Domain        (32 bits)
+            # [31:16]  Reserved      (16 bits, ignore)
+            # [15:8]   Bus           (8 bits)
+            # [7:3]    Device        (5 bits)
+            # [2:0]    Function      (3 bits)
+
+            bdfid = amdsmi_interface.amdsmi_get_gpu_bdf_id(processor_handle)
+
+            domain = (bdfid >> 32) & 0xFFFFFFFF
+            bus = (bdfid >> 8) & 0xFF
+            device = (bdfid >> 3) & 0x1F
+            function = bdfid & 0x7
+
+            return DeviceTopologyAmdSmi(
+                domain=domain,
+                bus=bus,
+                device=device,
+                function=function,
+            )
+
         try:
             amdsmi_interface.amdsmi_init()
             devices: list[GPUDevice] = []
 
             for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
 
-                unique_id: str = amdsmi_interface.amdsmi_get_gpu_device_uuid(
-                    processor_handle,
-                )
+                topology = get_gpu_topology(processor_handle)
+
+                unique_id: str = topology.to_str()
 
                 info = amdsmi_interface.amdsmi_get_gpu_asic_info(
                     processor_handle=processor_handle,
                 )
+
+                name: str = info["market_name"]
 
                 num_compute_units: int = info["num_compute_units"]
 
@@ -222,9 +306,10 @@ def list_gpus_amd() -> GetDevicesResult:
                 gpu_type = get_gpu_type(processor_handle)
 
                 device: GPUDevice = GPUDevice(
+                    name=name,
                     unique_id=unique_id,
                     origin="amdsmi",
-                    vendor=GPUVendor.nvidia,
+                    vendor=GPUVendor.amd,
                     type=gpu_type,
                     memory_amount=memory_amount,
                     num_compute_units=num_compute_units,
@@ -272,6 +357,58 @@ def list_gpus_native() -> GetDevicesResult:
     return GetDevicesResult.ok(devices)
 
 
+def list_gpus_torch() -> GetDevicesResult:
+    if not torch.cuda.is_available():
+        return GetDevicesResult.err("cuda not available")
+
+    try:
+        devices: list[GPUDevice] = []
+
+        for i in range(torch.cuda.device_count()):
+            properties = torch.cuda.get_device_properties(i)
+
+            name: str = torch.cuda.get_device_name(i)
+
+            vendor: Optional[GPUVendor] = None
+            if "AMD" in name or "Advanced Micro Devices" in name:
+                vendor = GPUVendor.amd
+            elif "NVIDIA" in name:
+                vendor = GPUVendor.nvidia
+            elif "Intel" in name:
+                vendor = GPUVendor.intel
+
+            if vendor is None:
+                continue
+
+            unique_id: str = str(properties.uuid)
+
+            num_compute_units: int = properties.multi_processor_count
+
+            memory_amount: int = properties.total_memory
+
+            gpu_type = (
+                GPUType.integrated if properties.is_integrated else GPUType.dedicated
+            )
+
+            device: GPUDevice = GPUDevice(
+                name=name,
+                unique_id=unique_id,
+                origin="torch",
+                vendor=vendor,
+                type=gpu_type,
+                memory_amount=memory_amount,
+                num_compute_units=num_compute_units,
+            )
+            devices.append(device)
+
+        return GetDevicesResult.ok(devices)
+
+    except torch.cuda.AcceleratorError as err:
+        return GetDevicesResult.err(str(err))
+    except Exception as err:  # noqa:  BLE001
+        return GetDevicesResult.err(str(err))
+
+
 def list_gpus_opencl() -> GetDevicesResult:
 
     def has_id(dev_id: str) -> Callable[[GPUDevice], bool]:
@@ -282,6 +419,9 @@ def list_gpus_opencl() -> GetDevicesResult:
         return has_id_impl
 
     def opencl_get_unique_name(device: opencl.Device, vendor: GPUVendor) -> str:
+
+        # note on device topology: 0000:03:00.0
+        # according to docs it means: <domain>:<bus>:<device>.<function>
 
         topology: str = "<no_topology>"
 
@@ -295,7 +435,14 @@ def list_gpus_opencl() -> GetDevicesResult:
                     msg,
                 )
 
-            topology = str(device.topology_amd)
+            topology_amd = device.topology_amd
+
+            topology = DeviceTopologyAmdSmi(
+                domain=0,
+                bus=topology_amd.bus,
+                device=topology_amd.device,
+                function=topology_amd.function,
+            ).to_str()
         elif "cl_nv_device_attribute_query" in device.extensions:
             if vendor != GPUVendor.nvidia:
                 msg = "device has nvidia query extensions, but not recognized as amd!"
@@ -303,9 +450,9 @@ def list_gpus_opencl() -> GetDevicesResult:
                     msg,
                 )
 
-            topology = f"{device.pci_domain_id_nv}_{device.pci_slot_id_nv}_{device.pci_bus_id_nv}"
+            topology = f"{device.pci_domain_id_nv}:{device.pci_slot_id_nv}.{device.pci_bus_id_nv}"
 
-        return f"{device.type}_{vendor!s}_{device.name}_{topology}"
+        return f"type_{device.type}_{vendor.value}_{device.name}_{topology}"
 
     try:
         devices: list[GPUDevice] = []
@@ -313,6 +460,8 @@ def list_gpus_opencl() -> GetDevicesResult:
         # on my pc, amd has two platform with the exact name and the same devices (maybe because of my amdgpu and rocm drivers??, but here we filter unique devices to occur only once)
         for platform in opencl.get_platforms():
             for device in platform.get_devices(device_type=opencl.device_type.GPU):
+
+                name: str = device.name
 
                 vendor_name = device.vendor.strip()
 
@@ -344,6 +493,7 @@ def list_gpus_opencl() -> GetDevicesResult:
                 type_: GPUType = GPUType.integrated if unified else GPUType.dedicated
 
                 device_to_add: GPUDevice = GPUDevice(
+                    name=name,
                     unique_id=unique_id,
                     origin="opencl",
                     vendor=vendor,
@@ -360,13 +510,11 @@ def list_gpus_opencl() -> GetDevicesResult:
 
 
 def get_devices() -> GetDevicesResult:
-    print(list_gpus_native())
-    print(list_gpus_opencl())
-    print(list_gpus_linux())
 
     ## try best detection methods in order, if no one succeeds, return an error
     methods: list[tuple[str, Callable[[], GetDevicesResult]]] = [
         ("list_gpus_native", list_gpus_native),
+        ("list_gpus_torch", list_gpus_torch),
         ("list_gpus_opencl", list_gpus_opencl),
         ("list_gpus_linux", list_gpus_linux),
     ]
@@ -382,6 +530,13 @@ def get_devices() -> GetDevicesResult:
         fails.append(f"{name} failed with error: {result.get_err()}")
 
     return GetDevicesResult.err(f"All gpu detection methods failed: {", ".join(fails)}")
+
+
+@dataclass
+class TorchDevice:
+    name: str
+    uuid: str
+    index: int
 
 
 GpuGetResult = Result["GPU", str]
@@ -480,20 +635,25 @@ class GPU:
         return torch.device(type="cuda", index=index)
 
     def get_index(self: Self) -> Optional[int]:
-
         for i in range(torch.cuda.device_count()):
-            print("  Name:", torch.cuda.get_device_name(i))
-            print("  Capability:", torch.cuda.get_device_capability(i))
-            print(
-                "  Memory (GB):",
-                round(torch.cuda.get_device_properties(i).total_memory / 1e9, 2),
+            name = torch.cuda.get_device_name(i)
+            properties = torch.cuda.get_device_properties(i)
+            uuid = str(properties.uuid)
+
+            torch_device: TorchDevice = TorchDevice(
+                name=name,
+                uuid=uuid,
+                index=i,
             )
+            if self.is_eq_to_torch_device(torch_device):
+                return i
 
         return None
 
     def is_eq_to_torch_device(
-        self: Self, torch_device: torch.device
-    ) -> bool:  # noqa: ARG002
+        self: Self,
+        torch_device: TorchDevice,  # noqa: ARG002
+    ) -> bool:
         raise MissingOverrideError
 
 
@@ -506,8 +666,9 @@ class NvidiaGPU(GPU):
         super().__init__(device)
 
     @override
-    def is_eq_to_torch_device(self: Self, torch_device: torch.device) -> bool:
-        return torch_device == self.device.unique_id
+    def is_eq_to_torch_device(self: Self, torch_device: TorchDevice) -> bool:
+        msg = "Not yet implemented for nvidia"
+        raise RuntimeError(msg)
 
 
 class AmdGPU(GPU):
@@ -519,5 +680,30 @@ class AmdGPU(GPU):
         super().__init__(device)
 
     @override
-    def is_eq_to_torch_device(self: Self, torch_device: torch.device) -> bool:
-        return torch_device == self.device.unique_id
+    def is_eq_to_torch_device(self: Self, torch_device: TorchDevice) -> bool:
+        match self.device.origin:
+            case "amdsmi":
+
+                topo1 = DeviceTopologyAmdSmi.from_str(self.device.unique_id)
+
+                if topo1 is None:
+                    return False
+
+                properties: Any = torch.cuda.get_device_properties(torch_device.index)
+
+                if properties.pci_bus_id is None:
+                    return False
+
+                topo2 = DeviceTopologyAmdSmi(
+                    domain=properties.pci_domain_id,
+                    bus=properties.pci_bus_id,
+                    device=properties.pci_device_id,
+                    function=0,
+                )
+
+                return topo1 == topo2
+            case "torch":
+                return self.device.unique_id == torch_device.uuid
+            case origin:
+                msg = f"Can't compare a gpu device from origin '{origin}' with a torch device, not implemented yet"
+                raise RuntimeError(msg)

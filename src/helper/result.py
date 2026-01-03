@@ -46,3 +46,12 @@ class Result[T, E]:
 
         msg = f"Called get_err() on ok: {self.__value}"
         raise RuntimeError(msg)
+
+    def __str__(self: Self) -> str:
+        if self.is_ok():
+            return f"<Result (ok): {self.get_ok()!s}>"
+
+        return f"<Result (err): {self.get_err()!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)

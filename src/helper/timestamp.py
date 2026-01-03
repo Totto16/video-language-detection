@@ -4,9 +4,9 @@ from typing import Never, Optional, Self
 from apischema import deserializer, schema, serializer
 
 
-def parse_int_safely(inp: str) -> Optional[int]:
+def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
     try:
-        return int(inp)
+        return int(inp, base)
     except ValueError:
         return None
 

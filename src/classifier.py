@@ -8,7 +8,6 @@ from logging import Logger
 from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
-import torch
 from typing import (
     Annotated,
     Any,
@@ -22,12 +21,13 @@ from typing import (
 )
 
 import psutil
-from speechbrain.dataio import audio_io
+import torch
 from apischema import deserializer, schema, serializer
 from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
+from speechbrain.dataio import audio_io
 
 from content.language import Language
 from content.language_picker import LanguagePicker
@@ -717,6 +717,7 @@ class ClassifierManager(AbstractContextManager[None]):
         self.__allocator = CPUAllocator()
 
     def __init_type(self: Self) -> None:
+        self.__allocator = CPUAllocator()
 
         gpu_result = GPU.get_best(use_integrated=False)
 
@@ -783,7 +784,8 @@ class ClassifierManager(AbstractContextManager[None]):
         device = gpu.torch_device()
 
         if device is None:
-            raise RuntimeError("Gpu found, but not usable in torch")
+            msg = "GPU found, but not usable in torch"
+            raise RuntimeError(msg)
 
         gpu.set_default_device(device)
 
