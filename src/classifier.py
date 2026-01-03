@@ -1,4 +1,5 @@
 import gc
+import math
 import re
 import tempfile
 from contextlib import AbstractContextManager
@@ -15,20 +16,22 @@ from typing import (
     Optional,
     Self,
     TypedDict,
-    Union,
     assert_never,
+    cast,
     override,
 )
 
-import psutil
+import numpy as np
 import torch
 from apischema import deserializer, schema, serializer
 from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
+from numpy.polynomial.polynomial import Polynomial
 from speechbrain.dataio import audio_io
 
+from content.general import MissingOverrideError
 from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
@@ -55,7 +58,349 @@ logger: Logger = get_logger()
 
 _ = get_translator()
 
-VOXLINGUA_SAMPLE_COUNT: int = 107
+
+class MemoryPatternType(Enum):
+    linear = "linear"
+    quadratic = "quadratic"
+
+
+class MemoryPattern:
+    pattern_type: MemoryPatternType
+
+    def __init__(self: Self, pattern_type: MemoryPatternType) -> None:
+        self.typepattern_type = pattern_type
+
+    def get_seconds_for_memory_amount(
+        self: Self,
+        memory_amount: int,  # noqa: ARG002
+    ) -> Optional[float]:
+        raise MissingOverrideError
+
+    def to_constructor_str(self: Self) -> str:
+        raise MissingOverrideError
+
+
+@dataclass
+class LinearCoeffs:
+    c: float  # x ^ 0
+    m: float  # x ^ 1
+
+
+class MemoryPatternLinear(MemoryPattern):
+    """
+    linear  =>
+    y = m * x + c
+    """
+
+    __coeffs: LinearCoeffs
+
+    def __init__(self: Self, coeffs: LinearCoeffs) -> None:
+        super().__init__(MemoryPatternType.linear)
+        self.__coeffs = coeffs
+
+    @staticmethod
+    def from_poly_coefs(
+        coeffs: tuple[float, float],
+    ) -> "MemoryPatternLinear":
+        l_coeffs = LinearCoeffs(c=coeffs[0], m=coeffs[1])
+        return MemoryPatternLinear(coeffs=l_coeffs)
+
+    @override
+    def get_seconds_for_memory_amount(
+        self: Self,
+        memory_amount: int,
+    ) -> Optional[float]:
+        """
+        x = seconds,
+        y = memory_used
+
+        y = m * x + c
+        x = (y - c) / m
+        """
+
+        result = (memory_amount - self.__coeffs.c) / self.__coeffs.m
+
+        if result < 0:
+            return None
+
+        return result
+
+    def to_constructor_str(self: Self) -> str:
+        return f"MemoryPatternLinear(coeffs=LinearCoeffs(c={self.__coeffs.c}, m={self.__coeffs.m}))"
+
+
+@dataclass
+class QuadraticCoeffs:
+    c: float  # x ^ 0
+    b: float  # x ^ 1
+    a: float  # x ^ 2
+
+
+class MemoryPatternQuadratic(MemoryPattern):
+    """
+    quadratic  =>
+    y = a * x^2 + b * x + c
+    """
+
+    __coeffs: QuadraticCoeffs
+
+    def __init__(self: Self, coeffs: QuadraticCoeffs) -> None:
+        super().__init__(MemoryPatternType.quadratic)
+        self.__coeffs = coeffs
+
+    @staticmethod
+    def from_poly_coefs(
+        coeffs: tuple[float, float, float],
+    ) -> "MemoryPatternQuadratic":
+        q_coeffs = QuadraticCoeffs(c=coeffs[0], b=coeffs[1], a=coeffs[2])
+        return MemoryPatternQuadratic(coeffs=q_coeffs)
+
+    @override
+    def get_seconds_for_memory_amount(
+        self: Self,
+        memory_amount: int,
+    ) -> Optional[float]:
+        """
+        x = seconds,
+        y = memory_used
+
+        y = a * x^2 + b * x + c
+        x = D1/2 / 2 a
+        D1/2 = -b +- sq(DISC)
+        DISC = b^2 - 4ac
+        """
+
+        disc = (self.__coeffs.b**2) - (4 * self.__coeffs.a * self.__coeffs.c)
+
+        if disc < 0:
+            return None
+
+        if disc == 0.0:
+            # only one solution
+            d1 = -self.__coeffs.b
+            res = d1 / (2 * self.__coeffs.a)
+
+            if res < 0:
+                return None
+
+            return res
+
+        # two solutions
+        sq_res = math.sqrt(disc)
+        min_b = -self.__coeffs.b
+        d1, d2 = (min_b + sq_res, min_b - sq_res)
+
+        _2a = 2 * self.__coeffs.a
+
+        sol1, sol2 = (d1 / _2a, d2 / _2a)
+
+        max_sol = max(sol1, sol2)
+
+        if max_sol < 0:
+            return None
+
+        return max_sol
+
+    def to_constructor_str(self: Self) -> str:
+        return f"MemoryPatternQuadratic(coeffs=QuadraticCoeffs(c={self.__coeffs.c}, b={self.__coeffs.b}, a={self.__coeffs.a}))"
+
+
+@dataclass
+class Model:
+    name: str
+    sample_count: int
+    source: str
+    bitrate: int
+    memory_pattern: Optional[MemoryPattern] = (
+        None  # if this is None, it is inferred and printed, so that you can hardcode it!
+    )
+
+
+class RunOpts(TypedDict, total=False):
+    device: torch.device
+    data_parallel_count: int
+    data_parallel_backend: bool
+    distributed_launch: bool
+    distributed_backend: str
+    jit: str
+    jit_module_keys: Optional[str]
+    compule: str
+    compile_module_keys: str
+    compile_mode: str
+    compile_using_fullgraph: str
+    compile_using_dynamic_shape_tracing: str
+
+
+voxlingua107_ecapa_model: Model = Model(
+    name="voxlingua107",
+    sample_count=107,
+    source="speechbrain/lang-id-voxlingua107-ecapa",
+    bitrate=16000,
+)
+
+
+MODEL_SAVEDIR: str = "model"
+
+
+def get_model_run_opts(device_manager: DeviceManager) -> Optional[RunOpts]:
+    device = device_manager.get_torch_device()
+
+    if device is None:
+        msg = "GPU found, but not usable in torch"
+        raise RuntimeError(msg)
+
+    run_ops: RunOpts
+    if device.type == "cpu":
+        run_ops = {
+            "device": device,
+        }
+    elif device.type == "cuda":
+        run_ops = {
+            "device": device,
+            "data_parallel_count": -1,
+            "data_parallel_backend": True,
+            "distributed_launch": False,
+            "distributed_backend": "nccl",
+            "jit_module_keys": None,
+        }
+    else:
+        msg = f"Not supported torch device: '{device}'"
+        raise RuntimeError(msg)
+
+    return run_ops
+
+
+def get_classifier_from_model(
+    model: Model,
+    run_opts: Optional[RunOpts],
+) -> EncoderClassifier:
+    classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
+        source=model.source,
+        savedir=MODEL_SAVEDIR,
+        run_opts=run_opts,
+    )
+    if classifier is None:
+        msg = "Couldn't initialize Classifier"
+        raise RuntimeError(msg)
+
+    classifier.hparams.label_encoder.expect_len(model.sample_count)
+
+    return classifier
+
+
+MAX_MEAN_VARIANCE: float = 0.05
+
+
+def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
+    @dataclass
+    class CalibrateResult:
+        peak_bytes: int
+        probe_sec: int
+
+    @dataclass
+    class SolvedPolynomial:
+        p: Polynomial
+        deg: int
+        coefs: list[float]
+        mean: float
+
+    def calibrate_ecapa(
+        classifier: EncoderClassifier,
+        sample_rate: int,
+        probe_sec: int,
+        device: Optional[torch.device],
+    ) -> CalibrateResult:
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats(device=device)
+
+        waveform = torch.randn(1, probe_sec * sample_rate, device=device).cuda(
+            device=device,
+        )
+
+        with torch.no_grad():
+            classifier.encode_batch(waveform)
+
+        peak_bytes: int = torch.cuda.max_memory_allocated(device=device)
+        return CalibrateResult(peak_bytes=peak_bytes, probe_sec=probe_sec)
+
+    device_manager: DeviceManager = DeviceManager()
+
+    run_opts: Optional[RunOpts] = get_model_run_opts(device_manager=device_manager)
+
+    device = run_opts["device"] if run_opts is not None else None
+
+    classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
+        source=model.source,
+        savedir=MODEL_SAVEDIR,
+        run_opts=run_opts,
+    )
+    if classifier is None:
+        msg = "Couldn't initialize Classifier"
+        raise RuntimeError(msg)
+
+    classifier.hparams.label_encoder.expect_len(model.sample_count)
+
+    results = [
+        calibrate_ecapa(
+            classifier=classifier,
+            sample_rate=model.bitrate,
+            probe_sec=5 * (i + 1),
+            device=device,
+        )
+        for i in range(25)
+    ]
+
+    torch.cuda.empty_cache()
+    x = np.array(list(r.probe_sec for r in results))
+    y = np.array(list(r.peak_bytes for r in results))
+
+    polynomials: list[SolvedPolynomial] = []
+    for deg in [1, 2]:
+        p = Polynomial.fit(x=x, y=y, deg=deg)
+
+        p_std = p.convert()
+        coefs = p_std.coef
+
+        y_fit = p_std(x)
+        residuals = y - y_fit
+        residuals_pct = residuals / y
+
+        mean_res = residuals_pct.mean()
+
+        polynomial: SolvedPolynomial = SolvedPolynomial(
+            p=p,
+            deg=deg,
+            coefs=coefs.tolist(),
+            mean=float(mean_res),
+        )
+
+        polynomials.append(polynomial)
+
+    def sort_by_mean(p: SolvedPolynomial) -> float:
+        return p.mean
+
+    polynomials.sort(key=sort_by_mean)
+
+    best_p = polynomials[0]
+
+    if abs(best_p.mean) > MAX_MEAN_VARIANCE:
+        return None
+
+    memory_pattern: MemoryPattern
+
+    match best_p.deg:
+        case 1:
+            memory_pattern = MemoryPatternLinear.from_poly_coefs(
+                cast(tuple[float, float], best_p.coefs),
+            )
+        case 2:
+            memory_pattern = MemoryPatternQuadratic.from_poly_coefs(
+                cast(tuple[float, float, float], best_p.coefs),
+            )
+        case _:
+            return None
+
+    return memory_pattern
 
 
 class WavFile:
@@ -366,6 +711,7 @@ class WAVFile:
                 output_options["ss"] = str(options.segment.start)
 
             # to use the same format as: https://huggingface.co/speechbrain/lang-id-voxlingua107-ecapa
+            # TODO. also depend on the model: Model somehow
             output_options = {
                 **output_options,
                 # mapping options
@@ -421,19 +767,6 @@ class WAVFile:
             return WavFile__WavFileResult.ok(wav_manager.release())
 
 
-def has_enough_memory() -> tuple[bool, float, float]:
-    memory = psutil.virtual_memory()
-    percent = memory.free / memory.total
-
-    swap_memory = psutil.swap_memory()
-    swap_percent = swap_memory.free / swap_memory.total
-
-    if percent <= 0.05 and swap_percent <= 0.10:
-        return (False, percent, swap_percent)
-
-    return (True, percent, swap_percent)
-
-
 # TODO: relativate to the root path
 def relative_path_str(path: Path) -> str:
     return str(object=path)
@@ -455,7 +788,7 @@ class AdvancedPercentage:
         option_name = "" if description == "" else f" '{description}'"
 
         if not is_percentage(value):
-            msg = f"Option{option_name} has to be in percentage (0.0 - 1.0) but was: {value}"
+            msg = f"Option {option_name} has to be in percentage (0.0 - 1.0) but was: {value}"
             raise RuntimeError(msg)
         self.__value = value
 
@@ -651,7 +984,8 @@ class ClassifierOptions:
 @dataclass()
 class ClassifierOptionsConfig:
     batch_settings: Annotated[
-        Optional[ManualBatchSettings | AutoBatchSettings | ConfigTimeStamp], OneOf
+        Optional[ManualBatchSettings | AutoBatchSettings | ConfigTimeStamp],
+        OneOf,
     ]
     accuracy: Annotated[Optional[AccuracySettingsDict], OneOf]
     scan_config: Annotated[Optional[ScanConfigDict], OneOf]
@@ -681,27 +1015,13 @@ class ClassifierOptionsConfig:
         )
 
 
-class RunOpts(TypedDict, total=False):
-    device: torch.device
-    data_parallel_count: int
-    data_parallel_backend: bool
-    distributed_launch: bool
-    distributed_backend: str
-    jit: str
-    jit_module_keys: Optional[str]
-    compule: str
-    compile_module_keys: str
-    compile_mode: str
-    compile_using_fullgraph: str
-    compile_using_dynamic_shape_tracing: str
-
-
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 
 
 class ClassifierManager(AbstractContextManager[None]):
     __device_manager: DeviceManager
+    __model: Model
     __batch_settings: BatchSettings
     __segment_length: Timestamp
     __classifier: EncoderClassifier
@@ -711,9 +1031,11 @@ class ClassifierManager(AbstractContextManager[None]):
     def __init__(
         self: Self,
         device_manager: DeviceManager,
+        model: Model,
         batch_settings: BatchSettings,
     ) -> None:
         self.__device_manager = device_manager
+        self.__model = model
         self.__batch_settings = batch_settings
         self.__init_classification()
         self.__retry_count = 0
@@ -722,22 +1044,15 @@ class ClassifierManager(AbstractContextManager[None]):
     def __init_classifier(self: Self) -> None:
         run_opts: Optional[RunOpts] = self.__get_run_opts()
 
-        classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
-            source="speechbrain/lang-id-voxlingua107-ecapa",
-            savedir="model",
+        self.__classifier = get_classifier_from_model(
+            model=self.__model,
             run_opts=run_opts,
         )
-        if classifier is None:
-            msg = "Couldn't initialize Classifier"
-            raise RuntimeError(msg)
-
-        classifier.hparams.label_encoder.expect_len(VOXLINGUA_SAMPLE_COUNT)
-
-        self.__classifier = classifier
 
     def __init_classification(self: Self) -> None:
         self.__check_audio_backends()
         self.__check_ffprobe()
+        self.__init_segment_length()
         self.__init_classifier()
 
     def __check_audio_backends(self: Self) -> None:
@@ -767,33 +1082,45 @@ class ClassifierManager(AbstractContextManager[None]):
 
         self.clear_cache()
 
-        device = self.__device_manager.get_torch_device()
+        return get_model_run_opts(device_manager=self.__device_manager)
 
-        if device is None:
-            msg = "GPU found, but not usable in torch"
-            raise RuntimeError(msg)
+    def __get_segment_length(self: Self, batch_settings: BatchSettings) -> Timestamp:
+        match batch_settings.batch_type:
+            case "manual":
+                return batch_settings.amount
+            case "auto":
+                available_memory: int = self.__device_manager.get_available_memory()
 
-        run_ops: RunOpts
-        if device.type == "cpu":
-            run_ops = {
-                "device": device,
-            }
-            self.__batch_settings.fsdsd
-        elif device.type == "cuda":
-            run_ops = {
-                "device": device,
-                "data_parallel_count": -1,
-                "data_parallel_backend": True,
-                "distributed_launch": False,
-                "distributed_backend": "nccl",
-                "jit_module_keys": None,
-            }
-            self.__batch_settings.fsdsd
-        else:
-            msg = f"Not supported torch device: '{device}'"
-            raise RuntimeError(msg)
+                memory_pattern = self.__model.memory_pattern
+                if memory_pattern is None:
 
-        return run_ops
+                    memory_pattern = get_memory_pattern_for_model(self.__model)
+
+                    if memory_pattern is None:
+                        msg = f"failed to derive the memory pattern for the model {self.__model.name}"
+                        raise RuntimeError(msg)
+
+                    msg = f"No memory_pattern for model {self.__model.name} defined, use the following derived:\n{memory_pattern.to_constructor_str()}"
+                    raise RuntimeError(msg)
+
+                keep_perc = to_advanced_percentage(batch_settings.keep_free, "")
+
+                usable_memory = round(available_memory * (1.0 - keep_perc.value))
+
+                seconds = memory_pattern.get_seconds_for_memory_amount(
+                    memory_amount=usable_memory,
+                )
+
+                if seconds is None:
+                    msg = "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"
+                    raise RuntimeError(msg)
+
+                return Timestamp.from_seconds(seconds=seconds)
+            case _:
+                assert_never(batch_settings.batch_type)
+
+    def __init_segment_length(self: Self) -> None:
+        self.__segment_length = self.__get_segment_length(self.__batch_settings)
 
     @override
     def __enter__(self: Self) -> None:
@@ -869,6 +1196,10 @@ class ClassifierManager(AbstractContextManager[None]):
         pass
 
     @property
+    def model(self: Self) -> Model:
+        return self.__model
+
+    @property
     def segment_length(self: Self) -> Timestamp:
         # TODO
         return Timestamp.from_seconds(30)
@@ -896,12 +1227,14 @@ class Classifier:
     def __init__(
         self: Self,
         device_manager: DeviceManager,
+        model: Model,
         options: Optional[ClassifierOptionsConfig] | ClassifierOptions = None,
     ) -> None:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
         self.__manager = ClassifierManager(
             device_manager=device_manager,
+            model=model,
             batch_settings=self.__options.batch_settings,
         )
 
@@ -926,7 +1259,8 @@ class Classifier:
                             )
                         )
                         if isinstance(
-                            options.batch_settings, (Timestamp, TimestampCompat)
+                            options.batch_settings,
+                            (Timestamp, TimestampCompat),
                         )
                         else options.batch_settings
                     )
@@ -978,7 +1312,7 @@ class Classifier:
         manager: Optional[Manager] = None,
     ) -> Optional[Prediction]:
         result: WavFile__WavFileResult = wav_file.create_wav_file(
-            WAVOptions(bitrate=16000, segment=segment),
+            WAVOptions(bitrate=self.__manager.model.bitrate, segment=segment),
             force_recreation=True,
             manager=manager,
         )

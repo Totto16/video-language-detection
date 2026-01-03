@@ -7,7 +7,7 @@ from typing import (
 
 from prompt_toolkit.key_binding import KeyBindings
 
-from classifier import Classifier
+from classifier import Classifier, Model, voxlingua107_ecapa_model
 from content.base_class import LanguageScanner, Scanner
 from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
@@ -54,7 +54,14 @@ def launch_tui(
     config_paramaters: Optional[tuple[int, int]],
 ) -> None:
     device_manager: DeviceManager = DeviceManager()
-    classifier = Classifier(device_manager=device_manager, options=config.classifier)
+
+    model: Model = voxlingua107_ecapa_model
+
+    classifier = Classifier(
+        device_manager=device_manager,
+        model=model,
+        options=config.classifier,
+    )
     language_scanner = LanguageScanner(classifier=classifier)
     metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
         config.metadata,

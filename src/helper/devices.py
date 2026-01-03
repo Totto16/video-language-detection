@@ -2,6 +2,7 @@ from enum import Enum
 from logging import Logger
 from typing import Optional, Self, TypeIs
 
+import psutil
 import torch
 
 from helper.gpu import GPU
@@ -96,3 +97,10 @@ class DeviceManager:
     @property
     def type(self: Self) -> AllocatorType:
         return self.__device_allocator.type
+
+    def get_available_memory(self: Self) -> int:
+        if is_cpu_allocator(self.__device_allocator):
+            return psutil.virtual_memory().available
+
+        gpu = self.__device_allocator.gpu
+        return gpu.get_available_memory()
