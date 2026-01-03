@@ -70,6 +70,10 @@ def setup_global_logger() -> None:
     # set speechbrain log level
     os.environ["SB_LOG_LEVEL"] = "WARNING"
 
+    # set amd MIOPEN log level, see https://rocm.docs.amd.com/projects/MIOpen/en/develop/how-to/debug-log.html
+    # 3 means: Errors, including fatal errors.
+    os.environ["MIOPEN_LOG_LEVEL"] = "3"
+
 
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
     formatter = colorlog.ColoredFormatter(
