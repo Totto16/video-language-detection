@@ -65,7 +65,9 @@ templates:
                     types: both
 
             classifier:
-                segment_length: "00:00:50"
+                batch_settings:
+                    batch_type: "auto"
+                    keep_free: "10%"
                 accuracy:
                     normal_threshold: "95%"
                     final_threshold: "55%"
@@ -86,7 +88,9 @@ templates:
                     types: both
 
             classifier:
-                segment_length: "00:00:50"
+                batch_settings:
+                    batch_type: "auto"
+                    keep_free: "10%"
                 accuracy:
                     normal_threshold: "95%"
                     final_threshold: "55%"

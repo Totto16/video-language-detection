@@ -250,8 +250,14 @@
         "ClassifierOptionsConfig": {
             "type": "object",
             "properties": {
-                "segment_length": {
+                "batch_settings": {
                     "oneOf": [
+                        {
+                            "$ref": "#/$defs/ManualBatchSettings"
+                        },
+                        {
+                            "$ref": "#/$defs/AutoBatchSettings"
+                        },
                         {
                             "$ref": "#/$defs/TimestampCompat"
                         },
@@ -285,21 +291,68 @@
                 }
             },
             "required": [
-                "segment_length",
+                "batch_settings",
                 "accuracy",
                 "scan_config"
             ],
             "additionalProperties": false
+        },
+        "ManualBatchSettings": {
+            "type": "object",
+            "properties": {
+                "batch_type": {
+                    "type": "string",
+                    "const": "manual"
+                },
+                "amount": {
+                    "$ref": "#/$defs/Timestamp"
+                }
+            },
+            "required": [
+                "batch_type",
+                "amount"
+            ],
+            "additionalProperties": false
+        },
+        "Timestamp": {
+            "type": "string",
+            "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
+        },
+        "AutoBatchSettings": {
+            "type": "object",
+            "properties": {
+                "batch_type": {
+                    "type": "string",
+                    "const": "auto"
+                },
+                "keep_free": {
+                    "oneOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "batch_type",
+                "keep_free"
+            ],
+            "additionalProperties": false
+        },
+        "AdvancedPercentage": {
+            "type": "string",
+            "pattern": "^(\\d{1,3})(?:\\.(\\d+))?%$"
         },
         "TimestampCompat": {
             "type": "integer",
             "minimum": 1,
             "maximum": 86400,
             "deprecated": true
-        },
-        "Timestamp": {
-            "type": "string",
-            "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
         },
         "AccuracySettingsDict": {
             "type": "object",
@@ -333,10 +386,6 @@
                 }
             },
             "additionalProperties": false
-        },
-        "AdvancedPercentage": {
-            "type": "string",
-            "pattern": "^(\\d{1,3})(?:\\.(\\d+))?%$"
         },
         "ScanConfigDict": {
             "type": "object",

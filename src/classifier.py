@@ -37,7 +37,12 @@ from helper.ffprobe import ffprobe, ffprobe_check
 from helper.gpu import GPU
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
-from helper.timestamp import ConfigTimeStamp, Timestamp, parse_int_safely
+from helper.timestamp import (
+    ConfigTimeStamp,
+    Timestamp,
+    TimestampCompat,
+    parse_int_safely,
+)
 from helper.translation import get_translator
 
 setup_global_logger()
@@ -595,10 +600,31 @@ class ScanConfigDictTotal(TypedDict, total=True):
     maximum: Optional[AdvancedPercentage]
 
 
+@dataclass
+class ManualBatchSettings:
+    batch_type: Literal["manual"]
+    amount: Timestamp
+
+
+@dataclass
+class AutoBatchSettings:
+    batch_type: Literal["auto"]
+    keep_free: Percentage
+
+    @staticmethod
+    def default() -> "AutoBatchSettings":
+        return AutoBatchSettings(
+            batch_type="auto",
+            keep_free=0.1,
+        )
+
+
+BatchSettings = ManualBatchSettings | AutoBatchSettings
+
+
 @dataclass()
 class ClassifierOptions:
-    ##TODO: allow detection, detect gpu gddr ram and select best length based on kbit/s
-    segment_length: Timestamp
+    batch_settings: BatchSettings
     accuracy: AccuracySettingsDictTotal
     scan_config: ScanConfigDictTotal
 
@@ -616,7 +642,7 @@ class ClassifierOptions:
         )
 
         return ClassifierOptions(
-            segment_length=Timestamp.from_seconds(30),
+            batch_settings=AutoBatchSettings.default(),
             accuracy=default_accuracy,
             scan_config=default_scan_config,
         )
@@ -624,7 +650,9 @@ class ClassifierOptions:
 
 @dataclass()
 class ClassifierOptionsConfig:
-    segment_length: Annotated[Optional[ConfigTimeStamp], OneOf]
+    batch_settings: Annotated[
+        Optional[ManualBatchSettings | AutoBatchSettings | ConfigTimeStamp], OneOf
+    ]
     accuracy: Annotated[Optional[AccuracySettingsDict], OneOf]
     scan_config: Annotated[Optional[ScanConfigDict], OneOf]
 
@@ -647,7 +675,7 @@ class ClassifierOptionsConfig:
             default_scan_config["maximum"] = maximum
 
         return ClassifierOptionsConfig(
-            segment_length=config_defaults.segment_length,
+            batch_settings=config_defaults.batch_settings,
             accuracy=default_accuracy,
             scan_config=default_scan_config,
         )
@@ -899,6 +927,7 @@ class Classifier:
     __save_dir: Path
     __options: ClassifierOptions
     __manager: ClassifierManager
+    __segment_length: Timestamp
 
     def __init__(
         self: Self,
@@ -907,6 +936,8 @@ class Classifier:
         self.__save_dir = Path(__file__).parent / "tmp"
         self.__options = self.__parse_options(options)
         self.__manager = ClassifierManager()
+        # TODO. resolve actual segment length, by using the batch options!
+        self.__segment_length = Timestamp.from_seconds(30)
 
     def __parse_options(
         self: Self,
@@ -915,14 +946,27 @@ class Classifier:
         total_options: ClassifierOptions = ClassifierOptions.default()
 
         if options is not None:
-            total_options.segment_length = (
+            total_options.batch_settings = (
                 (
-                    options.segment_length
-                    if isinstance(options.segment_length, Timestamp)
-                    else options.segment_length.value
+                    (
+                        (
+                            ManualBatchSettings(
+                                batch_type="manual",
+                                amount=(
+                                    options.batch_settings
+                                    if isinstance(options.batch_settings, Timestamp)
+                                    else options.batch_settings.value
+                                ),
+                            )
+                        )
+                        if isinstance(
+                            options.batch_settings, (Timestamp, TimestampCompat)
+                        )
+                        else options.batch_settings
+                    )
                 )
-                if options.segment_length is not None
-                else total_options.segment_length
+                if options.batch_settings is not None
+                else total_options.batch_settings
             )
 
             if options.accuracy is not None:
@@ -1020,8 +1064,8 @@ class Classifier:
             while current_timestamp <= runtime:
                 end: Optional[Timestamp] = (
                     None
-                    if current_timestamp + self.__options.segment_length > runtime
-                    else current_timestamp + self.__options.segment_length
+                    if current_timestamp + self.__segment_length > runtime
+                    else current_timestamp + self.__segment_length
                 )
                 segment: Segment = Segment(
                     index=index,
@@ -1031,7 +1075,7 @@ class Classifier:
                 index = index + 1
                 result.append((segment, end if end is not None else runtime))
                 # ATTENTION: don't use +=, since that doesn't create a new object!
-                current_timestamp = current_timestamp + self.__options.segment_length
+                current_timestamp = current_timestamp + self.__segment_length
 
             return result
 
