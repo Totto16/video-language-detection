@@ -654,7 +654,7 @@ class ClassifierOptionsConfig:
 
 
 class RunOpts(TypedDict, total=False):
-    device: torch.device | str
+    device: torch.device
     data_parallel_count: int
     data_parallel_backend: bool
     distributed_launch: bool
@@ -777,7 +777,7 @@ class ClassifierManager(AbstractContextManager[None]):
         self.clear_cache()
 
         if is_cpu_allocator(self.__allocator):
-            return {"device": "cpu"}
+            return {"device": torch.device(device="cpu")}
 
         gpu = self.__allocator.gpu
 
@@ -787,7 +787,19 @@ class ClassifierManager(AbstractContextManager[None]):
             msg = "GPU found, but not usable in torch"
             raise RuntimeError(msg)
 
-        gpu.set_default_device(device)
+        """ not possible, as speechbrain uses some hardcoded cpu device wrongly in the code:
+        ```python
+        zero = torch.zeros(1, device=self.device_inp)
+        fbank_matrix = torch.max(
+            zero, torch.min(left_side, right_side)
+        ).transpose(0, 1)
+        ```
+        this uses cpu and default allocated tensors, so this fails :(
+        note, device_inp is hardcoded to cpu, and caN#t be set
+        see: speechbrain/processing/features.py:642
+        """
+
+        # gpu.set_default_device(device)  # noqa: ERA001
 
         run_ops: RunOpts = {
             "device": device,
