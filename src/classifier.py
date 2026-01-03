@@ -1020,6 +1020,7 @@ class ClassifierOptionsConfig:
 
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
+BATCH_SIZE_DECREASE_CONST: float = 0.075  # 7.5 %
 
 
 class ClassifierManager(AbstractContextManager[None]):
@@ -1158,7 +1159,7 @@ class ClassifierManager(AbstractContextManager[None]):
                     self.__init_classifier()
 
                 self.__retry_count = self.__retry_count + 1
-                self.__decrease_batch_size()
+                self.__decrease_batch_size(BATCH_SIZE_DECREASE_CONST)
                 return True
 
             logger.exception("Classify file")
@@ -1194,9 +1195,23 @@ class ClassifierManager(AbstractContextManager[None]):
     def __del__(self: Self) -> None:
         self.clear_cache()
 
-    def __decrease_batch_size(self: Self) -> None:
-        # TODO
-        pass
+    def __decrease_batch_size(self: Self, percentage_decrease: float) -> None:
+
+        match self.__batch_settings.batch_type:
+            case "manual":
+                minutes = self.__batch_settings.amount.minutes
+                self.__batch_settings.amount = Timestamp.from_minutes(
+                    minutes * (1.0 - percentage_decrease)
+                )
+            case "auto":
+                keep_free_perc = to_advanced_percentage(
+                    self.__batch_settings.keep_free, ""
+                )
+                self.__batch_settings.keep_free = keep_free_perc * (
+                    1.0 + percentage_decrease
+                )
+
+        self.__segment_length = self.__get_segment_length(self.__batch_settings)
 
     @property
     def model(self: Self) -> Model:
@@ -1204,8 +1219,7 @@ class ClassifierManager(AbstractContextManager[None]):
 
     @property
     def segment_length(self: Self) -> Timestamp:
-        # TODO
-        return Timestamp.from_seconds(30)
+        return self.__segment_length
 
 
 class PredictionFailReason(Enum):
