@@ -3,7 +3,7 @@ import math
 import re
 import tempfile
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
@@ -24,6 +24,7 @@ from typing import (
 import numpy as np
 import torch
 from apischema import deserializer, schema, serializer
+from apischema.metadata import none_as_undefined
 from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
@@ -943,19 +944,67 @@ class ManualBatchSettings:
 
 
 @dataclass
+class AutoBatchSettingsConfig:
+    batch_type: Literal["auto"]
+    keep_free: Optional[Percentage] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+    target_fullness: Optional[Percentage] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
+
+
+@dataclass
 class AutoBatchSettings:
     batch_type: Literal["auto"]
     keep_free: Percentage
+    target_fullness: Percentage
 
     @staticmethod
     def default() -> "AutoBatchSettings":
         return AutoBatchSettings(
             batch_type="auto",
             keep_free=0.1,
+            target_fullness=0.95,
         )
 
 
 type BatchSettings = ManualBatchSettings | AutoBatchSettings
+
+
+def resolve_batch_settings(
+    batch_settings: ConfigTimeStamp | BatchSettings | AutoBatchSettingsConfig,
+) -> BatchSettings:
+
+    if isinstance(
+        batch_settings,
+        (Timestamp, TimestampCompat),
+    ):
+        return ManualBatchSettings(
+            batch_type="manual",
+            amount=(
+                batch_settings
+                if isinstance(batch_settings, Timestamp)
+                else batch_settings.value
+            ),
+        )
+
+    if isinstance(batch_settings, AutoBatchSettingsConfig):
+        total_settings: AutoBatchSettings = AutoBatchSettings.default()
+
+        config_settings: AutoBatchSettingsConfig = batch_settings
+
+        if config_settings.keep_free is not None:
+            total_settings.keep_free = config_settings.keep_free
+
+        if config_settings.target_fullness is not None:
+            total_settings.target_fullness = config_settings.target_fullness
+
+        return total_settings
+
+    return batch_settings
 
 
 @dataclass()
@@ -987,7 +1036,7 @@ class ClassifierOptions:
 @dataclass()
 class ClassifierOptionsConfig:
     batch_settings: Annotated[
-        Optional[ManualBatchSettings | AutoBatchSettings | ConfigTimeStamp],
+        Optional[ManualBatchSettings | AutoBatchSettingsConfig | ConfigTimeStamp],
         OneOf,
     ]
     accuracy: Annotated[Optional[AccuracySettingsDict], OneOf]
@@ -1007,12 +1056,24 @@ class ClassifierOptionsConfig:
             minimum=config_defaults.scan_config["minimum"],
         )
 
+        default_batch_settings: (
+            ManualBatchSettings | AutoBatchSettingsConfig | ConfigTimeStamp
+        ) = (
+            AutoBatchSettingsConfig(
+                batch_type="auto",
+                keep_free=config_defaults.batch_settings.keep_free,
+                target_fullness=config_defaults.batch_settings.target_fullness,
+            )
+            if isinstance(config_defaults.batch_settings, AutoBatchSettings)
+            else config_defaults.batch_settings
+        )
+
         maximum = config_defaults.scan_config["maximum"]
         if maximum is not None:
             default_scan_config["maximum"] = maximum
 
         return ClassifierOptionsConfig(
-            batch_settings=config_defaults.batch_settings,
+            batch_settings=default_batch_settings,
             accuracy=default_accuracy,
             scan_config=default_scan_config,
         )
@@ -1207,8 +1268,9 @@ class ClassifierManager(AbstractContextManager[None]):
                 keep_free_perc = to_advanced_percentage(
                     self.__batch_settings.keep_free, ""
                 )
-                self.__batch_settings.keep_free = keep_free_perc * (
-                    1.0 + percentage_decrease
+                self.__batch_settings.keep_free = to_advanced_percentage(
+                    keep_free_perc.value * (1.0 + percentage_decrease),
+                    "",
                 )
 
         self.__segment_length = self.__get_segment_length(self.__batch_settings)
@@ -1263,25 +1325,7 @@ class Classifier:
 
         if options is not None:
             total_options.batch_settings = (
-                (
-                    (
-                        (
-                            ManualBatchSettings(
-                                batch_type="manual",
-                                amount=(
-                                    options.batch_settings
-                                    if isinstance(options.batch_settings, Timestamp)
-                                    else options.batch_settings.value
-                                ),
-                            )
-                        )
-                        if isinstance(
-                            options.batch_settings,
-                            (Timestamp, TimestampCompat),
-                        )
-                        else options.batch_settings
-                    )
-                )
+                resolve_batch_settings(options.batch_settings)
                 if options.batch_settings is not None
                 else total_options.batch_settings
             )

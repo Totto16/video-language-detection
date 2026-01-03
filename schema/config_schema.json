@@ -256,7 +256,7 @@
                             "$ref": "#/$defs/ManualBatchSettings"
                         },
                         {
-                            "$ref": "#/$defs/AutoBatchSettings"
+                            "$ref": "#/$defs/AutoBatchSettingsConfig"
                         },
                         {
                             "$ref": "#/$defs/TimestampCompat"
@@ -318,7 +318,7 @@
             "type": "string",
             "pattern": "^\\d{1,2}:\\d{1,2}:\\d{1,2}$"
         },
-        "AutoBatchSettings": {
+        "AutoBatchSettingsConfig": {
             "type": "object",
             "properties": {
                 "batch_type": {
@@ -336,11 +336,22 @@
                             "$ref": "#/$defs/AdvancedPercentage"
                         }
                     ]
+                },
+                "target_fullness": {
+                    "oneOf": [
+                        {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0
+                        },
+                        {
+                            "$ref": "#/$defs/AdvancedPercentage"
+                        }
+                    ]
                 }
             },
             "required": [
-                "batch_type",
-                "keep_free"
+                "batch_type"
             ],
             "additionalProperties": false
         },
