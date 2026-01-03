@@ -60,6 +60,10 @@ class EpisodeContent(Content):
             msg = f"Couldn't get EpisodeDescription from '{path}'"
             raise NameError(msg, name="EpisodeDescription")
 
+        if description.episode < 1:
+            msg = f"EpisodeDescription is invalid, episode number is < 1: {description} -> '{path}'"
+            raise NameError(msg, name="EpisodeDescription")
+
         return EpisodeContent(
             ContentType.episode,
             scanned_file,
