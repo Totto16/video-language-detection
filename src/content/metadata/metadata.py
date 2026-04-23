@@ -16,12 +16,12 @@ class MetadataHandleHelper:
 
 def generate_provider_schema() -> Callable[[dict[str, Any]], None]:
     def make_provider_schema(schema: dict[str, Any]) -> None:
-        from content.metadata.provider.imdb import IMDBProvider
-        from content.metadata.provider.tmdb import TMDBProvider
+        from content.metadata.provider.imdb import IMDBProvider  # noqa: PLC0415
+        from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
 
         if TYPE_CHECKING:
-            from content.metadata.interfaces import Provider
-            from helper.apischema import SchemaType
+            from content.metadata.interfaces import Provider  # noqa: PLC0415
+            from helper.apischema import SchemaType  # noqa: PLC0415
 
         providers: list[type[Provider]] = [
             IMDBProvider,
@@ -90,7 +90,7 @@ class MetadataHandle:
 
         match provider:
             case "tmdb":
-                from content.metadata.provider.tmdb import TMDBProvider
+                from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
 
                 return MetadataHandle(provider, TMDBProvider.deserialize_metadata(data))
             case "imdb":

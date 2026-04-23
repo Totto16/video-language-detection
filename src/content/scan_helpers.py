@@ -140,4 +140,6 @@ def numerated_content_from_scan(
         parent_folders,
     )
 
+    _ = trailer_names
+
     return NumeratedContent.from_path(file_path, scanned_file, name_parser)

@@ -23,7 +23,9 @@ class ExpandableItem(wx.Panel):
 
         # Header with toggle button (arrow)
         self.toggle_button = wx.ToggleButton(
-            self, label="▶ " + title, style=wx.BU_EXACTFIT,
+            self,
+            label="▶ " + title,
+            style=wx.BU_EXACTFIT,
         )
         self.toggle_button.Bind(wx.EVT_TOGGLEBUTTON, self.on_toggle)
         self.main_sizer.Add(self.toggle_button, flag=wx.EXPAND | wx.ALL, border=5)
@@ -125,10 +127,16 @@ class MainPanel(wx.Panel):
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         main_sizer.Add(
-            self.__left_panel, proportion=60, flag=wx.EXPAND | wx.ALL, border=5,
+            self.__left_panel,
+            proportion=60,
+            flag=wx.EXPAND | wx.ALL,
+            border=5,
         )
         main_sizer.Add(
-            self.__right_panel, proportion=40, flag=wx.EXPAND | wx.ALL, border=5,
+            self.__right_panel,
+            proportion=40,
+            flag=wx.EXPAND | wx.ALL,
+            border=5,
         )
 
         self.SetSizer(main_sizer)
@@ -151,13 +159,15 @@ class MainApp(wx.App):
     __frame: MainFrame
 
     def __on_focus_event(self: Self, event: Any) -> None:
+        # TODO
         print(f"EVENT: {event.GetEventType()} from {event.GetEventObject()}")
         event.Skip()
 
     @override
     def OnInit(self: Self) -> bool:
-        # wx.Log.SetActiveTarget(wx.LogStderr())
-        # wx.Log.SetVerbose(True)
+        # TODO
+        """wx.Log.SetActiveTarget(wx.LogStderr())
+        wx.Log.SetVerbose(True)"""
         self.Bind(wx.EVT_SET_FOCUS, self.__on_focus_event)
 
         self.__frame = MainFrame()

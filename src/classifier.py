@@ -10,6 +10,7 @@ from pathlib import Path
 from shutil import rmtree
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -39,7 +40,6 @@ from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
-from helper.gpu import AvailableMemory
 from helper.log import get_logger, setup_global_logger
 from helper.result import Result
 from helper.timestamp import (
@@ -53,6 +53,9 @@ from helper.translation import get_translator
 setup_global_logger()
 
 from speechbrain.inference.classifiers import EncoderClassifier  # noqa: E402
+
+if TYPE_CHECKING:
+    from helper.gpu import AvailableMemory
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"
 
@@ -356,8 +359,8 @@ def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
     ]
 
     torch.cuda.empty_cache()
-    x = np.array(list(r.probe_sec for r in results))
-    y = np.array(list(r.peak_bytes for r in results))
+    x = np.array([r.probe_sec for r in results])
+    y = np.array([r.peak_bytes for r in results])
 
     polynomials: list[SolvedPolynomial] = []
     for deg in [1, 2]:
@@ -866,6 +869,9 @@ class AdvancedPercentage:
 
         return False
 
+    def __hash__(self: Self) -> int:
+        return hash(("AdvancedPercentage", self.__value))
+
     def __ne__(self: Self, value: object) -> bool:
         return not self.__eq__(value)
 
@@ -1179,7 +1185,7 @@ class ClassifierManager(AbstractContextManager[None]):
                     raise RuntimeError(msg)
 
                 target_fullness: float = get_percentage_value(
-                    batch_settings.target_fullness
+                    batch_settings.target_fullness,
                 )
 
                 target_used_memory: int = round(
@@ -1300,7 +1306,7 @@ class ClassifierManager(AbstractContextManager[None]):
             case "manual":
                 minutes = self.__batch_settings.amount.minutes
                 self.__batch_settings.amount = Timestamp.from_minutes(
-                    minutes * (1.0 - percentage_decrease)
+                    minutes * (1.0 - percentage_decrease),
                 )
             case "auto":
                 keep_free_perc = get_percentage_value(
