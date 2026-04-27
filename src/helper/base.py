@@ -374,6 +374,8 @@ def parse_contents(
                 language_picker=language_picker,
                 general_info=general_info,
             )
+            # TODO
+            return []
         case ConfigType.symlinked:
             callback = SymlinkedContentCallback(
                 options=options,
@@ -382,6 +384,8 @@ def parse_contents(
                 language_picker=language_picker,
                 general_info=general_info,
             )
+            # TODO
+            return []
         case _:
             assert_never(config_type)
 
