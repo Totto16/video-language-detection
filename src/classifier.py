@@ -222,7 +222,7 @@ class Model:
 
 
 class RunOpts(TypedDict, total=False):
-    device: torch.device
+    device: str
     data_parallel_count: int
     data_parallel_backend: bool
     distributed_launch: bool
@@ -260,11 +260,11 @@ def get_model_run_opts(device_manager: DeviceManager) -> Optional[RunOpts]:
     run_ops: RunOpts
     if device.type == "cpu":
         run_ops = {
-            "device": device,
+            "device": str(device),
         }
     elif device.type == "cuda":
         run_ops = {
-            "device": device,
+            "device": str(device),
             "data_parallel_count": -1,
             "data_parallel_backend": True,
             "distributed_launch": False,
@@ -353,7 +353,7 @@ def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
             classifier=classifier,
             sample_rate=model.bitrate,
             probe_sec=5 * (i + 1),
-            device=device,
+            device=torch.device(device) if device else None,
         )
         for i in range(25)
     ]
