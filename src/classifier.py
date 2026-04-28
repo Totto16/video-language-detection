@@ -84,6 +84,12 @@ class MemoryPattern:
     def to_constructor_str(self: Self) -> str:
         raise MissingOverrideError
 
+    def __str__(self: Self) -> str:
+        return self.to_constructor_str()
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 @dataclass
 class LinearCoeffs:
@@ -831,7 +837,7 @@ class AdvancedPercentage:
             msg = "Implementation error for AdvancedPercentage: case 1"
             raise TypeError(msg)
 
-        (match_arg1, match_arg2) = match_args
+        match_arg1, match_arg2 = match_args
 
         if match_arg1 is None:
             msg = "Implementation error for AdvancedPercentage: case 2"
