@@ -192,6 +192,35 @@ class DeviceTopologyAmdSmi:
             function=function,
         )
 
+    @staticmethod
+    def from_processor_handle(processor_handle: Any) -> "DeviceTopologyAmdSmi":
+        from amdsmi import (  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
+            amdsmi_interface,
+        )
+
+        # see: https://rocm.docs.amd.com/projects/amdsmi/en/latest/reference/amdsmi-py-api.html#amdsmi-get-gpu-device-bdf
+        # BDFID = ((DOMAIN & 0xffffffff) << 32) | ((BUS & 0xff) << 8) | ((DEVICE & 0x1f) <<3 ) | (FUNCTION & 0x7)  # noqa: ERA001
+
+        # [64:32]  Domain        (32 bits)
+        # [31:16]  Reserved      (16 bits, ignore)
+        # [15:8]   Bus           (8 bits)
+        # [7:3]    Device        (5 bits)
+        # [2:0]    Function      (3 bits)
+
+        bdfid = amdsmi_interface.amdsmi_get_gpu_bdf_id(processor_handle)
+
+        domain = (bdfid >> 32) & 0xFFFFFFFF
+        bus = (bdfid >> 8) & 0xFF
+        device = (bdfid >> 3) & 0x1F
+        function = bdfid & 0x7
+
+        return DeviceTopologyAmdSmi(
+            domain=domain,
+            bus=bus,
+            device=device,
+            function=function,
+        )
+
 
 def list_gpus_amd() -> GetDevicesResult:
 
@@ -254,39 +283,13 @@ def list_gpus_amd() -> GetDevicesResult:
 
             return type1
 
-        def get_gpu_topology(
-            processor_handle: amdsmi_interface.processor_handle,
-        ) -> DeviceTopologyAmdSmi:
-            # see: https://rocm.docs.amd.com/projects/amdsmi/en/latest/reference/amdsmi-py-api.html#amdsmi-get-gpu-device-bdf
-            # BDFID = ((DOMAIN & 0xffffffff) << 32) | ((BUS & 0xff) << 8) | ((DEVICE & 0x1f) <<3 ) | (FUNCTION & 0x7)  # noqa: ERA001
-
-            # [64:32]  Domain        (32 bits)
-            # [31:16]  Reserved      (16 bits, ignore)
-            # [15:8]   Bus           (8 bits)
-            # [7:3]    Device        (5 bits)
-            # [2:0]    Function      (3 bits)
-
-            bdfid = amdsmi_interface.amdsmi_get_gpu_bdf_id(processor_handle)
-
-            domain = (bdfid >> 32) & 0xFFFFFFFF
-            bus = (bdfid >> 8) & 0xFF
-            device = (bdfid >> 3) & 0x1F
-            function = bdfid & 0x7
-
-            return DeviceTopologyAmdSmi(
-                domain=domain,
-                bus=bus,
-                device=device,
-                function=function,
-            )
-
         try:
             amdsmi_interface.amdsmi_init()
             devices: list[GPUDevice] = []
 
             for processor_handle in amdsmi_interface.amdsmi_get_processor_handles():
 
-                topology = get_gpu_topology(processor_handle)
+                topology = DeviceTopologyAmdSmi.from_processor_handle(processor_handle)
 
                 unique_id: str = topology.to_str()
 
@@ -298,12 +301,10 @@ def list_gpus_amd() -> GetDevicesResult:
 
                 num_compute_units: int = info["num_compute_units"]
 
-                vram = amdsmi_interface.amdsmi_get_gpu_vram_info(processor_handle)
-
-                vram_size_mb: int = vram["vram_size"]
-
-                memory_amount = vram_size_mb * 1024 * 1024
-
+                memory_amount = amdsmi_interface.amdsmi_get_gpu_memory_total(
+                    processor_handle,
+                    amdsmi_interface.AmdSmiMemoryType.VRAM,
+                )
                 gpu_type = get_gpu_type(processor_handle)
 
                 device: GPUDevice = GPUDevice(
@@ -708,9 +709,9 @@ class AmdGPU(GPU):
         match self.device.origin:
             case "amdsmi":
 
-                topo1 = DeviceTopologyAmdSmi.from_str(self.device.unique_id)
+                topology1 = DeviceTopologyAmdSmi.from_str(self.device.unique_id)
 
-                if topo1 is None:
+                if topology1 is None:
                     return False
 
                 properties: Any = torch.cuda.get_device_properties(torch_device.index)
@@ -718,16 +719,88 @@ class AmdGPU(GPU):
                 if properties.pci_bus_id is None:
                     return False
 
-                topo2 = DeviceTopologyAmdSmi(
+                topology2 = DeviceTopologyAmdSmi(
                     domain=properties.pci_domain_id,
                     bus=properties.pci_bus_id,
                     device=properties.pci_device_id,
                     function=0,
                 )
 
-                return topo1 == topo2
+                return topology1 == topology2
             case "torch":
                 return self.device.unique_id == torch_device.uuid
             case origin:
                 msg = f"Can't compare a gpu device from origin '{origin}' with a torch device, not implemented yet"
+                raise RuntimeError(msg)
+
+    @override
+    def get_available_memory(self: Self) -> AvailableMemory:
+        match self.device.origin:
+            case "amdsmi":
+                import amdsmi.amdsmi_wrapper as amdsmi  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
+                from amdsmi import (  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
+                    amdsmi_exception,
+                    amdsmi_interface,
+                )
+
+                topology = DeviceTopologyAmdSmi.from_str(self.device.unique_id)
+
+                if topology is None:
+                    msg = f"AmdGPU with origin 'amdsmi' has an invalid unique_id: {self.device.unique_id}"
+                    raise RuntimeError(msg)
+
+                try:
+                    amdsmi_interface.amdsmi_init()
+
+                    processor_handle: Optional[amdsmi_interface.processor_handle] = None
+
+                    for (
+                        processor_handle_l
+                    ) in amdsmi_interface.amdsmi_get_processor_handles():
+
+                        handle_topology = DeviceTopologyAmdSmi.from_processor_handle(
+                            processor_handle_l,
+                        )
+
+                        if handle_topology == topology:
+                            if processor_handle is None:
+                                processor_handle = processor_handle_l
+                            else:
+                                msg = (
+                                    "topology wasn'r unique, two processor_handle found"
+                                )
+                                raise RuntimeError(msg)
+
+                    if processor_handle is None:
+                        msg = f"topology {topology} didn't lead to a processor handle"
+                        raise RuntimeError(msg)
+
+                    memory_total = amdsmi_interface.amdsmi_get_gpu_memory_total(
+                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM
+                    )
+
+                    memory_used = amdsmi_interface.amdsmi_get_gpu_memory_usage(
+                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM
+                    )
+
+                    free_memory = memory_total - memory_used
+
+                    if free_memory < 0:
+                        msg = f"free memory {free_memory} is larger than total memory {memory_total}"
+                        raise RuntimeError(msg)
+
+                    return AvailableMemory(available=free_memory, total=memory_total)
+                finally:
+                    with contextlib.suppress(Exception):
+                        # this can fail, but here we just ignore it
+                        amdsmi.amdsmi_shut_down()
+
+            case "torch":
+                # NOTE: the torch memory getter is bugged for some reason atm torch.cuda.mem_get_info with
+                # rocm7.2 returns some wrong values, I am using dev versions, so it might be because of that
+
+                msg = "Can't get available memory from 'torch' with a AMD device, not implemented yet"
+                raise RuntimeError(msg)
+            case origin:
+                msg = f"Can't get available memory from '{origin}' with a AMD device, not implemented yet"
                 raise RuntimeError(msg)
