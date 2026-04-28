@@ -9,7 +9,7 @@ verify_ssl = true
 name = "torch-nvidia"
 
 [[source]]
-url = "https://download.pytorch.org/whl/nightly/rocm7.1/"
+url = "https://download.pytorch.org/whl/nightly/rocm7.2/"
 verify_ssl = true
 name = "torch-amd"
 
@@ -41,17 +41,17 @@ nvidia-ml-py = "*"
 torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
-speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
+speechbrain = {version = ">=1.1.0"}
 
 ##amd gpu
 [amd]
 amdsmi = "*"
-torchvision = {version = "==0.25.0.dev20260102+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "==2.11.0.dev20260101+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torchaudio = {version = "==2.10.0.dev20260102+rocm7.1", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-triton-rocm = {version = "==3.6.0+git9844da95", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "==0.27.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "==2.13.0.dev20260426+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchaudio = {version = "==2.11.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+triton-rocm = {version = "==3.7.0+git88b227e2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
-speechbrain = {git = "https://github.com/speechbrain/speechbrain", ref="264b642d7820547f02ae25cba028a4ae96f0e88f"}
+speechbrain = {version = ">=1.1.0"}
 
 ## usage: pipenv install --categories "packages,packages-dev,amd"
 
