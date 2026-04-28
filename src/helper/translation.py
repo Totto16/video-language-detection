@@ -2,7 +2,7 @@ import gettext
 import locale
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Optional, cast
+from typing import Literal, Optional
 
 type SupportedLanguage = Literal["en", "de"]
 SUPPORTED_LANGUAGES: list[SupportedLanguage] = ["de", "en"]
@@ -16,7 +16,7 @@ def get_current_language() -> SupportedLanguage:
 
     [lang, *_] = lang_str.split("_")
     if lang in SUPPORTED_LANGUAGES:
-        return cast(SupportedLanguage, lang)
+        return lang
 
     return DEFAULT_LANGUAGE
 
