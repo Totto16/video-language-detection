@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 from typing import (
     Self,
 )
@@ -24,7 +24,7 @@ type IdentifierDescription = (
 )
 
 
-class MetadataType(str, Enum):
+class MetadataType(StrEnum):
     ok = "ok"
     missing = "missing"
     skipped = "skipped"

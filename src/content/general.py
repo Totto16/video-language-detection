@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum
 from hashlib import sha256
 from pathlib import Path
 from typing import (
@@ -31,7 +31,7 @@ class ScannedFileType(Enum):
         return str(self)
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     series = "series"
     season = "season"
     episode = "episode"
@@ -45,7 +45,7 @@ class ContentType(str, Enum):
         return str(self)
 
 
-#TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
+# TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
 class MissingOverrideError(RuntimeError):
     pass
 
