@@ -53,7 +53,7 @@ triton-rocm = {version = "==3.7.0+git88b227e2", index="torch-amd", markers = "sy
 
 speechbrain = {version = ">=1.1.0"}
 
-## usage: pipenv install --categories "packages,packages-dev,amd"
+## usage: pipenv install --categories "packages,dev-packages,amd"
 
 [dev-packages]
 pylint = "*"
