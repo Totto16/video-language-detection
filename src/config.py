@@ -1,4 +1,5 @@
 import json
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -499,7 +500,7 @@ class AdvancedConfig:
                 raise TypeError(msg)
             name_to_use = cli_name_to_use
 
-        # if the settings say, that the cli one is prefered, we use that one, if it is set
+        # if the settings say, that the cli one is preferred, we use that one, if it is set
         if (
             templates.settings is not None
             and templates.settings.prefer_cli_template
@@ -525,9 +526,14 @@ class AdvancedConfig:
                 name_to_use = temp_name
                 continue
 
-            # otherwise we can't find the name in the conigd ands also no alias, so raise an error
+            # otherwise we can't find the name in the config ands also no alias, so print an error and exit with a failure
             msg = f"No template or alias with name '{name_to_use}' was found"
-            raise TypeError(msg)
+            logger.error(msg)
+            available_names = (
+                f"Available names are: {", ".join([*aliases.keys(), *all_names.keys()])}"
+            )
+            logger.info(available_names)
+            sys.exit(1)
 
         return (template_to_use, name_to_use)
 
