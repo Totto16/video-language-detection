@@ -1,9 +1,9 @@
 allowBuilds:
-  '@parcel/watcher': set this to true or false
+  '@parcel/watcher': true
   electron-winstaller: true
-  esbuild: set this to true or false
-  lmdb: set this to true or false
-  msgpackr-extract: set this to true or false
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true
 allowedDeprecatedVersions:
   eslint: "8.57.1"
 blockExoticSubdeps: false
@@ -35,5 +35,7 @@ minimumReleaseAgeExclude:
   - '@angular/build@21.2.12'
   - '@angular/cli@21.2.12'
   - '@schematics/angular@21.2.12'
+  - '@angular/cdk@21.2.12'
+  - '@angular/material@21.2.12'
 
 nodeLinker: hoisted

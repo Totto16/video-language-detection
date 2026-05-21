@@ -6,6 +6,6 @@
     "outDir": "./out-tsc/app",
     "types": []
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "include": ["src/renderer/**/*.ts"],
+  "exclude": ["src/renderer/**/*.spec.ts"]
 }
