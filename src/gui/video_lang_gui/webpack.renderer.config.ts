@@ -7,23 +7,6 @@ import { AngularWebpackPlugin } from '@ngtools/webpack';
 export const rendererConfig: Configuration = {
   module: {
     rules: [
-      // Add support for native node modules
-      {
-        // We're specifying native_modules in the test because the asset relocator loader generates a
-        // "fake" .node file which is really a cjs file.
-        test: /native_modules[/\\].+\.node$/,
-        use: 'node-loader',
-      },
-      {
-        test: /[/\\]node_modules[/\\].+\.(m?js|node)$/,
-        parser: { amd: false },
-        use: {
-          loader: '@vercel/webpack-asset-relocator-loader',
-          options: {
-            outputAssetBase: 'native_modules',
-          },
-        },
-      },
       {
         test: /renderer\/preload.ts$/,
         use: {
@@ -36,17 +19,19 @@ export const rendererConfig: Configuration = {
       {
         test: /renderer\/.*\.[jt]s$/,
         loader: '@ngtools/webpack'
-      }, {
+      },
+      {
         test: /\.s[ac]ss$/i,
         use: [
           // Creates `style` nodes from JS strings
-          "style-loader",
+          { loader: 'style-loader' },
           // Translates CSS into CommonJS
-          "css-loader",
+          { loader: "css-loader" },
           // Compiles Sass to CSS
-          "sass-loader",
+          { loader: "sass-loader" },
         ],
-      }, {
+      },
+      {
         test: /\.css$/,
         use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
       }
@@ -61,4 +46,6 @@ export const rendererConfig: Configuration = {
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', ".scss"],
   },
+  target: "electron-renderer",
+
 };
