@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "test1": {
+    "video_lang_gui": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -59,10 +59,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "test1:build:production"
+              "buildTarget": "video_lang_gui:build:production"
             },
             "development": {
-              "buildTarget": "test1:build:development"
+              "buildTarget": "video_lang_gui:build:development"
             }
           },
           "defaultConfiguration": "development"

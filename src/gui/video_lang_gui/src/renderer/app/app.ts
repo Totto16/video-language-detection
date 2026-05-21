@@ -8,5 +8,5 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.scss',
 })
 export class App {
-  protected readonly title = signal('test1');
+  protected readonly title = signal('video_lang_gui');
 }

@@ -30,7 +30,7 @@
       "path": "./tsconfig.spec.json"
     },
     {
-      "path": "tsconfig.tools.json"
+      "path": "./tsconfig.tools.json"
     }
   ]
 }
