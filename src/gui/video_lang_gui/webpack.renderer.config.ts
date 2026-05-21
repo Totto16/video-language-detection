@@ -22,6 +22,7 @@ export const rendererConfig: Configuration = {
       },
       {
         test: /\.s[ac]ss$/i,
+        resourceQuery: { not: [/ngResource/] },
         use: [
           // Creates `style` nodes from JS strings
           { loader: 'style-loader' },
@@ -32,7 +33,12 @@ export const rendererConfig: Configuration = {
           // Compiles Sass to CSS
           { loader: "sass-loader" },
         ],
-      }
+      },
+      {
+        test: /\.s[ac]ss$/i,
+        resourceQuery: [/ngResource/],
+        type: "asset/source"
+      },
     ],
   },
   plugins: [
