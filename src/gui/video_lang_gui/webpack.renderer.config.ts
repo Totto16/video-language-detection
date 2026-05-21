@@ -51,6 +51,5 @@ export const rendererConfig: Configuration = {
     extensions: ['.js', '.ts', '.jsx', '.tsx', ".scss"],
   },
   target: "electron-renderer",
-  externals: {}
 
 };
