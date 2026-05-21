@@ -102,6 +102,8 @@ class SeasonContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
+        # TODO: find duplicates, e.g. simpson s32e10
+        # should i do that in summary generation or when?
         return Summary.construct_for_season(
             self.metadata,
             self.description,
