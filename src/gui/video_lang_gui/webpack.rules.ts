@@ -19,6 +19,15 @@ export const rules: Required<ModuleOptions>['rules'] = [
     },
   },
   {
+    test: /renderer\/preload.ts$/,
+    use: {
+      loader: 'ts-loader',
+      options: {
+        transpileOnly: true,
+      },
+    },
+  },
+  {
     test: /renderer\/.*\.[jt]s$/,
     loader: '@ngtools/webpack'
   },
