@@ -25,3 +25,5 @@ minimumReleaseAgeExclude:
   - '@electron-forge/template-webpack@7.11.2'
   - '@electron-forge/tracer@7.11.2'
   - '@electron-forge/web-multi-logger@7.11.2'
+
+nodeLinker: hoisted
