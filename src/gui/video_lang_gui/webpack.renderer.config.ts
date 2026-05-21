@@ -26,14 +26,12 @@ export const rendererConfig: Configuration = {
           // Creates `style` nodes from JS strings
           { loader: 'style-loader' },
           // Translates CSS into CommonJS
-          { loader: "css-loader" },
+          {
+            loader: "css-loader"
+          },
           // Compiles Sass to CSS
           { loader: "sass-loader" },
         ],
-      },
-      {
-        test: /\.css$/,
-        use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
       }
     ],
   },
@@ -44,7 +42,7 @@ export const rendererConfig: Configuration = {
     })
   ],
   resolve: {
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', ".scss"],
+    extensions: ['.js', '.ts', '.jsx', '.tsx', ".scss"],
   },
   target: "electron-renderer",
 

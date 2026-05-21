@@ -43,5 +43,6 @@ minimumReleaseAgeExclude:
   - '@angular/common@21.2.14'
   - '@angular/platform-browser@21.2.14'
   - '@angular/router@21.2.14'
+  - webpack@5.107.0
 
 nodeLinker: hoisted

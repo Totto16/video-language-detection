@@ -37,7 +37,7 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
-    "css-loader": "^6.11.0",
+    "css-loader": "^7.1.4",
     "electron": "42.2.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
@@ -47,11 +47,11 @@
     "prettier": "^3.8.1",
     "sass": "^1.99.0",
     "sass-loader": "^17.0.0",
-    "style-loader": "^3.3.4",
+    "style-loader": "^4.0.0",
     "ts-loader": "^9.5.7",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8",
-    "webpack": "^5.106.2"
+    "webpack": "^5.107.0"
   },
   "dependencies": {
     "@angular/cdk": "^21.2.12",
