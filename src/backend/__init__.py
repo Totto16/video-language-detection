@@ -1,28 +1,16 @@
 from dataclasses import dataclass
-from threading import Thread
 from typing import Self
 
 import requests
 import uvicorn
-from fastapi import FastAPI
-import asyncio
-import os
-import signal
+from fastapi import FastAPI, Response
 
 
-def register_routes(app) -> None:
-    @app.get("/")
-    def read_root():
-        return {"Hello": "World"}
-
-    @app.get("/items/{item_id}")
-    def read_item(item_id: int, q: str | None = None):
-        return {"item_id": item_id, "q": q}
-
+def register_routes(app: FastAPI, backend: "Backend") -> None:
     @app.get("/shutdown/")
-    def shutdown():
-        os.kill(os.getpid(), signal.SIGUSR2)
-        return fastapi.Response(status_code=200, content="Server shutting down...")
+    async def shutdown() -> Response:
+        await backend.shutdown()
+        return Response(status_code=200, content="Server shutting down")
 
 
 @dataclass
@@ -39,55 +27,40 @@ class BackendOptions:
     address: Address
 
 
-async def async_loop(server: uvicorn.Server) -> None:
-    
-    
-    await asyncio.create_task(server.serve())
-
-    await server.shutdown()
-
-
-def start_app(options: BackendOptions) -> None:
-    app = FastAPI()
-    register_routes(app)
-    config = uvicorn.Config(
-        app=app,
-        host=options.address.host,
-        port=options.address.port,
-        log_level="info",
-        lifespan="on",
-        reload=False,
-    )
-    server = uvicorn.Server(config=config)
-
-    asyncio.run(async_loop(server))
-
-
-def stop_app(address: Address, timeout: float) -> bool:
-    stop_result = requests.get(f"{address:s}/shutdown", timeout=timeout)
-    return stop_result.status_code == 200
-
-
 class Backend:
-    __handle: Thread
     __options: BackendOptions
+    __server: uvicorn.Server
 
     def __init__(self: Self, options: BackendOptions) -> None:
         self.__options = options
-        self.__handle = Thread(
-            target=start_app,
-            name="backend-thread",
-            args=((options,)),
+
+        app = FastAPI()
+        register_routes(app, self)
+
+        config = uvicorn.Config(
+            app=app,
+            host=options.address.host,
+            port=options.address.port,
+            log_level="info",
+            lifespan="on",
+            reload=False,
         )
 
-    def start(self: Self) -> None:
-        self.__handle.start()
+        self.__server = uvicorn.Server(config=config)
 
-    def stop(self: Self, timeout: float) -> bool:
-        success = stop_app(self.__options.address, timeout)
-        self.__handle.join(timeout)
+    async def shutdown(self: Self) -> None:
+        if not self.__server:
+            return
 
-        if self.__handle.is_alive():
-            return False
+        await self.__server.shutdown()
 
-        return success
+    def shutdown_app(self: Self, timeout: float) -> bool:
+        stop_result = requests.get(
+            f"{self.__options.address:s}/shutdown",
+            timeout=timeout,
+        )
+        return stop_result.status_code == 200
+
+    async def run(self: Self) -> None:
+        await self.__server.serve()
+        await self.__server.shutdown()

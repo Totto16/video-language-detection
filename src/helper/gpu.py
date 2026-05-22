@@ -739,7 +739,6 @@ class AmdGPU(GPU):
             case "amdsmi":
                 import amdsmi.amdsmi_wrapper as amdsmi  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
                 from amdsmi import (  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
-                    amdsmi_exception,
                     amdsmi_interface,
                 )
 
@@ -776,11 +775,11 @@ class AmdGPU(GPU):
                         raise RuntimeError(msg)
 
                     memory_total = amdsmi_interface.amdsmi_get_gpu_memory_total(
-                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM
+                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM,
                     )
 
                     memory_used = amdsmi_interface.amdsmi_get_gpu_memory_usage(
-                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM
+                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM,
                     )
 
                     free_memory = memory_total - memory_used
