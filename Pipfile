@@ -32,10 +32,18 @@ pyperclip = "*"
 
 # fastapi for the backend, using standard feature / configuration
 "fastapi[standard]" = "*"
+"uvicorn[standard]" = "*"
 
 ## generic opencl
 pyopencl = "*"
 siphash24 = "*"
+
+##no dedicated gpu
+[integrated]
+torchvision = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+
+speechbrain = {version = ">=1.1.0"}
 
 ##nvidia gpu
 [nvidia]
