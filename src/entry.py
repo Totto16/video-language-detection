@@ -23,7 +23,7 @@ from apischema import serialize
 from config import AdvancedConfig, FinalConfig
 from content.general import NameParser
 from content.language import Language
-from gui.main import launch_gui
+from gui import launch_gui
 from helper.log import LogLevel, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
@@ -264,9 +264,7 @@ def subcommand_gui(
 ) -> ExitCode:
     config = Path(args.config)
 
-    launch_gui(config)
-
-    return 0
+    return launch_gui(config)
 
 
 def subcommand_run(
