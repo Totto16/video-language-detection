@@ -1,12 +1,12 @@
 {
-  "name": "angular-electron",
-  "version": "17.1.0",
-  "description": "Angular 21 with Electron 41 (Typescript + SASS + Hot Reload)",
-  "homepage": "https://github.com/belnadris/angular-electron",
+  "name": "video_lang_gui",
+  "version": "1.0.0",
+  "description": "Electron GUI for the video language detection app",
   "author": {
-    "name": "Maxime GRIS",
-    "email": "maxime.gris@gmail.com"
+    "name": "Totto16",
+    "email": "tobiausgais@gmail.com"
   },
+  "license": "MIT",
   "keywords": [
     "angular",
     "angular 21",
@@ -105,5 +105,7 @@
   },
   "browserslist": [
     "chrome 146"
-  ]
+  ],
+  "packageManager": "pnpm@11.2.2",
+  "pnpm": {}
 }
