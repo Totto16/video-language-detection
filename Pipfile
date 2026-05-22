@@ -14,6 +14,12 @@ verify_ssl = true
 name = "torch-amd"
 
 
+[[source]]
+url = "https://download.pytorch.org/whl/cpu"
+verify_ssl = true
+name = "torch-cpu"
+
+
 [packages]
 #see: https://github.com/speechbrain/speechbrain/pull/2996
 # once this has a release, use it
