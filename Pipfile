@@ -30,6 +30,9 @@ questionary = "*"
 colorlog = "*"
 pyperclip = "*"
 
+# fastapi for the backend, using standard feature / configuration
+"fastapi[standard]" = "*"
+
 ## generic opencl
 pyopencl = "*"
 siphash24 = "*"
@@ -52,7 +55,7 @@ triton-rocm = {version = "==3.7.0+git88b227e2", index="torch-amd", markers = "sy
 
 speechbrain = {version = ">=1.1.0"}
 
-## usage: pipenv install --categories "packages,develop,amd"
+## usage: pipenv install --categories "packages,dev-packages,amd"
 
 [dev-packages]
 pylint = "*"
