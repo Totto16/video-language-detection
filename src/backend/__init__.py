@@ -55,11 +55,17 @@ class Backend:
         await self.__server.shutdown()
 
     def shutdown_app(self: Self, timeout: float) -> bool:
-        stop_result = requests.get(
-            f"{self.__options.address:s}/shutdown",
-            timeout=timeout,
-        )
-        return stop_result.status_code == 200
+        try:
+            stop_result = requests.get(
+                f"{self.__options.address!s}/shutdown",
+                timeout=timeout,
+            )
+        except RuntimeError:
+            return False
+        except requests.exceptions.RequestException:
+            return False
+        else:
+            return stop_result.status_code == 200
 
     async def run(self: Self) -> None:
         await self.__server.serve()
