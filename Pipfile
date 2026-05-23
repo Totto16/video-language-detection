@@ -39,6 +39,7 @@ pyperclip = "*"
 # fastapi for the backend, using standard feature / configuration
 "fastapi[standard]" = "*"
 "uvicorn[standard]" = "*"
+websockets = "*"
 
 ## generic opencl
 pyopencl = "*"
