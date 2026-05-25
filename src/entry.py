@@ -20,6 +20,7 @@ from typing import (
 
 from apischema import serialize
 
+from backend import Address, BackendOptions, launch_api
 from config import AdvancedConfig, FinalConfig
 from content.general import NameParser
 from content.language import Language
@@ -121,6 +122,13 @@ class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
 class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["gui"]
     config: str
+    config_to_use: Optional[str]
+
+
+class ApiCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["api"]
+    config: str
+    config_to_use: Optional[str]
 
 
 class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
@@ -133,6 +141,7 @@ type AllParsedNameSpaces = (
     RunCommandParsedArgNamespace
     | SchemaCommandParsedArgNamespace
     | GuiCommandParsedArgNamespace
+    | ApiCommandParsedArgNamespace
     | ConfigCheckCommandParsedArgNamespace
 )
 
@@ -220,6 +229,36 @@ def parse_args() -> AllParsedNameSpaces:
         default="config.yaml",
         help=_("The config to use"),
     )
+    gui_parser.add_argument(
+        "-t",
+        "--template",
+        dest="config_to_use",
+        default=None,
+        help=_(
+            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
+        ),
+    )
+
+    api_parser = subparsers.add_parser(
+        "api",
+        description=_("Run the API"),
+    )
+    api_parser.add_argument(
+        "-c",
+        "--config",
+        dest="config",
+        default="config.yaml",
+        help=_("The config to use"),
+    )
+    api_parser.add_argument(
+        "-t",
+        "--template",
+        dest="config_to_use",
+        default=None,
+        help=_(
+            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
+        ),
+    )
 
     config_check_parser = subparsers.add_parser(
         "config_check",
@@ -259,12 +298,53 @@ def subcommand_schema(
 
 
 def subcommand_gui(
-    _logger: Logger,
+    logger: Logger,
     args: GuiCommandParsedArgNamespace,
 ) -> ExitCode:
-    config = Path(args.config)
+    parsed_config = AdvancedConfig.load_and_resolve(
+        Path(args.config),
+        args.config_to_use,
+    )
+    if parsed_config.is_err():
+        logger.error("error while parsing config: %s", parsed_config.get_err())
+        return 1
 
-    return launch_gui(config)
+    configs = parsed_config.get_ok()
+
+    if len(configs) == 0:
+        logger.error("parsing returned 0 configs")
+        return 1
+
+    # TODO: get from args
+    address = Address(host="127.0.0.1", port=4433)
+    options = BackendOptions(address=address)
+
+    return launch_gui(configs, options)
+
+
+def subcommand_api(
+    logger: Logger,
+    args: ApiCommandParsedArgNamespace,
+) -> ExitCode:
+    parsed_config = AdvancedConfig.load_and_resolve(
+        Path(args.config),
+        args.config_to_use,
+    )
+    if parsed_config.is_err():
+        logger.error("error while parsing config: %s", parsed_config.get_err())
+        return 1
+
+    configs = parsed_config.get_ok()
+
+    if len(configs) == 0:
+        logger.error("parsing returned 0 configs")
+        return 1
+
+    # TODO: get from args
+    address = Address(host="127.0.0.1", port=4433)
+    options = BackendOptions(address=address)
+
+    return launch_api(configs, options)
 
 
 def subcommand_run(
@@ -348,6 +428,8 @@ def main() -> ExitCode:
                 )
             case "gui":
                 return subcommand_gui(logger, args)
+            case "api":
+                return subcommand_api(logger, args)
             case "run":
                 return subcommand_run(
                     logger,

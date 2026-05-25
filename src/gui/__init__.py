@@ -1,8 +1,8 @@
 import asyncio
 from logging import Logger
-from pathlib import Path
 
-from backend import Address, Backend, BackendOptions
+from backend import Backend, BackendOptions
+from config import FinalConfig
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -38,8 +38,5 @@ async def start_all(options: BackendOptions) -> int:
     return result
 
 
-def launch_gui(_config: Path) -> int:
-    address = Address(host="127.0.0.1", port=4433)
-    options = BackendOptions(address=address)
-
+def launch_gui(_configs: list[FinalConfig], options: BackendOptions) -> int:
     return asyncio.run(start_all(options))

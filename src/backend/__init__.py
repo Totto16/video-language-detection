@@ -6,6 +6,7 @@ import requests
 import uvicorn
 from fastapi import Depends, FastAPI, Response, WebSocket
 
+from config import FinalConfig
 from helper.result import Result
 
 
@@ -132,7 +133,7 @@ class Backend:
         self.__manager = Manager()
         self.__ready = asyncio.Event()
 
-        app = FastAPI()
+        app = FastAPI(dependencies=[Depends(self.ready)])
         register_routes(app, BackendRef(backend=self))
 
         config = uvicorn.Config(
@@ -178,3 +179,14 @@ class Backend:
     async def run(self: Self) -> None:
         await self.__server.serve()
         await self.__server.shutdown()
+
+
+async def start_all(options: BackendOptions) -> int:
+    backend = Backend(options)
+
+    await backend.run()
+    return 0
+
+
+def launch_api(_configs: list[FinalConfig], options: BackendOptions) -> int:
+    return asyncio.run(start_all(options))
