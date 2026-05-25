@@ -1,16 +1,30 @@
 import asyncio
+from collections.abc import Coroutine
+import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated, Any, Coroutine, Optional, Self, override
+from logging import Logger
+from typing import Annotated, Any, Optional, Self, override
 
-from fastapi.responses import JSONResponse
 import requests
 import uvicorn
-import json
 from fastapi import Depends, FastAPI, Response, WebSocket
+from fastapi.responses import JSONResponse
 
+from classifier import Classifier, Model, voxlingua107_ecapa_model
 from config import FinalConfig
+from content.base_class import Content, LanguageScanner, ScanSummaryDetailed, Scanner
+from content.general import NameParser
+from content.language_picker import LanguagePicker, get_picker_from_config
+from content.metadata.config import get_metadata_scanner_from_config
+from content.metadata.scanner import MetadataScanner
+from content.scanner import get_scanner_from_config
+from content.summary import LanguageDict, MetadataDict, Summary
+from entry import CustomNameParser
+from helper.base import AnyType, ManagerInterface, parse_contents
+from helper.devices import DeviceManager
 from helper.result import Result
+from main import AllContent
 
 
 class BackendRef:
@@ -149,12 +163,15 @@ class BackendOptions:
 class ScannerState(Enum):
     stopped = "stopped"
     running = "running"
+    finished = "finished"
 
 
 ScannerStartResult = Result[None, str]
 
+type SummaryTuple = tuple[LanguageDict, MetadataDict, ScanSummaryDetailed]
 
-class Scanner:
+
+class BackendScanner:
     __manager: ScannerManager
     __configs: list[FinalConfig]
     __state: ScannerState
@@ -170,16 +187,131 @@ class Scanner:
     def add_manager(self: Self, websocket: WebSocket) -> ScanManager:
         return self.__manager.add(websocket)
 
-    def __start_impl(self: Self) -> None:
-        pass
+    async def __launch_scanner_in_background(
+        self: Self,
+        config: FinalConfig,
+        name_parser: NameParser,
+        all_content_type: AnyType,
+        config_paramaters: Optional[tuple[int, int]],
+        manager: ManagerInterface,
+    ) -> SummaryTuple:
+        device_manager: DeviceManager = DeviceManager()
+
+        model: Model = voxlingua107_ecapa_model
+
+        classifier = Classifier(
+            device_manager=device_manager,
+            model=model,
+            options=config.classifier,
+        )
+        language_scanner = LanguageScanner(classifier=classifier)
+        metadata_scanner: MetadataScanner = get_metadata_scanner_from_config(
+            config.metadata,
+        )
+        scanner: Scanner = get_scanner_from_config(
+            config.scanner,
+            language_scanner,
+            metadata_scanner=metadata_scanner,
+        )
+
+        # TODO: note: we need to have a picker that is configured over ws not over terminal
+        language_picker: LanguagePicker = get_picker_from_config(config.picker)
+
+        general_info: list[str] = [
+            x
+            for x in [
+                f"Config: {config.config_name}",
+                (
+                    None
+                    if config_paramaters is None
+                    else f"Config progress: {config_paramaters[0]+1} / {config_paramaters[1]}"
+                ),
+                f"Config type: {config.config_type.value}",
+            ]
+            if x is not None
+        ]
+
+        contents: list[Content] = parse_contents(
+            root_folder=config.parser.root_folder,
+            options={
+                "ignore_files": config.parser.ignore_files,
+                "video_formats": config.parser.video_formats,
+                "trailer_names": config.parser.trailer_names,
+                "parse_error_is_exception": config.parser.exception_on_error,
+            },
+            save_file=config.general.target_file,
+            name_parser=name_parser,
+            scanner=scanner,
+            language_picker=language_picker,
+            all_content_type=all_content_type,
+            general_info=general_info,
+            config_type=config.config_type,
+            manager=manager,
+        )
+
+        language_summary, metadata_summary = Summary.combine_summaries(
+            content.summary() for content in contents
+        )
+
+        scan_summary = language_scanner.summary_manager.get_detailed_summary()
+
+        return (language_summary, metadata_summary, scan_summary)
+
+    async def __start_coroutine(
+        self: Self, configs: list[FinalConfig]
+    ) -> list[SummaryTuple]:
+        result: list[SummaryTuple] = []
+
+        manager = None
+
+        # TODO: set current configs and configs to process, support arguments
+        for index, config in enumerate(configs):
+            name_parser = CustomNameParser(season_special_names=config.parser.special)
+
+            config_paramaters: Optional[tuple[int, int]] = (
+                None if len(self.__configs) == 1 else (index, len(self.__configs))
+            )
+
+            summary = await self.__launch_scanner_in_background(
+                config=config,
+                name_parser=name_parser,
+                all_content_type=AllContent,
+                config_paramaters=config_paramaters,
+                manager=manager,
+            )
+
+            result.append(summary)
+
+        return result
+
+    def __start_impl(self: Self, configs: Optional[list[str]]) -> ScannerStartResult:
+
+        if configs is not None:
+            # TODO: implement
+            return ScannerStartResult.err("TODO")
+
+        self.__status = ScannerState.running
+
+        task: asyncio.Task[list[SummaryTuple]] = asyncio.Task(
+            self.__start_coroutine(configs=self.__configs),
+        )
+
+        def done(task: asyncio.Task[list[SummaryTuple]]) -> None:
+            result: list[SummaryTuple] = task.result()
+
+            # set result to the state
+            self.__status = ScannerState.finished
+
+        task.add_done_callback(done)
+
+        return ScannerStartResult.ok(None)
 
     def start(self: Self, configs: Optional[list[str]]) -> ScannerStartResult:
         if self.__state != ScannerState.stopped:
             return ScannerStartResult.err("Scanner is already running")
 
         if configs is None:
-            self.__start_impl()
-            return ScannerStartResult.ok(None)
+            return self.__start_impl(configs)
 
         # TODO: implement
         return ScannerStartResult.err("TODO")
@@ -192,13 +324,13 @@ class Backend:
     __options: BackendOptions
     __server: uvicorn.Server
     __ready: asyncio.Event
-    __scanner: Scanner
+    __scanner: BackendScanner
 
     def __init__(
         self: Self, options: BackendOptions, configs: list[FinalConfig]
     ) -> None:
         self.__options = options
-        self.__scanner = Scanner(configs)
+        self.__scanner = BackendScanner(configs)
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)])
@@ -229,7 +361,7 @@ class Backend:
         await self.__server.shutdown()
 
     @property
-    def scanner(self: Self) -> Scanner:
+    def scanner(self: Self) -> BackendScanner:
         return self.__scanner
 
     def shutdown_app(self: Self, timeout: float) -> bool:

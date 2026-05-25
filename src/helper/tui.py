@@ -5,6 +5,7 @@ from typing import (
     Optional,
 )
 
+from enlighten import Manager, get_manager
 from prompt_toolkit.key_binding import KeyBindings
 
 from classifier import Classifier, Model, voxlingua107_ecapa_model
@@ -12,7 +13,7 @@ from content.base_class import LanguageScanner, Scanner
 from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
-from helper.base import AnyType, parse_contents
+from helper.base import AnyType, ManagerInterface, parse_contents
 from helper.devices import DeviceManager
 
 if TYPE_CHECKING:
@@ -44,6 +45,15 @@ def get_keybindings(
             logger.info(_("Aborted scan"))
 
     return kb
+
+
+def get_tui_manager() -> ManagerInterface:
+    manager = get_manager()
+    if not isinstance(manager, Manager):
+        msg = _("UNREACHABLE (not runnable in notebooks)")
+        raise TypeError(msg)
+
+    return manager
 
 
 def launch_tui(
@@ -92,6 +102,8 @@ def launch_tui(
         if x is not None
     ]
 
+    manager = get_tui_manager()
+
     contents: list[Content] = parse_contents(
         root_folder=config.parser.root_folder,
         options={
@@ -107,6 +119,7 @@ def launch_tui(
         all_content_type=all_content_type,
         general_info=general_info,
         config_type=config.config_type,
+        manager=manager,
     )
 
     language_summary, metadata_summary = Summary.combine_summaries(

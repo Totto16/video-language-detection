@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, assert_never, override
 
 from apischema import deserialize, serialize
-from enlighten import Justify, Manager, get_manager
+from enlighten import Justify, Manager
 
 from config import ConfigType
 from content.base_class import (
@@ -80,12 +80,15 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
+type ManagerInterface = Manager
+
+
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __name_parser: NameParser
     __scanner: Scanner
     __progress_bars: dict[str, Any]
-    __manager: Manager
+    __manager: ManagerInterface
     __status_bar: Any
     __language_picker: LanguagePicker
 
@@ -96,6 +99,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         scanner: Scanner,
         language_picker: LanguagePicker,
         general_info: list[str],
+        manager: ManagerInterface,
     ) -> None:
         super().__init__()
 
@@ -103,11 +107,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__name_parser = name_parser
         self.__scanner = scanner
         self.__progress_bars = {}
-        manager = get_manager()
-        if not isinstance(manager, Manager):
-            msg = _("UNREACHABLE (not runnable in notebooks)")
-            raise TypeError(msg)
-
         self.__manager = manager
 
         info_str: str = ""
@@ -353,6 +352,7 @@ def parse_contents(
     all_content_type: AnyType,
     general_info: list[str],
     config_type: ConfigType,
+    manager: ManagerInterface,
 ) -> list[Content]:
 
     callback: ContentCallback
@@ -365,6 +365,7 @@ def parse_contents(
                 scanner=scanner,
                 language_picker=language_picker,
                 general_info=general_info,
+                manager=manager,
             )
         case ConfigType.numerated:
             callback = NumeratedContentCallback(
@@ -373,6 +374,7 @@ def parse_contents(
                 scanner=scanner,
                 language_picker=language_picker,
                 general_info=general_info,
+                manager=manager,
             )
             # TODO
             return []
@@ -383,6 +385,7 @@ def parse_contents(
                 scanner=scanner,
                 language_picker=language_picker,
                 general_info=general_info,
+                manager=manager,
             )
             # TODO
             return []
