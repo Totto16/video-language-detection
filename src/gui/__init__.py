@@ -27,8 +27,8 @@ async def start_gui(options: BackendOptions, backend: Backend) -> int:
     return 0 if success and app_ok else 1
 
 
-async def start_all(options: BackendOptions) -> int:
-    backend = Backend(options)
+async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    backend = Backend(options=options, configs=configs)
 
     [_, result] = await asyncio.gather(
         backend.run(),
@@ -38,5 +38,5 @@ async def start_all(options: BackendOptions) -> int:
     return result
 
 
-def launch_gui(_configs: list[FinalConfig], options: BackendOptions) -> int:
-    return asyncio.run(start_all(options))
+def launch_gui(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    return asyncio.run(start_all(options=options, configs=configs))

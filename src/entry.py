@@ -100,7 +100,7 @@ class CustomNameParser(NameParser):
         return (name, year)
 
 
-type SubCommand = Literal["run", "schema", "gui", "config_check"]
+type SubCommand = Literal["run", "schema", "gui", "config_check", "api"]
 
 
 class ParsedArgNamespace:
@@ -319,7 +319,7 @@ def subcommand_gui(
     address = Address(host="127.0.0.1", port=4433)
     options = BackendOptions(address=address)
 
-    return launch_gui(configs, options)
+    return launch_gui(options, configs)
 
 
 def subcommand_api(
@@ -344,7 +344,7 @@ def subcommand_api(
     address = Address(host="127.0.0.1", port=4433)
     options = BackendOptions(address=address)
 
-    return launch_api(configs, options)
+    return launch_api(options, configs)
 
 
 def subcommand_run(

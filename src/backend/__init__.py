@@ -1,9 +1,12 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Annotated, Any, Coroutine, Self, override
+from enum import Enum
+from typing import Annotated, Any, Coroutine, Optional, Self, override
 
+from fastapi.responses import JSONResponse
 import requests
 import uvicorn
+import json
 from fastapi import Depends, FastAPI, Response, WebSocket
 
 from config import FinalConfig
@@ -60,21 +63,22 @@ class WebsocketHandler:
                 await self.__ws.send_json({"type": "error", "error": str(err)})
 
 
-class SingleManager(WebsocketHandler):
+class ScanManager(WebsocketHandler):
 
     @override
     async def process_data(self: Self, _data: Any) -> ProcessResult:
+        # TODO: use pydantic to get e.g. status request
         return ProcessResult.err("Nothing can be written in this cases")
 
 
-class Manager:
-    __instances: list[SingleManager]
+class ScannerManager:
+    __instances: list[ScanManager]
 
     def __init__(self: Self) -> None:
         self.__instances = []
 
-    def add(self: Self, websocket: WebSocket) -> SingleManager:
-        manager = SingleManager(websocket)
+    def add(self: Self, websocket: WebSocket) -> ScanManager:
+        manager = ScanManager(websocket)
         self.__instances.append(manager)
         return manager
 
@@ -98,14 +102,34 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         await backend.shutdown()
         return Response(status_code=200, content="Server shutting down")
 
-    @app.websocket("/manager/ws/")
-    async def manager_ws(
+    @app.websocket("/scan/managers/ws/")
+    async def scan_manager_ws(
         websocket: WebSocket,
         backend: Annotated[Backend, Depends(retreive_backend)],
     ) -> None:
         await websocket.accept()
-        manager = backend.add_manager(websocket)
+        manager = backend.scanner.add_manager(websocket)
         await manager.process()
+
+    @app.websocket("/scan/start")
+    async def scan_start(
+        backend: Annotated[Backend, Depends(retreive_backend)],
+    ) -> Response:
+        # TODO. support one / multiple / some configs
+        configs: Optional[list[str]] = None
+        result = backend.scanner.start(configs)
+
+        if result.is_err():
+            return JSONResponse(status_code=422, content={"error": result.get_err()})
+
+        return JSONResponse(status_code=200, content={"ok": True})
+
+    @app.websocket("/scan/status")
+    async def scan_status(
+        backend: Annotated[Backend, Depends(retreive_backend)],
+    ) -> Response:
+        status = backend.scanner.status()
+        return JSONResponse(status_code=200, content={"status": status})
 
 
 @dataclass
@@ -122,15 +146,59 @@ class BackendOptions:
     address: Address
 
 
+class ScannerState(Enum):
+    stopped = "stopped"
+    running = "running"
+
+
+ScannerStartResult = Result[None, str]
+
+
+class Scanner:
+    __manager: ScannerManager
+    __configs: list[FinalConfig]
+    __state: ScannerState
+
+    def __init__(
+        self: Self,
+        configs: list[FinalConfig],
+    ) -> None:
+        self.__configs = configs
+        self.__manager = ScannerManager()
+        self.__state = ScannerState.stopped
+
+    def add_manager(self: Self, websocket: WebSocket) -> ScanManager:
+        return self.__manager.add(websocket)
+
+    def __start_impl(self: Self) -> None:
+        pass
+
+    def start(self: Self, configs: Optional[list[str]]) -> ScannerStartResult:
+        if self.__state != ScannerState.stopped:
+            return ScannerStartResult.err("Scanner is already running")
+
+        if configs is None:
+            self.__start_impl()
+            return ScannerStartResult.ok(None)
+
+        # TODO: implement
+        return ScannerStartResult.err("TODO")
+
+    def status(self: Self) -> str:
+        return self.__state.value
+
+
 class Backend:
     __options: BackendOptions
     __server: uvicorn.Server
     __ready: asyncio.Event
-    __manager: Manager
+    __scanner: Scanner
 
-    def __init__(self: Self, options: BackendOptions) -> None:
+    def __init__(
+        self: Self, options: BackendOptions, configs: list[FinalConfig]
+    ) -> None:
         self.__options = options
-        self.__manager = Manager()
+        self.__scanner = Scanner(configs)
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)])
@@ -154,14 +222,15 @@ class Backend:
 
         await self.__ready.wait()
 
-    def add_manager(self: Self, websocket: WebSocket) -> SingleManager:
-        return self.__manager.add(websocket)
-
     async def shutdown(self: Self) -> None:
         if not self.__server:
             return
 
         await self.__server.shutdown()
+
+    @property
+    def scanner(self: Self) -> Scanner:
+        return self.__scanner
 
     def shutdown_app(self: Self, timeout: float) -> bool:
         try:
@@ -181,12 +250,12 @@ class Backend:
         await self.__server.shutdown()
 
 
-async def start_all(options: BackendOptions) -> int:
-    backend = Backend(options)
+async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    backend = Backend(options=options, configs=configs)
 
     await backend.run()
     return 0
 
 
-def launch_api(_configs: list[FinalConfig], options: BackendOptions) -> int:
-    return asyncio.run(start_all(options))
+def launch_api(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    return asyncio.run(start_all(options, configs))
