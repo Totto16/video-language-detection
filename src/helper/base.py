@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, assert_never, override
+from typing import Any, Optional, Self, TypedDict, Unpack, assert_never, override
 
 from apischema import deserialize, serialize
-from enlighten import Justify, Manager
+from enlighten import Counter, Justify, Manager, StatusBar, get_manager
 
 from config import ConfigType
 from content.base_class import (
@@ -16,6 +16,7 @@ from content.base_class import (
 from content.general import (
     Callback,
     ContentType,
+    MissingOverrideError,
     NameParser,
     ScannedFileType,
 )
@@ -80,16 +81,140 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-type ManagerInterface = Manager
+class StatusBarInterface:
+    def update(self: Self, stage: str, force: bool = False) -> None:
+        raise MissingOverrideError
+
+
+class CounterInterface:
+    def update(self: Self, incr: int = 1, force: bool = False) -> None:
+        raise MissingOverrideError
+
+    def close(self: Self, clear: bool = False) -> None:
+        raise MissingOverrideError
+
+
+class ManagerInterface:
+    def status_bar(
+        self: Self,
+        *,
+        status_format: str,
+        color: str,
+        justify: Justify,
+        stage: str,
+        autorefresh: bool,
+        min_delta: float,
+        **kwargs: Any,
+    ) -> StatusBarInterface:
+        raise MissingOverrideError
+
+    def counter(
+        self: Self,
+        total: int,
+        desc: str,
+        unit: str,
+        leave: bool,
+        color: str,
+    ) -> CounterInterface:
+        raise MissingOverrideError
+
+    def stop(
+        self: Self,
+    ) -> None:
+        raise MissingOverrideError
+
+
+class TuiStatusBar(StatusBarInterface):
+    __impl: StatusBar
+
+    def __init__(self: Self, impl: StatusBar) -> None:
+        self.__impl = impl
+
+    @override
+    def update(self: Self, stage: str, force: bool = False) -> None:
+        return self.__impl.update(stage=stage, force=force)
+
+
+class TuiCounter(CounterInterface):
+    __impl: Counter
+
+    def __init__(self: Self, impl: Counter) -> None:
+        self.__impl = impl
+
+    @override
+    def update(self: Self, incr: int = 1, force: bool = False) -> None:
+        return self.__impl.update(incr=incr, force=force)
+
+    @override
+    def close(self: Self, clear: bool = False) -> None:
+        return self.__impl.close(clear=clear)
+
+
+class TuiManager(ManagerInterface):
+    __impl: Manager
+
+    def __init__(self: Self) -> None:
+        manager = get_manager()
+        if not isinstance(manager, Manager):
+            msg = _("UNREACHABLE (not runnable in notebooks)")
+            raise TypeError(msg)
+
+        self.__impl = manager
+
+    @override
+    def status_bar(
+        self: Self,
+        *,
+        status_format: str,
+        color: str,
+        justify: Justify,
+        stage: str,
+        autorefresh: bool,
+        min_delta: float,
+        **kwargs: Any,
+    ) -> TuiStatusBar:
+        status_bar = self.__impl.status_bar(
+            status_format=status_format,
+            color=color,
+            justify=justify,
+            stage=stage,
+            autorefresh=autorefresh,
+            min_delta=min_delta,
+            **kwargs,
+        )
+        return TuiStatusBar(impl=status_bar)
+
+    @override
+    def counter(
+        self: Self,
+        total: int,
+        desc: str,
+        unit: str,
+        leave: bool,
+        color: str,
+    ) -> CounterInterface:
+        counter = self.__impl.counter(
+            total=total,
+            desc=desc,
+            unit=unit,
+            leave=leave,
+            color=color,
+        )
+        return TuiCounter(impl=counter)
+
+    def stop(
+        self: Self,
+    ) -> None:
+        return self.__impl.stop()
 
 
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     __options: ContentOptions
     __name_parser: NameParser
     __scanner: Scanner
-    __progress_bars: dict[str, Any]
+    __progress_bars: dict[str, CounterInterface]
     __manager: ManagerInterface
-    __status_bar: Any
+    __status_bar: StatusBarInterface
     __language_picker: LanguagePicker
 
     def __init__(

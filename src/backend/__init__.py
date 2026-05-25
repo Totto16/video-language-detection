@@ -1,10 +1,7 @@
 import asyncio
-from collections.abc import Coroutine
-import json
 from dataclasses import dataclass
 from enum import Enum
-from logging import Logger
-from typing import Annotated, Any, Optional, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, override
 
 import requests
 import uvicorn
@@ -13,11 +10,10 @@ from fastapi.responses import JSONResponse
 
 from classifier import Classifier, Model, voxlingua107_ecapa_model
 from config import FinalConfig
-from content.base_class import Content, LanguageScanner, ScanSummaryDetailed, Scanner
-from content.general import NameParser
+from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
+from content.general import MissingOverrideError, NameParser
 from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
-from content.metadata.scanner import MetadataScanner
 from content.scanner import get_scanner_from_config
 from content.summary import LanguageDict, MetadataDict, Summary
 from entry import CustomNameParser
@@ -25,6 +21,11 @@ from helper.base import AnyType, ManagerInterface, parse_contents
 from helper.devices import DeviceManager
 from helper.result import Result
 from main import AllContent
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from content.metadata.scanner import MetadataScanner
 
 
 class BackendRef:
@@ -39,11 +40,6 @@ class BackendRef:
 
 
 ProcessResult = Result[Any, str]
-
-
-# TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
-class MissingOverrideError(RuntimeError):
-    pass
 
 
 class WebsocketHandler:
@@ -85,7 +81,7 @@ class ScanManager(WebsocketHandler):
         return ProcessResult.err("Nothing can be written in this cases")
 
 
-class ScannerManager:
+class ScannerManager(ManagerInterface):
     __instances: list[ScanManager]
 
     def __init__(self: Self) -> None:
@@ -258,11 +254,11 @@ class BackendScanner:
         return (language_summary, metadata_summary, scan_summary)
 
     async def __start_coroutine(
-        self: Self, configs: list[FinalConfig]
+        self: Self,
+        configs: list[FinalConfig],
+        manager: ManagerInterface,
     ) -> list[SummaryTuple]:
         result: list[SummaryTuple] = []
-
-        manager = None
 
         # TODO: set current configs and configs to process, support arguments
         for index, config in enumerate(configs):
@@ -293,7 +289,7 @@ class BackendScanner:
         self.__status = ScannerState.running
 
         task: asyncio.Task[list[SummaryTuple]] = asyncio.Task(
-            self.__start_coroutine(configs=self.__configs),
+            self.__start_coroutine(configs=self.__configs, manager=self.__manager),
         )
 
         def done(task: asyncio.Task[list[SummaryTuple]]) -> None:
