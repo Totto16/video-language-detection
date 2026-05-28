@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import gc
 import math
 import re
@@ -33,7 +34,6 @@ from ffmpeg.progress import Progress
 from numpy.polynomial.polynomial import Polynomial
 from speechbrain.dataio import audio_io
 
-from content.general import MissingOverrideError
 from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
@@ -69,20 +69,21 @@ class MemoryPatternType(Enum):
     quadratic = "quadratic"
 
 
-class MemoryPattern:
+class MemoryPattern(ABC):
     pattern_type: MemoryPatternType
 
     def __init__(self: Self, pattern_type: MemoryPatternType) -> None:
+        super().__init__()
         self.typepattern_type = pattern_type
 
+    @abstractmethod
     def get_seconds_for_memory_amount(
         self: Self,
         memory_amount: int,  # noqa: ARG002
-    ) -> Optional[float]:
-        raise MissingOverrideError
+    ) -> Optional[float]: ...
 
-    def to_constructor_str(self: Self) -> str:
-        raise MissingOverrideError
+    @abstractmethod
+    def to_constructor_str(self: Self) -> str: ...
 
     def __str__(self: Self) -> str:
         return self.to_constructor_str()

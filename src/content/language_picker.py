@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import platform
 import subprocess
 from dataclasses import dataclass
@@ -19,7 +20,6 @@ import pyperclip
 from questionary import Choice, Question, Separator, select
 from questionary.prompts.common import FormattedText
 
-from content.general import MissingOverrideError
 from content.language import Language
 from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
@@ -27,18 +27,18 @@ from helper.log import get_logger
 from helper.terminal import Terminal
 
 
-class LanguagePicker:
+class LanguagePicker(ABC):
     def __init__(
         self: Self,
     ) -> None:
-        pass
+        super().__init__()
 
+    @abstractmethod
     def pick_language(
         self: Self,
         path: Path,  # noqa: ARG002
         prediction: Prediction,  # noqa: ARG002
-    ) -> Optional[Language]:
-        raise MissingOverrideError
+    ) -> Optional[Language]: ...
 
 
 class NoLanguagePicker(LanguagePicker):

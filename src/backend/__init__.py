@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 from classifier import Classifier, Model, voxlingua107_ecapa_model
 from config import FinalConfig
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
-from content.general import MissingOverrideError, NameParser
+from content.general import NameParser
 from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.scanner import get_scanner_from_config
@@ -42,14 +43,16 @@ class BackendRef:
 ProcessResult = Result[Any, str]
 
 
-class WebsocketHandler:
+class WebsocketHandler(ABC):
     __ws: WebSocket
 
     def __init__(self: Self, websocket: WebSocket) -> None:
+        super().__init__()
         self.__ws = websocket
 
+    @abstractmethod
     async def process_data(self: Self, _data: Any) -> ProcessResult:
-        raise MissingOverrideError
+        ...
 
     async def send_data(self: Self, data: Any) -> None:
         await self.__ws.send_json({"type": "ok", "data": data})

@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import contextlib
 import subprocess
 import sys
@@ -10,7 +11,6 @@ from typing import Any, Optional, Self, assert_never, cast, override
 import pyopencl as opencl
 import torch
 
-from content.general import MissingOverrideError
 from helper.result import Result
 from helper.timestamp import parse_int_safely
 
@@ -550,10 +550,11 @@ class AvailableMemory:
 GpuGetResult = Result["GPU", str]
 
 
-class GPU:
+class GPU(ABC):
     __device: GPUDevice
 
     def __init__(self: Self, device: GPUDevice) -> None:
+        super().__init__()
         self.__device = device
 
     @staticmethod
@@ -665,11 +666,11 @@ class GPU:
 
         return None
 
+    @abstractmethod
     def is_eq_to_torch_device(
         self: Self,
         torch_device: TorchDevice,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+    ) -> bool: ...
 
     def get_available_memory(self: Self) -> AvailableMemory:
         torch_device = self.torch_device()
@@ -775,11 +776,13 @@ class AmdGPU(GPU):
                         raise RuntimeError(msg)
 
                     memory_total = amdsmi_interface.amdsmi_get_gpu_memory_total(
-                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM,
+                        processor_handle,
+                        amdsmi_interface.AmdSmiMemoryType.VRAM,
                     )
 
                     memory_used = amdsmi_interface.amdsmi_get_gpu_memory_usage(
-                        processor_handle, amdsmi_interface.AmdSmiMemoryType.VRAM,
+                        processor_handle,
+                        amdsmi_interface.AmdSmiMemoryType.VRAM,
                     )
 
                     free_memory = memory_total - memory_used

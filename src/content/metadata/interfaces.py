@@ -1,56 +1,57 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Literal, Optional, Self, override
 
-from content.general import MissingOverrideError
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 from helper.apischema import SchemaType
 
 
-class Provider:
+class Provider(ABC):
     __name: str
 
     def __init__(self: Self, name: str) -> None:
+        super().__init__()
         self.__name = name
 
+    @abstractmethod
     def get_series_metadata(
         self: Self,
         series_name: str,  # noqa: ARG002
-    ) -> Optional[object]:
-        raise MissingOverrideError
+    ) -> Optional[object]: ...
 
+    @abstractmethod
     def get_season_metadata(
         self: Self,
         series_data: object,  # noqa: ARG002
         season: int,  # noqa: ARG002
-    ) -> Optional[object]:
-        raise MissingOverrideError
+    ) -> Optional[object]: ...
 
+    @abstractmethod
     def get_episode_metadata(
         self: Self,
         series_data: object,  # noqa: ARG002
         season_data: object,  # noqa: ARG002
         episode: int,  # noqa: ARG002
-    ) -> Optional[object]:
-        raise MissingOverrideError
+    ) -> Optional[object]: ...
 
+    @abstractmethod
     def should_scan(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
         metadata: InternalMetadataType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+    ) -> bool: ...
 
-    def can_scan(self: Self) -> bool:
-        raise MissingOverrideError
+    @abstractmethod
+    def can_scan(self: Self) -> bool: ...
 
     @property
     def name(self: Self) -> str:
         return self.__name
 
     @staticmethod
-    def get_metadata_schema() -> SchemaType:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_metadata_schema() -> SchemaType: ...
 
 
 @dataclass

@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
@@ -11,7 +12,6 @@ from classifier import Classifier, FileMetadataError, PredictionFailReason, WAVF
 from content.general import (
     Callback,
     ContentType,
-    MissingOverrideError,
     ScannedFile,
     ScannedFileType,
     safe_index,
@@ -40,22 +40,23 @@ class ContentDict(TypedDict):
     scanned_file: ScannedFile
 
 
-class SummaryResult:
+class SummaryResult(ABC):
     __file: ScannedFile
     __value: bool
 
     def __init__(self: Self, file: ScannedFile, *, value: bool) -> None:
+        super().__init__()
         self.__file = file
         self.__value = value
 
-    def get_reason_as_str(self: Self) -> str:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_reason_as_str(self: Self) -> str: ...
 
-    def get_reason_identifier(self: Self) -> str:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_reason_identifier(self: Self) -> str: ...
 
-    def get_language(self: Self) -> Language:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_language(self: Self) -> Language: ...
 
     @property
     def file(self: Self) -> ScannedFile:
@@ -264,7 +265,7 @@ class LanguageScanner:
         return self.__summary_manager
 
 
-class Scanner:
+class Scanner(ABC):
     __language_scanner: LanguageScanner
     __metadata_scanner: MetadataScanner
 
@@ -273,21 +274,22 @@ class Scanner:
         language_scanner: LanguageScanner,
         metadata_scanner: MetadataScanner,
     ) -> None:
+        super().__init__()
         self.__language_scanner = language_scanner
         self.__metadata_scanner = metadata_scanner
 
+    @abstractmethod
     def should_scan_language(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+    ) -> bool: ...
 
+    @abstractmethod
     def should_scan_metadata(
         self: Self,
         scan_type: ScanType,  # noqa: ARG002
         metadata: InternalMetadataType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+    ) -> bool: ...
 
     @property
     def language_scanner(self: Self) -> LanguageScanner:
@@ -302,23 +304,27 @@ type CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
 
 
 @dataclass(slots=True, repr=True)
-class Content:
+class Content(ABC):
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
     _metadata: InternalMetadataType = field(
         metadata=alias("metadata"),
     )
 
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
     def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
-        raise MissingOverrideError
+        ...
 
     @property
     def type(self: Self) -> ContentType:
         return self.__type
 
     @property
-    def description(self: Self) -> Any:
-        raise MissingOverrideError
+    @abstractmethod
+    def description(self: Self) -> Any: ...
 
     @property
     def scanned_file(self: Self) -> ScannedFile:
@@ -344,6 +350,7 @@ class Content:
     def generate_checksum(self: Self, manager: Manager) -> None:
         self.__scanned_file.generate_checksum(manager)
 
+    @abstractmethod
     def scan(
         self: Self,
         callback: Callback[  # noqa: ARG002
@@ -356,8 +363,7 @@ class Content:
         parent_folders: list[str],  # noqa: ARG002
         trailer_names: list[str],  # noqa: ARG002
         rescan: bool = False,  # noqa: ARG002
-    ) -> None:
-        raise MissingOverrideError
+    ) -> None: ...
 
 
 def process_folder(

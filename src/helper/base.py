@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, Unpack, assert_never, override
@@ -16,7 +17,6 @@ from content.base_class import (
 from content.general import (
     Callback,
     ContentType,
-    MissingOverrideError,
     NameParser,
     ScannedFileType,
 )
@@ -81,20 +81,30 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class StatusBarInterface:
-    def update(self: Self, stage: str, force: bool = False) -> None:
-        raise MissingOverrideError
+class StatusBarInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def update(self: Self, stage: str, force: bool = False) -> None: ...
 
 
-class CounterInterface:
-    def update(self: Self, incr: int = 1, force: bool = False) -> None:
-        raise MissingOverrideError
+class CounterInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
 
-    def close(self: Self, clear: bool = False) -> None:
-        raise MissingOverrideError
+    @abstractmethod
+    def update(self: Self, incr: int = 1, force: bool = False) -> None: ...
+
+    @abstractmethod
+    def close(self: Self, clear: bool = False) -> None: ...
 
 
-class ManagerInterface:
+class ManagerInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
     def status_bar(
         self: Self,
         *,
@@ -105,9 +115,9 @@ class ManagerInterface:
         autorefresh: bool,
         min_delta: float,
         **kwargs: Any,
-    ) -> StatusBarInterface:
-        raise MissingOverrideError
+    ) -> StatusBarInterface: ...
 
+    @abstractmethod
     def counter(
         self: Self,
         total: int,
@@ -115,19 +125,19 @@ class ManagerInterface:
         unit: str,
         leave: bool,
         color: str,
-    ) -> CounterInterface:
-        raise MissingOverrideError
+    ) -> CounterInterface: ...
 
+    @abstractmethod
     def stop(
         self: Self,
-    ) -> None:
-        raise MissingOverrideError
+    ) -> None: ...
 
 
 class TuiStatusBar(StatusBarInterface):
     __impl: StatusBar
 
     def __init__(self: Self, impl: StatusBar) -> None:
+        super().__init__()
         self.__impl = impl
 
     @override
@@ -139,6 +149,7 @@ class TuiCounter(CounterInterface):
     __impl: Counter
 
     def __init__(self: Self, impl: Counter) -> None:
+        super().__init__()
         self.__impl = impl
 
     @override
@@ -154,6 +165,7 @@ class TuiManager(ManagerInterface):
     __impl: Manager
 
     def __init__(self: Self) -> None:
+        super().__init__()
         manager = get_manager()
         if not isinstance(manager, Manager):
             msg = _("UNREACHABLE (not runnable in notebooks)")

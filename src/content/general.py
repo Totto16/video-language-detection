@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from hashlib import sha256
@@ -43,11 +44,6 @@ class ContentType(StrEnum):
 
     def __repr__(self: Self) -> str:
         return str(self)
-
-
-# TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
-class MissingOverrideError(RuntimeError):
-    pass
 
 
 class StatsDict(TypedDict):
@@ -257,29 +253,32 @@ class ScannedFile:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 
-class NameParser:
+class NameParser(ABC):
     __language: Language
 
     def __init__(self: Self, language: Optional[Language]) -> None:
+        super().__init__()
         self.__language = language if language is not None else Language.get_default()
 
     @property
     def language(self: Self) -> Language:
         return self.__language
 
-    def parse_episode_name(self: Self, _name: str) -> Optional[tuple[str, int, int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_episode_name(
+        self: Self, _name: str
+    ) -> Optional[tuple[str, int, int]]: ...
 
-    def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]: ...
 
-    def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]: ...
 
 
-class Callback[C, CT, RT]:
+class Callback[C, CT, RT](ABC):
     def __init__(self: Self) -> None:
-        pass
+        super().__init__()
 
     def process(
         self: Self,
@@ -329,8 +328,8 @@ class Callback[C, CT, RT]:
     ) -> None:
         return None
 
-    def get_saved(self: Self) -> RT:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_saved(self: Self) -> RT: ...
 
 
 def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:
