@@ -36,8 +36,8 @@ class LanguagePicker(ABC):
     @abstractmethod
     def pick_language(
         self: Self,
-        path: Path,  # noqa: ARG002
-        prediction: Prediction,  # noqa: ARG002
+        path: Path,
+        prediction: Prediction,
     ) -> Optional[Language]: ...
 
 

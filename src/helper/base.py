@@ -1,10 +1,19 @@
-from abc import ABC, abstractmethod
 import json
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, Unpack, assert_never, override
+from typing import (
+    Any,
+    Optional,
+    Protocol,
+    Self,
+    TypedDict,
+    Unpack,
+    assert_never,
+    override,
+)
 
+import enlighten
 from apischema import deserialize, serialize
-from enlighten import Counter, Justify, Manager, StatusBar, get_manager
 
 from config import ConfigType
 from content.base_class import (
@@ -94,38 +103,61 @@ class CounterInterface(ABC):
         super().__init__()
 
     @abstractmethod
-    def update(self: Self, incr: int = 1, force: bool = False) -> None: ...
+    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None: ...
 
     @abstractmethod
     def close(self: Self, clear: bool = False) -> None: ...
+
+
+ManagerJustify = enlighten.Justify
+
+
+# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar
+class StatusBarOptions(TypedDict, total=False):
+    color: str
+    justify: enlighten.Justify
+    min_delta: float  # = 0.1
+    status_format: str
+
+
+# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
+class StatusBarGetOptions(StatusBarOptions, total=False):
+    autorefresh: bool
+
+
+class SupportsFloat(Protocol):
+    def __float__(self) -> float: ...
+
+
+# actual type int, but implementation and python allows classes, which support int() or float()
+type IntLike = int | float | SupportsFloat
+
+
+# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter
+class CounterOptions(TypedDict, total=False):
+    bar_format: str
+    count: IntLike  # = 0,
+    color: str
+    desc: str
+    leave: bool  # = True
+    total: IntLike
+    unit: str
 
 
 class ManagerInterface(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
 
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
     @abstractmethod
     def status_bar(
         self: Self,
-        *,
-        status_format: str,
-        color: str,
-        justify: Justify,
-        stage: str,
-        autorefresh: bool,
-        min_delta: float,
-        **kwargs: Any,
+        **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface: ...
 
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.counter
     @abstractmethod
-    def counter(
-        self: Self,
-        total: int,
-        desc: str,
-        unit: str,
-        leave: bool,
-        color: str,
-    ) -> CounterInterface: ...
+    def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface: ...
 
     @abstractmethod
     def stop(
@@ -134,9 +166,9 @@ class ManagerInterface(ABC):
 
 
 class TuiStatusBar(StatusBarInterface):
-    __impl: StatusBar
+    __impl: enlighten.StatusBar
 
-    def __init__(self: Self, impl: StatusBar) -> None:
+    def __init__(self: Self, impl: enlighten.StatusBar) -> None:
         super().__init__()
         self.__impl = impl
 
@@ -146,14 +178,14 @@ class TuiStatusBar(StatusBarInterface):
 
 
 class TuiCounter(CounterInterface):
-    __impl: Counter
+    __impl: enlighten.Counter
 
-    def __init__(self: Self, impl: Counter) -> None:
+    def __init__(self: Self, impl: enlighten.Counter) -> None:
         super().__init__()
         self.__impl = impl
 
     @override
-    def update(self: Self, incr: int = 1, force: bool = False) -> None:
+    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None:
         return self.__impl.update(incr=incr, force=force)
 
     @override
@@ -162,12 +194,12 @@ class TuiCounter(CounterInterface):
 
 
 class TuiManager(ManagerInterface):
-    __impl: Manager
+    __impl: enlighten.Manager
 
     def __init__(self: Self) -> None:
         super().__init__()
-        manager = get_manager()
-        if not isinstance(manager, Manager):
+        manager = enlighten.get_manager()
+        if not isinstance(manager, enlighten.Manager):
             msg = _("UNREACHABLE (not runnable in notebooks)")
             raise TypeError(msg)
 
@@ -176,41 +208,19 @@ class TuiManager(ManagerInterface):
     @override
     def status_bar(
         self: Self,
-        *,
-        status_format: str,
-        color: str,
-        justify: Justify,
-        stage: str,
-        autorefresh: bool,
-        min_delta: float,
-        **kwargs: Any,
-    ) -> TuiStatusBar:
+        **kwargs: Unpack[StatusBarGetOptions],
+    ) -> StatusBarInterface:
         status_bar = self.__impl.status_bar(
-            status_format=status_format,
-            color=color,
-            justify=justify,
-            stage=stage,
-            autorefresh=autorefresh,
-            min_delta=min_delta,
-            **kwargs,
+            kwargs=kwargs,
         )
         return TuiStatusBar(impl=status_bar)
 
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.counter
     @override
-    def counter(
-        self: Self,
-        total: int,
-        desc: str,
-        unit: str,
-        leave: bool,
-        color: str,
-    ) -> CounterInterface:
+    def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
         counter = self.__impl.counter(
-            total=total,
-            desc=desc,
-            unit=unit,
-            leave=leave,
-            color=color,
+            position=None,
+            kwargs=kwargs,
         )
         return TuiCounter(impl=counter)
 
@@ -249,6 +259,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         info_str: str = ""
         info_kw: dict[str, str] = {}
 
+        info_kw["stage"] = _("Scanning")
+
         if len(general_info) > 0:
             info_parts: list[tuple[str, str]] = [
                 (f"info_{i}", general_info[i]) for i in range(len(general_info))
@@ -264,8 +276,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             + info_str
             + "{elapsed}",
             color="bold_underline_bright_white_on_blue",
-            justify=Justify.CENTER,
-            stage=_("Scanning"),
+            justify=ManagerJustify.CENTER,
             autorefresh=True,
             min_delta=0.5,
             **info_kw,

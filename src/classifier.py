@@ -27,7 +27,6 @@ import numpy as np
 import torch
 from apischema import deserializer, schema, serializer
 from apischema.metadata import none_as_undefined
-from enlighten import Manager
 from ffmpeg.errors import FFmpegError
 from ffmpeg.ffmpeg import FFmpeg
 from ffmpeg.progress import Progress
@@ -38,6 +37,7 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
+from helper.base import ManagerInterface
 from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
@@ -79,7 +79,7 @@ class MemoryPattern(ABC):
     @abstractmethod
     def get_seconds_for_memory_amount(
         self: Self,
-        memory_amount: int,  # noqa: ARG002
+        memory_amount: int,
     ) -> Optional[float]: ...
 
     @abstractmethod
@@ -654,7 +654,7 @@ class WAVFile:
         options: WAVOptions,
         *,
         force_recreation: bool = False,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> WavFile__WavFileResult:
 
         if force_recreation:
@@ -687,7 +687,7 @@ class WAVFile:
     def __convert_to_wav(
         self: Self,
         options: WAVOptions,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> WavFile__WavFileResult:
         if isinstance(self.__status, WavFile):
             return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
@@ -1421,7 +1421,7 @@ class Classifier:
         self: Self,
         wav_file: WAVFile,
         segment: Segment,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> Optional[Prediction]:
         result: WavFile__WavFileResult = wav_file.create_wav_file(
             WAVOptions(bitrate=self.__manager.model.bitrate, segment=segment),
@@ -1463,7 +1463,7 @@ class Classifier:
         wav_file: WAVFile,
         path: Path,
         language_picker: LanguagePicker,
-        manager: Optional[Manager],
+        manager: Optional[ManagerInterface],
     ) -> PredictionBest | PredictionFail:
         if self.__manager.failed_too_often:
             return PredictionFail(PredictionFailReason.failed_too_often, None)

@@ -17,29 +17,29 @@ class Provider(ABC):
     @abstractmethod
     def get_series_metadata(
         self: Self,
-        series_name: str,  # noqa: ARG002
+        series_name: str,
     ) -> Optional[object]: ...
 
     @abstractmethod
     def get_season_metadata(
         self: Self,
-        series_data: object,  # noqa: ARG002
-        season: int,  # noqa: ARG002
+        series_data: object,
+        season: int,
     ) -> Optional[object]: ...
 
     @abstractmethod
     def get_episode_metadata(
         self: Self,
-        series_data: object,  # noqa: ARG002
-        season_data: object,  # noqa: ARG002
-        episode: int,  # noqa: ARG002
+        series_data: object,
+        season_data: object,
+        episode: int,
     ) -> Optional[object]: ...
 
     @abstractmethod
     def should_scan(
         self: Self,
-        scan_type: ScanType,  # noqa: ARG002
-        metadata: InternalMetadataType,  # noqa: ARG002
+        scan_type: ScanType,
+        metadata: InternalMetadataType,
     ) -> bool: ...
 
     @abstractmethod

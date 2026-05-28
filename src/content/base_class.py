@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, override
 
 from apischema import alias
-from enlighten import Manager
 
 from classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from content.general import (
@@ -28,6 +27,7 @@ from content.metadata.scanner import MetadataScanner
 from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
+from helper.base import ManagerInterface
 from helper.log import get_logger
 
 logger: Logger = get_logger()
@@ -215,7 +215,7 @@ class LanguageScanner:
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
         *,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> Optional[Language]:
         try:
             wav_file = WAVFile(scanned_file.path)
@@ -251,7 +251,7 @@ class LanguageScanner:
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
         *,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> Language:
         language = self.get_language(scanned_file, language_picker, manager=manager)
 
@@ -281,14 +281,14 @@ class Scanner(ABC):
     @abstractmethod
     def should_scan_language(
         self: Self,
-        scan_type: ScanType,  # noqa: ARG002
+        scan_type: ScanType,
     ) -> bool: ...
 
     @abstractmethod
     def should_scan_metadata(
         self: Self,
-        scan_type: ScanType,  # noqa: ARG002
-        metadata: InternalMetadataType,  # noqa: ARG002
+        scan_type: ScanType,
+        metadata: InternalMetadataType,
     ) -> bool: ...
 
     @property
@@ -300,7 +300,7 @@ class Scanner(ABC):
         return self.__metadata_scanner
 
 
-type CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
+type CallbackTuple = tuple[ManagerInterface, Scanner, LanguagePicker]
 
 
 @dataclass(slots=True, repr=True)
@@ -315,8 +315,7 @@ class Content(ABC):
         super().__init__()
 
     @abstractmethod
-    def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
-        ...
+    def summary(self: Self, *, detailed: bool = False) -> Summary: ...
 
     @property
     def type(self: Self) -> ContentType:
@@ -347,22 +346,22 @@ class Content(ABC):
 
         return new_handles
 
-    def generate_checksum(self: Self, manager: Manager) -> None:
+    def generate_checksum(self: Self, manager: ManagerInterface) -> None:
         self.__scanned_file.generate_checksum(manager)
 
     @abstractmethod
     def scan(
         self: Self,
-        callback: Callback[  # noqa: ARG002
+        callback: Callback[
             "Content",
             ContentCharacteristic,
             CallbackTuple,
         ],
         *,
-        handles: HandlesType,  # noqa: ARG002
-        parent_folders: list[str],  # noqa: ARG002
-        trailer_names: list[str],  # noqa: ARG002
-        rescan: bool = False,  # noqa: ARG002
+        handles: HandlesType,
+        parent_folders: list[str],
+        trailer_names: list[str],
+        rescan: bool = False,
     ) -> None: ...
 
 

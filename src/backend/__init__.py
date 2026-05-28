@@ -2,7 +2,17 @@ from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Optional, Self, override
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    Optional,
+    Self,
+    TypedDict,
+    Unpack,
+    override,
+)
 
 import requests
 import uvicorn
@@ -18,7 +28,17 @@ from content.metadata.config import get_metadata_scanner_from_config
 from content.scanner import get_scanner_from_config
 from content.summary import LanguageDict, MetadataDict, Summary
 from entry import CustomNameParser
-from helper.base import AnyType, ManagerInterface, parse_contents
+from helper.base import (
+    AnyType,
+    CounterInterface,
+    CounterOptions,
+    IntLike,
+    ManagerInterface,
+    ManagerJustify,
+    StatusBarGetOptions,
+    StatusBarInterface,
+    parse_contents,
+)
 from helper.devices import DeviceManager
 from helper.result import Result
 from main import AllContent
@@ -51,8 +71,7 @@ class WebsocketHandler(ABC):
         self.__ws = websocket
 
     @abstractmethod
-    async def process_data(self: Self, _data: Any) -> ProcessResult:
-        ...
+    async def process_data(self: Self, _data: Any) -> ProcessResult: ...
 
     async def send_data(self: Self, data: Any) -> None:
         await self.__ws.send_json({"type": "ok", "data": data})
@@ -84,6 +103,52 @@ class ScanManager(WebsocketHandler):
         return ProcessResult.err("Nothing can be written in this cases")
 
 
+class ScannerStatusBar(StatusBarInterface):
+
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def update(self: Self, stage: str, force: bool = False) -> None:
+        raise NotImplementedError("TODO")
+
+
+class ScannerCounter(CounterInterface):
+
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None:
+        raise NotImplementedError("TODO")
+
+    @override
+    def close(self: Self, clear: bool = False) -> None:
+        raise NotImplementedError("TODO")
+
+
+class ManagerWsGlobalMessageGeneric[D](TypedDict, total=True):
+    type: Literal["global"]
+    data: D
+
+
+class ManagerWsGlobalMessageStopData(TypedDict, total=True):
+    type: Literal["stop"]
+
+
+ManagerWsGlobalMessageStop = ManagerWsGlobalMessageGeneric[
+    ManagerWsGlobalMessageStopData
+]
+
+ManagerWsGlobalMessage = ManagerWsGlobalMessageStop
+
+ManagerWsCounterMessageTodo = int
+
+ManagerWsCounterMessage = ManagerWsCounterMessageTodo
+
+ManagerWsData = ManagerWsGlobalMessage | ManagerWsCounterMessage
+
+
 class ScannerManager(ManagerInterface):
     __instances: list[ScanManager]
 
@@ -95,12 +160,37 @@ class ScannerManager(ManagerInterface):
         self.__instances.append(manager)
         return manager
 
-    async def send_data(self: Self, data: Any) -> None:
+    async def __send_data(self: Self, data: ManagerWsData) -> None:
         futures: list[Coroutine[Any, Any, None]] = [
             instance.send_data(data) for instance in self.__instances
         ]
 
         await asyncio.gather(*futures)
+
+    @override
+    def status_bar(
+        self: Self,
+        **kwargs: Unpack[StatusBarGetOptions],
+    ) -> StatusBarInterface:
+        raise NotImplementedError("TODO")
+        return ScannerStatusBar(
+            **kwargs,
+        )
+
+    @override
+    def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
+        raise NotImplementedError("TODO")
+        return ScannerCounter(kwargs)
+
+    async def __stop_impl(
+        self: Self,
+    ) -> None:
+        await self.__send_data({"type": "global", "data": {"type": "stop"}})
+
+    def stop(
+        self: Self,
+    ) -> None:
+        asyncio.run(self.__stop_impl())
 
 
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:

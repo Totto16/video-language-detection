@@ -11,10 +11,10 @@ from typing import (
 )
 
 from apischema import schema
-from enlighten import Manager
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
+from helper.base import ManagerInterface
 
 
 class ScannedFileType(Enum):
@@ -115,7 +115,7 @@ class Stats:
     mtime: float
 
     @staticmethod
-    def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
+    def hash_file(file_path: Path, manager: Optional[ManagerInterface] = None) -> str:
         if file_path.is_dir():
             msg = "Can't take checksum of directory"
             raise RuntimeError(msg)
@@ -150,7 +150,7 @@ class Stats:
         file_type: ScannedFileType,
         *,
         generate_checksum: bool = True,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> "Stats":
         mtime: float = file_path.stat().st_mtime
 
@@ -170,7 +170,7 @@ class Stats:
         self: Self,
         path: Path,
         _type: ScannedFileType,
-        manager: Optional[Manager] = None,
+        manager: Optional[ManagerInterface] = None,
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
@@ -241,7 +241,7 @@ class ScannedFile:
             stats=stats,
         )
 
-    def generate_checksum(self: Self, manager: Optional[Manager] = None) -> None:
+    def generate_checksum(self: Self, manager: Optional[ManagerInterface] = None) -> None:
         self.stats = Stats.from_file(
             self.path,
             self.type,
@@ -249,7 +249,7 @@ class ScannedFile:
             manager=manager,
         )
 
-    def is_outdated(self: Self, manager: Optional[Manager] = None) -> bool:
+    def is_outdated(self: Self, manager: Optional[ManagerInterface] = None) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 

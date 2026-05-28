@@ -669,7 +669,7 @@ class GPU(ABC):
     @abstractmethod
     def is_eq_to_torch_device(
         self: Self,
-        torch_device: TorchDevice,  # noqa: ARG002
+        torch_device: TorchDevice,
     ) -> bool: ...
 
     def get_available_memory(self: Self) -> AvailableMemory:
