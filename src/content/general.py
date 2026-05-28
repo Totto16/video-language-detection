@@ -241,7 +241,9 @@ class ScannedFile:
             stats=stats,
         )
 
-    def generate_checksum(self: Self, manager: Optional[ManagerInterface] = None) -> None:
+    def generate_checksum(
+        self: Self, manager: Optional[ManagerInterface] = None
+    ) -> None:
         self.stats = Stats.from_file(
             self.path,
             self.type,
@@ -266,7 +268,8 @@ class NameParser(ABC):
 
     @abstractmethod
     def parse_episode_name(
-        self: Self, _name: str
+        self: Self,
+        _name: str,
     ) -> Optional[tuple[str, int, int]]: ...
 
     @abstractmethod

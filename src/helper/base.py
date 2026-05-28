@@ -103,7 +103,7 @@ class CounterInterface(ABC):
         super().__init__()
 
     @abstractmethod
-    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None: ...
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None: ...
 
     @abstractmethod
     def close(self: Self, clear: bool = False) -> None: ...
@@ -130,17 +130,21 @@ class SupportsFloat(Protocol):
 
 
 # actual type int, but implementation and python allows classes, which support int() or float()
-type IntLike = int | float | SupportsFloat
+type NumberLike = int | float | SupportsFloat
+
+
+def number_like_convert_to_serializable(number_like: NumberLike) -> float:
+    return float(number_like)
 
 
 # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter
 class CounterOptions(TypedDict, total=False):
     bar_format: str
-    count: IntLike  # = 0,
+    count: NumberLike  # = 0,
     color: str
     desc: str
     leave: bool  # = True
-    total: IntLike
+    total: NumberLike
     unit: str
 
 
@@ -185,7 +189,7 @@ class TuiCounter(CounterInterface):
         self.__impl = impl
 
     @override
-    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None:
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
         return self.__impl.update(incr=incr, force=force)
 
     @override

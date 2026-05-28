@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 import asyncio
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -32,11 +32,11 @@ from helper.base import (
     AnyType,
     CounterInterface,
     CounterOptions,
-    IntLike,
     ManagerInterface,
-    ManagerJustify,
+    NumberLike,
     StatusBarGetOptions,
     StatusBarInterface,
+    number_like_convert_to_serializable,
     parse_contents,
 )
 from helper.devices import DeviceManager
@@ -104,9 +104,13 @@ class ScanManager(WebsocketHandler):
 
 
 class ScannerStatusBar(StatusBarInterface):
+    __ref: "ScannerManager"
+    __idx: int
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
         super().__init__()
+        self.__ref = ref
+        self.__idx = idx
 
     @override
     def update(self: Self, stage: str, force: bool = False) -> None:
@@ -114,12 +118,16 @@ class ScannerStatusBar(StatusBarInterface):
 
 
 class ScannerCounter(CounterInterface):
+    __ref: "ScannerManager"
+    __idx: int
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
         super().__init__()
+        self.__ref = ref
+        self.__idx = idx
 
     @override
-    def update(self: Self, incr: IntLike = 1, force: bool = False) -> None:
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
         raise NotImplementedError("TODO")
 
     @override
@@ -140,7 +148,32 @@ ManagerWsGlobalMessageStop = ManagerWsGlobalMessageGeneric[
     ManagerWsGlobalMessageStopData
 ]
 
-ManagerWsGlobalMessage = ManagerWsGlobalMessageStop
+
+class CounterTypeCounter(TypedDict, total=True):
+    type: Literal["counter"]
+    options: CounterOptions
+
+
+class CounterTypeStatusBar(TypedDict, total=True):
+    type: Literal["status_bar"]
+    options: StatusBarGetOptions
+
+
+CounterType = Literal["counter", "status_bar"]
+
+CounterInstanceType = CounterTypeCounter | CounterTypeStatusBar
+
+
+class ManagerWsGlobalMessageCounterData(TypedDict, total=True):
+    type: Literal["counter"]
+    counter: CounterInstanceType
+
+
+ManagerWsGlobalMessageCounter = ManagerWsGlobalMessageGeneric[
+    ManagerWsGlobalMessageCounterData
+]
+
+ManagerWsGlobalMessage = ManagerWsGlobalMessageStop | ManagerWsGlobalMessageCounter
 
 ManagerWsCounterMessageTodo = int
 
@@ -151,6 +184,7 @@ ManagerWsData = ManagerWsGlobalMessage | ManagerWsCounterMessage
 
 class ScannerManager(ManagerInterface):
     __instances: list[ScanManager]
+    __counters: list[CounterType]
 
     def __init__(self: Self) -> None:
         self.__instances = []
@@ -158,6 +192,7 @@ class ScannerManager(ManagerInterface):
     def add(self: Self, websocket: WebSocket) -> ScanManager:
         manager = ScanManager(websocket)
         self.__instances.append(manager)
+        self.__counters = []
         return manager
 
     async def __send_data(self: Self, data: ManagerWsData) -> None:
@@ -167,25 +202,77 @@ class ScannerManager(ManagerInterface):
 
         await asyncio.gather(*futures)
 
+    async def __add_counter(
+        self: Self,
+        instance: CounterInstanceType,
+    ) -> int:
+        idx = len(self.__counters)
+        self.__counters.append(instance["type"])
+        instance_serializable: CounterInstanceType
+
+        if instance["type"] == "counter":
+            serializable_options1: CounterOptions = {**instance["options"]}
+            number_like_keys: list[Literal["count", "total"]] = [
+                "count",
+                "total",
+            ]
+            for number_like_key in number_like_keys:
+                if serializable_options1.get(number_like_key) is not None:
+                    serializable_options1[number_like_key] = (
+                        number_like_convert_to_serializable(
+                            serializable_options1[number_like_key],
+                        )
+                    )
+            instance_serializable = {
+                "type": "counter",
+                "options": serializable_options1,
+            }
+        else:
+            serializable_options2: StatusBarGetOptions = {**instance["options"]}
+
+            instance_serializable = {
+                "type": "status_bar",
+                "options": serializable_options2,
+            }
+        data: ManagerWsGlobalMessageCounter = {
+            "type": "global",
+            "data": {"type": "counter", "counter": instance_serializable},
+        }
+        await self.__send_data(data)
+        return idx
+
+    async def __status_bar_impl(
+        self: Self,
+        **kwargs: Unpack[StatusBarGetOptions],
+    ) -> StatusBarInterface:
+        options: CounterTypeStatusBar = {"type": "status_bar", "options": kwargs}
+        idx: int = await self.__add_counter(options)
+        return ScannerStatusBar(self, idx)
+
     @override
     def status_bar(
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
-        raise NotImplementedError("TODO")
-        return ScannerStatusBar(
-            **kwargs,
-        )
+        return asyncio.run(self.__status_bar_impl(**kwargs))
+
+    async def __counter_impl(
+        self: Self,
+        **kwargs: Unpack[CounterOptions],
+    ) -> CounterInterface:
+        options: CounterTypeCounter = {"type": "counter", "options": kwargs}
+        idx: int = await self.__add_counter(options)
+        return ScannerCounter(self, idx)
 
     @override
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        raise NotImplementedError("TODO")
-        return ScannerCounter(kwargs)
+        return asyncio.run(self.__counter_impl(**kwargs))
 
     async def __stop_impl(
         self: Self,
     ) -> None:
-        await self.__send_data({"type": "global", "data": {"type": "stop"}})
+        data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
+        await self.__send_data(data)
 
     def stop(
         self: Self,
@@ -416,7 +503,9 @@ class Backend:
     __scanner: BackendScanner
 
     def __init__(
-        self: Self, options: BackendOptions, configs: list[FinalConfig]
+        self: Self,
+        options: BackendOptions,
+        configs: list[FinalConfig],
     ) -> None:
         self.__options = options
         self.__scanner = BackendScanner(configs)
