@@ -9,6 +9,7 @@ from typing import (
     TypedDict,
     Unpack,
     assert_never,
+    cast,
     override,
 )
 
@@ -123,6 +124,7 @@ class StatusBarOptions(TypedDict, total=False):
 # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
 class StatusBarGetOptions(StatusBarOptions, total=False):
     autorefresh: bool
+    additional_args: dict[str, Any]
 
 
 class SupportsFloat(Protocol):
@@ -214,8 +216,20 @@ class TuiManager(ManagerInterface):
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
+        modified_kwargs: StatusBarGetOptions = {**kwargs}
+
+        if modified_kwargs.get("additional_args") is not None:
+            additional_args: dict[str, Any] = modified_kwargs["additional_args"]
+            del modified_kwargs["additional_args"]
+            for key, value in additional_args.items():
+                if modified_kwargs.get(key) is not None:
+                    msg = f"Trying to overwrite normal option key '{key}' in enlighten Manager implementation"
+                    raise RuntimeError(msg)
+
+                cast(dict[str, Any], modified_kwargs)[key] = value
+
         status_bar = self.__impl.status_bar(
-            kwargs=kwargs,
+            kwargs=modified_kwargs,
         )
         return TuiStatusBar(impl=status_bar)
 
@@ -283,7 +297,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             justify=ManagerJustify.CENTER,
             autorefresh=True,
             min_delta=0.5,
-            **info_kw,
+            additional_args=info_kw,
         )
         self.__language_picker = language_picker
 

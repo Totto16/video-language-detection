@@ -96,43 +96,10 @@ class WebsocketHandler(ABC):
 
 
 class ScanManager(WebsocketHandler):
-
     @override
     async def process_data(self: Self, _data: Any) -> ProcessResult:
         # TODO: use pydantic to get e.g. status request
         return ProcessResult.err("Nothing can be written in this cases")
-
-
-class ScannerStatusBar(StatusBarInterface):
-    __ref: "ScannerManager"
-    __idx: int
-
-    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
-        super().__init__()
-        self.__ref = ref
-        self.__idx = idx
-
-    @override
-    def update(self: Self, stage: str, force: bool = False) -> None:
-        raise NotImplementedError("TODO")
-
-
-class ScannerCounter(CounterInterface):
-    __ref: "ScannerManager"
-    __idx: int
-
-    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
-        super().__init__()
-        self.__ref = ref
-        self.__idx = idx
-
-    @override
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
-        raise NotImplementedError("TODO")
-
-    @override
-    def close(self: Self, clear: bool = False) -> None:
-        raise NotImplementedError("TODO")
 
 
 class ManagerWsGlobalMessageGeneric[D](TypedDict, total=True):
@@ -180,6 +147,38 @@ ManagerWsCounterMessageTodo = int
 ManagerWsCounterMessage = ManagerWsCounterMessageTodo
 
 ManagerWsData = ManagerWsGlobalMessage | ManagerWsCounterMessage
+
+
+class ScannerStatusBar(StatusBarInterface):
+    __ref: "ScannerManager"
+    __idx: int
+
+    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
+        super().__init__()
+        self.__ref = ref
+        self.__idx = idx
+
+    @override
+    def update(self: Self, stage: str, force: bool = False) -> None:
+        raise NotImplementedError("TODO")
+
+
+class ScannerCounter(CounterInterface):
+    __ref: "ScannerManager"
+    __idx: int
+
+    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
+        super().__init__()
+        self.__ref = ref
+        self.__idx = idx
+
+    @override
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
+        raise NotImplementedError("TODO")
+
+    @override
+    def close(self: Self, clear: bool = False) -> None:
+        raise NotImplementedError("TODO")
 
 
 class ScannerManager(ManagerInterface):
