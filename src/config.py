@@ -12,7 +12,6 @@ from apischema import ValidationError, deserialize, deserializer, schema, serial
 from apischema.metadata import none_as_undefined, required
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
-from classifier import ClassifierOptionsConfig
 from content.language_picker import (
     LanguagePickerConfig,
     NoLanguagePickerConfig,
@@ -21,6 +20,7 @@ from content.metadata.config import MetadataConfig
 from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
+from helper.classifier import ClassifierOptionsConfig
 from helper.log import get_logger
 from helper.result import Result
 

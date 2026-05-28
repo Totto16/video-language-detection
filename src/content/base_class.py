@@ -7,7 +7,6 @@ from typing import Any, Optional, Self, TypedDict, override
 
 from apischema import alias
 
-from classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from content.general import (
     Callback,
     ContentType,
@@ -28,6 +27,7 @@ from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
 from helper.base import ManagerInterface
+from helper.classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from helper.log import get_logger
 
 logger: Logger = get_logger()

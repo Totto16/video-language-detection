@@ -19,7 +19,6 @@ import uvicorn
 from fastapi import Depends, FastAPI, Response, WebSocket
 from fastapi.responses import JSONResponse
 
-from classifier import Classifier, Model, voxlingua107_ecapa_model
 from config import FinalConfig
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
@@ -40,6 +39,7 @@ from helper.base import (
     number_like_convert_to_serializable,
     parse_contents,
 )
+from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
 from helper.devices import DeviceManager
 from helper.result import Result
 from main import AllContent

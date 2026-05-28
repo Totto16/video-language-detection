@@ -7,12 +7,12 @@ from typing import (
 
 from prompt_toolkit.key_binding import KeyBindings
 
-from classifier import Classifier, Model, voxlingua107_ecapa_model
 from content.base_class import LanguageScanner, Scanner
 from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.base import AnyType, TuiManager, parse_contents
+from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
 from helper.devices import DeviceManager
 
 if TYPE_CHECKING:
