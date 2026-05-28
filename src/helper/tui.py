@@ -19,12 +19,12 @@ if TYPE_CHECKING:
     from content.base_class import Content
     from content.metadata.scanner import MetadataScanner
 
-from config import FinalConfig, KeyBoardConfig
 from content.general import NameParser
 from content.scanner import (
     ConfigScanner,
     get_scanner_from_config,
 )
+from helper.config import FinalConfig, KeyBoardConfig
 from helper.translation import get_translator
 
 _ = get_translator()

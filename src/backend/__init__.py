@@ -19,7 +19,6 @@ import uvicorn
 from fastapi import Depends, FastAPI, Response, WebSocket
 from fastapi.responses import JSONResponse
 
-from config import FinalConfig
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
 from content.language_picker import LanguagePicker, get_picker_from_config
@@ -40,6 +39,7 @@ from helper.base import (
     parse_contents,
 )
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
+from helper.config import FinalConfig
 from helper.devices import DeviceManager
 from helper.result import Result
 from main import AllContent

@@ -21,10 +21,10 @@ from typing import (
 from apischema import serialize
 
 from backend import Address, BackendOptions, launch_api
-from config import AdvancedConfig, FinalConfig
 from content.general import NameParser
 from content.language import Language
 from gui import launch_gui
+from helper.config import AdvancedConfig, FinalConfig
 from helper.log import LogLevel, setup_custom_logger
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator

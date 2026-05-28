@@ -529,9 +529,7 @@ class AdvancedConfig:
             # otherwise we can't find the name in the config ands also no alias, so print an error and exit with a failure
             msg = f"No template or alias with name '{name_to_use}' was found"
             logger.error(msg)
-            available_names = (
-                f"Available names are: {", ".join([*aliases.keys(), *all_names.keys()])}"
-            )
+            available_names = f"Available names are: {", ".join([*aliases.keys(), *all_names.keys()])}"
             logger.info(available_names)
             sys.exit(1)
 

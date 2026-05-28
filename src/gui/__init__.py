@@ -2,7 +2,7 @@ import asyncio
 from logging import Logger
 
 from backend import Backend, BackendOptions
-from config import FinalConfig
+from helper.config import FinalConfig
 from helper.log import get_logger
 
 logger: Logger = get_logger()

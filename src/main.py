@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional
 
-from config import SchemaConfig
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.apischema import EmitType, OneOf, get_schema
+from helper.config import SchemaConfig
 from helper.translation import get_translator
 
 if TYPE_CHECKING:

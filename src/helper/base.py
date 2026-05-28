@@ -16,7 +16,6 @@ from typing import (
 import enlighten
 from apischema import deserialize, serialize
 
-from config import ConfigType
 from content.base_class import (
     CallbackTuple,
     Content,
@@ -33,6 +32,7 @@ from content.general import (
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
+from helper.config import ConfigType
 from helper.constants import APP_NAME
 from helper.translation import get_translator
 
