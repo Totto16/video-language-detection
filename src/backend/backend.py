@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
-from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -47,7 +47,6 @@ from helper.result import Result
 from main import AllContent
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
 
     from content.metadata.scanner import MetadataScanner
 
@@ -299,6 +298,24 @@ class ScannerManager(ManagerInterface):
 
         await asyncio.gather(*futures)
 
+    def __run_async[T](self: Self, coro: Coroutine[Any, Any, T]) -> T:
+        try:
+            loop = asyncio.get_running_loop()
+            future: asyncio.Future[T] = loop.create_future()
+
+            async def wrapper() -> None:
+                try:
+                    result = await coro
+                    future.set_result(result)
+                except BaseException as e:
+                    future.set_exception(e)
+
+            _task = loop.create_task(wrapper())
+
+            return future.result()
+        except RuntimeError:
+            return asyncio.run(coro)
+
     async def __add_counter(
         self: Self,
         instance: CounterInstanceType,
@@ -351,7 +368,7 @@ class ScannerManager(ManagerInterface):
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
-        return asyncio.run(self.__status_bar_impl(**kwargs))
+        return self.__run_async(self.__status_bar_impl(**kwargs))
 
     async def __counter_impl(
         self: Self,
@@ -363,7 +380,7 @@ class ScannerManager(ManagerInterface):
 
     @override
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        return asyncio.run(self.__counter_impl(**kwargs))
+        return self.__run_async(self.__counter_impl(**kwargs))
 
     async def __stop_impl(
         self: Self,
@@ -374,7 +391,7 @@ class ScannerManager(ManagerInterface):
     def stop(
         self: Self,
     ) -> None:
-        asyncio.run(self.__stop_impl())
+        self.__run_async(self.__stop_impl())
 
 
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
@@ -404,20 +421,28 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         manager = backend.scanner.add_manager(websocket)
         await manager.process()
 
-    @app.websocket("/scan/start")
+    @app.get("/scan/start")
     async def scan_start(
         backend: Annotated[Backend, Depends(retreive_backend)],
+        background_tasks: BackgroundTasks,
     ) -> Response:
         # TODO. support one / multiple / some configs
         configs: Optional[list[str]] = None
-        result = backend.scanner.start(configs)
 
-        if result.is_err():
-            return JSONResponse(status_code=422, content={"error": result.get_err()})
+        def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
+            background_tasks.add_task(fn)
+
+        result: Optional[str] = backend.scanner.start(
+            configs=configs,
+            run_in_background=run_in_background,
+        )
+
+        if result is not None:
+            return JSONResponse(status_code=422, content={"error": result})
 
         return JSONResponse(status_code=200, content={"ok": True})
 
-    @app.websocket("/scan/status")
+    @app.get("/scan/status")
     async def scan_status(
         backend: Annotated[Backend, Depends(retreive_backend)],
     ) -> Response:
@@ -439,29 +464,45 @@ class BackendOptions:
     address: Address
 
 
-class ScannerState(Enum):
-    stopped = "stopped"
-    running = "running"
-    finished = "finished"
+class ScannerStateIdle(TypedDict):
+    type: Literal["idle"]
 
 
-ScannerStartResult = Result[None, str]
+class ScannerStateRunning(TypedDict):
+    type: Literal["running"]
+    configs: list[FinalConfig]
+
 
 type SummaryTuple = tuple[LanguageDict, MetadataDict, ScanSummaryDetailed]
 
 
+class ScannerStateFinished(TypedDict):
+    type: Literal["finished"]
+    result: list[SummaryTuple]
+
+
+class ScannerStateError(TypedDict):
+    type: Literal["error"]
+    error: str | BaseException
+
+
+ScannerState = (
+    ScannerStateIdle | ScannerStateRunning | ScannerStateFinished | ScannerStateError
+)
+
+
 class BackendScanner:
     __manager: ScannerManager
-    __configs: list[FinalConfig]
+    __all_configs: list[FinalConfig]
     __state: ScannerState
 
     def __init__(
         self: Self,
         configs: list[FinalConfig],
     ) -> None:
-        self.__configs = configs
+        self.__all_configs = configs
         self.__manager = ScannerManager()
-        self.__state = ScannerState.stopped
+        self.__state = {"type": "idle"}
 
     def add_manager(self: Self, websocket: WebSocket) -> ScanManager:
         return self.__manager.add(websocket)
@@ -548,7 +589,7 @@ class BackendScanner:
             name_parser = CustomNameParser(season_special_names=config.parser.special)
 
             config_paramaters: Optional[tuple[int, int]] = (
-                None if len(self.__configs) == 1 else (index, len(self.__configs))
+                None if len(configs) == 1 else (index, len(configs))
             )
 
             summary = await self.__launch_scanner_in_background(
@@ -563,40 +604,47 @@ class BackendScanner:
 
         return result
 
-    def __start_impl(self: Self, configs: Optional[list[str]]) -> ScannerStartResult:
+    def __start_impl(
+        self: Self,
+        configs: list[FinalConfig],
+        run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
+    ) -> Optional[str]:
 
-        if configs is not None:
-            # TODO: implement
-            return ScannerStartResult.err("TODO")
+        self.__state = {"type": "running", "configs": configs}
 
-        self.__status = ScannerState.running
+        async def run_async() -> None:
+            try:
+                result: list[SummaryTuple] = await self.__start_coroutine(
+                    configs=configs,
+                    manager=self.__manager,
+                )
 
-        task: asyncio.Task[list[SummaryTuple]] = asyncio.Task(
-            self.__start_coroutine(configs=self.__configs, manager=self.__manager),
-        )
+                self.__state = {"type": "finished", "result": result}
+            except BaseException as err:
+                self.__state = {"type": "error", "error": err}
 
-        def done(task: asyncio.Task[list[SummaryTuple]]) -> None:
-            result: list[SummaryTuple] = task.result()
+        run_in_background(run_async)
 
-            # set result to the state
-            self.__status = ScannerState.finished
+        return None
 
-        task.add_done_callback(done)
-
-        return ScannerStartResult.ok(None)
-
-    def start(self: Self, configs: Optional[list[str]]) -> ScannerStartResult:
-        if self.__state != ScannerState.stopped:
-            return ScannerStartResult.err("Scanner is already running")
+    def start(
+        self: Self,
+        configs: Optional[list[str]],
+        run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
+    ) -> Optional[str]:
+        if self.__state["type"] == "running":
+            return "Scanner is already running"
 
         if configs is None:
-            return self.__start_impl(configs)
+            return self.__start_impl(
+                configs=self.__all_configs, run_in_background=run_in_background
+            )
 
         # TODO: implement
-        return ScannerStartResult.err("TODO")
+        return "TODO"
 
-    def status(self: Self) -> str:
-        return self.__state.value
+    def status(self: Self) -> Any:
+        return self.__state
 
 
 class Backend:
