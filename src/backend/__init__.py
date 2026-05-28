@@ -36,6 +36,7 @@ from helper.base import (
     NumberLike,
     StatusBarGetOptions,
     StatusBarInterface,
+    StatusBarInterfaceUpdateOptions,
     number_like_convert_to_serializable,
     parse_contents,
 )
@@ -159,7 +160,10 @@ class ScannerStatusBar(StatusBarInterface):
         self.__idx = idx
 
     @override
-    def update(self: Self, stage: str, force: bool = False) -> None:
+    def update(
+        self: Self,
+        **fields: Unpack[StatusBarInterfaceUpdateOptions],
+    ) -> None:
         raise NotImplementedError("TODO")
 
 

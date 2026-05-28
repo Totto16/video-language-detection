@@ -91,25 +91,6 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class StatusBarInterface(ABC):
-    def __init__(self: Self) -> None:
-        super().__init__()
-
-    @abstractmethod
-    def update(self: Self, stage: str, force: bool = False) -> None: ...
-
-
-class CounterInterface(ABC):
-    def __init__(self: Self) -> None:
-        super().__init__()
-
-    @abstractmethod
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None: ...
-
-    @abstractmethod
-    def close(self: Self, clear: bool = False) -> None: ...
-
-
 ManagerJustify = enlighten.Justify
 
 
@@ -121,10 +102,13 @@ class StatusBarOptions(TypedDict, total=False):
     status_format: str
 
 
+type AdditionalArgs = dict[str, Any]
+
+
 # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
 class StatusBarGetOptions(StatusBarOptions, total=False):
     autorefresh: bool
-    additional_args: dict[str, Any]
+    additional_args: AdditionalArgs
 
 
 class SupportsFloat(Protocol):
@@ -148,6 +132,40 @@ class CounterOptions(TypedDict, total=False):
     leave: bool  # = True
     total: NumberLike
     unit: str
+
+
+# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
+class StatusBarInterfaceUpdateOptions(TypedDict, total=False):
+    force: bool
+    additional_args: AdditionalArgs
+
+
+class StatusBarInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
+    @abstractmethod
+    def update(
+        self: Self,
+        **fields: Unpack[StatusBarInterfaceUpdateOptions],
+    ) -> None: ...
+
+
+# NOTE: only StatusBarInterface supports AdditionalArgs atm!
+
+
+class CounterInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.update
+    @abstractmethod
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None: ...
+
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.close
+    @abstractmethod
+    def close(self: Self, clear: bool = False) -> None: ...
 
 
 class ManagerInterface(ABC):
@@ -178,9 +196,25 @@ class TuiStatusBar(StatusBarInterface):
         super().__init__()
         self.__impl = impl
 
+    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
     @override
-    def update(self: Self, stage: str, force: bool = False) -> None:
-        return self.__impl.update(stage=stage, force=force)
+    def update(
+        self: Self,
+        **fields: Unpack[StatusBarInterfaceUpdateOptions],
+    ) -> None:
+        modified_fields: StatusBarInterfaceUpdateOptions = {**fields}
+
+        if modified_fields.get("additional_args") is not None:
+            additional_args: AdditionalArgs = modified_fields["additional_args"]
+            del modified_fields["additional_args"]
+            for key, value in additional_args.items():
+                if modified_fields.get(key) is not None:
+                    msg = f"Trying to overwrite normal option key '{key}' in enlighten Manager implementation"
+                    raise RuntimeError(msg)
+
+                cast(AdditionalArgs, modified_fields)[key] = value
+
+        return self.__impl.update(fields=modified_fields)
 
 
 class TuiCounter(CounterInterface):
@@ -219,14 +253,14 @@ class TuiManager(ManagerInterface):
         modified_kwargs: StatusBarGetOptions = {**kwargs}
 
         if modified_kwargs.get("additional_args") is not None:
-            additional_args: dict[str, Any] = modified_kwargs["additional_args"]
+            additional_args: AdditionalArgs = modified_kwargs["additional_args"]
             del modified_kwargs["additional_args"]
             for key, value in additional_args.items():
                 if modified_kwargs.get(key) is not None:
                     msg = f"Trying to overwrite normal option key '{key}' in enlighten Manager implementation"
                     raise RuntimeError(msg)
 
-                cast(dict[str, Any], modified_kwargs)[key] = value
+                cast(AdditionalArgs, modified_kwargs)[key] = value
 
         status_bar = self.__impl.status_bar(
             kwargs=modified_kwargs,
@@ -394,7 +428,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         del self.__progress_bars[name]
 
     def __del__(self: Self) -> None:
-        self.__status_bar.update(stage=_("finished"))
+        self.__status_bar.update(additional_args={"stage": _("finished")})
         self.__manager.stop()
 
     @property
