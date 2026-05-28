@@ -85,3 +85,26 @@ class MissingProvider(Provider):
     @override
     def can_scan(self: Self) -> bool:
         return False
+
+    @override
+    def get_series_metadata(
+        self: Self,
+        series_name: str,
+    ) -> Optional[object]:
+        msg = "Method 'get_series_metadata' on MissingProvider called"
+        raise RuntimeError(msg)
+
+    @override
+    def get_season_metadata(
+        self: Self,
+        series_data: object,
+        season: int,
+    ) -> Optional[object]:
+        msg = "Method 'get_season_metadata' on MissingProvider called"
+        raise RuntimeError(msg)
+
+    @override
+    @staticmethod
+    def get_metadata_schema() -> SchemaType:
+        msg = "Method 'get_metadata_schema' on MissingProvider called"
+        raise RuntimeError(msg)

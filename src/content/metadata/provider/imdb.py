@@ -54,3 +54,27 @@ class IMDBProvider(Provider):
     @staticmethod
     def get_metadata_schema() -> SchemaType:
         return get_schema(IMDBMetadataSchema, emit_type="deserialize")
+
+    @override
+    def get_series_metadata(
+        self: Self,
+        series_name: str,
+    ) -> Optional[object]:
+        raise RuntimeError("Not implemented yet")
+
+    @override
+    def get_season_metadata(
+        self: Self,
+        series_data: object,
+        season: int,
+    ) -> Optional[object]:
+        raise RuntimeError("Not implemented yet")
+
+    @override
+    def get_episode_metadata(
+        self: Self,
+        series_data: object,
+        season_data: object,
+        episode: int,
+    ) -> Optional[object]:
+        raise RuntimeError("Not implemented yet")
