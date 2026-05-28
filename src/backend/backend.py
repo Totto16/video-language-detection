@@ -390,7 +390,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
 
         # if we would await backend.shutdown() , we would deadlock here
         async def shutdown_ignore_result() -> None:
-            _task = asyncio.create_task(backend.shutdown())
+            backend.schedule_shutdown()
 
         background_tasks.add_task(shutdown_ignore_result)
         return Response(status_code=200, content="Server shutting down")
@@ -635,12 +635,11 @@ class Backend:
 
         await self.__ready.wait()
 
-    async def shutdown(self: Self) -> None:
+    def schedule_shutdown(self: Self) -> None:
         if not self.__server:
             return
 
         self.__server.should_exit = True
-        await self.__server.shutdown()
 
     @property
     def scanner(self: Self) -> BackendScanner:
@@ -661,8 +660,6 @@ class Backend:
 
     async def run(self: Self) -> None:
         await self.__server.serve()
-        if not self.__server.should_exit:
-            await self.__server.shutdown()
 
 
 async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
