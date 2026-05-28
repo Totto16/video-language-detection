@@ -25,7 +25,6 @@ from content.language_picker import LanguagePicker, get_picker_from_config
 from content.metadata.config import get_metadata_scanner_from_config
 from content.scanner import get_scanner_from_config
 from content.summary import LanguageDict, MetadataDict, Summary
-from entry import CustomNameParser
 from helper.base import (
     AnyType,
     parse_contents,
@@ -43,6 +42,7 @@ from helper.manager import (
     StatusBarInterfaceUpdateOptions,
     number_like_convert_to_serializable,
 )
+from helper.parser import CustomNameParser
 from helper.result import Result
 from main import AllContent
 
