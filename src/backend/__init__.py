@@ -179,8 +179,14 @@ ManagerWsCounterMessageUpdate = ManagerWsCounterMessageGeneric[
 ]
 
 
+class CounterMessageCloseOptions(TypedDict, total=True):
+    clear: bool
+
+
 class ManagerWsCounterMessageCloseData(TypedDict, total=True):
     type: Literal["close"]
+    idx: int
+    options: CounterMessageCloseOptions
 
 
 ManagerWsCounterMessageClose = ManagerWsCounterMessageGeneric[
@@ -255,9 +261,20 @@ class ScannerCounter(CounterInterface):
     def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
         return asyncio.run(self.__update_impl(incr=incr, force=force))
 
+    async def __close_impl(self: Self, clear: bool = False) -> None:
+        data: ManagerWsCounterMessageClose = {
+            "type": "counter",
+            "data": {
+                "type": "close",
+                "idx": self.__idx,
+                "options": {"clear": clear},
+            },
+        }
+        await self.__ref.send_data(data)
+
     @override
     def close(self: Self, clear: bool = False) -> None:
-        raise NotImplementedError("TODO")
+        return asyncio.run(self.__close_impl(clear=clear))
 
 
 class ScannerManager(ManagerInterface):
