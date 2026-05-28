@@ -121,14 +121,14 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         info_str: str = ""
         info_kw: dict[str, str] = {}
 
-        info_kw["stage"] = _("Scanning")
-
         if len(general_info) > 0:
             info_parts: list[tuple[str, str]] = [
                 (f"info_{i}", general_info[i]) for i in range(len(general_info))
             ]
             info_kw = dict(info_parts)
             info_str = "{fill}".join(f"{{{x[0]}}}" for x in info_parts) + "{fill}"
+
+        info_kw["stage"] = _("Scanning")
 
         self.__status_bar = self.__manager.status_bar(
             status_format=APP_NAME

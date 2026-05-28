@@ -139,7 +139,7 @@ class TuiStatusBar(StatusBarInterface):
 
                 cast(AdditionalArgs, modified_fields)[key] = value
 
-        return self.__impl.update(fields=modified_fields)
+        return self.__impl.update(**modified_fields)
 
 
 class TuiCounter(CounterInterface):
@@ -188,7 +188,7 @@ class TuiManager(ManagerInterface):
                 cast(AdditionalArgs, modified_kwargs)[key] = value
 
         status_bar = self.__impl.status_bar(
-            kwargs=modified_kwargs,
+            **modified_kwargs,
         )
         return TuiStatusBar(impl=status_bar)
 
@@ -197,7 +197,7 @@ class TuiManager(ManagerInterface):
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
         counter = self.__impl.counter(
             position=None,
-            kwargs=kwargs,
+            **kwargs,
         )
         return TuiCounter(impl=counter)
 
