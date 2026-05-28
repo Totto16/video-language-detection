@@ -16,7 +16,7 @@ from typing import (
 
 import requests
 import uvicorn
-from fastapi import Depends, FastAPI, Response, WebSocket
+from fastapi import BackgroundTasks, Depends, FastAPI, Response, WebSocket
 from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
@@ -385,8 +385,14 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
     @app.get("/shutdown/")
     async def shutdown(
         backend: Annotated[Backend, Depends(retreive_backend)],
+        background_tasks: BackgroundTasks,
     ) -> Response:
-        await backend.shutdown()
+
+        # if we would await backend.shutdown() , we would deadlock here
+        async def shutdown_ignore_result() -> None:
+            _task = asyncio.create_task(backend.shutdown())
+
+        background_tasks.add_task(shutdown_ignore_result)
         return Response(status_code=200, content="Server shutting down")
 
     @app.websocket("/scan/managers/ws/")
@@ -633,6 +639,7 @@ class Backend:
         if not self.__server:
             return
 
+        self.__server.should_exit = True
         await self.__server.shutdown()
 
     @property
@@ -654,7 +661,8 @@ class Backend:
 
     async def run(self: Self) -> None:
         await self.__server.serve()
-        await self.__server.shutdown()
+        if not self.__server.should_exit:
+            await self.__server.shutdown()
 
 
 async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
