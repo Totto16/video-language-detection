@@ -14,7 +14,7 @@ from apischema import schema
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
-from helper.base import ManagerInterface
+from helper.manager import ManagerInterface
 
 
 class ScannedFileType(Enum):

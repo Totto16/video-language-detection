@@ -37,10 +37,10 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
-from helper.base import ManagerInterface
 from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
+from helper.manager import ManagerInterface
 from helper.result import Result
 from helper.timestamp import (
     ConfigTimeStamp,

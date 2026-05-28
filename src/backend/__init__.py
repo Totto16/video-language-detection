@@ -28,6 +28,12 @@ from content.summary import LanguageDict, MetadataDict, Summary
 from entry import CustomNameParser
 from helper.base import (
     AnyType,
+    parse_contents,
+)
+from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
+from helper.config import FinalConfig
+from helper.devices import DeviceManager
+from helper.manager import (
     CounterInterface,
     CounterOptions,
     ManagerInterface,
@@ -36,11 +42,7 @@ from helper.base import (
     StatusBarInterface,
     StatusBarInterfaceUpdateOptions,
     number_like_convert_to_serializable,
-    parse_contents,
 )
-from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
-from helper.config import FinalConfig
-from helper.devices import DeviceManager
 from helper.result import Result
 from main import AllContent
 

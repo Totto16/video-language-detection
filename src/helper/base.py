@@ -1,19 +1,14 @@
 import json
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import (
     Any,
     Optional,
-    Protocol,
     Self,
     TypedDict,
-    Unpack,
     assert_never,
-    cast,
     override,
 )
 
-import enlighten
 from apischema import deserialize, serialize
 
 from content.base_class import (
@@ -34,6 +29,12 @@ from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.config import ConfigType
 from helper.constants import APP_NAME
+from helper.manager import (
+    CounterInterface,
+    ManagerInterface,
+    ManagerJustify,
+    StatusBarInterface,
+)
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -89,197 +90,6 @@ class ContentOptions(TypedDict):
     video_formats: list[str]
     trailer_names: list[str]
     parse_error_is_exception: bool
-
-
-ManagerJustify = enlighten.Justify
-
-
-# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar
-class StatusBarOptions(TypedDict, total=False):
-    color: str
-    justify: enlighten.Justify
-    min_delta: float  # = 0.1
-    status_format: str
-
-
-type AdditionalArgs = dict[str, Any]
-
-
-# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
-class StatusBarGetOptions(StatusBarOptions, total=False):
-    autorefresh: bool
-    additional_args: AdditionalArgs
-
-
-class SupportsFloat(Protocol):
-    def __float__(self) -> float: ...
-
-
-# actual type int, but implementation and python allows classes, which support int() or float()
-type NumberLike = int | float | SupportsFloat
-
-
-def number_like_convert_to_serializable(number_like: NumberLike) -> float:
-    return float(number_like)
-
-
-# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter
-class CounterOptions(TypedDict, total=False):
-    bar_format: str
-    count: NumberLike  # = 0,
-    color: str
-    desc: str
-    leave: bool  # = True
-    total: NumberLike
-    unit: str
-
-
-# see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
-class StatusBarInterfaceUpdateOptions(TypedDict, total=False):
-    force: bool
-    additional_args: AdditionalArgs
-
-
-class StatusBarInterface(ABC):
-    def __init__(self: Self) -> None:
-        super().__init__()
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
-    @abstractmethod
-    def update(
-        self: Self,
-        **fields: Unpack[StatusBarInterfaceUpdateOptions],
-    ) -> None: ...
-
-
-# NOTE: only StatusBarInterface supports AdditionalArgs atm!
-
-
-class CounterInterface(ABC):
-    def __init__(self: Self) -> None:
-        super().__init__()
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.update
-    @abstractmethod
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None: ...
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.close
-    @abstractmethod
-    def close(self: Self, clear: bool = False) -> None: ...
-
-
-class ManagerInterface(ABC):
-    def __init__(self: Self) -> None:
-        super().__init__()
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.status_bar
-    @abstractmethod
-    def status_bar(
-        self: Self,
-        **kwargs: Unpack[StatusBarGetOptions],
-    ) -> StatusBarInterface: ...
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.counter
-    @abstractmethod
-    def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface: ...
-
-    @abstractmethod
-    def stop(
-        self: Self,
-    ) -> None: ...
-
-
-class TuiStatusBar(StatusBarInterface):
-    __impl: enlighten.StatusBar
-
-    def __init__(self: Self, impl: enlighten.StatusBar) -> None:
-        super().__init__()
-        self.__impl = impl
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar.update
-    @override
-    def update(
-        self: Self,
-        **fields: Unpack[StatusBarInterfaceUpdateOptions],
-    ) -> None:
-        modified_fields: StatusBarInterfaceUpdateOptions = {**fields}
-
-        if modified_fields.get("additional_args") is not None:
-            additional_args: AdditionalArgs = modified_fields["additional_args"]
-            del modified_fields["additional_args"]
-            for key, value in additional_args.items():
-                if modified_fields.get(key) is not None:
-                    msg = f"Trying to overwrite normal option key '{key}' in enlighten Manager implementation"
-                    raise RuntimeError(msg)
-
-                cast(AdditionalArgs, modified_fields)[key] = value
-
-        return self.__impl.update(fields=modified_fields)
-
-
-class TuiCounter(CounterInterface):
-    __impl: enlighten.Counter
-
-    def __init__(self: Self, impl: enlighten.Counter) -> None:
-        super().__init__()
-        self.__impl = impl
-
-    @override
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
-        return self.__impl.update(incr=incr, force=force)
-
-    @override
-    def close(self: Self, clear: bool = False) -> None:
-        return self.__impl.close(clear=clear)
-
-
-class TuiManager(ManagerInterface):
-    __impl: enlighten.Manager
-
-    def __init__(self: Self) -> None:
-        super().__init__()
-        manager = enlighten.get_manager()
-        if not isinstance(manager, enlighten.Manager):
-            msg = _("UNREACHABLE (not runnable in notebooks)")
-            raise TypeError(msg)
-
-        self.__impl = manager
-
-    @override
-    def status_bar(
-        self: Self,
-        **kwargs: Unpack[StatusBarGetOptions],
-    ) -> StatusBarInterface:
-        modified_kwargs: StatusBarGetOptions = {**kwargs}
-
-        if modified_kwargs.get("additional_args") is not None:
-            additional_args: AdditionalArgs = modified_kwargs["additional_args"]
-            del modified_kwargs["additional_args"]
-            for key, value in additional_args.items():
-                if modified_kwargs.get(key) is not None:
-                    msg = f"Trying to overwrite normal option key '{key}' in enlighten Manager implementation"
-                    raise RuntimeError(msg)
-
-                cast(AdditionalArgs, modified_kwargs)[key] = value
-
-        status_bar = self.__impl.status_bar(
-            kwargs=modified_kwargs,
-        )
-        return TuiStatusBar(impl=status_bar)
-
-    # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.NotebookManager.counter
-    @override
-    def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        counter = self.__impl.counter(
-            position=None,
-            kwargs=kwargs,
-        )
-        return TuiCounter(impl=counter)
-
-    def stop(
-        self: Self,
-    ) -> None:
-        return self.__impl.stop()
 
 
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
