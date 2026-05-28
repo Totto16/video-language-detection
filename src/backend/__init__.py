@@ -135,6 +135,7 @@ CounterInstanceType = CounterTypeCounter | CounterTypeStatusBar
 class ManagerWsGlobalMessageCounterData(TypedDict, total=True):
     type: Literal["counter"]
     counter: CounterInstanceType
+    idx: int
 
 
 ManagerWsGlobalMessageCounter = ManagerWsGlobalMessageGeneric[
@@ -143,9 +144,50 @@ ManagerWsGlobalMessageCounter = ManagerWsGlobalMessageGeneric[
 
 ManagerWsGlobalMessage = ManagerWsGlobalMessageStop | ManagerWsGlobalMessageCounter
 
-ManagerWsCounterMessageTodo = int
 
-ManagerWsCounterMessage = ManagerWsCounterMessageTodo
+class ManagerWsCounterMessageGeneric[D](TypedDict, total=True):
+    type: Literal["counter"]
+    data: D
+
+
+class CounterUpdateOptions(TypedDict, total=False):
+    incr: NumberLike  # = 1
+    force: bool  # = False
+
+
+class CounterUpdateTypeCounter(TypedDict, total=True):
+    type: Literal["counter"]
+    options: CounterUpdateOptions
+
+
+class CounterUpdateTypeStatusBar(TypedDict, total=True):
+    type: Literal["status_bar"]
+    options: StatusBarInterfaceUpdateOptions
+
+
+CounterUpdateType = CounterUpdateTypeCounter | CounterUpdateTypeStatusBar
+
+
+class ManagerWsCounterMessageUpdateData(TypedDict, total=True):
+    type: Literal["update"]
+    idx: int
+    options: CounterUpdateType
+
+
+ManagerWsCounterMessageUpdate = ManagerWsCounterMessageGeneric[
+    ManagerWsCounterMessageUpdateData
+]
+
+
+class ManagerWsCounterMessageCloseData(TypedDict, total=True):
+    type: Literal["close"]
+
+
+ManagerWsCounterMessageClose = ManagerWsCounterMessageGeneric[
+    ManagerWsCounterMessageCloseData
+]
+
+ManagerWsCounterMessage = ManagerWsCounterMessageUpdate | ManagerWsCounterMessageClose
 
 ManagerWsData = ManagerWsGlobalMessage | ManagerWsCounterMessage
 
@@ -159,12 +201,26 @@ class ScannerStatusBar(StatusBarInterface):
         self.__ref = ref
         self.__idx = idx
 
+    async def __update_impl(
+        self: Self,
+        **fields: Unpack[StatusBarInterfaceUpdateOptions],
+    ) -> None:
+        data: ManagerWsCounterMessageUpdate = {
+            "type": "counter",
+            "data": {
+                "type": "update",
+                "idx": self.__idx,
+                "options": {"type": "status_bar", "options": fields},
+            },
+        }
+        await self.__ref.send_data(data)
+
     @override
     def update(
         self: Self,
         **fields: Unpack[StatusBarInterfaceUpdateOptions],
     ) -> None:
-        raise NotImplementedError("TODO")
+        return asyncio.run(self.__update_impl(**fields))
 
 
 class ScannerCounter(CounterInterface):
@@ -176,9 +232,28 @@ class ScannerCounter(CounterInterface):
         self.__ref = ref
         self.__idx = idx
 
+    async def __update_impl(
+        self: Self, incr: NumberLike = 1, force: bool = False
+    ) -> None:
+        data: ManagerWsCounterMessageUpdate = {
+            "type": "counter",
+            "data": {
+                "type": "update",
+                "idx": self.__idx,
+                "options": {
+                    "type": "counter",
+                    "options": {
+                        "force": force,
+                        "incr": number_like_convert_to_serializable(incr),
+                    },
+                },
+            },
+        }
+        await self.__ref.send_data(data)
+
     @override
     def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
-        raise NotImplementedError("TODO")
+        return asyncio.run(self.__update_impl(incr=incr, force=force))
 
     @override
     def close(self: Self, clear: bool = False) -> None:
@@ -198,7 +273,7 @@ class ScannerManager(ManagerInterface):
         self.__counters = []
         return manager
 
-    async def __send_data(self: Self, data: ManagerWsData) -> None:
+    async def send_data(self: Self, data: ManagerWsData) -> None:
         futures: list[Coroutine[Any, Any, None]] = [
             instance.send_data(data) for instance in self.__instances
         ]
@@ -239,9 +314,9 @@ class ScannerManager(ManagerInterface):
             }
         data: ManagerWsGlobalMessageCounter = {
             "type": "global",
-            "data": {"type": "counter", "counter": instance_serializable},
+            "data": {"type": "counter", "counter": instance_serializable, "idx": idx},
         }
-        await self.__send_data(data)
+        await self.send_data(data)
         return idx
 
     async def __status_bar_impl(
@@ -275,7 +350,7 @@ class ScannerManager(ManagerInterface):
         self: Self,
     ) -> None:
         data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
-        await self.__send_data(data)
+        await self.send_data(data)
 
     def stop(
         self: Self,
