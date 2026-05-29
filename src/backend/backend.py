@@ -517,7 +517,7 @@ class BackendScanner:
     __manager: ScannerManager
     __all_configs: list[FinalConfig]
 
-    ##TODO:
+    ##TODO: use a seperate thread for this instead of using asyncio!
     __thread_and_mutex: None  # Mutex
     __state: ScannerState
 

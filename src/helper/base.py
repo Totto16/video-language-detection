@@ -364,6 +364,8 @@ def parse_contents(
     config_type: ConfigType,
     manager: ManagerInterface,
 ) -> list[Content]:
+    
+    #TODO: lock the config file HERE, use contex manager
 
     callback: ContentCallback
 
