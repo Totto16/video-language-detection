@@ -11,6 +11,7 @@ from typing import (
     Self,
     TypedDict,
     Unpack,
+    cast,
     override,
 )
 
@@ -299,19 +300,11 @@ class ScannerManager(ManagerInterface):
         await asyncio.gather(*futures)
 
     def __run_async[T](self: Self, coro: Coroutine[Any, Any, T]) -> T:
+        print("RUN ASYNC in scanner manager")
         try:
             loop = asyncio.get_running_loop()
-            future: asyncio.Future[T] = loop.create_future()
 
-            async def wrapper() -> None:
-                try:
-                    result = await coro
-                    future.set_result(result)
-                except BaseException as e:
-                    future.set_exception(e)
-
-            _task = loop.create_task(wrapper())
-
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
             return future.result()
         except RuntimeError:
             return asyncio.run(coro)
@@ -430,6 +423,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         configs: Optional[list[str]] = None
 
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
+            print("add background task")
             background_tasks.add_task(fn)
 
         result: Optional[str] = backend.scanner.start(
@@ -621,6 +615,7 @@ class BackendScanner:
 
                 self.__state = {"type": "finished", "result": result}
             except BaseException as err:
+                print("RUN ASYNC err: ", err)
                 self.__state = {"type": "error", "error": err}
 
         run_in_background(run_async)
@@ -643,8 +638,12 @@ class BackendScanner:
         # TODO: implement
         return "TODO"
 
-    def status(self: Self) -> Any:
-        return self.__state
+    def status(self: Self) -> dict[str, Any]:
+        match self.__state["type"]:
+            case "error":
+                return {"state": "error", "error": str(self.__state["error"])}
+            case _:
+                return cast(dict[str, Any], self.__state)
 
 
 class Backend:
