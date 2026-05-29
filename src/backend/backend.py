@@ -15,9 +15,10 @@ from typing import (
     override,
 )
 
+import pydantic
 import requests
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI, Response, WebSocket
+from fastapi import BackgroundTasks, Depends, FastAPI, Query, Response, WebSocket
 from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
@@ -31,7 +32,7 @@ from helper.base import (
     parse_contents,
 )
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
-from helper.config import FinalConfig
+from helper.config import ConfigFilter, ConfigFilterItem, FinalConfig, filter_configs
 from helper.devices import DeviceManager
 from helper.manager import (
     CounterInterface,
@@ -387,6 +388,25 @@ class ScannerManager(ManagerInterface):
         self.__run_async(self.__stop_impl())
 
 
+class ScanStartQuery(pydantic.BaseModel):
+    model_config = {"extra": "forbid"}
+
+    filter: Optional[list[ConfigFilterItem] | ConfigFilterItem] = None
+
+
+def get_config_filters(
+    filter_inp: Optional[list[ConfigFilterItem] | ConfigFilterItem],
+) -> Optional[ConfigFilter]:
+    if filter_inp is None:
+        return None
+
+    if isinstance(filter_inp, list):
+        return filter_inp
+
+    res: ConfigFilter = [filter_inp]
+    return res
+
+
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
 
     async def retreive_backend() -> "Backend":
@@ -418,16 +438,16 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
     async def scan_start(
         backend: Annotated[Backend, Depends(retreive_backend)],
         background_tasks: BackgroundTasks,
+        start_query: Annotated[ScanStartQuery, Query()],
     ) -> Response:
-        # TODO. support one / multiple / some configs
-        configs: Optional[list[str]] = None
+        cfg_filter: Optional[ConfigFilter] = get_config_filters(start_query.filter)
 
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
             print("add background task")
             background_tasks.add_task(fn)
 
         result: Optional[str] = backend.scanner.start(
-            configs=configs,
+            cfg_filter=cfg_filter,
             run_in_background=run_in_background,
         )
 
@@ -488,6 +508,9 @@ ScannerState = (
 class BackendScanner:
     __manager: ScannerManager
     __all_configs: list[FinalConfig]
+
+    ##TODO:
+    __thread_and_mutex: None  # Mutex
     __state: ScannerState
 
     def __init__(
@@ -624,19 +647,22 @@ class BackendScanner:
 
     def start(
         self: Self,
-        configs: Optional[list[str]],
+        cfg_filter: Optional[ConfigFilter],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
     ) -> Optional[str]:
         if self.__state["type"] == "running":
             return "Scanner is already running"
 
-        if configs is None:
+        if cfg_filter is None:
             return self.__start_impl(
-                configs=self.__all_configs, run_in_background=run_in_background
+                configs=self.__all_configs,
+                run_in_background=run_in_background,
             )
-
-        # TODO: implement
-        return "TODO"
+        try:
+            filter_configs(configs=self.__all_configs, cfg_filter=cfg_filter)
+            return "TODO"
+        except RuntimeError as err:
+            return str(err)
 
     def status(self: Self) -> dict[str, Any]:
         match self.__state["type"]:

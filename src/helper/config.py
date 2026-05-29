@@ -23,6 +23,7 @@ from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
 from helper.log import get_logger
 from helper.result import Result
+from helper.timestamp import parse_int_safely
 
 
 @dataclass
@@ -613,3 +614,56 @@ class AdvancedConfig:
             return AdvancedConfig__LoadAndResolve.err(res.get_err())
 
         return AdvancedConfig__LoadAndResolve.ok(res.get_ok()[0])
+
+
+type ConfigFilterItem = str | int
+
+type ConfigFilter = list[ConfigFilterItem]
+
+
+def parse_config_filter_string(inp: str) -> ConfigFilterItem:
+    num = parse_int_safely(inp)
+    if num is not None:
+        return num
+
+    return inp
+
+
+def filter_configs(
+    configs: list[FinalConfig],
+    cfg_filter: Optional[ConfigFilter],
+) -> list[FinalConfig]:
+    if cfg_filter is None:
+        return configs
+
+    def is_included(cfg: FinalConfig, idx: int) -> bool:
+        for filter_item in cfg_filter:
+            if isinstance(filter_item, int):
+                if idx == filter_item:
+                    return True
+
+            elif isinstance(filter_item, str):
+                if cfg.config_name == filter_item:
+                    return True
+            else:
+                assert_never(filter_item)
+
+        return False
+
+    def is_valid_name(name: str) -> bool:
+        return any(name == cfg.config_name for cfg in configs)
+
+    for filter_item in cfg_filter:
+        if isinstance(filter_item, int):
+            if filter_item < 0 or filter_item >= len(configs):
+                msg = f"Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {filter_item}"
+                raise RuntimeError(msg)
+        elif isinstance(filter_item, str):
+            valid_name = is_valid_name(filter_item)
+            if not valid_name:
+                msg = f"Filter name is invalid: '{filter_item}'"
+                raise RuntimeError(msg)
+        else:
+            assert_never(filter_item)
+
+    return [cfg for idx, cfg in enumerate(configs) if is_included(cfg, idx)]
