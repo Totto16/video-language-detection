@@ -1,7 +1,10 @@
 import asyncio
+import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -291,14 +294,16 @@ class ScannerCounter(CounterInterface):
 class ScannerManager(ManagerInterface):
     __instances: list[ScanManager]
     __counters: list[CounterType]
+    __loop: asyncio.AbstractEventLoop
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, loop: asyncio.AbstractEventLoop) -> None:
         self.__instances = []
+        self.__counters = []
+        self.__loop = loop
 
     def add(self: Self, websocket: WebSocket) -> ScanManager:
         manager = ScanManager(websocket)
         self.__instances.append(manager)
-        self.__counters = []
         return manager
 
     async def send_data(self: Self, data: ManagerWsData) -> None:
@@ -308,17 +313,14 @@ class ScannerManager(ManagerInterface):
 
         await asyncio.gather(*futures)
 
-    def __run_async[T](self: Self, coro: Coroutine[Any, Any, T]) -> T:
-        print("RUN ASYNC in scanner manager")
-        try:
-            loop = asyncio.get_running_loop()
+    def send_data_sync(self: Self, data: ManagerWsData) -> None:
+        future = asyncio.run_coroutine_threadsafe(
+            coro=self.send_data(data),
+            loop=self.__loop,
+        )
+        return future.result()
 
-            future = asyncio.run_coroutine_threadsafe(coro, loop)
-            return future.result()
-        except RuntimeError:
-            return asyncio.run(coro)
-
-    async def __add_counter(
+    def __add_counter(
         self: Self,
         instance: CounterInstanceType,
     ) -> int:
@@ -354,46 +356,29 @@ class ScannerManager(ManagerInterface):
             "type": "global",
             "data": {"type": "counter", "counter": instance_serializable, "idx": idx},
         }
-        await self.send_data(data)
+        self.send_data_sync(data)
         return idx
-
-    async def __status_bar_impl(
-        self: Self,
-        **kwargs: Unpack[StatusBarGetOptions],
-    ) -> StatusBarInterface:
-        options: CounterTypeStatusBar = {"type": "status_bar", "options": kwargs}
-        idx: int = await self.__add_counter(options)
-        return ScannerStatusBar(self, idx)
 
     @override
     def status_bar(
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
-        return self.__run_async(self.__status_bar_impl(**kwargs))
-
-    async def __counter_impl(
-        self: Self,
-        **kwargs: Unpack[CounterOptions],
-    ) -> CounterInterface:
-        options: CounterTypeCounter = {"type": "counter", "options": kwargs}
-        idx: int = await self.__add_counter(options)
-        return ScannerCounter(self, idx)
+        options: CounterTypeStatusBar = {"type": "status_bar", "options": kwargs}
+        idx: int = self.__add_counter(options)
+        return ScannerStatusBar(self, idx)
 
     @override
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        return self.__run_async(self.__counter_impl(**kwargs))
-
-    async def __stop_impl(
-        self: Self,
-    ) -> None:
-        data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
-        await self.send_data(data)
+        options: CounterTypeCounter = {"type": "counter", "options": kwargs}
+        idx: int = self.__add_counter(options)
+        return ScannerCounter(self, idx)
 
     def stop(
         self: Self,
     ) -> None:
-        self.__run_async(self.__stop_impl())
+        data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
+        self.send_data_sync(data)
 
 
 class ScanStartQuery(pydantic.BaseModel):
@@ -513,21 +498,109 @@ ScannerState = (
 )
 
 
+class ThreadSafeAcquired[A]:
+    __get_impl: Callable[[], A]
+    __set_impl: Callable[[A], None]
+
+    def __init__(self: Self, get_fn: Callable[[], A], set_fn: Callable[[A], None]):
+        self.__get_impl = get_fn
+        self.__set_impl = set_fn
+
+    def set(self: Self, data: A) -> None:
+        self.__set_impl(data)
+
+    def get(self: Self) -> A:
+        return self.__get_impl()
+
+    def modify(self: Self, fn: Callable[[A], A]) -> None:
+        self.__set_impl(fn(self.__get_impl()))
+
+
+class ThreadSafe[A](AbstractContextManager[ThreadSafeAcquired[A]]):
+    __data: A
+    __mutex: threading.Lock
+
+    def __init__(self: Self, data: A) -> None:
+        super().__init__()
+        self.__mutex = threading.Lock()
+        self.__data = data
+
+    def get_data(self: Self) -> A:
+        self.__mutex.acquire()
+        data = self.__data
+        self.__mutex.release()
+        return data
+
+    def set_data(self: Self, data: A) -> None:
+        self.__mutex.acquire()
+        self.__data = data
+        self.__mutex.release()
+
+    def modify_data(self: Self, fn: Callable[[A], A]) -> None:
+        self.__mutex.acquire()
+        self.__data = fn(self.__data)
+        self.__mutex.release()
+
+    def ctx(self: Self) -> AbstractContextManager[ThreadSafeAcquired[A]]:
+        return self
+
+    @override
+    def __enter__(self: Self) -> ThreadSafeAcquired[A]:
+        self.__mutex.acquire()
+
+        def set_fn(d: A) -> None:
+            self.__data = d
+
+        return ThreadSafeAcquired(lambda: self.__data, set_fn)
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        self.__mutex.release()
+        return False
+
+
+@dataclass
+class ThreadState:
+    thread: threading.Thread
+    event: asyncio.Event
+
+
+@dataclass
+class ScannerThreadState:
+    state: ScannerState
+    thread: Optional[ThreadState]
+
+
+def run_in_thread(
+    self: "BackendScanner",
+    configs: list[FinalConfig],
+    event: asyncio.Event,
+) -> None:
+    asyncio.run(self.start_run_async(configs))
+    event.set()
+
+
 class BackendScanner:
     __manager: ScannerManager
     __all_configs: list[FinalConfig]
 
-    ##TODO: use a seperate thread for this instead of using asyncio!
-    __thread_and_mutex: None  # Mutex
-    __state: ScannerState
+    __state: ThreadSafe[ScannerThreadState]
 
     def __init__(
         self: Self,
         configs: list[FinalConfig],
+        loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__all_configs = configs
-        self.__manager = ScannerManager()
-        self.__state = {"type": "idle"}
+        self.__manager = ScannerManager(loop=loop)
+        self.__state = ThreadSafe[ScannerThreadState](
+            ScannerThreadState(state={"type": "idle"}, thread=None),
+        )
 
     def add_manager(self: Self, websocket: WebSocket) -> ScanManager:
         return self.__manager.add(websocket)
@@ -629,27 +702,69 @@ class BackendScanner:
 
         return result
 
+    async def start_run_async(
+        self: Self,
+        configs: list[FinalConfig],
+    ) -> None:
+        try:
+            result: list[SummaryTuple] = await self.__start_coroutine(
+                configs=configs,
+                manager=self.__manager,
+            )
+
+            self.__state.modify_data(
+                lambda d: ScannerThreadState(
+                    state={"type": "finished", "result": result}, thread=d.thread
+                ),
+            )
+        except BaseException as err:
+            print("RUN ASYNC err: ", err)
+            self.__state.modify_data(
+                lambda d: ScannerThreadState(
+                    state={"type": "error", "error": err},
+                    thread=d.thread,
+                ),
+            )
+
     def __start_impl(
         self: Self,
         configs: list[FinalConfig],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
     ) -> Optional[str]:
 
-        self.__state = {"type": "running", "configs": configs}
+        with self.__state.ctx() as ctx:
+            state = ctx.get()
+            if state.state["type"] == "running" or state.thread is not None:
+                return "Scanner is already running"
 
-        async def run_async() -> None:
-            try:
-                result: list[SummaryTuple] = await self.__start_coroutine(
-                    configs=configs,
-                    manager=self.__manager,
-                )
+            event = asyncio.Event()
 
-                self.__state = {"type": "finished", "result": result}
-            except BaseException as err:
-                print("RUN ASYNC err: ", err)
-                self.__state = {"type": "error", "error": err}
+            thread = threading.Thread(
+                target=run_in_thread,
+                args=(self, configs, event),
+            )
 
-        run_in_background(run_async)
+            new_state: ScannerThreadState = ScannerThreadState(
+                state={"type": "running", "configs": configs},
+                thread=ThreadState(thread=thread, event=event),
+            )
+
+            async def start_and_wait_for_thread() -> None:
+                thread.start()
+                await event.wait()
+
+                with self.__state.ctx() as ctx:
+                    state = ctx.get()
+                    # cleanup the thread
+                    if state.thread is not None:
+                        await state.thread.event.wait()
+                        ctx.modify(
+                            lambda d: ScannerThreadState(state=d.state, thread=None),
+                        )
+
+            run_in_background(start_and_wait_for_thread)
+
+            ctx.set(new_state)
 
         return None
 
@@ -658,9 +773,6 @@ class BackendScanner:
         cfg_filter: Optional[ConfigFilter],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
     ) -> Optional[str]:
-        if self.__state["type"] == "running":
-            return "Scanner is already running"
-
         if cfg_filter is None:
             return self.__start_impl(
                 configs=self.__all_configs,
@@ -676,11 +788,12 @@ class BackendScanner:
             raise HTTPException(status_code=400, detail=str(err)) from None
 
     def status(self: Self) -> dict[str, Any]:
-        match self.__state["type"]:
+        state = self.__state.get_data()
+        match state.state["type"]:
             case "error":
-                return {"state": "error", "error": str(self.__state["error"])}
+                return {"state": "error", "error": str(state.state["error"])}
             case _:
-                return cast(dict[str, Any], self.__state)
+                return cast(dict[str, Any], state.state)
 
 
 class Backend:
@@ -693,9 +806,10 @@ class Backend:
         self: Self,
         options: BackendOptions,
         configs: list[FinalConfig],
+        loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__options = options
-        self.__scanner = BackendScanner(configs)
+        self.__scanner = BackendScanner(configs=configs, loop=loop)
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)])
@@ -747,7 +861,9 @@ class Backend:
 
 
 async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
-    backend = Backend(options=options, configs=configs)
+    loop = asyncio.get_running_loop()
+
+    backend = Backend(options=options, configs=configs, loop=loop)
 
     await backend.run()
     return 0

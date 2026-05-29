@@ -28,7 +28,9 @@ async def start_gui(options: BackendOptions, backend: Backend) -> int:
 
 
 async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
-    backend = Backend(options=options, configs=configs)
+    loop = asyncio.get_running_loop()
+
+    backend = Backend(options=options, configs=configs, loop=loop)
 
     [_, result] = await asyncio.gather(
         backend.run(),
