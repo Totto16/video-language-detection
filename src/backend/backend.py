@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine
 from contextlib import AbstractContextManager
@@ -44,6 +45,7 @@ from content.language_picker import (
     LanguagePicker,
     ManualSelectResult,
     PredictionBestSelectResult,
+    SelectedType,
     SelectResult,
     get_picker_from_config,
 )
@@ -99,7 +101,7 @@ class WebsocketHandler(ABC):
         self.__ws = websocket
 
     @abstractmethod
-    async def process_data(self: Self, _data: Any) -> ProcessResult: ...
+    async def process_data(self: Self, _data: Any) -> Optional[ProcessResult]: ...
 
     async def send_data(self: Self, data: Any) -> None:
         await self.__ws.send_json({"type": "ok", "data": data})
@@ -114,20 +116,76 @@ class WebsocketHandler(ABC):
             try:
                 data = await self.__ws.receive_json()
                 result = await self.process_data(data)
-                if result.is_ok():
-                    await self.send_data(result.get_ok())
-                else:
-                    await self.send_error(result.get_err())
+                if result is not None:
+                    if result.is_ok():
+                        await self.send_data(result.get_ok())
+                    else:
+                        await self.send_error(result.get_err())
 
             except RuntimeError as err:
                 await self.__ws.send_json({"type": "error", "error": str(err)})
 
 
+class ManagerWsChoiceMessageAskQuestionReply(TypedDict, total=True):
+    type: Literal["reply"]
+    reply: Literal["ask_question"]
+    result: Optional["ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult"]
+    id: str
+
+
+IncomingWsData = ManagerWsChoiceMessageAskQuestionReply
+
+
+ProcessResultTyped = Result["OutgoingWsData", str]
+
+
 class ScanManager(WebsocketHandler):
+    __parent_ref: "ScannerManager"
+
+    def __init__(
+        self: Self, parent_ref: "ScannerManager", websocket: WebSocket,
+    ) -> None:
+        super().__init__(websocket=websocket)
+        self.__parent_ref = parent_ref
+
+    async def __process_data(
+        self: Self, data: IncomingWsData | dict[str, Any],
+    ) -> Optional[ProcessResultTyped]:
+        match data["type"]:
+            case "reply":
+                match data["reply"]:
+                    case "ask_question":
+                        res_data: Optional[SelectResult] = (
+                            None
+                            if data["result"] is None
+                            else deserialize_select_result(data["result"])
+                        )
+                        id: uuid.UUID = uuid.UUID(data["id"])
+                        result = self.__parent_ref.process_ask_question_reply(
+                            res_data,
+                            id,
+                        )
+                        if result is None:
+                            response: ManagerWsChoiceMessageQuestionReplyReceived = {
+                                "type": "choice",
+                                "data": {"type": "reply_received", "id": data["id"]},
+                            }
+                            return ProcessResultTyped.ok(response)
+
+                        return ProcessResultTyped.err(result)
+                    case _:
+                        return ProcessResultTyped.err("Invalid reply data received")
+            case _:
+                return ProcessResultTyped.err("Invalid data received")
+
     @override
-    async def process_data(self: Self, _data: Any) -> ProcessResult:
-        # TODO: use pydantic to get e.g. status request
-        return ProcessResult.err("Nothing can be written in this cases")
+    async def process_data(self: Self, data: Any) -> Optional[ProcessResult]:
+        # TODO: use pydantic to validate the incoming data
+        typed_data: IncomingWsData | dict[str, Any] = cast(
+            IncomingWsData | dict[str, Any],
+            data,
+        )
+        return await self.__process_data(typed_data)
 
 
 class ManagerWsGlobalMessageGeneric[D](TypedDict, total=True):
@@ -296,6 +354,10 @@ def language_to_serializable_data(language: Language) -> LanguageTypedDict:
     return {"short": language.short, "long": language.long}
 
 
+def deserialize_language(language: LanguageTypedDict) -> Language:
+    return Language(short=language["short"], long=language["long"])
+
+
 class PredictionBestDict(
     TypedDict,
     total=True,
@@ -309,6 +371,12 @@ def prediction_best_to_serializable_data(data: PredictionBest) -> PredictionBest
         "accuracy": data.accuracy,
         "language": language_to_serializable_data(data.language),
     }
+
+
+def deserialize_prediction_best(data: PredictionBestDict) -> PredictionBest:
+    return PredictionBest(
+        accuracy=data["accuracy"], language=deserialize_language(data["language"]),
+    )
 
 
 class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest(
@@ -343,6 +411,27 @@ def select_result_to_serializable_data(
         }
         return choice
     assert_never(result)
+
+
+def deserialize_select_result(
+    result: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult,
+) -> SelectResult:
+    match result["type"]:
+        case "manual":
+            manual: ManualSelectResult = ManualSelectResult(
+                select_result_type="manual",
+                selected=SelectedType(result["selected"]),
+            )
+            return manual
+        case "prediction_best":
+            value = deserialize_prediction_best(result["value"])
+            best: PredictionBestSelectResult = PredictionBestSelectResult(
+                select_result_type="prediction_best",
+                value=value,
+            )
+            return best
+        case _:
+            assert_never(result)
 
 
 class ManagerWsChoiceMessageAskQuestionChoiceDataChoice(TypedDict, total=True):
@@ -385,6 +474,7 @@ class ManagerWsChoiceMessageAskQuestionData(TypedDict, total=True):
     message: str
     choices: list[ManagerWsChoiceMessageAskQuestionChoiceData]
     default: ManagerWsChoiceMessageAskQuestionChoiceData
+    id: str
 
 
 ManagerWsChoiceMessageAskQuestion = ManagerWsChoiceMessageGeneric[
@@ -392,9 +482,21 @@ ManagerWsChoiceMessageAskQuestion = ManagerWsChoiceMessageGeneric[
 ]
 
 
-ManagerWsChoiceMessage = ManagerWsChoiceMessageAskQuestion
+class ManagerWsChoiceMessageQuestionReplyReceivedData(TypedDict, total=True):
+    type: Literal["reply_received"]
+    id: str
 
-ManagerWsData = (
+
+ManagerWsChoiceMessageQuestionReplyReceived = ManagerWsChoiceMessageGeneric[
+    ManagerWsChoiceMessageQuestionReplyReceivedData
+]
+
+
+ManagerWsChoiceMessage = (
+    ManagerWsChoiceMessageAskQuestion | ManagerWsChoiceMessageQuestionReplyReceived
+)
+
+OutgoingWsData = (
     ManagerWsGlobalMessage | ManagerWsCounterMessage | ManagerWsChoiceMessage
 )
 
@@ -440,7 +542,9 @@ class ScannerCounter(CounterInterface):
         self.__idx = idx
 
     async def __update_impl(
-        self: Self, incr: NumberLike = 1, force: bool = False,
+        self: Self,
+        incr: NumberLike = 1,
+        force: bool = False,
     ) -> None:
         data: ManagerWsCounterMessageUpdate = {
             "type": "counter",
@@ -522,30 +626,40 @@ class WSChoiceSeparator(ChoiceInterface):
 WSChoice = WSChoiceChoice | WSChoiceSeparator
 
 
+@dataclass
+class ReplyData:
+    type: str
+    finished: bool
+    event: asyncio.Event
+    data: None | Any
+
+
 class ScannerManager(ManagerInterface, ChoiceManagerInterface):
     __instances: list[ScanManager]
     __counters: list[CounterType]
     __loop: asyncio.AbstractEventLoop
+    __reply_ids: dict[uuid.UUID, ReplyData]
 
     def __init__(self: Self, loop: asyncio.AbstractEventLoop) -> None:
         super().__init__()
         self.__instances = []
         self.__counters = []
         self.__loop = loop
+        self.__reply_ids = {}
 
     def add(self: Self, websocket: WebSocket) -> ScanManager:
-        manager = ScanManager(websocket)
+        manager = ScanManager(self, websocket)
         self.__instances.append(manager)
         return manager
 
-    async def send_data(self: Self, data: ManagerWsData) -> None:
+    async def send_data(self: Self, data: OutgoingWsData) -> None:
         futures: list[Coroutine[Any, Any, None]] = [
             instance.send_data(data) for instance in self.__instances
         ]
 
         await asyncio.gather(*futures)
 
-    def send_data_sync(self: Self, data: ManagerWsData) -> None:
+    def send_data_sync(self: Self, data: OutgoingWsData) -> None:
         future = asyncio.run_coroutine_threadsafe(
             coro=self.send_data(data),
             loop=self.__loop,
@@ -657,6 +771,8 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
             ScannerManager.__get_underlying_choice(default),
         )
 
+        uid: uuid.UUID = uuid.uuid4()
+
         data: ManagerWsChoiceMessageAskQuestion = {
             "type": "choice",
             "data": {
@@ -664,11 +780,55 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
                 "message": message,
                 "choices": choices_impl,
                 "default": default_impl,
+                "id": str(uid),
             },
         }
+
+        event = asyncio.Event()
+
+        reply_data = ReplyData(
+            type="ask_question",
+            finished=False,
+            event=event,
+            data=None,
+        )
+
+        self.__reply_ids[uid] = reply_data
+
+        async def wait_for_uuid_finish(r_data: ReplyData) -> Optional[SelectResult]:
+            await r_data.event.wait()
+            data = r_data.data
+
+            del self.__reply_ids[uid]
+
+            return data
+
         self.send_data_sync(data)
 
-        # TODO: await and return the result afterwards
+        thread_loop = asyncio.get_running_loop()
+
+        future = asyncio.run_coroutine_threadsafe(
+            coro=wait_for_uuid_finish(reply_data),
+            loop=thread_loop,
+        )
+        return future.result()
+
+    def process_ask_question_reply(
+        self: Self, result: Optional[SelectResult], id: uuid.UUID,
+    ) -> Optional[str]:
+        reply_data = self.__reply_ids.get(id, None)
+        if reply_data is None:
+            return "Error: reply not present or already answered!"
+
+        if reply_data.type != "ask_question":
+            return "Error: wrong reply type!"
+
+        if reply_data.finished or reply_data.event.is_set():
+            return "Error: reply already finished!"
+
+        reply_data.data = result
+        reply_data.finished = True
+        reply_data.event.set()
 
         return None
 
@@ -1008,7 +1168,8 @@ class BackendScanner:
 
             self.__state.modify_data(
                 lambda d: ScannerThreadState(
-                    state={"type": "finished", "result": result}, thread=d.thread,
+                    state={"type": "finished", "result": result},
+                    thread=d.thread,
                 ),
             )
         except BaseException as err:
