@@ -8,7 +8,11 @@ from typing import (
 from prompt_toolkit.key_binding import KeyBindings
 
 from content.base_class import LanguageScanner, Scanner
-from content.language_picker import LanguagePicker, get_picker_from_config
+from content.language_picker import (
+    LanguagePicker,
+    TUIChoiceManager,
+    get_picker_from_config,
+)
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.base import AnyType, parse_contents
@@ -73,7 +77,11 @@ def launch_tui(
         metadata_scanner=metadata_scanner,
     )
 
-    language_picker: LanguagePicker = get_picker_from_config(config.picker)
+    choice_manager = TUIChoiceManager()
+
+    language_picker: LanguagePicker = get_picker_from_config(
+        config=config.picker, choice_manager=choice_manager
+    )
 
     # TODO: this doesn't work atm
     # this is also unnecessary complicated for a tui app, do this in the gui instead

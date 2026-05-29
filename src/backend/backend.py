@@ -14,6 +14,7 @@ from typing import (
     Self,
     TypedDict,
     Unpack,
+    assert_never,
     cast,
     override,
 )
@@ -34,14 +35,26 @@ from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
+from content.language import Language
 from content.language_picker import (
+    ChoiceColor,
+    ChoiceColorType,
+    ChoiceColorValue,
+    ChoiceInterface,
+    ChoiceManagerInterface,
+    ChoiceTitle,
     LanguagePicker,
     LanguagePickerConfig,
+    ManualSelectResult,
     NoLanguagePicker,
+    PredictionBestSelectResult,
+    SelectResult,
+    SelectedType,
     get_picker_from_config,
     resolve_interactive_config,
 )
 from content.metadata.config import get_metadata_scanner_from_config
+from content.prediction import PredictionBest
 from content.scanner import get_scanner_from_config
 from content.summary import LanguageDict, MetadataDict, Summary
 from helper.base import (
@@ -215,7 +228,183 @@ ManagerWsCounterMessageClose = ManagerWsCounterMessageGeneric[
 
 ManagerWsCounterMessage = ManagerWsCounterMessageUpdate | ManagerWsCounterMessageClose
 
-ManagerWsData = ManagerWsGlobalMessage | ManagerWsCounterMessage
+
+class ManagerWsChoiceMessageGeneric[D](TypedDict, total=True):
+    type: Literal["choice"]
+    data: D
+
+
+class ManagerWsChoiceMessageAskQuestionChoiceDataSeparator(TypedDict, total=True):
+    tag: Literal["separator"]
+
+
+type ChoiceColorTypeValues = Literal["fg", "bg"]
+
+
+type ChoiceColorValueValues = Literal["ansiblue", "ansigreen"]
+
+
+class ChoiceColorDict(
+    TypedDict,
+    total=True,
+):
+    type: ChoiceColorTypeValues
+    color: ChoiceColorValueValues
+
+
+def choice_color_to_serializable_data(
+    choice_color: ChoiceColor,
+) -> ChoiceColorDict:
+    return {"type": choice_color.type.value, "color": choice_color.color.value}
+
+
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle(
+    TypedDict,
+    total=True,
+):
+    color: Optional[ChoiceColorDict]
+    content: str
+
+
+def choice_title_to_serializable_data(
+    title: ChoiceTitle,
+) -> ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle:
+    return {
+        "content": title.content,
+        "color": (
+            None
+            if title.color is None
+            else choice_color_to_serializable_data(title.color)
+        ),
+    }
+
+
+type SelectedTypeValues = Literal["open", "no_language", " copy", "more", "unknown"]
+
+
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual(
+    TypedDict,
+    total=True,
+):
+    type: Literal["manual"]
+    selected: SelectedTypeValues
+
+
+class LanguageTypedDict(
+    TypedDict,
+    total=True,
+):
+    short: str
+    long: str
+
+
+def language_to_serializable_data(language: Language) -> LanguageTypedDict:
+    return {"short": language.short, "long": language.long}
+
+
+class PredictionBestDict(
+    TypedDict,
+    total=True,
+):
+    accuracy: float
+    language: LanguageTypedDict
+
+
+def prediction_best_to_serializable_data(data: PredictionBest) -> PredictionBestDict:
+    return {
+        "accuracy": data.accuracy,
+        "language": language_to_serializable_data(data.language),
+    }
+
+
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest(
+    TypedDict,
+    total=True,
+):
+    type: Literal["prediction_best"]
+    value: PredictionBestDict
+
+
+ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult = (
+    ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual
+    | ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest
+)
+
+
+def select_result_to_serializable_data(
+    result: SelectResult,
+) -> ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult:
+    if isinstance(result, ManualSelectResult):
+        manual: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual = {
+            "type": "manual",
+            "selected": result.selected.value,
+        }
+        return manual
+    elif isinstance(result, PredictionBestSelectResult):
+        value = prediction_best_to_serializable_data(result.value)
+
+        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest = {
+            "type": "prediction_best",
+            "value": value,
+        }
+        return choice
+    else:
+        assert_never(result)
+
+
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoice(TypedDict, total=True):
+    tag: Literal["choice"]
+    title: list[ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle]
+    value: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult
+
+
+ManagerWsChoiceMessageAskQuestionChoiceData = (
+    ManagerWsChoiceMessageAskQuestionChoiceDataSeparator
+    | ManagerWsChoiceMessageAskQuestionChoiceDataChoice
+)
+
+
+def choice_to_serializable_data(
+    data: "WSChoice",
+) -> ManagerWsChoiceMessageAskQuestionChoiceData:
+    if isinstance(data, WSChoiceSeparator):
+        separator: ManagerWsChoiceMessageAskQuestionChoiceDataSeparator = {
+            "tag": "separator",
+        }
+        return separator
+    elif isinstance(data, WSChoiceChoice):
+        impl = data.impl
+
+        title = [choice_title_to_serializable_data(segement) for segement in impl.title]
+        value = select_result_to_serializable_data(impl.value)
+
+        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoice = {
+            "tag": "choice",
+            "title": title,
+            "value": value,
+        }
+        return choice
+    else:
+        assert_never(data)
+
+
+class ManagerWsChoiceMessageAskQuestionData(TypedDict, total=True):
+    type: Literal["ask_question"]
+    message: str
+    choices: list[ManagerWsChoiceMessageAskQuestionChoiceData]
+    default: ManagerWsChoiceMessageAskQuestionChoiceData
+
+
+ManagerWsChoiceMessageAskQuestion = ManagerWsChoiceMessageGeneric[
+    ManagerWsChoiceMessageAskQuestionData
+]
+
+
+ManagerWsChoiceMessage = ManagerWsChoiceMessageAskQuestion
+
+ManagerWsData = (
+    ManagerWsGlobalMessage | ManagerWsCounterMessage | ManagerWsChoiceMessage
+)
 
 
 class ScannerStatusBar(StatusBarInterface):
@@ -297,12 +486,57 @@ class ScannerCounter(CounterInterface):
         return asyncio.run(self.__close_impl(clear=clear))
 
 
-class ScannerManager(ManagerInterface):
+class EmptyContextManager(AbstractContextManager[None]):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def __enter__(self: Self) -> None:
+        pass
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        return False
+
+
+@dataclass
+class WSChoiceChoiceImpl:
+    title: list[ChoiceTitle]
+    value: SelectResult
+
+
+class WSChoiceChoice(ChoiceInterface):
+    __impl: WSChoiceChoiceImpl
+
+    def __init__(self: Self, impl: WSChoiceChoiceImpl) -> None:
+        super().__init__()
+        self.__impl = impl
+
+    @property
+    def impl(self: Self) -> WSChoiceChoiceImpl:
+        return self.__impl
+
+
+class WSChoiceSeparator(ChoiceInterface):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+
+WSChoice = WSChoiceChoice | WSChoiceSeparator
+
+
+class ScannerManager(ManagerInterface, ChoiceManagerInterface):
     __instances: list[ScanManager]
     __counters: list[CounterType]
     __loop: asyncio.AbstractEventLoop
 
     def __init__(self: Self, loop: asyncio.AbstractEventLoop) -> None:
+        super().__init__()
         self.__instances = []
         self.__counters = []
         self.__loop = loop
@@ -380,11 +614,71 @@ class ScannerManager(ManagerInterface):
         idx: int = self.__add_counter(options)
         return ScannerCounter(self, idx)
 
+    @override
     def stop(
         self: Self,
     ) -> None:
         data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
         self.send_data_sync(data)
+
+    @override
+    def get_choice(
+        self: Self,
+        title: list[ChoiceTitle],
+        value: SelectResult,
+    ) -> ChoiceInterface:
+        return WSChoiceChoice(WSChoiceChoiceImpl(title=title, value=value))
+
+    @override
+    def get_separator(
+        self: Self,
+    ) -> ChoiceInterface:
+        return WSChoiceSeparator()
+
+    @override
+    def ctx(
+        self: Self,
+    ) -> AbstractContextManager[None]:
+        return EmptyContextManager()
+
+    @staticmethod
+    def __get_underlying_choice(choice: ChoiceInterface) -> WSChoice:
+        if isinstance(choice, WSChoiceChoice) or isinstance(choice, WSChoiceSeparator):
+            return choice
+
+        msg = "Implementation Error: used wrong choices with wrong choices manager!"
+        raise RuntimeError(msg)
+
+    @override
+    def ask_question(
+        self: Self,
+        message: str,
+        choices: list[ChoiceInterface],
+        default: ChoiceInterface,
+    ) -> Optional[SelectResult]:
+
+        choices_impl = [
+            choice_to_serializable_data(ScannerManager.__get_underlying_choice(choice))
+            for choice in choices
+        ]
+        default_impl = choice_to_serializable_data(
+            ScannerManager.__get_underlying_choice(default),
+        )
+
+        data: ManagerWsChoiceMessageAskQuestion = {
+            "type": "choice",
+            "data": {
+                "type": "ask_question",
+                "message": message,
+                "choices": choices_impl,
+                "default": default_impl,
+            },
+        }
+        self.send_data_sync(data)
+
+        # TODO: await and return the result afterwards
+
+        return None
 
 
 class ScanStartQuery(pydantic.BaseModel):
