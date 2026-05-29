@@ -26,9 +26,9 @@ from content.metadata.scanner import MetadataScanner
 from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
-from helper.manager import ManagerInterface
 from helper.classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from helper.log import get_logger
+from helper.manager import ManagerInterface
 
 logger: Logger = get_logger()
 

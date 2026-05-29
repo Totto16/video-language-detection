@@ -38,20 +38,14 @@ from content.general import NameParser
 from content.language import Language
 from content.language_picker import (
     ChoiceColor,
-    ChoiceColorType,
-    ChoiceColorValue,
     ChoiceInterface,
     ChoiceManagerInterface,
     ChoiceTitle,
     LanguagePicker,
-    LanguagePickerConfig,
     ManualSelectResult,
-    NoLanguagePicker,
     PredictionBestSelectResult,
     SelectResult,
-    SelectedType,
     get_picker_from_config,
-    resolve_interactive_config,
 )
 from content.metadata.config import get_metadata_scanner_from_config
 from content.prediction import PredictionBest
@@ -340,7 +334,7 @@ def select_result_to_serializable_data(
             "selected": result.selected.value,
         }
         return manual
-    elif isinstance(result, PredictionBestSelectResult):
+    if isinstance(result, PredictionBestSelectResult):
         value = prediction_best_to_serializable_data(result.value)
 
         choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest = {
@@ -348,8 +342,7 @@ def select_result_to_serializable_data(
             "value": value,
         }
         return choice
-    else:
-        assert_never(result)
+    assert_never(result)
 
 
 class ManagerWsChoiceMessageAskQuestionChoiceDataChoice(TypedDict, total=True):
@@ -372,7 +365,7 @@ def choice_to_serializable_data(
             "tag": "separator",
         }
         return separator
-    elif isinstance(data, WSChoiceChoice):
+    if isinstance(data, WSChoiceChoice):
         impl = data.impl
 
         title = [choice_title_to_serializable_data(segement) for segement in impl.title]
@@ -384,8 +377,7 @@ def choice_to_serializable_data(
             "value": value,
         }
         return choice
-    else:
-        assert_never(data)
+    assert_never(data)
 
 
 class ManagerWsChoiceMessageAskQuestionData(TypedDict, total=True):
@@ -448,7 +440,7 @@ class ScannerCounter(CounterInterface):
         self.__idx = idx
 
     async def __update_impl(
-        self: Self, incr: NumberLike = 1, force: bool = False
+        self: Self, incr: NumberLike = 1, force: bool = False,
     ) -> None:
         data: ManagerWsCounterMessageUpdate = {
             "type": "counter",
@@ -1016,7 +1008,7 @@ class BackendScanner:
 
             self.__state.modify_data(
                 lambda d: ScannerThreadState(
-                    state={"type": "finished", "result": result}, thread=d.thread
+                    state={"type": "finished", "result": result}, thread=d.thread,
                 ),
             )
         except BaseException as err:

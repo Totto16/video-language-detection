@@ -242,7 +242,7 @@ class ScannedFile:
         )
 
     def generate_checksum(
-        self: Self, manager: Optional[ManagerInterface] = None
+        self: Self, manager: Optional[ManagerInterface] = None,
     ) -> None:
         self.stats = Stats.from_file(
             self.path,

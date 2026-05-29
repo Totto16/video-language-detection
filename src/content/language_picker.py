@@ -358,20 +358,20 @@ class InteractiveLanguagePicker(LanguagePicker):
                 title=[
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                         ),
                         content="[open]",
                     ),
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green,
                         ),
                         content=" '",
                     ),
                     ChoiceTitle(color=None, content=f"{path}"),
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green,
                         ),
                         content="'",
                     ),
@@ -385,20 +385,20 @@ class InteractiveLanguagePicker(LanguagePicker):
                 title=[
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                         ),
                         content="[copy path]",
                     ),
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green,
                         ),
                         content=" '",
                     ),
                     ChoiceTitle(color=None, content=f"{path}"),
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green,
                         ),
                         content="'",
                     ),
@@ -412,10 +412,10 @@ class InteractiveLanguagePicker(LanguagePicker):
                 title=[
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                         ),
                         content="[more]",
-                    )
+                    ),
                 ],
                 value=ManualSelectResult("manual", SelectedType.more),
             ),
@@ -426,7 +426,7 @@ class InteractiveLanguagePicker(LanguagePicker):
                 title=[
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                         ),
                         content="[unknown language]",
                     ),
@@ -440,10 +440,10 @@ class InteractiveLanguagePicker(LanguagePicker):
                 title=[
                     ChoiceTitle(
                         color=ChoiceColor(
-                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                         ),
                         content="[no language]",
-                    )
+                    ),
                 ],
                 value=ManualSelectResult("manual", SelectedType.no_language),
             ),
@@ -461,7 +461,7 @@ class InteractiveLanguagePicker(LanguagePicker):
             title: list[ChoiceTitle] = [
                 ChoiceTitle(
                     color=ChoiceColor(
-                        type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        type=ChoiceColorType.fg, color=ChoiceColorValue.blue,
                     ),
                     content=f"[{index}]",
                 ),
@@ -470,7 +470,7 @@ class InteractiveLanguagePicker(LanguagePicker):
                 ChoiceTitle(color=None, content=" - "),
                 ChoiceTitle(
                     color=ChoiceColor(
-                        type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                        type=ChoiceColorType.fg, color=ChoiceColorValue.green,
                     ),
                     content=f"{value.accuracy:.2%}",
                 ),

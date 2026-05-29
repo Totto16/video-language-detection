@@ -80,7 +80,7 @@ def launch_tui(
     choice_manager = TUIChoiceManager()
 
     language_picker: LanguagePicker = get_picker_from_config(
-        config=config.picker, choice_manager=choice_manager
+        config=config.picker, choice_manager=choice_manager,
     )
 
     # TODO: this doesn't work atm
