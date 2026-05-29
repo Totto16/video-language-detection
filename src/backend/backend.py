@@ -18,7 +18,15 @@ from typing import (
 import pydantic
 import requests
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI, Query, Response, WebSocket
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Response,
+    WebSocket,
+)
 from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
@@ -659,10 +667,13 @@ class BackendScanner:
                 run_in_background=run_in_background,
             )
         try:
-            filter_configs(configs=self.__all_configs, cfg_filter=cfg_filter)
-            return "TODO"
+            configs = filter_configs(configs=self.__all_configs, cfg_filter=cfg_filter)
+            return self.__start_impl(
+                configs=configs,
+                run_in_background=run_in_background,
+            )
         except RuntimeError as err:
-            return str(err)
+            raise HTTPException(status_code=400, detail=str(err)) from None
 
     def status(self: Self) -> dict[str, Any]:
         match self.__state["type"]:

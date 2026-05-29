@@ -28,6 +28,7 @@ from helper.config import (
 )
 from helper.log import LogLevel, setup_custom_logger
 from helper.parser import CustomNameParser
+from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from helper.tui import launch_tui
 from main import AllContent, generate_schemas
@@ -60,6 +61,8 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     config: str
     template_to_use: Optional[str]
     config_filter: Optional[ConfigFilter]
+    backend_host: str
+    backend_port: int
 
 
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
@@ -67,6 +70,8 @@ class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     config: str
     template_to_use: Optional[str]
     config_filter: Optional[ConfigFilter]
+    host: str
+    port: int
 
 
 class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
@@ -85,6 +90,15 @@ type AllParsedNameSpaces = (
 )
 
 _ = get_translator()
+
+
+def parse_port(arg: str) -> int:
+    value = parse_int_safely(arg)
+    if value is None:
+        msg = f"expected the argument to be a port but got: {arg}"
+        raise argparse.ArgumentTypeError(msg)
+
+    return value
 
 
 def parse_args() -> AllParsedNameSpaces:
@@ -162,7 +176,7 @@ def parse_args() -> AllParsedNameSpaces:
     )
     schema_parser.add_argument(
         "-s",
-        "--schema_folder",
+        "--schema-folder",
         dest="schema_folder",
         default="schema/",
         help=_("The folder where to put the schemas"),
@@ -199,6 +213,21 @@ def parse_args() -> AllParsedNameSpaces:
             "Filter the provided configs, allowed are names or indices"  # noqa: COM812
         ),
     )
+    gui_parser.add_argument(
+        "-b",
+        "--backend-host",
+        dest="backend_host",
+        default="127.0.0.1",
+        help=_("Tha host the backend runs on"),
+    )
+    gui_parser.add_argument(
+        "-p",
+        "--port",
+        dest="backend_port",
+        default=4433,
+        type=parse_port,
+        help=_("Tha port the backend runs on"),
+    )
 
     api_parser = subparsers.add_parser(
         "api",
@@ -230,6 +259,21 @@ def parse_args() -> AllParsedNameSpaces:
         help=_(
             "Filter the provided configs, allowed are names or indices"  # noqa: COM812
         ),
+    )
+    api_parser.add_argument(
+        "-b",
+        "--host",
+        dest="host",
+        default="127.0.0.1",
+        help=_("Tha host the backend runs on"),
+    )
+    api_parser.add_argument(
+        "-p",
+        "--port",
+        dest="port",
+        default=4433,
+        type=parse_port,
+        help=_("Tha port the backend runs on"),
     )
 
     config_check_parser = subparsers.add_parser(
@@ -310,8 +354,7 @@ def subcommand_gui(
         logger.error("filtering returned 0 configs")
         return 1
 
-    # TODO: get from args
-    address = Address(host="127.0.0.1", port=4433)
+    address = Address(host=args.backend_host, port=args.backend_port)
     options = BackendOptions(address=address)
 
     return launch_gui(options, configs)
@@ -347,7 +390,7 @@ def subcommand_api(
         logger.error("filtering returned 0 configs")
         return 1
 
-    address = Address(host="127.0.0.1", port=4433)
+    address = Address(host=args.host, port=args.port)
     options = BackendOptions(address=address)
 
     return launch_api(options, configs)
