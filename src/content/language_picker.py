@@ -1,10 +1,12 @@
 import platform
 import subprocess
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
 from pathlib import Path
+from types import TracebackType
 from typing import (
     Annotated,
     Any,
@@ -17,14 +19,15 @@ from typing import (
 )
 
 import pyperclip
-from questionary import Choice, Question, Separator, select
-from questionary.prompts.common import FormattedText
+import questionary
+import questionary.prompts
+import questionary.prompts.common
 
 from content.language import Language
 from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.log import get_logger
-from helper.terminal import Terminal
+from helper.terminal import ClearContextManager, Terminal
 
 
 class LanguagePicker(ABC):
@@ -127,14 +130,6 @@ class ManualSelectResult:
 type SelectResult = PredictionBestSelectResult | ManualSelectResult
 
 
-def construct_choice(title: FormattedText, value: SelectResult) -> Choice:
-    return Choice(title=title, value=value)
-
-
-def ask_question(question: Question) -> Optional[SelectResult] | Any:
-    return question.ask()
-
-
 def open_file(path: Path) -> None:
     if platform.system() == "Darwin":  # macOS
         subprocess.run(["open", path], check=True)  # noqa: S603, S607
@@ -165,60 +160,291 @@ logger: Logger = get_logger()
 INCREASE_STEP_FOR_SELECTOR: int = 5
 
 
+class ChoiceColorType(Enum):
+    fg = "fg"
+    bg = "bg"
+
+
+class ChoiceColorValue(Enum):
+    blue = "ansiblue"
+    green = "ansigreen"
+
+
+@dataclass
+class ChoiceColor:
+    type: ChoiceColorType
+    color: ChoiceColorValue
+
+
+@dataclass
+class ChoiceTitle:
+    color: Optional[ChoiceColor]
+    content: str
+
+
+class ChoiceInterface:
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+
+class ChoiceManagerInterface(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def get_choice(
+        self: Self,
+        title: list[ChoiceTitle],
+        value: SelectResult,
+    ) -> ChoiceInterface: ...
+
+    @abstractmethod
+    def get_separator(
+        self: Self,
+    ) -> ChoiceInterface: ...
+
+    @abstractmethod
+    def ctx(
+        self: Self,
+    ) -> AbstractContextManager[None]: ...
+
+    @abstractmethod
+    def ask_question(
+        self: Self,
+        message: str,
+        choices: list[ChoiceInterface],
+        default: ChoiceInterface,
+    ) -> Optional[SelectResult]: ...
+
+
+class TUIChoice(ChoiceInterface):
+    __impl: questionary.Choice
+
+    def __init__(self: Self, impl: questionary.Choice) -> None:
+        super().__init__()
+        self.__impl = impl
+
+    @property
+    def impl(self: Self) -> questionary.Choice:
+        return self.__impl
+
+
+class TuiContextWrapper(AbstractContextManager[None]):
+    __underlying: ClearContextManager
+
+    def __init__(self: Self, underlying: ClearContextManager) -> None:
+        super().__init__()
+        self.__underlying = underlying
+
+    @override
+    def __enter__(self: Self) -> None:
+        self.__underlying.__enter__()
+
+    @override
+    def __exit__(
+        self: Self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        self.__underlying.__exit__(
+            exc_type,
+            exc_val,
+            exc_tb,
+        )
+        return False
+
+
+class TUIChoiceManager(ChoiceManagerInterface):
+
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @staticmethod
+    def __get_formatted_color(color: Optional[ChoiceColor]) -> str:
+        if color is None:
+            return ""
+
+        return f"{color.type.value}:{color.color.value}"
+
+    @staticmethod
+    def __get_formatted_title(
+        title: list[ChoiceTitle],
+    ) -> questionary.prompts.common.FormattedText:
+        return [
+            (TUIChoiceManager.__get_formatted_color(segment.color), segment.content)
+            for segment in title
+        ]
+
+    @override
+    def get_choice(
+        self: Self,
+        title: list[ChoiceTitle],
+        value: SelectResult,
+    ) -> ChoiceInterface:
+        title_formatted = TUIChoiceManager.__get_formatted_title(title)
+        choice = questionary.Choice(title=title_formatted, value=value)
+        return TUIChoice(choice)
+
+    @override
+    def get_separator(
+        self: Self,
+    ) -> ChoiceInterface:
+        return TUIChoice(questionary.Separator())
+
+    @override
+    def ctx(
+        self: Self,
+    ) -> AbstractContextManager[None]:
+        return TuiContextWrapper(Terminal.clear_block(clear_on_entry=False))
+
+    @staticmethod
+    def __get_underlying_choice(choice: ChoiceInterface) -> questionary.Choice:
+        if isinstance(choice, TUIChoice):
+            return choice.impl
+
+        msg = "Implementation Error: used wrong choices with wrong choices manager!"
+        raise RuntimeError(msg)
+
+    @override
+    def ask_question(
+        self: Self,
+        message: str,
+        choices: list[ChoiceInterface],
+        default: ChoiceInterface,
+    ) -> Optional[SelectResult]:
+        choices_impl = [
+            TUIChoiceManager.__get_underlying_choice(choice) for choice in choices
+        ]
+        default_impl = TUIChoiceManager.__get_underlying_choice(default)
+        question = questionary.select(
+            message,
+            choices=choices_impl,
+            default=default_impl,
+        )
+        result: Optional[SelectResult] | Any = question.ask()
+
+        if not isinstance(
+            result,
+            PredictionBestSelectResult,
+        ) and not isinstance(result, ManualSelectResult):
+            return None
+
+        return result
+
+
 class InteractiveLanguagePicker(LanguagePicker):
     __config: InteractiveLanguagePickerDictTotal
+    __manager: ChoiceManagerInterface
 
-    def __init__(self: Self, *, config: InteractiveLanguagePickerDictTotal) -> None:
+    def __init__(
+        self: Self,
+        *,
+        config: InteractiveLanguagePickerDictTotal,
+        manager: ChoiceManagerInterface,
+    ) -> None:
         super().__init__()
         self.__config = config
+        self.__manager = manager
 
     def __get_manual_choices(
         self: Self,
         path: Path,
-    ) -> list[Choice]:
-        result: list[Choice] = []
+    ) -> list[ChoiceInterface]:
+        result: list[ChoiceInterface] = []
 
         result.append(
-            construct_choice(
+            self.__manager.get_choice(
                 title=[
-                    ("fg:ansiblue", "[open]"),
-                    ("fg:ansigreen", " '"),
-                    ("", f"{path}"),
-                    ("fg:ansigreen", "'"),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        ),
+                        content="[open]",
+                    ),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                        ),
+                        content=" '",
+                    ),
+                    ChoiceTitle(color=None, content=f"{path}"),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                        ),
+                        content="'",
+                    ),
                 ],
                 value=ManualSelectResult("manual", SelectedType.open),
             ),
         )
 
         result.append(
-            construct_choice(
+            self.__manager.get_choice(
                 title=[
-                    ("fg:ansiblue", "[copy path]"),
-                    ("fg:ansigreen", " '"),
-                    ("", f"{path}"),
-                    ("fg:ansigreen", "'"),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        ),
+                        content="[copy path]",
+                    ),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                        ),
+                        content=" '",
+                    ),
+                    ChoiceTitle(color=None, content=f"{path}"),
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                        ),
+                        content="'",
+                    ),
                 ],
                 value=ManualSelectResult("manual", SelectedType.copy),
             ),
         )
 
         result.append(
-            construct_choice(
-                title=[("fg:ansiblue", "[more]")],
+            self.__manager.get_choice(
+                title=[
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        ),
+                        content="[more]",
+                    )
+                ],
                 value=ManualSelectResult("manual", SelectedType.more),
             ),
         )
 
         result.append(
-            construct_choice(
-                title=[("fg:ansiblue", "[unknown language]")],
+            self.__manager.get_choice(
+                title=[
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        ),
+                        content="[unknown language]",
+                    ),
+                ],
                 value=ManualSelectResult("manual", SelectedType.unknown),
             ),
         )
 
         result.append(
-            construct_choice(
-                title=[("fg:ansiblue", "[no language]")],
+            self.__manager.get_choice(
+                title=[
+                    ChoiceTitle(
+                        color=ChoiceColor(
+                            type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                        ),
+                        content="[no language]",
+                    )
+                ],
                 value=ManualSelectResult("manual", SelectedType.no_language),
             ),
         )
@@ -229,23 +455,33 @@ class InteractiveLanguagePicker(LanguagePicker):
         self: Self,
         best_list: list[PredictionBest],
         length_to_use: int,
-    ) -> list[Choice]:
+    ) -> list[ChoiceInterface]:
 
-        def format_choice(index: int, value: PredictionBest) -> Choice:
-            title: FormattedText = [
-                ("fg:ansiblue", f"[{index}]"),
-                ("", " "),
-                ("", f"{value.language}"),
-                ("", " - "),
-                ("fg:ansigreen", f"{value.accuracy:.2%}"),
+        def format_choice(index: int, value: PredictionBest) -> ChoiceInterface:
+            title: list[ChoiceTitle] = [
+                ChoiceTitle(
+                    color=ChoiceColor(
+                        type=ChoiceColorType.fg, color=ChoiceColorValue.blue
+                    ),
+                    content=f"[{index}]",
+                ),
+                ChoiceTitle(color=None, content=" "),
+                ChoiceTitle(color=None, content=f"{value.language}"),
+                ChoiceTitle(color=None, content=" - "),
+                ChoiceTitle(
+                    color=ChoiceColor(
+                        type=ChoiceColorType.fg, color=ChoiceColorValue.green
+                    ),
+                    content=f"{value.accuracy:.2%}",
+                ),
             ]
 
-            return construct_choice(
+            return self.__manager.get_choice(
                 title=title,
                 value=PredictionBestSelectResult("prediction_best", value),
             )
 
-        result: list[Choice] = [
+        result: list[ChoiceInterface] = [
             format_choice(i, best)
             for i, best in enumerate(best_list)
             if i < length_to_use
@@ -258,14 +494,14 @@ class InteractiveLanguagePicker(LanguagePicker):
         path: Path,
         best_list: list[PredictionBest],
         length_to_use: int,
-    ) -> list[Choice]:
+    ) -> list[ChoiceInterface]:
 
-        result: list[Choice] = []
+        result: list[ChoiceInterface] = []
 
         prediction_choices = self.__get_prediction_choices(best_list, length_to_use)
         result.extend(prediction_choices)
 
-        result.append(Separator())
+        result.append(self.__manager.get_separator())
 
         manual_choices = self.__get_manual_choices(path)
         result.extend(manual_choices)
@@ -278,7 +514,7 @@ class InteractiveLanguagePicker(LanguagePicker):
         path: Path,
         prediction: Prediction,
     ) -> Optional[Language]:
-        with Terminal.clear_block(clear_on_entry=False):
+        with self.__manager.ctx():
             if self.__config["play_sound"]:
                 play_notification_sound()
 
@@ -296,20 +532,13 @@ class InteractiveLanguagePicker(LanguagePicker):
                     length_to_use,
                 )
 
-                question = select(
+                result = self.__manager.ask_question(
                     "Select the desired option:",
                     choices=choices,
                     default=choices[0],
                 )
 
-                result = ask_question(question)
                 if result is None:
-                    continue
-
-                if not isinstance(
-                    result,
-                    PredictionBestSelectResult,
-                ) and not isinstance(result, ManualSelectResult):
                     continue
 
                 match result.select_result_type:
@@ -371,6 +600,7 @@ LanguagePickerConfig = Annotated[
 
 def get_picker_from_config(
     config: LanguagePickerConfig,
+    choice_manager: ChoiceManagerInterface,
 ) -> LanguagePicker:
     match config.picker_type:
         case "none":
@@ -379,4 +609,9 @@ def get_picker_from_config(
             resolved_config = resolve_interactive_config(
                 config.config,
             )
-            return InteractiveLanguagePicker(config=resolved_config)
+            return InteractiveLanguagePicker(
+                config=resolved_config,
+                manager=choice_manager,
+            )
+        case _:
+            assert_never(config.picker_type)

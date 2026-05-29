@@ -34,7 +34,13 @@ from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
-from content.language_picker import LanguagePicker, get_picker_from_config
+from content.language_picker import (
+    LanguagePicker,
+    LanguagePickerConfig,
+    NoLanguagePicker,
+    get_picker_from_config,
+    resolve_interactive_config,
+)
 from content.metadata.config import get_metadata_scanner_from_config
 from content.scanner import get_scanner_from_config
 from content.summary import LanguageDict, MetadataDict, Summary
@@ -611,7 +617,7 @@ class BackendScanner:
         name_parser: NameParser,
         all_content_type: AnyType,
         config_paramaters: Optional[tuple[int, int]],
-        manager: ManagerInterface,
+        manager: ScannerManager,
     ) -> SummaryTuple:
         device_manager: DeviceManager = DeviceManager()
 
@@ -632,8 +638,10 @@ class BackendScanner:
             metadata_scanner=metadata_scanner,
         )
 
-        # TODO: note: we need to have a picker that is configured over ws not over terminal
-        language_picker: LanguagePicker = get_picker_from_config(config.picker)
+        language_picker: LanguagePicker = get_picker_from_config(
+            config.picker,
+            manager,
+        )
 
         general_info: list[str] = [
             x
@@ -678,7 +686,7 @@ class BackendScanner:
     async def __start_coroutine(
         self: Self,
         configs: list[FinalConfig],
-        manager: ManagerInterface,
+        manager: ScannerManager,
     ) -> list[SummaryTuple]:
         result: list[SummaryTuple] = []
 
