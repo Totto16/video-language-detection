@@ -8,7 +8,7 @@ from warnings import filterwarnings
 
 import colorlog
 
-__all__: list[str] = ["add_formatted_handler", "get_logger"]
+__all__: list[str] = ["get_logger"]
 
 __GLOBAL__LOGGER__NAME = "__global__logger__"
 
@@ -77,31 +77,6 @@ def setup_global_logger() -> None:
     os.environ["MIOPEN_LOG_LEVEL"] = "3"
 
 
-def add_formatted_handler(
-    logger: Logger,
-    handler: Handler,
-    stream: Optional[IO[str]] = None,
-) -> None:
-    formatter = colorlog.ColoredFormatter(
-        fmt="%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(green)s%(module)s%(reset)s - %(message)s",
-        log_colors={
-            "DEBUG": "white",
-            "INFO": "cyan",
-            "WARNING": "yellow",
-            "ERROR": "red",
-            "CRITICAL": "bold_purple",
-        },
-        stream=stream,
-        reset=True,
-        style="%",
-        no_color=stream is None,
-    )
-
-    handler.setFormatter(formatter)
-
-    logger.addHandler(hdlr=handler)
-
-
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
     stream = sys.stdout
 
@@ -117,6 +92,24 @@ def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
         raise RuntimeError(msg)
 
     logger.setLevel(level.underlying)
-    add_formatted_handler(logger=logger, handler=console_handler, stream=stream)
+
+    formatter = colorlog.ColoredFormatter(
+        fmt="%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(green)s%(module)s%(reset)s - %(message)s",
+        log_colors={
+            "DEBUG": "white",
+            "INFO": "cyan",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_purple",
+        },
+        stream=stream,
+        reset=True,
+        style="%",
+        validate=True,
+    )
+
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(hdlr=console_handler)
 
     return logger

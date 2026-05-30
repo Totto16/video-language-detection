@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from logging import Handler, LogRecord, Logger
+from logging import Formatter, Handler, Logger, LogRecord
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -62,7 +62,7 @@ from helper.base import (
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
 from helper.config import ConfigFilter, ConfigFilterItem, FinalConfig, filter_configs
 from helper.devices import DeviceManager
-from helper.log import add_formatted_handler, get_logger
+from helper.log import get_logger
 from helper.manager import (
     CounterInterface,
     CounterOptions,
@@ -523,6 +523,8 @@ class ManagerWsLogMessageEventData(TypedDict, total=True):
     type: Literal["event"]
     level: LogLevelStr
     message: str
+    asctime: str
+    module: str
 
 
 ManagerWsLogMessageEvent = ManagerWsLogMessageGeneric[ManagerWsLogMessageEventData]
@@ -1173,10 +1175,13 @@ class ThreadHandler(Handler):
         try:
 
             msg = self.format(record)
+
             message: ManagerWsLogMessageEventData = {
                 "type": "event",
                 "level": cast(LogLevelStr, record.levelname),
                 "message": msg,
+                "asctime": record.asctime,
+                "module": record.module,
             }
             self.__send(message)
 
@@ -1212,7 +1217,15 @@ class ThreadLoggerCtx(AbstractContextManager[Logger]):
 
         thread_handler = ThreadHandler(send=send, thread_id=self.__thread_id)
 
-        add_formatted_handler(logger=logger, handler=thread_handler, stream=None)
+        formatter = Formatter(
+            fmt="%(message)s",
+            style="%",
+            validate=True,
+        )
+
+        thread_handler.setFormatter(formatter)
+
+        logger.addHandler(hdlr=thread_handler)
 
         return logger
 
@@ -1554,5 +1567,12 @@ async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
     return 0
 
 
+def suppress_logs() -> None:
+    logger = get_logger()
+
+    logger.handlers = []
+
+
 def launch_api(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    suppress_logs()
     return asyncio.run(start_all(options, configs))

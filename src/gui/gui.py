@@ -1,7 +1,7 @@
 import asyncio
 from logging import Logger
 
-from backend.backend import Backend, BackendOptions
+from backend.backend import Backend, BackendOptions, suppress_logs
 from helper.config import FinalConfig
 from helper.log import get_logger
 
@@ -41,4 +41,5 @@ async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
 
 
 def launch_gui(options: BackendOptions, configs: list[FinalConfig]) -> int:
+    suppress_logs()
     return asyncio.run(start_all(options=options, configs=configs))
