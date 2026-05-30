@@ -80,6 +80,10 @@ if TYPE_CHECKING:
     from content.metadata.scanner import MetadataScanner
 
 
+# TODO: remove
+TODO_PRINT_REMOVE = print
+
+
 class BackendRef:
     __backend: "Backend"
 
@@ -516,7 +520,8 @@ class ScannerStatusBar(StatusBarInterface):
         self.__ref = ref
         self.__idx = idx
 
-    async def __update_impl(
+    @override
+    def update(
         self: Self,
         **fields: Unpack[StatusBarInterfaceUpdateOptions],
     ) -> None:
@@ -528,14 +533,7 @@ class ScannerStatusBar(StatusBarInterface):
                 "options": {"type": "status_bar", "options": fields},
             },
         }
-        await self.__ref.send_data(data)
-
-    @override
-    def update(
-        self: Self,
-        **fields: Unpack[StatusBarInterfaceUpdateOptions],
-    ) -> None:
-        return asyncio.run(self.__update_impl(**fields))
+        self.__ref.send_data_sync(data)
 
 
 class ScannerCounter(CounterInterface):
@@ -547,11 +545,8 @@ class ScannerCounter(CounterInterface):
         self.__ref = ref
         self.__idx = idx
 
-    async def __update_impl(
-        self: Self,
-        incr: NumberLike = 1,
-        force: bool = False,
-    ) -> None:
+    @override
+    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
         data: ManagerWsCounterMessageUpdate = {
             "type": "counter",
             "data": {
@@ -566,13 +561,10 @@ class ScannerCounter(CounterInterface):
                 },
             },
         }
-        await self.__ref.send_data(data)
+        self.__ref.send_data_sync(data)
 
     @override
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
-        return asyncio.run(self.__update_impl(incr=incr, force=force))
-
-    async def __close_impl(self: Self, clear: bool = False) -> None:
+    def close(self: Self, clear: bool = False) -> None:
         data: ManagerWsCounterMessageClose = {
             "type": "counter",
             "data": {
@@ -581,11 +573,7 @@ class ScannerCounter(CounterInterface):
                 "options": {"clear": clear},
             },
         }
-        await self.__ref.send_data(data)
-
-    @override
-    def close(self: Self, clear: bool = False) -> None:
-        return asyncio.run(self.__close_impl(clear=clear))
+        self.__ref.send_data_sync(data)
 
 
 class EmptyContextManager(AbstractContextManager[None]):
@@ -926,7 +914,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         cfg_filter: Optional[ConfigFilter] = get_config_filters(start_query.filter)
 
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
-            print("add background task")
+            TODO_PRINT_REMOVE("add background task")
             background_tasks.add_task(fn)
 
         result: Optional[str] = backend.scanner.start(
@@ -1211,7 +1199,7 @@ class BackendScanner:
                 ),
             )
         except BaseException as err:
-            print("RUN ASYNC err: ", err)
+            TODO_PRINT_REMOVE("RUN ASYNC err: ", err)
             self.__state.modify_data(
                 lambda d: ScannerThreadState(
                     state={"type": "error", "error": err},
