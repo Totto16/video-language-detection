@@ -58,20 +58,8 @@ class LogLevel(Enum):
         return self.__str__()
 
 
-def __impl_get_logger() -> Logger:
-    return getLogger(__GLOBAL__LOGGER__NAME)
-
-
-__impl_logger_set_up: bool = False
-
-
 def get_logger() -> Logger:
-    logger = __impl_get_logger()
-    if not __impl_logger_set_up:
-        msg = "Logger not setup"
-        raise RuntimeError(msg)
-
-    return logger
+    return getLogger(__GLOBAL__LOGGER__NAME)
 
 
 def setup_global_logger() -> None:
@@ -115,18 +103,13 @@ def add_formatted_handler(
 
 
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
-    global __impl_logger_set_up  # noqa: PLW0603
-    if __impl_logger_set_up:
-        msg = "Logger already setup"
-        raise RuntimeError(msg)
-
     stream = sys.stdout
 
     console_handler = StreamHandler(stream=stream)
 
     setup_global_logger()
 
-    logger = __impl_get_logger()
+    logger = get_logger()
     logger.propagate = False  # don't propagate to the root handler
 
     if logger.hasHandlers():
@@ -136,5 +119,4 @@ def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
     logger.setLevel(level.underlying)
     add_formatted_handler(logger=logger, handler=console_handler, stream=stream)
 
-    __impl_logger_set_up = True
     return logger
