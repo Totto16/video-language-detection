@@ -53,7 +53,7 @@ from content.language_picker import (
 from content.metadata.config import get_metadata_scanner_from_config
 from content.prediction import PredictionBest
 from content.scanner import get_scanner_from_config
-from content.summary import LanguageDict, MetadataDict, Summary
+from content.summary import LanguageDict, MetadataDict, MetadataSubDict, Summary
 from helper.base import (
     AnyType,
     parse_contents,
@@ -960,6 +960,71 @@ class ScannerStateRunning(TypedDict):
 
 type SummaryTuple = tuple[LanguageDict, MetadataDict, ScanSummaryDetailed]
 
+type LongLanguageStr = str
+
+type LanguageDictSerializable = dict[LongLanguageStr, int]
+
+
+class MetadataSubDictSerializable(TypedDict, total=False):
+    ok: int
+    missing: int
+    skipped: int
+
+
+class MetadataDictSerializable(TypedDict, total=False):
+    series: MetadataSubDictSerializable
+    season: MetadataSubDictSerializable
+    episode: MetadataSubDictSerializable
+
+
+class ScanSummaryDetailedSerializable(TypedDict):
+    success: LanguageDictSerializable
+    failure: dict[str, int]
+
+
+class SummaryTupleDict(TypedDict):
+    language: LanguageDictSerializable
+    metadata: MetadataDictSerializable
+    details: ScanSummaryDetailedSerializable
+
+
+def language_dict_to_serializable_data(
+    language_dict: LanguageDict,
+) -> LanguageDictSerializable:
+    return {k.long: v for k, v in language_dict.items()}
+
+
+def scan_summary_detailed_to_serializable_data(
+    obj: ScanSummaryDetailed,
+) -> ScanSummaryDetailedSerializable:
+    return {
+        "success": language_dict_to_serializable_data(obj.success),
+        "failure": obj.failure,
+    }
+
+
+def metadata_sub_dict_to_serializable_data(
+    obj: MetadataSubDict,
+) -> MetadataSubDictSerializable:
+    return cast(MetadataSubDictSerializable, {k.value: v for k, v in obj.items()})
+
+
+def metadata_dict_to_serializable_data(
+    obj: MetadataDict,
+) -> MetadataDictSerializable:
+    return cast(
+        MetadataDictSerializable,
+        {k.value: metadata_sub_dict_to_serializable_data(v) for k, v in obj.items()},
+    )
+
+
+def summary_tuple_to_serializable_data(summary: SummaryTuple) -> SummaryTupleDict:
+    return {
+        "language": language_dict_to_serializable_data(summary[0]),
+        "metadata": metadata_dict_to_serializable_data(summary[1]),
+        "details": scan_summary_detailed_to_serializable_data(summary[2]),
+    }
+
 
 class ScannerStateFinished(TypedDict):
     type: Literal["finished"]
@@ -1273,6 +1338,14 @@ class BackendScanner:
         match state.state["type"]:
             case "error":
                 return {"state": "error", "error": str(state.state["error"])}
+            case "finished":
+                return {
+                    "state": "finished",
+                    "result": [
+                        summary_tuple_to_serializable_data(item)
+                        for item in state.state["result"]
+                    ],
+                }
             case _:
                 return cast(dict[str, Any], state.state)
 
