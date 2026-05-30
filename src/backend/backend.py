@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Coroutine
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from logging import Handler, LogRecord, Logger
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -61,6 +62,7 @@ from helper.base import (
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
 from helper.config import ConfigFilter, ConfigFilterItem, FinalConfig, filter_configs
 from helper.devices import DeviceManager
+from helper.log import add_formatted_handler, get_logger
 from helper.manager import (
     CounterInterface,
     CounterOptions,
@@ -197,8 +199,8 @@ class ScanManager(WebsocketHandler):
         return await self.__process_data(typed_data)
 
 
-class ManagerWsGlobalMessageGeneric[D](TypedDict, total=True):
-    type: Literal["global"]
+class ManagerWsGlobalCounterMessageGeneric[D](TypedDict, total=True):
+    type: Literal["global_counter"]
     data: D
 
 
@@ -206,7 +208,7 @@ class ManagerWsGlobalMessageStopData(TypedDict, total=True):
     type: Literal["stop"]
 
 
-ManagerWsGlobalMessageStop = ManagerWsGlobalMessageGeneric[
+ManagerWsGlobalCounterMessageStop = ManagerWsGlobalCounterMessageGeneric[
     ManagerWsGlobalMessageStopData
 ]
 
@@ -232,11 +234,13 @@ class ManagerWsGlobalMessageCounterData(TypedDict, total=True):
     idx: int
 
 
-ManagerWsGlobalMessageCounter = ManagerWsGlobalMessageGeneric[
+ManagerWsGlobalCounterMessageCounter = ManagerWsGlobalCounterMessageGeneric[
     ManagerWsGlobalMessageCounterData
 ]
 
-ManagerWsGlobalMessage = ManagerWsGlobalMessageStop | ManagerWsGlobalMessageCounter
+ManagerWsGlobalCounterMessage = (
+    ManagerWsGlobalCounterMessageStop | ManagerWsGlobalCounterMessageCounter
+)
 
 
 class ManagerWsCounterMessageGeneric[D](TypedDict, total=True):
@@ -506,8 +510,33 @@ ManagerWsChoiceMessage = (
     ManagerWsChoiceMessageAskQuestion | ManagerWsChoiceMessageQuestionReplyReceived
 )
 
+
+class ManagerWsLogMessageGeneric[D](TypedDict, total=True):
+    type: Literal["log"]
+    data: D
+
+
+type LogLevelStr = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]
+
+
+class ManagerWsLogMessageEventData(TypedDict, total=True):
+    type: Literal["event"]
+    level: LogLevelStr
+    message: str
+
+
+ManagerWsLogMessageEvent = ManagerWsLogMessageGeneric[ManagerWsLogMessageEventData]
+
+ManagerWsLogMessage = ManagerWsLogMessageEvent
+
+ManagerWsStatusMessage = int  # TODO
+
 OutgoingWsData = (
-    ManagerWsGlobalMessage | ManagerWsCounterMessage | ManagerWsChoiceMessage
+    ManagerWsGlobalCounterMessage
+    | ManagerWsCounterMessage
+    | ManagerWsChoiceMessage
+    | ManagerWsLogMessage
+    | ManagerWsStatusMessage
 )
 
 
@@ -722,8 +751,8 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
                 "type": "status_bar",
                 "options": serializable_options2,
             }
-        data: ManagerWsGlobalMessageCounter = {
-            "type": "global",
+        data: ManagerWsGlobalCounterMessageCounter = {
+            "type": "global_counter",
             "data": {"type": "counter", "counter": instance_serializable, "idx": idx},
         }
         self.send_data_sync(data)
@@ -748,7 +777,10 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
     def stop(
         self: Self,
     ) -> None:
-        data: ManagerWsGlobalMessageStop = {"type": "global", "data": {"type": "stop"}}
+        data: ManagerWsGlobalCounterMessageStop = {
+            "type": "global_counter",
+            "data": {"type": "stop"},
+        }
         self.send_data_sync(data)
 
     @override
@@ -1119,12 +1151,95 @@ class ScannerThreadState:
     thread: Optional[ThreadState]
 
 
+type ThreadId = int
+
+
+class ThreadHandler(Handler):
+    __send: Callable[[ManagerWsLogMessageEventData], None]
+    __thread_id: ThreadId
+
+    def __init__(
+        self: Self,
+        send: Callable[[ManagerWsLogMessageEventData], None],
+        thread_id: ThreadId,
+    ) -> None:
+        super().__init__()
+        self.__send = send
+        self.__thread_id = thread_id
+
+    def emit(self, record: LogRecord) -> None:
+        if threading.current_thread().native_id != self.__thread_id:
+            return
+        try:
+
+            msg = self.format(record)
+            message: ManagerWsLogMessageEventData = {
+                "type": "event",
+                "level": cast(LogLevelStr, record.levelname),
+                "message": msg,
+            }
+            self.__send(message)
+
+        except RecursionError:
+            raise
+        except Exception:  # noqa: BLE001
+            self.handleError(record)
+
+
+class ThreadLoggerCtx(AbstractContextManager[Logger]):
+    __handlers: Optional[list[Handler]]
+    __send: Callable[[ManagerWsLogMessage], None]
+    __thread_id: ThreadId
+
+    def __init__(
+        self: Self, send: Callable[[ManagerWsLogMessage], None], thread_id: ThreadId
+    ) -> None:
+        super().__init__()
+        self.__handlers = None
+        self.__send = send
+        self.__thread_id = thread_id
+
+    @override
+    def __enter__(self: Self) -> Logger:
+        logger = get_logger()
+        self.__handlers = logger.handlers
+
+        logger.handlers = []
+
+        def send(data: ManagerWsLogMessageEventData) -> None:
+            message: ManagerWsLogMessage = {"type": "log", "data": data}
+            self.__send(message)
+
+        thread_handler = ThreadHandler(send=send, thread_id=self.__thread_id)
+
+        add_formatted_handler(logger=logger, handler=thread_handler, stream=None)
+
+        return logger
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        if self.__handlers is not None:
+            logger = get_logger()
+            logger.handlers = self.__handlers
+            self.__handlers = None
+
+        return False
+
+
 def run_in_thread(
     self: "BackendScanner",
     configs: list[FinalConfig],
     event: asyncio.Event,
 ) -> None:
-    asyncio.run(self.start_run_async(configs))
+
+    with self.thread_logger():
+        asyncio.run(self.start_run_async(configs))
+
     event.set()
 
 
@@ -1246,6 +1361,22 @@ class BackendScanner:
             result.append(summary)
 
         return result
+
+    def thread_logger(self: Self) -> ThreadLoggerCtx:
+
+        def send_log_data(data: ManagerWsLogMessage) -> None:
+            self.__manager.send_data_sync(data)
+
+        thread_id: Optional[int] = threading.current_thread().native_id
+
+        if thread_id is None:
+            msg = "Thread Id is undefined, how could this happen?"
+            raise RuntimeError(msg)
+
+        return ThreadLoggerCtx(
+            send=send_log_data,
+            thread_id=thread_id,
+        )
 
     async def start_run_async(
         self: Self,

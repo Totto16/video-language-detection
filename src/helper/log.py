@@ -2,11 +2,13 @@ import logging
 import os
 import sys
 from enum import Enum
-from logging import Logger, StreamHandler, getLogger
-from typing import Optional, Self, assert_never
+from logging import Handler, Logger, StreamHandler, getLogger
+from typing import IO, Optional, Self, assert_never
 from warnings import filterwarnings
 
 import colorlog
+
+__all__: list[str] = ["add_formatted_handler", "get_logger"]
 
 __GLOBAL__LOGGER__NAME = "__global__logger__"
 
@@ -56,8 +58,20 @@ class LogLevel(Enum):
         return self.__str__()
 
 
-def get_logger() -> Logger:
+def __impl_get_logger() -> Logger:
     return getLogger(__GLOBAL__LOGGER__NAME)
+
+
+__impl_logger_set_up: bool = False
+
+
+def get_logger() -> Logger:
+    logger = __impl_get_logger()
+    if not __impl_logger_set_up:
+        msg = "Logger not setup"
+        raise RuntimeError(msg)
+
+    return logger
 
 
 def setup_global_logger() -> None:
@@ -75,7 +89,11 @@ def setup_global_logger() -> None:
     os.environ["MIOPEN_LOG_LEVEL"] = "3"
 
 
-def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
+def add_formatted_handler(
+    logger: Logger,
+    handler: Handler,
+    stream: Optional[IO[str]] = None,
+) -> None:
     formatter = colorlog.ColoredFormatter(
         fmt="%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(green)s%(module)s%(reset)s - %(message)s",
         log_colors={
@@ -85,14 +103,30 @@ def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
             "ERROR": "red",
             "CRITICAL": "bold_purple",
         },
+        stream=stream,
+        reset=True,
+        style="%",
+        no_color=stream is None,
     )
 
-    console_handler = StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
+    handler.setFormatter(formatter)
+
+    logger.addHandler(hdlr=handler)
+
+
+def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
+    global __impl_logger_set_up  # noqa: PLW0603
+    if __impl_logger_set_up:
+        msg = "Logger already setup"
+        raise RuntimeError(msg)
+
+    stream = sys.stdout
+
+    console_handler = StreamHandler(stream=stream)
 
     setup_global_logger()
 
-    logger = get_logger()
+    logger = __impl_get_logger()
     logger.propagate = False  # don't propagate to the root handler
 
     if logger.hasHandlers():
@@ -100,5 +134,7 @@ def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
         raise RuntimeError(msg)
 
     logger.setLevel(level.underlying)
-    logger.addHandler(hdlr=console_handler)
+    add_formatted_handler(logger=logger, handler=console_handler, stream=stream)
+
+    __impl_logger_set_up = True
     return logger
