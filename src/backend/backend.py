@@ -31,6 +31,7 @@ from fastapi import (
     Query,
     Response,
     WebSocket,
+    WebSocketDisconnect,
 )
 from fastapi.responses import JSONResponse
 
@@ -121,7 +122,8 @@ class WebsocketHandler(ABC):
                         await self.send_data(result.get_ok())
                     else:
                         await self.send_error(result.get_err())
-
+            except WebSocketDisconnect:
+                return
             except RuntimeError as err:
                 await self.__ws.send_json({"type": "error", "error": str(err)})
 
@@ -143,13 +145,16 @@ class ScanManager(WebsocketHandler):
     __parent_ref: "ScannerManager"
 
     def __init__(
-        self: Self, parent_ref: "ScannerManager", websocket: WebSocket,
+        self: Self,
+        parent_ref: "ScannerManager",
+        websocket: WebSocket,
     ) -> None:
         super().__init__(websocket=websocket)
         self.__parent_ref = parent_ref
 
     async def __process_data(
-        self: Self, data: IncomingWsData | dict[str, Any],
+        self: Self,
+        data: IncomingWsData | dict[str, Any],
     ) -> Optional[ProcessResultTyped]:
         match data["type"]:
             case "reply":
@@ -375,7 +380,8 @@ def prediction_best_to_serializable_data(data: PredictionBest) -> PredictionBest
 
 def deserialize_prediction_best(data: PredictionBestDict) -> PredictionBest:
     return PredictionBest(
-        accuracy=data["accuracy"], language=deserialize_language(data["language"]),
+        accuracy=data["accuracy"],
+        language=deserialize_language(data["language"]),
     )
 
 
@@ -634,6 +640,32 @@ class ReplyData:
     data: None | Any
 
 
+class ManagerCtx(AbstractContextManager[ScanManager]):
+    __manager: ScanManager
+    __remove_fn: Callable[[], None]
+
+    def __init__(
+        self: Self, manager: ScanManager, remove_fn: Callable[[], None]
+    ) -> None:
+        super().__init__()
+        self.__manager = manager
+        self.__remove_fn = remove_fn
+
+    @override
+    def __enter__(self: Self) -> ScanManager:
+        return self.__manager
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        self.__remove_fn()
+        return False
+
+
 class ScannerManager(ManagerInterface, ChoiceManagerInterface):
     __instances: list[ScanManager]
     __counters: list[CounterType]
@@ -647,10 +679,14 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
         self.__loop = loop
         self.__reply_ids = {}
 
-    def add(self: Self, websocket: WebSocket) -> ScanManager:
+    def ctx(self: Self, websocket: WebSocket) -> ManagerCtx:
         manager = ScanManager(self, websocket)
         self.__instances.append(manager)
-        return manager
+
+        def remove_fn() -> None:
+            self.__instances.remove(manager)
+
+        return ManagerCtx(manager=manager, remove_fn=remove_fn)
 
     async def send_data(self: Self, data: OutgoingWsData) -> None:
         futures: list[Coroutine[Any, Any, None]] = [
@@ -742,7 +778,7 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
         return WSChoiceSeparator()
 
     @override
-    def ctx(
+    def picker_ctx(
         self: Self,
     ) -> AbstractContextManager[None]:
         return EmptyContextManager()
@@ -814,7 +850,9 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
         return future.result()
 
     def process_ask_question_reply(
-        self: Self, result: Optional[SelectResult], id: uuid.UUID,
+        self: Self,
+        result: Optional[SelectResult],
+        id: uuid.UUID,
     ) -> Optional[str]:
         reply_data = self.__reply_ids.get(id, None)
         if reply_data is None:
@@ -876,8 +914,8 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         backend: Annotated[Backend, Depends(retreive_backend)],
     ) -> None:
         await websocket.accept()
-        manager = backend.scanner.add_manager(websocket)
-        await manager.process()
+        with backend.scanner.manager_ctx(websocket) as manager:
+            await manager.process()
 
     @app.get("/scan/start")
     async def scan_start(
@@ -1054,8 +1092,8 @@ class BackendScanner:
             ScannerThreadState(state={"type": "idle"}, thread=None),
         )
 
-    def add_manager(self: Self, websocket: WebSocket) -> ScanManager:
-        return self.__manager.add(websocket)
+    def manager_ctx(self: Self, websocket: WebSocket) -> ManagerCtx:
+        return self.__manager.ctx(websocket)
 
     async def __launch_scanner_in_background(
         self: Self,
@@ -1267,7 +1305,7 @@ class Backend:
         self.__scanner = BackendScanner(configs=configs, loop=loop)
         self.__ready = asyncio.Event()
 
-        app = FastAPI(dependencies=[Depends(self.ready)])
+        app = FastAPI(dependencies=[Depends(self.ready)], strict_content_type=True)
         register_routes(app, BackendRef(backend=self))
 
         config = uvicorn.Config(

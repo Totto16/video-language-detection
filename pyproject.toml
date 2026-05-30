@@ -117,3 +117,7 @@ module = [
     "amdsmi.*",
 ]
 follow_untyped_imports = true
+
+
+[tool.fastapi]
+entrypoint = "backend:app"
