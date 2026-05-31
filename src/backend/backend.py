@@ -147,12 +147,12 @@ IncomingWsData = ManagerWsChoiceMessageAskQuestionReply
 ProcessResultTyped = Result["OutgoingWsData", str]
 
 
-class ScanManager(WebsocketHandler):
-    __parent_ref: "ScannerManager"
+class WsSingleManager(WebsocketHandler):
+    __parent_ref: "WsManager"
 
     def __init__(
         self: Self,
-        parent_ref: "ScannerManager",
+        parent_ref: "WsManager",
         websocket: WebSocket,
     ) -> None:
         super().__init__(websocket=websocket)
@@ -543,10 +543,10 @@ OutgoingWsData = (
 
 
 class ScannerStatusBar(StatusBarInterface):
-    __ref: "ScannerManager"
+    __ref: "WsManager"
     __idx: int
 
-    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
+    def __init__(self: Self, ref: "WsManager", idx: int) -> None:
         super().__init__()
         self.__ref = ref
         self.__idx = idx
@@ -568,10 +568,10 @@ class ScannerStatusBar(StatusBarInterface):
 
 
 class ScannerCounter(CounterInterface):
-    __ref: "ScannerManager"
+    __ref: "WsManager"
     __idx: int
 
-    def __init__(self: Self, ref: "ScannerManager", idx: int) -> None:
+    def __init__(self: Self, ref: "WsManager", idx: int) -> None:
         super().__init__()
         self.__ref = ref
         self.__idx = idx
@@ -659,19 +659,19 @@ class ReplyData:
     data: None | Any
 
 
-class ManagerCtx(AbstractContextManager[ScanManager]):
-    __manager: ScanManager
+class ManagerCtx(AbstractContextManager[WsSingleManager]):
+    __manager: WsSingleManager
     __remove_fn: Callable[[], None]
 
     def __init__(
-        self: Self, manager: ScanManager, remove_fn: Callable[[], None]
+        self: Self, manager: WsSingleManager, remove_fn: Callable[[], None]
     ) -> None:
         super().__init__()
         self.__manager = manager
         self.__remove_fn = remove_fn
 
     @override
-    def __enter__(self: Self) -> ScanManager:
+    def __enter__(self: Self) -> WsSingleManager:
         return self.__manager
 
     @override
@@ -685,8 +685,8 @@ class ManagerCtx(AbstractContextManager[ScanManager]):
         return False
 
 
-class ScannerManager(ManagerInterface, ChoiceManagerInterface):
-    __instances: list[ScanManager]
+class WsManager(ManagerInterface, ChoiceManagerInterface):
+    __instances: list[WsSingleManager]
     __counters: list[CounterType]
     __loop: asyncio.AbstractEventLoop
     __reply_ids: dict[uuid.UUID, ReplyData]
@@ -699,7 +699,7 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
         self.__reply_ids = {}
 
     def ctx(self: Self, websocket: WebSocket) -> ManagerCtx:
-        manager = ScanManager(self, websocket)
+        manager = WsSingleManager(self, websocket)
         self.__instances.append(manager)
 
         def remove_fn() -> None:
@@ -822,11 +822,11 @@ class ScannerManager(ManagerInterface, ChoiceManagerInterface):
     ) -> Optional[SelectResult]:
 
         choices_impl = [
-            choice_to_serializable_data(ScannerManager.__get_underlying_choice(choice))
+            choice_to_serializable_data(WsManager.__get_underlying_choice(choice))
             for choice in choices
         ]
         default_impl = choice_to_serializable_data(
-            ScannerManager.__get_underlying_choice(default),
+            WsManager.__get_underlying_choice(default),
         )
 
         uid: uuid.UUID = uuid.uuid4()
@@ -930,13 +930,13 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         background_tasks.add_task(shutdown_ignore_result)
         return Response(status_code=200, content="Server shutting down")
 
-    @app.websocket("/scan/managers/ws/")
-    async def scan_manager_ws(
+    @app.websocket("/ws/")
+    async def ws(
         websocket: WebSocket,
         backend: Annotated[Backend, Depends(retreive_backend)],
     ) -> None:
         await websocket.accept()
-        with backend.scanner.manager_ctx(websocket) as manager:
+        with backend.manager.ctx(websocket) as manager:
             await manager.process()
 
     @app.get("/scan/start")
@@ -954,6 +954,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         result: Optional[str] = backend.scanner.start(
             cfg_filter=cfg_filter,
             run_in_background=run_in_background,
+            backend=backend,
         )
 
         if result is not None:
@@ -1248,16 +1249,16 @@ def run_in_thread(
     self: "BackendScanner",
     configs: list[FinalConfig],
     event: asyncio.Event,
+    backend: "Backend",
 ) -> None:
 
-    with self.thread_logger():
-        asyncio.run(self.start_run_async(configs))
+    with backend.thread_logger():
+        asyncio.run(self.start_run_async(configs=configs, backend=backend))
 
     event.set()
 
 
 class BackendScanner:
-    __manager: ScannerManager
     __all_configs: list[FinalConfig]
 
     __state: ThreadSafe[ScannerThreadState]
@@ -1265,16 +1266,11 @@ class BackendScanner:
     def __init__(
         self: Self,
         configs: list[FinalConfig],
-        loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__all_configs = configs
-        self.__manager = ScannerManager(loop=loop)
         self.__state = ThreadSafe[ScannerThreadState](
             ScannerThreadState(state={"type": "idle"}, thread=None),
         )
-
-    def manager_ctx(self: Self, websocket: WebSocket) -> ManagerCtx:
-        return self.__manager.ctx(websocket)
 
     async def __launch_scanner_in_background(
         self: Self,
@@ -1282,7 +1278,7 @@ class BackendScanner:
         name_parser: NameParser,
         all_content_type: AnyType,
         config_paramaters: Optional[tuple[int, int]],
-        manager: ScannerManager,
+        manager: WsManager,
     ) -> SummaryTuple:
         device_manager: DeviceManager = DeviceManager()
 
@@ -1351,7 +1347,7 @@ class BackendScanner:
     async def __start_coroutine(
         self: Self,
         configs: list[FinalConfig],
-        manager: ScannerManager,
+        manager: WsManager,
     ) -> list[SummaryTuple]:
         result: list[SummaryTuple] = []
 
@@ -1375,30 +1371,15 @@ class BackendScanner:
 
         return result
 
-    def thread_logger(self: Self) -> ThreadLoggerCtx:
-
-        def send_log_data(data: ManagerWsLogMessage) -> None:
-            self.__manager.send_data_sync(data)
-
-        thread_id: Optional[int] = threading.current_thread().native_id
-
-        if thread_id is None:
-            msg = "Thread Id is undefined, how could this happen?"
-            raise RuntimeError(msg)
-
-        return ThreadLoggerCtx(
-            send=send_log_data,
-            thread_id=thread_id,
-        )
-
     async def start_run_async(
         self: Self,
         configs: list[FinalConfig],
+        backend: "Backend",
     ) -> None:
         try:
             result: list[SummaryTuple] = await self.__start_coroutine(
                 configs=configs,
-                manager=self.__manager,
+                manager=backend.manager,
             )
 
             self.__state.modify_data(
@@ -1420,6 +1401,7 @@ class BackendScanner:
         self: Self,
         configs: list[FinalConfig],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
+        backend: "Backend",
     ) -> Optional[str]:
 
         with self.__state.ctx() as ctx:
@@ -1431,7 +1413,7 @@ class BackendScanner:
 
             thread = threading.Thread(
                 target=run_in_thread,
-                args=(self, configs, event),
+                args=(self, configs, event, backend.manager),
             )
 
             new_state: ScannerThreadState = ScannerThreadState(
@@ -1462,17 +1444,20 @@ class BackendScanner:
         self: Self,
         cfg_filter: Optional[ConfigFilter],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
+        backend: "Backend",
     ) -> Optional[str]:
         if cfg_filter is None:
             return self.__start_impl(
                 configs=self.__all_configs,
                 run_in_background=run_in_background,
+                backend=backend,
             )
         try:
             configs = filter_configs(configs=self.__all_configs, cfg_filter=cfg_filter)
             return self.__start_impl(
                 configs=configs,
                 run_in_background=run_in_background,
+                backend=backend,
             )
         except RuntimeError as err:
             raise HTTPException(status_code=400, detail=str(err)) from None
@@ -1499,6 +1484,7 @@ class Backend:
     __server: uvicorn.Server
     __ready: asyncio.Event
     __scanner: BackendScanner
+    __manager: WsManager
 
     def __init__(
         self: Self,
@@ -1507,7 +1493,8 @@ class Backend:
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__options = options
-        self.__scanner = BackendScanner(configs=configs, loop=loop)
+        self.__manager = WsManager(loop=loop)
+        self.__scanner = BackendScanner(configs=configs)
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)], strict_content_type=True)
@@ -1540,6 +1527,26 @@ class Backend:
     @property
     def scanner(self: Self) -> BackendScanner:
         return self.__scanner
+
+    @property
+    def manager(self: Self) -> WsManager:
+        return self.__manager
+
+    def thread_logger(self: Self) -> ThreadLoggerCtx:
+
+        def send_log_data(data: ManagerWsLogMessage) -> None:
+            self.__manager.send_data_sync(data)
+
+        thread_id: Optional[int] = threading.current_thread().native_id
+
+        if thread_id is None:
+            msg = "Thread Id is undefined, how could this happen?"
+            raise RuntimeError(msg)
+
+        return ThreadLoggerCtx(
+            send=send_log_data,
+            thread_id=thread_id,
+        )
 
     def shutdown_app(self: Self, timeout: float) -> bool:
         try:
