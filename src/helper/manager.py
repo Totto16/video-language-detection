@@ -86,11 +86,11 @@ class CounterInterface(ABC):
 
     # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.update
     @abstractmethod
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None: ...
+    def update(self: Self, incr: NumberLike = 1, *, force: bool = False) -> None: ...
 
     # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.Counter.close
     @abstractmethod
-    def close(self: Self, clear: bool = False) -> None: ...
+    def close(self: Self, *, clear: bool = False) -> None: ...
 
 
 class ManagerInterface(ABC):
@@ -150,11 +150,11 @@ class TuiCounter(CounterInterface):
         self.__impl = impl
 
     @override
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
+    def update(self: Self, incr: NumberLike = 1, *, force: bool = False) -> None:
         return self.__impl.update(incr=incr, force=force)
 
     @override
-    def close(self: Self, clear: bool = False) -> None:
+    def close(self: Self, *, clear: bool = False) -> None:
         return self.__impl.close(clear=clear)
 
 

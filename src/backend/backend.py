@@ -596,7 +596,7 @@ class ScannerCounter(CounterInterface):
         self.__idx = idx
 
     @override
-    def update(self: Self, incr: NumberLike = 1, force: bool = False) -> None:
+    def update(self: Self, incr: NumberLike = 1, *, force: bool = False) -> None:
         data: ManagerWsCounterMessageUpdate = {
             "type": "counter",
             "data": {
@@ -614,7 +614,7 @@ class ScannerCounter(CounterInterface):
         self.__ref.send_data_sync(data)
 
     @override
-    def close(self: Self, clear: bool = False) -> None:
+    def close(self: Self, *, clear: bool = False) -> None:
         data: ManagerWsCounterMessageClose = {
             "type": "counter",
             "data": {
@@ -1101,7 +1101,9 @@ class ThreadSafeAcquired[A]:
     __set_impl: Callable[[A], None]
 
     def __init__(
-        self: Self, get_fn: Callable[[], A], set_fn: Callable[[A], None]
+        self: Self,
+        get_fn: Callable[[], A],
+        set_fn: Callable[[A], None],
     ) -> None:
         self.__get_impl = get_fn
         self.__set_impl = set_fn
@@ -1401,8 +1403,12 @@ class BackendScanner:
         backend: "Backend",
     ) -> None:
 
-        previous: ScannersStateStr
-        new: ScannersStateStr
+        def on_status_change(previous: ScannersStateStr, new: ScannersStateStr) -> None:
+            data: ManagerWsScannerMessageStatusChanged = {
+                "type": "scanner",
+                "data": {"type": "status_changed", "previous": previous, "new": new},
+            }
+            backend.manager.send_data_sync(data)
 
         try:
             result: list[SummaryTuple] = await self.__start_coroutine(
@@ -1411,10 +1417,7 @@ class BackendScanner:
             )
 
             def mod(d: ScannerThreadState) -> ScannerThreadState:
-                nonlocal previous
-                nonlocal new
-                previous = d.state["type"]
-                new = "finished"
+                on_status_change(d.state["type"], "finished")
                 return ScannerThreadState(
                     state={"type": "finished", "result": result},
                     thread=d.thread,
@@ -1429,10 +1432,7 @@ class BackendScanner:
             ) -> Callable[[ScannerThreadState], ScannerThreadState]:
 
                 def mod(d: ScannerThreadState) -> ScannerThreadState:
-                    nonlocal previous
-                    nonlocal new
-                    previous = d.state["type"]
-                    new = "error"
+                    on_status_change(d.state["type"], "error")
                     return ScannerThreadState(
                         state={"type": "error", "error": err},
                         thread=d.thread,
@@ -1441,12 +1441,6 @@ class BackendScanner:
                 return mod
 
             self.__state.modify_data(mod_helper(err))
-        finally:
-            data: ManagerWsScannerMessageStatusChanged = {
-                "type": "scanner",
-                "data": {"type": "status_changed", "previous": previous, "new": new},
-            }
-            await backend.manager.send_data(data)
 
     def __start_impl(
         self: Self,
