@@ -2,8 +2,8 @@ import logging
 import os
 import sys
 from enum import Enum
-from logging import Handler, Logger, StreamHandler, getLogger
-from typing import IO, Optional, Self, assert_never
+from logging import Logger, StreamHandler, getLogger
+from typing import Optional, Self, assert_never
 from warnings import filterwarnings
 
 import colorlog

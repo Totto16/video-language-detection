@@ -82,10 +82,6 @@ if TYPE_CHECKING:
     from content.metadata.scanner import MetadataScanner
 
 
-# TODO: remove
-TODO_PRINT_REMOVE = print
-
-
 class BackendRef:
     __backend: "Backend"
 
@@ -134,6 +130,7 @@ class WebsocketHandler(ABC):
                 await self.__ws.send_json({"type": "error", "error": str(err)})
 
 
+# TODO: use pydantic instead of TYpeDicts everywhere
 class ManagerWsChoiceMessageAskQuestionReply(TypedDict, total=True):
     type: Literal["reply"]
     reply: Literal["ask_question"]
@@ -531,14 +528,34 @@ ManagerWsLogMessageEvent = ManagerWsLogMessageGeneric[ManagerWsLogMessageEventDa
 
 ManagerWsLogMessage = ManagerWsLogMessageEvent
 
-ManagerWsStatusMessage = int  # TODO
+
+class ManagerWsScannerMessageGeneric[D](TypedDict, total=True):
+    type: Literal["scanner"]
+    data: D
+
+
+type ScannersStateStr = Literal["idle", "running", "finished", "error"]
+
+
+class ManagerWsScannerMessageStatusChangedData(TypedDict, total=True):
+    type: Literal["status_changed"]
+    previous: ScannersStateStr
+    new: ScannersStateStr
+
+
+ManagerWsScannerMessageStatusChanged = ManagerWsScannerMessageGeneric[
+    ManagerWsScannerMessageStatusChangedData
+]
+
+
+ManagerWsScannerMessage = ManagerWsScannerMessageStatusChanged
 
 OutgoingWsData = (
     ManagerWsGlobalCounterMessage
     | ManagerWsCounterMessage
     | ManagerWsChoiceMessage
     | ManagerWsLogMessage
-    | ManagerWsStatusMessage
+    | ManagerWsScannerMessage
 )
 
 
@@ -948,7 +965,6 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         cfg_filter: Optional[ConfigFilter] = get_config_filters(start_query.filter)
 
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
-            TODO_PRINT_REMOVE("add background task")
             background_tasks.add_task(fn)
 
         result: Optional[str] = backend.scanner.start(
@@ -1198,7 +1214,9 @@ class ThreadLoggerCtx(AbstractContextManager[Logger]):
     __thread_id: ThreadId
 
     def __init__(
-        self: Self, send: Callable[[ManagerWsLogMessage], None], thread_id: ThreadId
+        self: Self,
+        send: Callable[[ManagerWsLogMessage], None],
+        thread_id: ThreadId,
     ) -> None:
         super().__init__()
         self.__handlers = None
@@ -1376,26 +1394,46 @@ class BackendScanner:
         configs: list[FinalConfig],
         backend: "Backend",
     ) -> None:
+
+        previous: ScannersStateStr
+        new: ScannersStateStr
+
         try:
             result: list[SummaryTuple] = await self.__start_coroutine(
                 configs=configs,
                 manager=backend.manager,
             )
 
-            self.__state.modify_data(
-                lambda d: ScannerThreadState(
+            def mod(d: ScannerThreadState) -> ScannerThreadState:
+                nonlocal previous
+                nonlocal new
+                previous = d.state["type"]
+                new = "finished"
+                return ScannerThreadState(
                     state={"type": "finished", "result": result},
                     thread=d.thread,
-                ),
-            )
+                )
+
+            self.__state.modify_data(mod)
         except BaseException as err:
-            TODO_PRINT_REMOVE("RUN ASYNC err: ", err)
-            self.__state.modify_data(
-                lambda d: ScannerThreadState(
+
+            def mod(d: ScannerThreadState) -> ScannerThreadState:
+                nonlocal previous
+                nonlocal new
+                previous = d.state["type"]
+                new = "error"
+                return ScannerThreadState(
                     state={"type": "error", "error": err},
                     thread=d.thread,
-                ),
-            )
+                )
+
+            self.__state.modify_data(mod)
+        finally:
+            data: ManagerWsScannerMessageStatusChanged = {
+                "type": "scanner",
+                "data": {"type": "status_changed", "previous": previous, "new": new},
+            }
+            await backend.manager.send_data(data)
 
     def __start_impl(
         self: Self,
@@ -1430,6 +1468,7 @@ class BackendScanner:
                     # cleanup the thread
                     if state.thread is not None:
                         await state.thread.event.wait()
+                        # NOTE: now ManagerWsScannerMessageStatusChanged message needed, as no state is changed, only the internal thread
                         ctx.modify(
                             lambda d: ScannerThreadState(state=d.state, thread=None),
                         )
@@ -1437,6 +1476,15 @@ class BackendScanner:
             run_in_background(start_and_wait_for_thread)
 
             ctx.set(new_state)
+            data: ManagerWsScannerMessageStatusChanged = {
+                "type": "scanner",
+                "data": {
+                    "type": "status_changed",
+                    "previous": state.state["type"],
+                    "new": new_state.state["type"],
+                },
+            }
+            backend.manager.send_data_sync(data)
 
         return None
 
@@ -1462,6 +1510,7 @@ class BackendScanner:
         except RuntimeError as err:
             raise HTTPException(status_code=400, detail=str(err)) from None
 
+    # TODO: type correctly
     def status(self: Self) -> dict[str, Any]:
         state = self.__state.get_data()
         match state.state["type"]:
