@@ -168,10 +168,12 @@ class WsSingleManager(WebsocketHandler):
                             if data["result"] is None
                             else deserialize_select_result(data["result"])
                         )
-                        id: uuid.UUID = uuid.UUID(data["id"])
-                        result = self.__parent_ref.process_ask_question_reply(
-                            res_data,
-                            id,
+                        unique_id: uuid.UUID = uuid.UUID(data["id"])
+                        result: Optional[str] = (
+                            self.__parent_ref.process_ask_question_reply(
+                                result=res_data,
+                                unique_id=unique_id,
+                            )
                         )
                         if result is None:
                             response: ManagerWsChoiceMessageQuestionReplyReceived = {
@@ -681,7 +683,9 @@ class ManagerCtx(AbstractContextManager[WsSingleManager]):
     __remove_fn: Callable[[], None]
 
     def __init__(
-        self: Self, manager: WsSingleManager, remove_fn: Callable[[], None]
+        self: Self,
+        manager: WsSingleManager,
+        remove_fn: Callable[[], None],
     ) -> None:
         super().__init__()
         self.__manager = manager
@@ -824,7 +828,7 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
 
     @staticmethod
     def __get_underlying_choice(choice: ChoiceInterface) -> WSChoice:
-        if isinstance(choice, WSChoiceChoice) or isinstance(choice, WSChoiceSeparator):
+        if isinstance(choice, (WSChoiceChoice, WSChoiceSeparator)):
             return choice
 
         msg = "Implementation Error: used wrong choices with wrong choices manager!"
@@ -891,9 +895,9 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
     def process_ask_question_reply(
         self: Self,
         result: Optional[SelectResult],
-        id: uuid.UUID,
+        unique_id: uuid.UUID,
     ) -> Optional[str]:
-        reply_data = self.__reply_ids.get(id, None)
+        reply_data = self.__reply_ids.get(unique_id, None)
         if reply_data is None:
             return "Error: reply not present or already answered!"
 
@@ -1096,7 +1100,9 @@ class ThreadSafeAcquired[A]:
     __get_impl: Callable[[], A]
     __set_impl: Callable[[A], None]
 
-    def __init__(self: Self, get_fn: Callable[[], A], set_fn: Callable[[A], None]):
+    def __init__(
+        self: Self, get_fn: Callable[[], A], set_fn: Callable[[A], None]
+    ) -> None:
         self.__get_impl = get_fn
         self.__set_impl = set_fn
 
@@ -1415,19 +1421,26 @@ class BackendScanner:
                 )
 
             self.__state.modify_data(mod)
-        except BaseException as err:
+        except BaseException as err:  # noqa: BLE001
 
-            def mod(d: ScannerThreadState) -> ScannerThreadState:
-                nonlocal previous
-                nonlocal new
-                previous = d.state["type"]
-                new = "error"
-                return ScannerThreadState(
-                    state={"type": "error", "error": err},
-                    thread=d.thread,
-                )
+            # this indirection if for ruff, that doesn't recognize, that if i just define mod, err is captured and usable, mypy does recognize it :)
+            def mod_helper(
+                err: BaseException,
+            ) -> Callable[[ScannerThreadState], ScannerThreadState]:
 
-            self.__state.modify_data(mod)
+                def mod(d: ScannerThreadState) -> ScannerThreadState:
+                    nonlocal previous
+                    nonlocal new
+                    previous = d.state["type"]
+                    new = "error"
+                    return ScannerThreadState(
+                        state={"type": "error", "error": err},
+                        thread=d.thread,
+                    )
+
+                return mod
+
+            self.__state.modify_data(mod_helper(err))
         finally:
             data: ManagerWsScannerMessageStatusChanged = {
                 "type": "scanner",
