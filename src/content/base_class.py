@@ -221,7 +221,7 @@ class LanguageScanner:
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
         *,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> Optional[Language]:
         try:
             wav_file = WAVFile(scanned_file.path)
@@ -257,7 +257,7 @@ class LanguageScanner:
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
         *,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> Language:
         language = self.get_language(scanned_file, language_picker, manager=manager)
 
@@ -399,7 +399,9 @@ def process_folder(
 
     #  total, processing, ignored
     amount: StartAmount = StartAmount(
-        total=len(temp) + ignored, processing=len(temp), ignored=ignored,
+        total=len(temp) + ignored,
+        processing=len(temp),
+        ignored=ignored,
     )
 
     callback.start(amount, directory.name, parent_folders, value)

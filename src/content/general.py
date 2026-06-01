@@ -15,7 +15,7 @@ from apischema import schema
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
-from helper.manager import ManagerInterface
+from helper.manager import CounterInterface, ManagerInterface
 
 
 class ScannedFileType(Enum):
@@ -116,32 +116,31 @@ class Stats:
     mtime: float
 
     @staticmethod
-    def hash_file(file_path: Path, manager: Optional[ManagerInterface] = None) -> str:
+    def hash_file(file_path: Path, manager: ManagerInterface) -> str:
         if file_path.is_dir():
             msg = "Can't take checksum of directory"
             raise RuntimeError(msg)
         size: float = float(file_path.stat().st_size)
-        bar: Optional[Any] = None
-        if manager is not None:
-            bar = manager.counter(
-                total=size,
-                desc="sha256 checksum",
-                unit="B",
-                leave=False,
-                bar_format=CHECKSUM_BAR_FORMAT,
-                color="red",
-            )
-            bar.update(0, force=True)
+
+        bar: CounterInterface = manager.counter(
+            total=size,
+            desc="sha256 checksum",
+            unit="B",
+            leave=False,
+            bar_format=CHECKSUM_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
         sha256_hash = sha256()
         with file_path.open(mode="rb") as file:
             # Read and update hash string value in blocks of 4K
             for byte_block in iter(lambda: file.read(4096), b""):
                 sha256_hash.update(byte_block)
-                if bar is not None:
-                    bar.update(float(len(byte_block)))
 
-            if bar is not None:
-                bar.close(clear=True)
+                bar.update(float(len(byte_block)))
+
+            bar.close(clear=True)
 
             return sha256_hash.hexdigest()
 
@@ -151,7 +150,7 @@ class Stats:
         file_type: ScannedFileType,
         *,
         generate_checksum: bool = True,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> "Stats":
         mtime: float = file_path.stat().st_mtime
 
@@ -171,7 +170,7 @@ class Stats:
         self: Self,
         path: Path,
         _type: ScannedFileType,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
@@ -186,7 +185,9 @@ class Stats:
             # update the new mtime, since if we aren't outdated (per checksum), the parent caller will not do it, if we are outdated, he will update it anyway
             self.mtime = new_stats.mtime
 
-            with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)
+            with_checksum: Stats = Stats.from_file(
+                path, _type, generate_checksum=True, manager=manager,
+            )
             return with_checksum.checksum != self.checksum
 
         msg = "Outdated state for directories is not correctly reported by mtime or similar stats, so it isn't possible"
@@ -244,7 +245,7 @@ class ScannedFile:
 
     def generate_checksum(
         self: Self,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> None:
         self.stats = Stats.from_file(
             self.path,
@@ -253,7 +254,7 @@ class ScannedFile:
             manager=manager,
         )
 
-    def is_outdated(self: Self, manager: Optional[ManagerInterface] = None) -> bool:
+    def is_outdated(self: Self, manager: ManagerInterface) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 

@@ -42,7 +42,7 @@ from helper.apischema import OneOf
 from helper.devices import AllocatorType, DeviceManager
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
-from helper.manager import ManagerInterface
+from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Result
 from helper.timestamp import (
     ConfigTimeStamp,
@@ -656,7 +656,7 @@ class WAVFile:
         options: WAVOptions,
         *,
         force_recreation: bool = False,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> WavFile__WavFileResult:
 
         if force_recreation:
@@ -689,12 +689,10 @@ class WAVFile:
     def __convert_to_wav(
         self: Self,
         options: WAVOptions,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> WavFile__WavFileResult:
         if isinstance(self.__status, WavFile):
             return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
-
-        bar: Optional[Any] = None
 
         if not options.segment.is_valid:
             msg = f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}"
@@ -703,17 +701,16 @@ class WAVFile:
         total_time: Timestamp = options.segment.timediff(self.runtime)
         elapsed_time: Timestamp = Timestamp.zero()
 
-        if manager is not None:
-            bar = manager.counter(
-                total=total_time,
-                count=elapsed_time,
-                desc="generating wav",
-                unit="minutes",
-                leave=False,
-                bar_format=WAV_FILE_BAR_FMT,
-                color="red",
-            )
-            bar.update(Timestamp.zero(), force=True)
+        bar: CounterInterface = manager.counter(
+            total=total_time,
+            count=elapsed_time,
+            desc="generating wav",
+            unit="minutes",
+            leave=False,
+            bar_format=WAV_FILE_BAR_FMT,
+            color="red",
+        )
+        bar.update(Timestamp.zero(), force=True)
 
         wav_manager = self.__get_temp_file_manager(options.segment.index)
 
@@ -754,10 +751,10 @@ class WAVFile:
 
             def progress_report(progress: Progress) -> None:
                 nonlocal elapsed_time
-                if bar is not None:
-                    delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
-                    bar.update(delta_time)
-                    elapsed_time += progress.time
+
+                delta_time: Timestamp = Timestamp(progress.time) - elapsed_time
+                bar.update(delta_time)
+                elapsed_time += progress.time
 
             ffmpeg_proc.on("progress", progress_report)
             try:
@@ -765,8 +762,9 @@ class WAVFile:
             except FFmpegError:
                 msg = f"FFmpeg exception in file {self.__file.absolute()}"
                 logger.exception(msg)
-                if bar is not None:
-                    bar.close(clear=True)
+
+                bar.close(clear=True)
+
                 return WavFile__WavFileResult.err(error=())
 
             match self.__status:
@@ -778,8 +776,7 @@ class WAVFile:
                 case _:
                     assert_never(self.__status)
 
-            if bar is not None:
-                bar.close(clear=True)
+            bar.close(clear=True)
 
             return WavFile__WavFileResult.ok(wav_manager.release())
 
@@ -1431,7 +1428,7 @@ class Classifier:
         self: Self,
         wav_file: WAVFile,
         segment: Segment,
-        manager: Optional[ManagerInterface] = None,
+        manager: ManagerInterface,
     ) -> Optional[Prediction]:
         result: WavFile__WavFileResult = wav_file.create_wav_file(
             WAVOptions(bitrate=self.__manager.model.bitrate, segment=segment),
@@ -1473,7 +1470,7 @@ class Classifier:
         wav_file: WAVFile,
         path: Path,
         language_picker: LanguagePicker,
-        manager: Optional[ManagerInterface],
+        manager: ManagerInterface,
     ) -> PredictionBest | PredictionFail:
         if self.__manager.failed_too_often:
             return PredictionFail(PredictionFailReason.failed_too_often, None)
@@ -1515,16 +1512,14 @@ class Classifier:
             [] if scan_nothing else get_segments(wav_file.runtime)
         )
 
-        bar: Optional[Any] = None
-        if manager is not None:
-            bar = manager.counter(
-                total=len(segments),
-                desc="detecting language",
-                unit="fragments",
-                leave=False,
-                color="red",
-            )
-            bar.update(0, force=True)
+        bar: CounterInterface = manager.counter(
+            total=len(segments),
+            desc="detecting language",
+            unit="fragments",
+            leave=False,
+            color="red",
+        )
+        bar.update(0, force=True)
 
         prediction: Prediction = Prediction()
 
@@ -1538,8 +1533,7 @@ class Classifier:
 
             prediction += local_prediction
 
-            if bar is not None:
-                bar.update()
+            bar.update()
 
             amount_scanned = scanned_length / wav_file.runtime
 
@@ -1571,8 +1565,7 @@ class Classifier:
 
         # END OF FOR LOOP (I hate python and significant whitespace, {} would be better)
 
-        if bar is not None:
-            bar.close(clear=True)
+        bar.close(clear=True)
 
         best: Optional[PredictionBest] = prediction.get_best(MeanType.truncated)
 

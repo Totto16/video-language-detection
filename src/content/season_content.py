@@ -97,6 +97,7 @@ class SeasonContent(Content):
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
         # TODO: find duplicates, e.g. simpson s32e10
+        # TODO: also display missing episodes / episodes with the "wrong" language etc
         # should i do that in summary generation or when?
         return Summary.construct_for_season(
             self.metadata,
