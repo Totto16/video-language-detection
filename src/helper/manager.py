@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import (
+    Annotated,
     Any,
     Protocol,
     Self,
@@ -10,10 +12,33 @@ from typing import (
 )
 
 import enlighten
+import pydantic
+import pydantic_core
 
 from helper.translation import get_translator
 
 ManagerJustify = enlighten.Justify
+
+
+class _ImplJustifyEnum(Enum):
+
+    CENTER = "center"
+    LEFT = "ljust"
+    RIGHT = "rjust"
+
+
+class _PydanticJustifyAnnotation:
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+
+        return pydantic_core.core_schema.enum_schema(
+            _ImplJustifyEnum,
+            list(_ImplJustifyEnum.__members__.values()),
+        )
 
 
 _ = get_translator()
@@ -22,7 +47,7 @@ _ = get_translator()
 # see: https://python-enlighten.readthedocs.io/en/stable/api.html#enlighten.StatusBar
 class StatusBarOptions(TypedDict, total=False):
     color: str
-    justify: enlighten.Justify
+    justify: Annotated[enlighten.Justify, _PydanticJustifyAnnotation]
     min_delta: float  # = 0.1
     status_format: str
 
@@ -37,7 +62,18 @@ class StatusBarGetOptions(StatusBarOptions, total=False):
 
 
 class SupportsFloat(Protocol):
+    __slots__ = ()
+
+    @abstractmethod
     def __float__(self) -> float: ...
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+        return pydantic_core.core_schema.float_schema()
 
 
 # actual type int, but implementation and python allows classes, which support int() or float()

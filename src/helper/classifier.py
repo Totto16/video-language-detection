@@ -24,6 +24,8 @@ from typing import (
 )
 
 import numpy as np
+import pydantic
+import pydantic_core
 import torch
 from apischema import deserializer, schema, serializer
 from apischema.metadata import none_as_undefined
@@ -910,6 +912,14 @@ class AdvancedPercentage:
             value,
             ">=",
         )
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+        return pydantic_core.core_schema.str_schema(pattern=PERCENTAGE_PATTERN)
 
 
 SimplePercentage = Annotated[float, schema(min=0.0, max=1.0)]

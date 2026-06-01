@@ -7,6 +7,8 @@ from logging import Logger
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Self, assert_never
 
+import pydantic
+import pydantic_core
 import yaml
 from apischema import ValidationError, deserialize, deserializer, schema, serializer
 from apischema.metadata import none_as_undefined, required
@@ -141,6 +143,16 @@ class CustomKey:
     @property
     def value(self: Self) -> Keys:
         return self.__underlying
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+        return pydantic_core.core_schema.literal_schema(
+            get_all_keys_with_aliases(),
+        )
 
 
 @dataclass

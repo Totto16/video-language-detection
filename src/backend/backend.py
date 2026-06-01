@@ -797,7 +797,8 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
             )
         data: ManagerWsGlobalCounterMessage = ManagerWsGlobalCounterMessage(
             data=ManagerWsGlobalMessageCounterData(
-                counter=instance_serializable, idx=idx,
+                counter=instance_serializable,
+                idx=idx,
             ),
         )
         self.send_data_sync(data)
@@ -1118,10 +1119,9 @@ def summary_tuple_to_serializable_data(
     )
 
 
-class ScannerStateFinished(pydantic.BaseModel):
-    model_config = DEFAULT_MODEL_CONFIG
-
-    type: Literal["finished"] = "finished"
+@dataclass
+class ScannerStateFinished:
+    type: Literal["finished"]
     result: list[SummaryTuple]
 
 
@@ -1132,11 +1132,10 @@ class ScannerStateFinishedSerializable(pydantic.BaseModel):
     result: list[SummaryTupleSerializable]
 
 
-class ScannerStateError(pydantic.BaseModel):
-    model_config = DEFAULT_MODEL_CONFIG
-
-    type: Literal["error"] = "error"
-    error: Annotated[str | BaseException, pydantic.Field(union_mode="smart")]
+@dataclass
+class ScannerStateError:
+    type: Literal["error"]
+    error: str | BaseException
 
 
 class ScannerStateErrorSerializable(pydantic.BaseModel):
@@ -1146,10 +1145,10 @@ class ScannerStateErrorSerializable(pydantic.BaseModel):
     error: str
 
 
-ScannerState = Annotated[
-    (ScannerStateIdle | ScannerStateRunning | ScannerStateFinished | ScannerStateError),
-    pydantic.Discriminator(discriminator="type"),
-]
+ScannerState = (
+    ScannerStateIdle | ScannerStateRunning | ScannerStateFinished | ScannerStateError
+)
+
 
 ScanStatusSerializable = Annotated[
     (
@@ -1493,7 +1492,8 @@ class BackendScanner:
         def on_status_change(previous: ScannersStateStr, new: ScannersStateStr) -> None:
             data: ManagerWsScannerMessage = ManagerWsScannerMessage(
                 data=ManagerWsScannerMessageStatusChangedData(
-                    previous=previous, new=new,
+                    previous=previous,
+                    new=new,
                 ),
             )
             backend.manager.send_data_sync(data)
@@ -1507,7 +1507,7 @@ class BackendScanner:
             def mod(d: ScannerThreadState) -> ScannerThreadState:
                 on_status_change(d.state.type, "finished")
                 return ScannerThreadState(
-                    state=ScannerStateFinished(result=result),
+                    state=ScannerStateFinished(type="finished", result=result),
                     thread=d.thread,
                 )
 
@@ -1522,7 +1522,7 @@ class BackendScanner:
                 def mod(d: ScannerThreadState) -> ScannerThreadState:
                     on_status_change(d.state.type, "error")
                     return ScannerThreadState(
-                        state=ScannerStateError(error=err),
+                        state=ScannerStateError(type="error", error=err),
                         thread=d.thread,
                     )
 

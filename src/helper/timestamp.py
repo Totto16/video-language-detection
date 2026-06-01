@@ -1,7 +1,11 @@
 from datetime import datetime, timedelta
-from typing import Never, Optional, Self
+from typing import Any, Never, Optional, Self, override
 
+import pydantic
+import pydantic_core
 from apischema import deserializer, schema, serializer
+
+from helper.manager import SupportsFloat
 
 
 def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
@@ -15,7 +19,7 @@ def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
 
 
 @schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$")
-class Timestamp:
+class Timestamp(SupportsFloat):
     __delta: timedelta
 
     def __init__(self: Self, delta: timedelta) -> None:
@@ -189,6 +193,7 @@ class Timestamp:
     def __abs__(self: Self) -> "Timestamp":
         return Timestamp(abs(self.__delta))
 
+    @override
     def __float__(self: Self) -> float:
         return self.minutes
 
@@ -217,6 +222,14 @@ class TimestampCompat:
     @staticmethod
     def deserialize_int(inp: int) -> "TimestampCompat":
         return TimestampCompat(Timestamp.from_seconds(inp))
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+        return pydantic_core.core_schema.int_schema(ge=1, le=60 * 60 * 24)
 
 
 ConfigTimeStamp = TimestampCompat | Timestamp
