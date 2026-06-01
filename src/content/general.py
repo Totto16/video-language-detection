@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from hashlib import sha256
@@ -242,7 +243,8 @@ class ScannedFile:
         )
 
     def generate_checksum(
-        self: Self, manager: Optional[ManagerInterface] = None,
+        self: Self,
+        manager: Optional[ManagerInterface] = None,
     ) -> None:
         self.stats = Stats.from_file(
             self.path,
@@ -279,6 +281,17 @@ class NameParser(ABC):
     def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]: ...
 
 
+@dataclass
+class StartAmount:
+    total: int
+    processing: int
+    ignored: int
+
+
+# a list of optional functions, they return if they deleted something or not, None means also no
+type CallbackWorkload = Optional[Callable[[], Optional[bool]]]
+
+
 class Callback[C, CT, RT](ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -305,7 +318,7 @@ class Callback[C, CT, RT](ABC):
 
     def start(
         self: Self,
-        amount: tuple[int, int, int],  # noqa: ARG002
+        amount: StartAmount,  # noqa: ARG002
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
@@ -330,6 +343,48 @@ class Callback[C, CT, RT](ABC):
         characteristic: CT,  # noqa: ARG002
     ) -> None:
         return None
+
+    def process_workload(
+        self: Self,
+        workload: list[CallbackWorkload],
+        name: str,
+        parent_folders: list[str],
+        characteristic: CT,
+    ) -> None:
+        total = len(workload)
+        processing = sum(0 if wk is None else 1 for wk in workload)
+        ignored = total - processing
+
+        self.start(
+            amount=StartAmount(total=total, processing=processing, ignored=ignored),
+            name=name,
+            parent_folders=parent_folders,
+            characteristic=characteristic,
+        )
+
+        deleted = 0
+
+        for wk in workload:
+            if wk is None:
+                continue
+
+            result = wk()
+
+            if result is not None and result:
+                deleted = deleted + 1
+
+            self.progress(
+                name=name,
+                parent_folders=parent_folders,
+                characteristic=characteristic,
+            )
+
+        self.finish(
+            name=name,
+            parent_folders=parent_folders,
+            deleted=deleted,
+            characteristic=characteristic,
+        )
 
     @abstractmethod
     def get_saved(self: Self) -> RT: ...

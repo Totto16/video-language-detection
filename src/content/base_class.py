@@ -12,6 +12,7 @@ from content.general import (
     ContentType,
     ScannedFile,
     ScannedFileType,
+    StartAmount,
     safe_index,
 )
 from content.language import Language
@@ -26,7 +27,12 @@ from content.metadata.scanner import MetadataScanner
 from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
-from helper.classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
+from helper.classifier import (
+    Classifier,
+    FileMetadataError,
+    PredictionFailReason,
+    WAVFile,
+)
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 
@@ -187,7 +193,7 @@ class SuccessFor(SummaryResult):
 
     @override
     def get_reason_identifier(self: Self) -> str:
-        msg = "Succesful summaries can't access the reason identifier"
+        msg = "Successful summaries can't access the reason identifier"
         raise RuntimeError(msg)
 
     @override
@@ -392,7 +398,9 @@ def process_folder(
     value: ContentCharacteristic = (parent_type, ScannedFileType.folder)
 
     #  total, processing, ignored
-    amount: tuple[int, int, int] = (len(temp) + ignored, len(temp), ignored)
+    amount: StartAmount = StartAmount(
+        total=len(temp) + ignored, processing=len(temp), ignored=ignored,
+    )
 
     callback.start(amount, directory.name, parent_folders, value)
 

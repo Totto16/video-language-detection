@@ -23,6 +23,7 @@ from content.general import (
     ContentType,
     NameParser,
     ScannedFileType,
+    StartAmount,
 )
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
@@ -173,7 +174,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
     @override
     def start(
         self: Self,
-        amount: tuple[int, int, int],
+        amount: StartAmount,
         name: str,
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
@@ -196,10 +197,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
 
         color, unit = value
 
-        _1, processing, _2 = amount
-
         self.__progress_bars[name] = self.__manager.counter(
-            total=processing,
+            total=amount.processing,
             desc=name,
             unit=unit,
             leave=False,

@@ -19,6 +19,7 @@ from content.base_class import (
 )
 from content.general import (
     Callback,
+    CallbackWorkload,
     ContentType,
     NameParser,
     NumeratedDescription,
@@ -152,119 +153,94 @@ class NumeratedContent(Content):
             is_outdated: bool = self.scanned_file.is_outdated(manager)
             if not is_outdated:
                 if Language.is_default_value(self.__language) or self._metadata is None:
-                    callback.start(
-                        (2, 2, 0),
-                        self.scanned_file.path.name,
-                        self.scanned_file.parents,
-                        characteristic,
-                    )
 
-                    if Language.is_default_value(
-                        self.__language,
-                    ) and scanner.should_scan_language(ScanType.rescan):
-                        self.__language = (
-                            scanner.language_scanner.get_language_or_default(
-                                self.scanned_file,
-                                language_picker,
-                                manager=manager,
+                    def scan_language_outdated() -> None:
+                        if Language.is_default_value(
+                            self.__language,
+                        ) and scanner.should_scan_language(ScanType.rescan):
+                            self.__language = (
+                                scanner.language_scanner.get_language_or_default(
+                                    self.scanned_file,
+                                    language_picker,
+                                    manager=manager,
+                                )
                             )
-                        )
 
-                    callback.progress(
-                        self.scanned_file.path.name,
-                        self.scanned_file.parents,
-                        characteristic,
-                    )
-
-                    if (
-                        current_handles is not None
-                        and not isinstance(current_handles, SkipHandle)
-                        and scanner.should_scan_metadata(
-                            ScanType.rescan,
-                            self.metadata,
-                        )
-                    ):
-                        series_handle, season_handle = current_handles
-                        self._metadata = SkipHandle()
-                        """self._metadata = (
-                            scanner.metadata_scanner.get_numerated_metadata(
-                                series_handle,
-                                season_handle,
-                                self.description.episode,
+                    def scan_metadata_outdated() -> None:
+                        if (
+                            current_handles is not None
+                            and not isinstance(current_handles, SkipHandle)
+                            and scanner.should_scan_metadata(
+                                ScanType.rescan,
+                                self.metadata,
                             )
-                        ) """
+                        ):
+                            series_handle, season_handle = current_handles
+                            self._metadata = SkipHandle()
+                            """self._metadata = (
+                                scanner.metadata_scanner.get_numerated_metadata(
+                                    series_handle,
+                                    season_handle,
+                                    self.description.episode,
+                                )
+                            ) """
 
-                    callback.progress(
+                    callback_workload_outdated: list[CallbackWorkload] = [
+                        scan_language_outdated,
+                        scan_metadata_outdated,
+                    ]
+
+                    callback.process_workload(
+                        callback_workload_outdated,
                         self.scanned_file.path.name,
                         self.scanned_file.parents,
                         characteristic,
                     )
 
-                    callback.finish(
-                        self.scanned_file.path.name,
-                        self.scanned_file.parents,
-                        0,
-                        characteristic,
-                    )
                 return
 
             self.__reset_metadata_of_file()
 
-        callback.start(
-            (3, 3, 0),
+        def generate_checksum() -> None:
+            self.generate_checksum(manager)
+
+        def scan_language() -> None:
+            if scanner.should_scan_language(ScanType.first_scan):
+                self.__language = scanner.language_scanner.get_language_or_default(
+                    self.scanned_file,
+                    language_picker,
+                    manager=manager,
+                )
+            else:
+                self.__reset_metadata_of_file()
+
+        def scan_metadata() -> None:
+            if (
+                current_handles is not None
+                and self.metadata is None
+                and not isinstance(current_handles, SkipHandle)
+                and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
+            ):
+                series_handle, season_handle = current_handles
+                self._metadata = SkipHandle()
+                """ self._metadata = scanner.metadata_scanner.get_numerated_metadata(
+                    series_handle,
+                    season_handle,
+                    self.description.episode,
+                ) """
+            else:
+                # don't need new metadata for changed files
+                pass
+
+        callback_workload: list[CallbackWorkload] = [
+            generate_checksum,
+            scan_language,
+            scan_metadata,
+        ]
+
+        callback.process_workload(
+            callback_workload,
             self.scanned_file.path.name,
             self.scanned_file.parents,
-            characteristic,
-        )
-
-        self.generate_checksum(manager)
-        callback.progress(
-            self.scanned_file.path.name,
-            self.scanned_file.parents,
-            characteristic,
-        )
-
-        if scanner.should_scan_language(ScanType.first_scan):
-            self.__language = scanner.language_scanner.get_language_or_default(
-                self.scanned_file,
-                language_picker,
-                manager=manager,
-            )
-        else:
-            self.__reset_metadata_of_file()
-
-        callback.progress(
-            self.scanned_file.path.name,
-            self.scanned_file.parents,
-            characteristic,
-        )
-
-        if (
-            current_handles is not None
-            and self.metadata is None
-            and not isinstance(current_handles, SkipHandle)
-            and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
-        ):
-            series_handle, season_handle = current_handles
-            self._metadata = SkipHandle()
-            """ self._metadata = scanner.metadata_scanner.get_numerated_metadata(
-                series_handle,
-                season_handle,
-                self.description.episode,
-            ) """
-        else:
-            # don't need new metadata for changed files
-            pass
-
-        callback.progress(
-            self.scanned_file.path.name,
-            self.scanned_file.parents,
-            characteristic,
-        )
-
-        callback.finish(
-            self.scanned_file.path.name,
-            self.scanned_file.parents,
-            0,
             characteristic,
         )
