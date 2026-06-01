@@ -59,8 +59,7 @@ class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
 class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["gui"]
     config: str
-    template_to_use: Optional[str]
-    config_filter: Optional[ConfigFilter]
+
     backend_host: str
     backend_port: int
 
@@ -68,8 +67,7 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["api"]
     config: str
-    template_to_use: Optional[str]
-    config_filter: Optional[ConfigFilter]
+
     host: str
     port: int
 
@@ -194,26 +192,6 @@ def parse_args() -> AllParsedNameSpaces:
         help=_("The config to use"),
     )
     gui_parser.add_argument(
-        "-t",
-        "--template",
-        dest="template_to_use",
-        default=None,
-        help=_(
-            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
-        ),
-    )
-    gui_parser.add_argument(
-        "-f",
-        "--filter",
-        dest="config_filter",
-        default=None,
-        type=parse_config_filter_string,
-        action="append",
-        help=_(
-            "Filter the provided configs, allowed are names or indices"  # noqa: COM812
-        ),
-    )
-    gui_parser.add_argument(
         "-b",
         "--backend-host",
         dest="backend_host",
@@ -239,26 +217,6 @@ def parse_args() -> AllParsedNameSpaces:
         dest="config",
         default="config.yaml",
         help=_("The config to use"),
-    )
-    api_parser.add_argument(
-        "-t",
-        "--template",
-        dest="template_to_use",
-        default=None,
-        help=_(
-            "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
-        ),
-    )
-    api_parser.add_argument(
-        "-f",
-        "--filter",
-        dest="config_filter",
-        default=None,
-        type=parse_config_filter_string,
-        action="append",
-        help=_(
-            "Filter the provided configs, allowed are names or indices"  # noqa: COM812
-        ),
     )
     api_parser.add_argument(
         "-b",
@@ -328,72 +286,34 @@ def subcommand_gui(
     logger: Logger,
     args: GuiCommandParsedArgNamespace,
 ) -> ExitCode:
-    parsed_config = AdvancedConfig.load_and_resolve(
+    raw_config = AdvancedConfig.load_raw(
         Path(args.config),
-        args.template_to_use,
     )
-    if parsed_config.is_err():
-        logger.error("error while parsing config: %s", parsed_config.get_err())
-        return 1
-
-    parsed_configs = parsed_config.get_ok()
-
-    if len(parsed_configs) == 0:
-        logger.error("parsing returned 0 configs")
-        return 1
-
-    configs = filter_configs(parsed_configs, args.config_filter)
-
-    if len(configs) > len(parsed_configs):
-        logger.error(
-            "filtering returned more configs than there are, at least one was used multiple times",
-        )
-        return 1
-
-    if len(configs) == 0:
-        logger.error("filtering returned 0 configs")
+    if raw_config is None:
+        logger.error("error while parsing config: can't load config")
         return 1
 
     address = Address(host=args.backend_host, port=args.backend_port)
     options = BackendOptions(address=address)
 
-    return launch_gui(options, configs)
+    return launch_gui(options, raw_config)
 
 
 def subcommand_api(
     logger: Logger,
     args: ApiCommandParsedArgNamespace,
 ) -> ExitCode:
-    parsed_config = AdvancedConfig.load_and_resolve(
+    raw_config = AdvancedConfig.load_raw(
         Path(args.config),
-        args.template_to_use,
     )
-    if parsed_config.is_err():
-        logger.error("error while parsing config: %s", parsed_config.get_err())
-        return 1
-
-    parsed_configs = parsed_config.get_ok()
-
-    if len(parsed_configs) == 0:
-        logger.error("parsing returned 0 configs")
-        return 1
-
-    configs = filter_configs(parsed_configs, args.config_filter)
-
-    if len(configs) > len(parsed_configs):
-        logger.error(
-            "filtering returned more configs than there are, at least one was used multiple times",
-        )
-        return 1
-
-    if len(configs) == 0:
-        logger.error("filtering returned 0 configs")
+    if raw_config is None:
+        logger.error("error while parsing config: can't load config")
         return 1
 
     address = Address(host=args.host, port=args.port)
     options = BackendOptions(address=address)
 
-    return launch_api(options, configs)
+    return launch_api(options, raw_config)
 
 
 def subcommand_run(

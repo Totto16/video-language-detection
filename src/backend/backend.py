@@ -59,7 +59,14 @@ from helper.base import (
     parse_contents,
 )
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
-from helper.config import ConfigFilter, ConfigFilterItem, FinalConfig, filter_configs
+from helper.config import (
+    AdvancedConfig,
+    ConfigFilter,
+    ConfigFilterItem,
+    FinalConfig,
+    RawConfig,
+    filter_configs,
+)
 from helper.devices import DeviceManager
 from helper.log import get_logger
 from helper.manager import (
@@ -938,6 +945,13 @@ class ScanStartQuery(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
     filter: Optional[list[ConfigFilterItem] | ConfigFilterItem] = None
+    template: Optional[str] = None
+
+
+@dataclass
+class StartOptions:
+    template_to_use: Optional[str]
+    config_filter: Optional[ConfigFilter]
 
 
 def get_config_filters(
@@ -991,8 +1005,12 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
             background_tasks.add_task(fn)
 
+        options: StartOptions = StartOptions(
+            config_filter=cfg_filter, template_to_use=start_query.template
+        )
+
         result: Optional[str] = backend.scanner.start(
-            cfg_filter=cfg_filter,
+            options=options,
             run_in_background=run_in_background,
             backend=backend,
         )
@@ -1371,15 +1389,15 @@ def run_in_thread(
 
 
 class BackendScanner:
-    __all_configs: list[FinalConfig]
+    __raw_config: RawConfig
 
     __state: ThreadSafe[ScannerThreadState]
 
     def __init__(
         self: Self,
-        configs: list[FinalConfig],
+        raw_config: RawConfig,
     ) -> None:
-        self.__all_configs = configs
+        self.__raw_config = raw_config
         self.__state = ThreadSafe[ScannerThreadState](
             ScannerThreadState(state=ScannerStateIdle(), thread=None),
         )
@@ -1583,18 +1601,38 @@ class BackendScanner:
 
     def start(
         self: Self,
-        cfg_filter: Optional[ConfigFilter],
+        options: StartOptions,
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
         backend: "Backend",
     ) -> Optional[str]:
-        if cfg_filter is None:
-            return self.__start_impl(
-                configs=self.__all_configs,
-                run_in_background=run_in_background,
-                backend=backend,
-            )
+
+        parsed_config = AdvancedConfig.resolve_raw(
+            raw_config=self.__raw_config,
+            cli_name_to_use=options.template_to_use,
+        )
+        if parsed_config.is_err():
+            msg = f"error while parsing config: {parsed_config.get_err()}"
+            raise HTTPException(status_code=400, detail=msg)
+
+        parsed_configs = parsed_config.get_ok()
+
+        if len(parsed_configs) == 0:
+            msg = "parsing returned 0 configs"
+            raise HTTPException(status_code=400, detail=msg)
+
+        configs = filter_configs(parsed_configs, options.config_filter)
+
+        if len(configs) > len(parsed_configs):
+            msg = "filtering returned more configs than there are, at least one was used multiple times"
+
+            raise HTTPException(status_code=400, detail=msg)
+
+        if len(configs) == 0:
+            msg = "filtering returned 0 configs"
+            raise HTTPException(status_code=400, detail=msg)
+
         try:
-            configs = filter_configs(configs=self.__all_configs, cfg_filter=cfg_filter)
+
             return self.__start_impl(
                 configs=configs,
                 run_in_background=run_in_background,
@@ -1619,12 +1657,12 @@ class Backend:
     def __init__(
         self: Self,
         options: BackendOptions,
-        configs: list[FinalConfig],
+        raw_config: RawConfig,
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__options = options
         self.__manager = WsManager(loop=loop)
-        self.__scanner = BackendScanner(configs=configs)
+        self.__scanner = BackendScanner(raw_config=raw_config)
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)], strict_content_type=True)
@@ -1695,10 +1733,10 @@ class Backend:
         await self.__server.serve()
 
 
-async def start_all(options: BackendOptions, configs: list[FinalConfig]) -> int:
+async def start_all(options: BackendOptions, raw_config: RawConfig) -> int:
     loop = asyncio.get_running_loop()
 
-    backend = Backend(options=options, configs=configs, loop=loop)
+    backend = Backend(options=options, raw_config=raw_config, loop=loop)
 
     await backend.run()
     return 0
@@ -1710,6 +1748,6 @@ def suppress_logs() -> None:
     logger.handlers = []
 
 
-def launch_api(options: BackendOptions, configs: list[FinalConfig]) -> int:
+def launch_api(options: BackendOptions, raw_config: RawConfig) -> int:
     suppress_logs()
-    return asyncio.run(start_all(options, configs))
+    return asyncio.run(start_all(options, raw_config))
