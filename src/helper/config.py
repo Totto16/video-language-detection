@@ -1,11 +1,15 @@
 import json
+import os
 import sys
+import threading
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Self, assert_never
+from types import TracebackType
+from typing import Annotated, Any, Literal, Optional, Self, assert_never, override
 
 import pydantic
 import pydantic_core
@@ -706,3 +710,62 @@ def filter_configs(
             assert_never(filter_item)
 
     return [cfg for idx, cfg in enumerate(configs) if is_included(cfg, idx)]
+
+
+class FileLockError(RuntimeError):
+
+    def __init__(self: Self, msg: str) -> None:
+        super().__init__(msg)
+
+
+class LockFile(AbstractContextManager[None]):
+    __lock_file: Path
+    __fd: Optional[int]
+
+    def __init__(self: Self, lock_file: Path) -> None:
+        super().__init__()
+        self.__lock_file = lock_file
+        self.__fd = None
+
+    @staticmethod
+    def for_file(file: Path) -> "LockFile":
+        lock_file = file.parent / (file.stem + ".lock")
+        return LockFile(lock_file)
+
+    def __create_lock_file(self: Self) -> None:
+        try:
+            self.__fd = os.open(
+                self.__lock_file,
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o644,
+            )
+
+            unique_data = (
+                f"PID: {os.getpid()} TID: {threading.current_thread().native_id}"
+            )
+
+            os.write(self.__fd, unique_data.encode())
+
+        except FileExistsError:
+            msg = "lock for file already held"
+            raise FileLockError(msg) from None
+
+    def __remove_lock_file(self: Self) -> None:
+        if self.__fd is not None:
+            os.close(self.__fd)
+            self.__fd = None
+            self.__lock_file.unlink()
+
+    @override
+    def __enter__(self: Self) -> None:
+        self.__create_lock_file()
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        self.__remove_lock_file()
+        return False

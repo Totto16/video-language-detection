@@ -1,5 +1,6 @@
 import asyncio
 from logging import Logger
+from pathlib import Path
 
 from backend.backend import Backend, BackendOptions, suppress_logs
 from helper.config import RawConfig
@@ -27,10 +28,19 @@ async def start_gui(options: BackendOptions, backend: Backend) -> int:
     return 0 if success and app_ok else 1
 
 
-async def start_all(options: BackendOptions, raw_config: RawConfig) -> int:
+async def start_all(
+    options: BackendOptions,
+    raw_config: RawConfig,
+    config_file_path: Path,
+) -> int:
     loop = asyncio.get_running_loop()
 
-    backend = Backend(options=options, raw_config=raw_config, loop=loop)
+    backend = Backend(
+        options=options,
+        raw_config=raw_config,
+        config_file_path=config_file_path,
+        loop=loop,
+    )
 
     [_, result] = await asyncio.gather(
         backend.run(),
@@ -40,6 +50,16 @@ async def start_all(options: BackendOptions, raw_config: RawConfig) -> int:
     return result
 
 
-def launch_gui(options: BackendOptions, raw_config: RawConfig) -> int:
+def launch_gui(
+    options: BackendOptions,
+    raw_config: RawConfig,
+    config_file_path: Path,
+) -> int:
     suppress_logs()
-    return asyncio.run(start_all(options=options, raw_config=raw_config))
+    return asyncio.run(
+        start_all(
+            options=options,
+            raw_config=raw_config,
+            config_file_path=config_file_path,
+        ),
+    )

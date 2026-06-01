@@ -6,6 +6,7 @@ from collections.abc import Callable, Coroutine
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from logging import Formatter, Handler, Logger, LogRecord
+from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
@@ -63,7 +64,9 @@ from helper.config import (
     AdvancedConfig,
     ConfigFilter,
     ConfigFilterItem,
+    FileLockError,
     FinalConfig,
+    LockFile,
     RawConfig,
     filter_configs,
 )
@@ -1380,24 +1383,28 @@ def run_in_thread(
     configs: list[FinalConfig],
     event: asyncio.Event,
     backend: "Backend",
+    config_file_path: Path,
 ) -> None:
 
     with backend.thread_logger():
-        asyncio.run(self.start_run_async(configs=configs, backend=backend))
+        asyncio.run(
+            self.start_run_async(
+                configs=configs, backend=backend, config_file_path=config_file_path
+            )
+        )
 
     event.set()
 
 
 class BackendScanner:
     __raw_config: RawConfig
+    __config_file_path: Path
 
     __state: ThreadSafe[ScannerThreadState]
 
-    def __init__(
-        self: Self,
-        raw_config: RawConfig,
-    ) -> None:
+    def __init__(self: Self, raw_config: RawConfig, config_file_path: Path) -> None:
         self.__raw_config = raw_config
+        self.__config_file_path = config_file_path
         self.__state = ThreadSafe[ScannerThreadState](
             ScannerThreadState(state=ScannerStateIdle(), thread=None),
         )
@@ -1478,33 +1485,41 @@ class BackendScanner:
         self: Self,
         configs: list[FinalConfig],
         manager: WsManager,
+        config_file_path: Path,
     ) -> list[SummaryTuple]:
         result: list[SummaryTuple] = []
 
-        # TODO: set current configs and configs to process, support arguments
-        for index, config in enumerate(configs):
-            name_parser = CustomNameParser(season_special_names=config.parser.special)
+        try:
+            with LockFile.for_file(config_file_path):
 
-            config_paramaters: Optional[tuple[int, int]] = (
-                None if len(configs) == 1 else (index, len(configs))
-            )
+                for index, config in enumerate(configs):
+                    name_parser = CustomNameParser(
+                        season_special_names=config.parser.special,
+                    )
 
-            summary = await self.__launch_scanner_in_background(
-                config=config,
-                name_parser=name_parser,
-                all_content_type=AllContent,
-                config_paramaters=config_paramaters,
-                manager=manager,
-            )
+                    config_paramaters: Optional[tuple[int, int]] = (
+                        None if len(configs) == 1 else (index, len(configs))
+                    )
 
-            result.append(summary)
+                    summary = await self.__launch_scanner_in_background(
+                        config=config,
+                        name_parser=name_parser,
+                        all_content_type=AllContent,
+                        config_paramaters=config_paramaters,
+                        manager=manager,
+                    )
 
-        return result
+                    result.append(summary)
+
+                return result
+        except FileLockError as err:
+            raise HTTPException(status_code=400, detail=err) from None
 
     async def start_run_async(
         self: Self,
         configs: list[FinalConfig],
         backend: "Backend",
+        config_file_path: Path,
     ) -> None:
 
         def on_status_change(previous: ScannersStateStr, new: ScannersStateStr) -> None:
@@ -1520,6 +1535,7 @@ class BackendScanner:
             result: list[SummaryTuple] = await self.__start_coroutine(
                 configs=configs,
                 manager=backend.manager,
+                config_file_path=config_file_path,
             )
 
             def mod(d: ScannerThreadState) -> ScannerThreadState:
@@ -1564,7 +1580,7 @@ class BackendScanner:
 
             thread = threading.Thread(
                 target=run_in_thread,
-                args=(self, configs, event, backend.manager),
+                args=(self, configs, event, backend.manager, self.__config_file_path),
             )
 
             new_state: ScannerThreadState = ScannerThreadState(
@@ -1658,11 +1674,14 @@ class Backend:
         self: Self,
         options: BackendOptions,
         raw_config: RawConfig,
+        config_file_path: Path,
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         self.__options = options
         self.__manager = WsManager(loop=loop)
-        self.__scanner = BackendScanner(raw_config=raw_config)
+        self.__scanner = BackendScanner(
+            raw_config=raw_config, config_file_path=config_file_path
+        )
         self.__ready = asyncio.Event()
 
         app = FastAPI(dependencies=[Depends(self.ready)], strict_content_type=True)
@@ -1733,10 +1752,17 @@ class Backend:
         await self.__server.serve()
 
 
-async def start_all(options: BackendOptions, raw_config: RawConfig) -> int:
+async def start_all(
+    options: BackendOptions, raw_config: RawConfig, config_file_path: Path
+) -> int:
     loop = asyncio.get_running_loop()
 
-    backend = Backend(options=options, raw_config=raw_config, loop=loop)
+    backend = Backend(
+        options=options,
+        raw_config=raw_config,
+        config_file_path=config_file_path,
+        loop=loop,
+    )
 
     await backend.run()
     return 0
@@ -1748,6 +1774,8 @@ def suppress_logs() -> None:
     logger.handlers = []
 
 
-def launch_api(options: BackendOptions, raw_config: RawConfig) -> int:
+def launch_api(
+    options: BackendOptions, raw_config: RawConfig, config_file_path: Path
+) -> int:
     suppress_logs()
-    return asyncio.run(start_all(options, raw_config))
+    return asyncio.run(start_all(options, raw_config, config_file_path))

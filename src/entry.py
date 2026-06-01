@@ -22,7 +22,9 @@ from gui.gui import launch_gui
 from helper.config import (
     AdvancedConfig,
     ConfigFilter,
+    FileLockError,
     FinalConfig,
+    LockFile,
     filter_configs,
     parse_config_filter_string,
 )
@@ -286,8 +288,10 @@ def subcommand_gui(
     logger: Logger,
     args: GuiCommandParsedArgNamespace,
 ) -> ExitCode:
+    config_file_path = Path(args.config)
+
     raw_config = AdvancedConfig.load_raw(
-        Path(args.config),
+        config_file_path,
     )
     if raw_config is None:
         logger.error("error while parsing config: can't load config")
@@ -296,15 +300,17 @@ def subcommand_gui(
     address = Address(host=args.backend_host, port=args.backend_port)
     options = BackendOptions(address=address)
 
-    return launch_gui(options, raw_config)
+    return launch_gui(options, raw_config, config_file_path)
 
 
 def subcommand_api(
     logger: Logger,
     args: ApiCommandParsedArgNamespace,
 ) -> ExitCode:
+    config_file_path = Path(args.config)
+
     raw_config = AdvancedConfig.load_raw(
-        Path(args.config),
+        config_file_path,
     )
     if raw_config is None:
         logger.error("error while parsing config: can't load config")
@@ -313,7 +319,7 @@ def subcommand_api(
     address = Address(host=args.host, port=args.port)
     options = BackendOptions(address=address)
 
-    return launch_api(options, raw_config)
+    return launch_api(options, raw_config, config_file_path)
 
 
 def subcommand_run(
@@ -346,21 +352,27 @@ def subcommand_run(
         logger.error("filtering returned 0 configs")
         return 1
 
-    for index, config in enumerate(configs):
-        name_parser = CustomNameParser(season_special_names=config.parser.special)
+    try:
+        with LockFile.for_file(Path(args.config)):
+            for index, config in enumerate(configs):
+                name_parser = CustomNameParser(
+                    season_special_names=config.parser.special,
+                )
 
-        config_paramaters: Optional[tuple[int, int]] = (
-            None if len(configs) == 1 else (index, len(configs))
-        )
+                config_paramaters: Optional[tuple[int, int]] = (
+                    None if len(configs) == 1 else (index, len(configs))
+                )
 
-        launch_tui(
-            logger=logger,
-            config=config,
-            name_parser=name_parser,
-            all_content_type=AllContent,
-            config_paramaters=config_paramaters,
-        )
-
+                launch_tui(
+                    logger=logger,
+                    config=config,
+                    name_parser=name_parser,
+                    all_content_type=AllContent,
+                    config_paramaters=config_paramaters,
+                )
+    except FileLockError as err:
+        logger.error("File lock error: %s", str(err))  # noqa: TRY400
+        return 1
     return 0
 
 
