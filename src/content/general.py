@@ -175,15 +175,15 @@ class Stats:
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
-                path,
-                _type,
+                file_path=path,
+                file_type=_type,
                 generate_checksum=False,
                 manager=manager,
             )
             if new_stats.mtime <= self.mtime:
                 return False
 
-            # update the new mtime, since if we aren't outdated (per checksum), the parent caller wan't do it, if we are outdated, he will update it anyway
+            # update the new mtime, since if we aren't outdated (per checksum), the parent caller will not do it, if we are outdated, he will update it anyway
             self.mtime = new_stats.mtime
 
             with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)

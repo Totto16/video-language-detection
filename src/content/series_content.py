@@ -14,7 +14,6 @@ from content.base_class import (
     CallbackTuple,
     Content,
     ContentCharacteristic,
-    ContentDict,
     process_folder,
 )
 from content.general import (
@@ -29,11 +28,6 @@ from content.season_content import SeasonContent
 from content.shared import ScanType
 from content.summary import Summary
 from helper.apischema import narrow_type
-
-
-class SeriesContentDict(ContentDict):
-    description: SeriesDescription
-    seasons: list[SeasonContent]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.series])))

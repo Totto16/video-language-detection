@@ -15,7 +15,6 @@ from content.base_class import (
     CallbackTuple,
     Content,
     ContentCharacteristic,
-    ContentDict,
     process_folder,
 )
 from content.episode_content import EpisodeContent
@@ -37,11 +36,6 @@ from helper.apischema import narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()
-
-
-class SeasonContentDict(ContentDict):
-    description: SeasonDescription
-    episodes: list[EpisodeContent]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.season])))

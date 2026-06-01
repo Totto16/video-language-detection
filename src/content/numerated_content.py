@@ -29,16 +29,10 @@ from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 from content.summary import Summary
-from helper.apischema import OneOf, narrow_type
+from helper.apischema import narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()
-
-
-class NumeratedContentDict(ContentDict):
-    description: NumeratedDescription
-    language: Language
-    metadata: Annotated[Optional[MetadataHandle], OneOf]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.numerated])))
