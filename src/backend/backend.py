@@ -14,7 +14,6 @@ from typing import (
     Literal,
     Optional,
     Self,
-    TypedDict,
     Unpack,
     assert_never,
     cast,
@@ -104,7 +103,7 @@ class WebsocketHandler(ABC):
         self.__ws = websocket
 
     @abstractmethod
-    async def process_data(self: Self, _data: Any) -> Optional[ProcessResult]: ...
+    async def process_data(self: Self, data: Any) -> Optional[ProcessResult]: ...
 
     async def send_data(self: Self, data: Any) -> None:
         await self.__ws.send_json({"type": "ok", "data": data})
@@ -130,9 +129,16 @@ class WebsocketHandler(ABC):
                 await self.__ws.send_json({"type": "error", "error": str(err)})
 
 
-# TODO: use pydantic instead of TYpeDicts everywhere
-class ManagerWsChoiceMessageAskQuestionReply(TypedDict, total=True):
-    type: Literal["reply"]
+DEFAULT_MODEL_CONFIG: pydantic.ConfigDict = pydantic.ConfigDict(
+    extra="forbid",
+    strict=True,
+)
+
+
+class ManagerWsChoiceMessageAskQuestionReply(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["reply"] = "reply"
     reply: Literal["ask_question"]
     result: Optional["ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult"]
     id: str
@@ -157,18 +163,18 @@ class WsSingleManager(WebsocketHandler):
 
     async def __process_data(
         self: Self,
-        data: IncomingWsData | dict[str, Any],
+        data: IncomingWsData,
     ) -> Optional[ProcessResultTyped]:
-        match data["type"]:
+        match data.type:
             case "reply":
-                match data["reply"]:
+                match data.reply:
                     case "ask_question":
                         res_data: Optional[SelectResult] = (
                             None
-                            if data["result"] is None
-                            else deserialize_select_result(data["result"])
+                            if data.result is None
+                            else deserialize_select_result(data.result)
                         )
-                        unique_id: uuid.UUID = uuid.UUID(data["id"])
+                        unique_id: uuid.UUID = uuid.UUID(data.id)
                         result: Optional[str] = (
                             self.__parent_ref.process_ask_question_reply(
                                 result=res_data,
@@ -176,130 +182,134 @@ class WsSingleManager(WebsocketHandler):
                             )
                         )
                         if result is None:
-                            response: ManagerWsChoiceMessageQuestionReplyReceived = {
-                                "type": "choice",
-                                "data": {"type": "reply_received", "id": data["id"]},
-                            }
+                            response = ManagerWsChoiceMessage(
+                                data=ManagerWsChoiceMessageQuestionReplyReceivedData(
+                                    id=data.id,
+                                ),
+                            )
                             return ProcessResultTyped.ok(response)
 
                         return ProcessResultTyped.err(result)
                     case _:
-                        return ProcessResultTyped.err("Invalid reply data received")
+                        assert_never(data.reply)
             case _:
-                return ProcessResultTyped.err("Invalid data received")
+                assert_never(data.type)
 
     @override
     async def process_data(self: Self, data: Any) -> Optional[ProcessResult]:
-        # TODO: use pydantic to validate the incoming data
-        typed_data: IncomingWsData | dict[str, Any] = cast(
-            IncomingWsData | dict[str, Any],
-            data,
+        typed_data: IncomingWsData = IncomingWsData.model_validate(
+            obj=data,
+            strict=True,
+            extra="forbid",
         )
         return await self.__process_data(typed_data)
 
 
-class ManagerWsGlobalCounterMessageGeneric[D](TypedDict, total=True):
-    type: Literal["global_counter"]
-    data: D
+class ManagerWsGlobalMessageStopData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["stop"] = "stop"
 
 
-class ManagerWsGlobalMessageStopData(TypedDict, total=True):
-    type: Literal["stop"]
+class CounterTypeCounter(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-
-ManagerWsGlobalCounterMessageStop = ManagerWsGlobalCounterMessageGeneric[
-    ManagerWsGlobalMessageStopData
-]
-
-
-class CounterTypeCounter(TypedDict, total=True):
-    type: Literal["counter"]
+    type: Literal["counter"] = "counter"
     options: CounterOptions
 
 
-class CounterTypeStatusBar(TypedDict, total=True):
-    type: Literal["status_bar"]
+class CounterTypeStatusBar(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["status_bar"] = "status_bar"
     options: StatusBarGetOptions
 
 
 CounterType = Literal["counter", "status_bar"]
 
-CounterInstanceType = CounterTypeCounter | CounterTypeStatusBar
+CounterInstanceType = Annotated[
+    CounterTypeCounter | CounterTypeStatusBar,
+    pydantic.Discriminator(discriminator="type"),
+]
 
 
-class ManagerWsGlobalMessageCounterData(TypedDict, total=True):
-    type: Literal["counter"]
+class ManagerWsGlobalMessageCounterData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["counter"] = "counter"
     counter: CounterInstanceType
     idx: int
 
 
-ManagerWsGlobalCounterMessageCounter = ManagerWsGlobalCounterMessageGeneric[
-    ManagerWsGlobalMessageCounterData
-]
+class ManagerWsGlobalCounterMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-ManagerWsGlobalCounterMessage = (
-    ManagerWsGlobalCounterMessageStop | ManagerWsGlobalCounterMessageCounter
-)
-
-
-class ManagerWsCounterMessageGeneric[D](TypedDict, total=True):
-    type: Literal["counter"]
-    data: D
+    type: Literal["global_counter"] = "global_counter"
+    data: Annotated[
+        ManagerWsGlobalMessageCounterData | ManagerWsGlobalMessageStopData,
+        pydantic.Discriminator(discriminator="type"),
+    ]
 
 
-class CounterUpdateOptions(TypedDict, total=False):
+class CounterUpdateOptions(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     incr: NumberLike  # = 1
     force: bool  # = False
 
 
-class CounterUpdateTypeCounter(TypedDict, total=True):
-    type: Literal["counter"]
+class CounterUpdateTypeCounter(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["counter"] = "counter"
     options: CounterUpdateOptions
 
 
-class CounterUpdateTypeStatusBar(TypedDict, total=True):
-    type: Literal["status_bar"]
+class CounterUpdateTypeStatusBar(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["status_bar"] = "status_bar"
     options: StatusBarInterfaceUpdateOptions
 
 
-CounterUpdateType = CounterUpdateTypeCounter | CounterUpdateTypeStatusBar
+class ManagerWsCounterMessageUpdateData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-
-class ManagerWsCounterMessageUpdateData(TypedDict, total=True):
-    type: Literal["update"]
+    type: Literal["update"] = "update"
     idx: int
-    options: CounterUpdateType
+    options: Annotated[
+        CounterUpdateTypeCounter | CounterUpdateTypeStatusBar,
+        pydantic.Discriminator(discriminator="type"),
+    ]
 
 
-ManagerWsCounterMessageUpdate = ManagerWsCounterMessageGeneric[
-    ManagerWsCounterMessageUpdateData
-]
+class CounterMessageCloseOptions(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-
-class CounterMessageCloseOptions(TypedDict, total=True):
     clear: bool
 
 
-class ManagerWsCounterMessageCloseData(TypedDict, total=True):
-    type: Literal["close"]
+class ManagerWsCounterMessageCloseData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+    type: Literal["close"] = "close"
     idx: int
     options: CounterMessageCloseOptions
 
 
-ManagerWsCounterMessageClose = ManagerWsCounterMessageGeneric[
-    ManagerWsCounterMessageCloseData
-]
+class ManagerWsCounterMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-ManagerWsCounterMessage = ManagerWsCounterMessageUpdate | ManagerWsCounterMessageClose
-
-
-class ManagerWsChoiceMessageGeneric[D](TypedDict, total=True):
-    type: Literal["choice"]
-    data: D
+    type: Literal["counter"] = "counter"
+    data: Annotated[
+        ManagerWsCounterMessageUpdateData | ManagerWsCounterMessageCloseData,
+        pydantic.Discriminator(discriminator="type"),
+    ]
 
 
-class ManagerWsChoiceMessageAskQuestionChoiceDataSeparator(TypedDict, total=True):
-    tag: Literal["separator"]
+class ManagerWsChoiceMessageAskQuestionChoiceDataSeparator(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    tag: Literal["separator"] = "separator"
 
 
 type ChoiceColorTypeValues = Literal["fg", "bg"]
@@ -308,120 +318,128 @@ type ChoiceColorTypeValues = Literal["fg", "bg"]
 type ChoiceColorValueValues = Literal["ansiblue", "ansigreen"]
 
 
-class ChoiceColorDict(
-    TypedDict,
-    total=True,
-):
+class ChoiceColorSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     type: ChoiceColorTypeValues
     color: ChoiceColorValueValues
 
 
 def choice_color_to_serializable_data(
     choice_color: ChoiceColor,
-) -> ChoiceColorDict:
-    return {"type": choice_color.type.value, "color": choice_color.color.value}
+) -> ChoiceColorSerializable:
+    return ChoiceColorSerializable(
+        type=choice_color.type.value,
+        color=choice_color.color.value,
+    )
 
 
-class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle(
-    TypedDict,
-    total=True,
-):
-    color: Optional[ChoiceColorDict]
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    color: Optional[ChoiceColorSerializable]
     content: str
 
 
 def choice_title_to_serializable_data(
     title: ChoiceTitle,
 ) -> ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle:
-    return {
-        "content": title.content,
-        "color": (
+    return ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle(
+        content=title.content,
+        color=(
             None
             if title.color is None
             else choice_color_to_serializable_data(title.color)
         ),
-    }
+    )
 
 
 type SelectedTypeValues = Literal["open", "no_language", " copy", "more", "unknown"]
 
 
 class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual(
-    TypedDict,
-    total=True,
+    pydantic.BaseModel,
 ):
-    type: Literal["manual"]
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["manual"] = "manual"
     selected: SelectedTypeValues
 
 
-class LanguageTypedDict(
-    TypedDict,
-    total=True,
-):
+class LanguageSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     short: str
     long: str
 
 
-def language_to_serializable_data(language: Language) -> LanguageTypedDict:
-    return {"short": language.short, "long": language.long}
+def language_to_serializable_data(language: Language) -> LanguageSerializable:
+    return LanguageSerializable(short=language.short, long=language.long)
 
 
-def deserialize_language(language: LanguageTypedDict) -> Language:
-    return Language(short=language["short"], long=language["long"])
+def deserialize_language(language: LanguageSerializable) -> Language:
+    return Language(short=language.short, long=language.long)
 
 
-class PredictionBestDict(
-    TypedDict,
-    total=True,
-):
+class PredictionBestSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     accuracy: float
-    language: LanguageTypedDict
+    language: LanguageSerializable
 
 
-def prediction_best_to_serializable_data(data: PredictionBest) -> PredictionBestDict:
-    return {
-        "accuracy": data.accuracy,
-        "language": language_to_serializable_data(data.language),
-    }
+def prediction_best_to_serializable_data(
+    data: PredictionBest,
+) -> PredictionBestSerializable:
+    return PredictionBestSerializable(
+        accuracy=data.accuracy,
+        language=language_to_serializable_data(data.language),
+    )
 
 
-def deserialize_prediction_best(data: PredictionBestDict) -> PredictionBest:
+def deserialize_prediction_best(data: PredictionBestSerializable) -> PredictionBest:
     return PredictionBest(
-        accuracy=data["accuracy"],
-        language=deserialize_language(data["language"]),
+        accuracy=data.accuracy,
+        language=deserialize_language(data.language),
     )
 
 
 class ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest(
-    TypedDict,
-    total=True,
+    pydantic.BaseModel,
 ):
-    type: Literal["prediction_best"]
-    value: PredictionBestDict
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["prediction_best"] = "prediction_best"
+    value: PredictionBestSerializable
 
 
-ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult = (
-    ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual
-    | ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest
-)
+ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult = Annotated[
+    (
+        ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual
+        | ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest
+    ),
+    pydantic.Discriminator(discriminator="type"),
+]
 
 
 def select_result_to_serializable_data(
     result: SelectResult,
 ) -> ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult:
     if isinstance(result, ManualSelectResult):
-        manual: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual = {
-            "type": "manual",
-            "selected": result.selected.value,
-        }
+        manual: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual = (
+            ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultManual(
+                selected=result.selected.value,
+            )
+        )
         return manual
     if isinstance(result, PredictionBestSelectResult):
         value = prediction_best_to_serializable_data(result.value)
 
-        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest = {
-            "type": "prediction_best",
-            "value": value,
-        }
+        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest = (
+            ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResultBest(
+                value=value,
+            )
+        )
         return choice
     assert_never(result)
 
@@ -429,15 +447,15 @@ def select_result_to_serializable_data(
 def deserialize_select_result(
     result: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult,
 ) -> SelectResult:
-    match result["type"]:
+    match result.type:
         case "manual":
             manual: ManualSelectResult = ManualSelectResult(
                 select_result_type="manual",
-                selected=SelectedType(result["selected"]),
+                selected=SelectedType(value=result.selected),
             )
             return manual
         case "prediction_best":
-            value = deserialize_prediction_best(result["value"])
+            value = deserialize_prediction_best(data=result.value)
             best: PredictionBestSelectResult = PredictionBestSelectResult(
                 select_result_type="prediction_best",
                 value=value,
@@ -447,25 +465,30 @@ def deserialize_select_result(
             assert_never(result)
 
 
-class ManagerWsChoiceMessageAskQuestionChoiceDataChoice(TypedDict, total=True):
-    tag: Literal["choice"]
+class ManagerWsChoiceMessageAskQuestionChoiceDataChoice(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    tag: Literal["choice"] = "choice"
     title: list[ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectTitle]
     value: ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult
 
 
-ManagerWsChoiceMessageAskQuestionChoiceData = (
-    ManagerWsChoiceMessageAskQuestionChoiceDataSeparator
-    | ManagerWsChoiceMessageAskQuestionChoiceDataChoice
-)
+ManagerWsChoiceMessageAskQuestionChoiceData = Annotated[
+    (
+        ManagerWsChoiceMessageAskQuestionChoiceDataSeparator
+        | ManagerWsChoiceMessageAskQuestionChoiceDataChoice
+    ),
+    pydantic.Discriminator(discriminator="tag"),
+]
 
 
 def choice_to_serializable_data(
     data: "WSChoice",
 ) -> ManagerWsChoiceMessageAskQuestionChoiceData:
     if isinstance(data, WSChoiceSeparator):
-        separator: ManagerWsChoiceMessageAskQuestionChoiceDataSeparator = {
-            "tag": "separator",
-        }
+        separator: ManagerWsChoiceMessageAskQuestionChoiceDataSeparator = (
+            ManagerWsChoiceMessageAskQuestionChoiceDataSeparator()
+        )
         return separator
     if isinstance(data, WSChoiceChoice):
         impl = data.impl
@@ -473,92 +496,98 @@ def choice_to_serializable_data(
         title = [choice_title_to_serializable_data(segement) for segement in impl.title]
         value = select_result_to_serializable_data(impl.value)
 
-        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoice = {
-            "tag": "choice",
-            "title": title,
-            "value": value,
-        }
+        choice: ManagerWsChoiceMessageAskQuestionChoiceDataChoice = (
+            ManagerWsChoiceMessageAskQuestionChoiceDataChoice(
+                title=title,
+                value=value,
+            )
+        )
         return choice
     assert_never(data)
 
 
-class ManagerWsChoiceMessageAskQuestionData(TypedDict, total=True):
-    type: Literal["ask_question"]
+class ManagerWsChoiceMessageAskQuestionData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["ask_question"] = "ask_question"
     message: str
     choices: list[ManagerWsChoiceMessageAskQuestionChoiceData]
     default: ManagerWsChoiceMessageAskQuestionChoiceData
     id: str
 
 
-ManagerWsChoiceMessageAskQuestion = ManagerWsChoiceMessageGeneric[
-    ManagerWsChoiceMessageAskQuestionData
-]
+class ManagerWsChoiceMessageQuestionReplyReceivedData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-
-class ManagerWsChoiceMessageQuestionReplyReceivedData(TypedDict, total=True):
-    type: Literal["reply_received"]
+    type: Literal["reply_received"] = "reply_received"
     id: str
 
 
-ManagerWsChoiceMessageQuestionReplyReceived = ManagerWsChoiceMessageGeneric[
-    ManagerWsChoiceMessageQuestionReplyReceivedData
-]
+class ManagerWsChoiceMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-
-ManagerWsChoiceMessage = (
-    ManagerWsChoiceMessageAskQuestion | ManagerWsChoiceMessageQuestionReplyReceived
-)
-
-
-class ManagerWsLogMessageGeneric[D](TypedDict, total=True):
-    type: Literal["log"]
-    data: D
+    type: Literal["choice"] = "choice"
+    data: Annotated[
+        ManagerWsChoiceMessageAskQuestionData
+        | ManagerWsChoiceMessageQuestionReplyReceivedData,
+        pydantic.Discriminator(discriminator="type"),
+    ]
 
 
 type LogLevelStr = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"]
 
 
-class ManagerWsLogMessageEventData(TypedDict, total=True):
-    type: Literal["event"]
+class ManagerWsLogMessageEventData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["event"] = "event"
     level: LogLevelStr
     message: str
     asctime: str
     module: str
 
 
-ManagerWsLogMessageEvent = ManagerWsLogMessageGeneric[ManagerWsLogMessageEventData]
+class ManagerWsLogMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
 
-ManagerWsLogMessage = ManagerWsLogMessageEvent
-
-
-class ManagerWsScannerMessageGeneric[D](TypedDict, total=True):
-    type: Literal["scanner"]
-    data: D
+    type: Literal["log"] = "log"
+    data: Annotated[
+        ManagerWsLogMessageEventData,
+        pydantic.Discriminator(discriminator="type"),
+    ]
 
 
 type ScannersStateStr = Literal["idle", "running", "finished", "error"]
 
 
-class ManagerWsScannerMessageStatusChangedData(TypedDict, total=True):
-    type: Literal["status_changed"]
+class ManagerWsScannerMessageStatusChangedData(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["status_changed"] = "status_changed"
     previous: ScannersStateStr
     new: ScannersStateStr
 
 
-ManagerWsScannerMessageStatusChanged = ManagerWsScannerMessageGeneric[
-    ManagerWsScannerMessageStatusChangedData
+class ManagerWsScannerMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["scanner"] = "scanner"
+    data: Annotated[
+        ManagerWsScannerMessageStatusChangedData,
+        pydantic.Discriminator(discriminator="type"),
+    ]
+
+
+OutgoingWsData = Annotated[
+    (
+        ManagerWsGlobalCounterMessage
+        | ManagerWsCounterMessage
+        | ManagerWsChoiceMessage
+        | ManagerWsLogMessage
+        | ManagerWsScannerMessage
+    ),
+    pydantic.Discriminator(discriminator="type"),
 ]
-
-
-ManagerWsScannerMessage = ManagerWsScannerMessageStatusChanged
-
-OutgoingWsData = (
-    ManagerWsGlobalCounterMessage
-    | ManagerWsCounterMessage
-    | ManagerWsChoiceMessage
-    | ManagerWsLogMessage
-    | ManagerWsScannerMessage
-)
 
 
 class ScannerStatusBar(StatusBarInterface):
@@ -575,14 +604,12 @@ class ScannerStatusBar(StatusBarInterface):
         self: Self,
         **fields: Unpack[StatusBarInterfaceUpdateOptions],
     ) -> None:
-        data: ManagerWsCounterMessageUpdate = {
-            "type": "counter",
-            "data": {
-                "type": "update",
-                "idx": self.__idx,
-                "options": {"type": "status_bar", "options": fields},
-            },
-        }
+        data: ManagerWsCounterMessage = ManagerWsCounterMessage(
+            data=ManagerWsCounterMessageUpdateData(
+                idx=self.__idx,
+                options=CounterUpdateTypeStatusBar(options=fields),
+            ),
+        )
         self.__ref.send_data_sync(data)
 
 
@@ -597,32 +624,28 @@ class ScannerCounter(CounterInterface):
 
     @override
     def update(self: Self, incr: NumberLike = 1, *, force: bool = False) -> None:
-        data: ManagerWsCounterMessageUpdate = {
-            "type": "counter",
-            "data": {
-                "type": "update",
-                "idx": self.__idx,
-                "options": {
-                    "type": "counter",
-                    "options": {
-                        "force": force,
-                        "incr": number_like_convert_to_serializable(incr),
-                    },
-                },
-            },
-        }
+        data: ManagerWsCounterMessage = ManagerWsCounterMessage(
+            data=ManagerWsCounterMessageUpdateData(
+                type="update",
+                idx=self.__idx,
+                options=CounterUpdateTypeCounter(
+                    options=CounterUpdateOptions(
+                        force=force,
+                        incr=number_like_convert_to_serializable(incr),
+                    ),
+                ),
+            ),
+        )
         self.__ref.send_data_sync(data)
 
     @override
     def close(self: Self, *, clear: bool = False) -> None:
-        data: ManagerWsCounterMessageClose = {
-            "type": "counter",
-            "data": {
-                "type": "close",
-                "idx": self.__idx,
-                "options": {"clear": clear},
-            },
-        }
+        data: ManagerWsCounterMessage = ManagerWsCounterMessage(
+            data=ManagerWsCounterMessageCloseData(
+                idx=self.__idx,
+                options=CounterMessageCloseOptions(clear=clear),
+            ),
+        )
         self.__ref.send_data_sync(data)
 
 
@@ -675,7 +698,7 @@ class ReplyData:
     type: str
     finished: bool
     event: asyncio.Event
-    data: None | Any
+    data: Optional[Any]
 
 
 class ManagerCtx(AbstractContextManager[WsSingleManager]):
@@ -747,11 +770,11 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
         instance: CounterInstanceType,
     ) -> int:
         idx = len(self.__counters)
-        self.__counters.append(instance["type"])
+        self.__counters.append(instance.type)
         instance_serializable: CounterInstanceType
 
-        if instance["type"] == "counter":
-            serializable_options1: CounterOptions = {**instance["options"]}
+        if instance.type == "counter":
+            serializable_options1: CounterOptions = {**instance.options}
             number_like_keys: list[Literal["count", "total"]] = [
                 "count",
                 "total",
@@ -763,21 +786,20 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
                             serializable_options1[number_like_key],
                         )
                     )
-            instance_serializable = {
-                "type": "counter",
-                "options": serializable_options1,
-            }
+            instance_serializable = CounterTypeCounter(
+                options=serializable_options1,
+            )
         else:
-            serializable_options2: StatusBarGetOptions = {**instance["options"]}
+            serializable_options2: StatusBarGetOptions = {**instance.options}
 
-            instance_serializable = {
-                "type": "status_bar",
-                "options": serializable_options2,
-            }
-        data: ManagerWsGlobalCounterMessageCounter = {
-            "type": "global_counter",
-            "data": {"type": "counter", "counter": instance_serializable, "idx": idx},
-        }
+            instance_serializable = CounterTypeStatusBar(
+                options=serializable_options2,
+            )
+        data: ManagerWsGlobalCounterMessage = ManagerWsGlobalCounterMessage(
+            data=ManagerWsGlobalMessageCounterData(
+                counter=instance_serializable, idx=idx,
+            ),
+        )
         self.send_data_sync(data)
         return idx
 
@@ -786,13 +808,13 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
-        options: CounterTypeStatusBar = {"type": "status_bar", "options": kwargs}
+        options: CounterTypeStatusBar = CounterTypeStatusBar(options=kwargs)
         idx: int = self.__add_counter(options)
         return ScannerStatusBar(self, idx)
 
     @override
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        options: CounterTypeCounter = {"type": "counter", "options": kwargs}
+        options: CounterTypeCounter = CounterTypeCounter(options=kwargs)
         idx: int = self.__add_counter(options)
         return ScannerCounter(self, idx)
 
@@ -800,10 +822,9 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
     def stop(
         self: Self,
     ) -> None:
-        data: ManagerWsGlobalCounterMessageStop = {
-            "type": "global_counter",
-            "data": {"type": "stop"},
-        }
+        data: ManagerWsGlobalCounterMessage = ManagerWsGlobalCounterMessage(
+            data=ManagerWsGlobalMessageStopData(),
+        )
         self.send_data_sync(data)
 
     @override
@@ -852,16 +873,14 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
 
         uid: uuid.UUID = uuid.uuid4()
 
-        data: ManagerWsChoiceMessageAskQuestion = {
-            "type": "choice",
-            "data": {
-                "type": "ask_question",
-                "message": message,
-                "choices": choices_impl,
-                "default": default_impl,
-                "id": str(uid),
-            },
-        }
+        data: ManagerWsChoiceMessage = ManagerWsChoiceMessage(
+            data=ManagerWsChoiceMessageAskQuestionData(
+                message=message,
+                choices=choices_impl,
+                default=default_impl,
+                id=str(uid),
+            ),
+        )
 
         event = asyncio.Event()
 
@@ -915,7 +934,7 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
 
 
 class ScanStartQuery(pydantic.BaseModel):
-    model_config = {"extra": "forbid"}
+    model_config = DEFAULT_MODEL_CONFIG
 
     filter: Optional[list[ConfigFilterItem] | ConfigFilterItem] = None
 
@@ -986,8 +1005,11 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
     async def scan_status(
         backend: Annotated[Backend, Depends(retreive_backend)],
     ) -> Response:
-        status = backend.scanner.status()
-        return JSONResponse(status_code=200, content={"status": status})
+        status: ScanStatusSerializable = backend.scanner.status()
+        return JSONResponse(
+            status_code=200,
+            content=ScanStatusSerializableResult(status=status),
+        )
 
 
 @dataclass
@@ -1004,40 +1026,53 @@ class BackendOptions:
     address: Address
 
 
-class ScannerStateIdle(TypedDict):
-    type: Literal["idle"]
+class ScannerStateIdle(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["idle"] = "idle"
 
 
-class ScannerStateRunning(TypedDict):
-    type: Literal["running"]
+class ScannerStateRunning(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["running"] = "running"
     configs: list[FinalConfig]
 
 
 type SummaryTuple = tuple[LanguageDict, MetadataDict, ScanSummaryDetailed]
 
+# TODO: use the short string
 type LongLanguageStr = str
 
 type LanguageDictSerializable = dict[LongLanguageStr, int]
 
 
-class MetadataSubDictSerializable(TypedDict, total=False):
+class MetadataSubDictSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     ok: int
     missing: int
     skipped: int
 
 
-class MetadataDictSerializable(TypedDict, total=False):
+class MetadataDictSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     series: MetadataSubDictSerializable
     season: MetadataSubDictSerializable
     episode: MetadataSubDictSerializable
 
 
-class ScanSummaryDetailedSerializable(TypedDict):
+class ScanSummaryDetailedSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     success: LanguageDictSerializable
     failure: dict[str, int]
 
 
-class SummaryTupleDict(TypedDict):
+class SummaryTupleSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
     language: LanguageDictSerializable
     metadata: MetadataDictSerializable
     details: ScanSummaryDetailedSerializable
@@ -1052,10 +1087,10 @@ def language_dict_to_serializable_data(
 def scan_summary_detailed_to_serializable_data(
     obj: ScanSummaryDetailed,
 ) -> ScanSummaryDetailedSerializable:
-    return {
-        "success": language_dict_to_serializable_data(obj.success),
-        "failure": obj.failure,
-    }
+    return ScanSummaryDetailedSerializable(
+        success=language_dict_to_serializable_data(obj.success),
+        failure=obj.failure,
+    )
 
 
 def metadata_sub_dict_to_serializable_data(
@@ -1073,27 +1108,80 @@ def metadata_dict_to_serializable_data(
     )
 
 
-def summary_tuple_to_serializable_data(summary: SummaryTuple) -> SummaryTupleDict:
-    return {
-        "language": language_dict_to_serializable_data(summary[0]),
-        "metadata": metadata_dict_to_serializable_data(summary[1]),
-        "details": scan_summary_detailed_to_serializable_data(summary[2]),
-    }
+def summary_tuple_to_serializable_data(
+    summary: SummaryTuple,
+) -> SummaryTupleSerializable:
+    return SummaryTupleSerializable(
+        language=language_dict_to_serializable_data(summary[0]),
+        metadata=metadata_dict_to_serializable_data(summary[1]),
+        details=scan_summary_detailed_to_serializable_data(summary[2]),
+    )
 
 
-class ScannerStateFinished(TypedDict):
-    type: Literal["finished"]
+class ScannerStateFinished(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["finished"] = "finished"
     result: list[SummaryTuple]
 
 
-class ScannerStateError(TypedDict):
-    type: Literal["error"]
-    error: str | BaseException
+class ScannerStateFinishedSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["finished"] = "finished"
+    result: list[SummaryTupleSerializable]
 
 
-ScannerState = (
-    ScannerStateIdle | ScannerStateRunning | ScannerStateFinished | ScannerStateError
-)
+class ScannerStateError(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["error"] = "error"
+    error: Annotated[str | BaseException, pydantic.Field(union_mode="smart")]
+
+
+class ScannerStateErrorSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["error"] = "error"
+    error: str
+
+
+ScannerState = Annotated[
+    (ScannerStateIdle | ScannerStateRunning | ScannerStateFinished | ScannerStateError),
+    pydantic.Discriminator(discriminator="type"),
+]
+
+ScanStatusSerializable = Annotated[
+    (
+        ScannerStateIdle
+        | ScannerStateRunning
+        | ScannerStateFinishedSerializable
+        | ScannerStateErrorSerializable
+    ),
+    pydantic.Discriminator(discriminator="type"),
+]
+
+
+def scanner_state_to_serializable_data(
+    state: ScannerState,
+) -> ScanStatusSerializable:
+    match state.type:
+        case "error":
+            return ScannerStateErrorSerializable(error=str(state.error))
+        case "finished":
+            return ScannerStateFinishedSerializable(
+                result=[
+                    summary_tuple_to_serializable_data(item) for item in state.result
+                ],
+            )
+        case _:
+            return state
+
+
+class ScanStatusSerializableResult(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    status: ScanStatusSerializable
 
 
 class ThreadSafeAcquired[A]:
@@ -1201,13 +1289,12 @@ class ThreadHandler(Handler):
 
             msg = self.format(record)
 
-            message: ManagerWsLogMessageEventData = {
-                "type": "event",
-                "level": cast(LogLevelStr, record.levelname),
-                "message": msg,
-                "asctime": record.asctime,
-                "module": record.module,
-            }
+            message: ManagerWsLogMessageEventData = ManagerWsLogMessageEventData(
+                level=cast(LogLevelStr, record.levelname),
+                message=msg,
+                asctime=record.asctime,
+                module=record.module,
+            )
             self.__send(message)
 
         except RecursionError:
@@ -1239,7 +1326,7 @@ class ThreadLoggerCtx(AbstractContextManager[Logger]):
         logger.handlers = []
 
         def send(data: ManagerWsLogMessageEventData) -> None:
-            message: ManagerWsLogMessage = {"type": "log", "data": data}
+            message: ManagerWsLogMessage = ManagerWsLogMessage(data=data)
             self.__send(message)
 
         thread_handler = ThreadHandler(send=send, thread_id=self.__thread_id)
@@ -1295,7 +1382,7 @@ class BackendScanner:
     ) -> None:
         self.__all_configs = configs
         self.__state = ThreadSafe[ScannerThreadState](
-            ScannerThreadState(state={"type": "idle"}, thread=None),
+            ScannerThreadState(state=ScannerStateIdle(), thread=None),
         )
 
     async def __launch_scanner_in_background(
@@ -1404,10 +1491,11 @@ class BackendScanner:
     ) -> None:
 
         def on_status_change(previous: ScannersStateStr, new: ScannersStateStr) -> None:
-            data: ManagerWsScannerMessageStatusChanged = {
-                "type": "scanner",
-                "data": {"type": "status_changed", "previous": previous, "new": new},
-            }
+            data: ManagerWsScannerMessage = ManagerWsScannerMessage(
+                data=ManagerWsScannerMessageStatusChangedData(
+                    previous=previous, new=new,
+                ),
+            )
             backend.manager.send_data_sync(data)
 
         try:
@@ -1417,9 +1505,9 @@ class BackendScanner:
             )
 
             def mod(d: ScannerThreadState) -> ScannerThreadState:
-                on_status_change(d.state["type"], "finished")
+                on_status_change(d.state.type, "finished")
                 return ScannerThreadState(
-                    state={"type": "finished", "result": result},
+                    state=ScannerStateFinished(result=result),
                     thread=d.thread,
                 )
 
@@ -1432,9 +1520,9 @@ class BackendScanner:
             ) -> Callable[[ScannerThreadState], ScannerThreadState]:
 
                 def mod(d: ScannerThreadState) -> ScannerThreadState:
-                    on_status_change(d.state["type"], "error")
+                    on_status_change(d.state.type, "error")
                     return ScannerThreadState(
-                        state={"type": "error", "error": err},
+                        state=ScannerStateError(error=err),
                         thread=d.thread,
                     )
 
@@ -1451,7 +1539,7 @@ class BackendScanner:
 
         with self.__state.ctx() as ctx:
             state = ctx.get()
-            if state.state["type"] == "running" or state.thread is not None:
+            if state.state.type == "running" or state.thread is not None:
                 return "Scanner is already running"
 
             event = asyncio.Event()
@@ -1462,7 +1550,7 @@ class BackendScanner:
             )
 
             new_state: ScannerThreadState = ScannerThreadState(
-                state={"type": "running", "configs": configs},
+                state=ScannerStateRunning(configs=configs),
                 thread=ThreadState(thread=thread, event=event),
             )
 
@@ -1483,14 +1571,12 @@ class BackendScanner:
             run_in_background(start_and_wait_for_thread)
 
             ctx.set(new_state)
-            data: ManagerWsScannerMessageStatusChanged = {
-                "type": "scanner",
-                "data": {
-                    "type": "status_changed",
-                    "previous": state.state["type"],
-                    "new": new_state.state["type"],
-                },
-            }
+            data: ManagerWsScannerMessage = ManagerWsScannerMessage(
+                data=ManagerWsScannerMessageStatusChangedData(
+                    previous=state.state.type,
+                    new=new_state.state.type,
+                ),
+            )
             backend.manager.send_data_sync(data)
 
         return None
@@ -1518,21 +1604,9 @@ class BackendScanner:
             raise HTTPException(status_code=400, detail=str(err)) from None
 
     # TODO: type correctly
-    def status(self: Self) -> dict[str, Any]:
+    def status(self: Self) -> ScanStatusSerializable:
         state = self.__state.get_data()
-        match state.state["type"]:
-            case "error":
-                return {"state": "error", "error": str(state.state["error"])}
-            case "finished":
-                return {
-                    "state": "finished",
-                    "result": [
-                        summary_tuple_to_serializable_data(item)
-                        for item in state.state["result"]
-                    ],
-                }
-            case _:
-                return cast(dict[str, Any], state.state)
+        return scanner_state_to_serializable_data(state.state)
 
 
 class Backend:
