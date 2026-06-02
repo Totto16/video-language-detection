@@ -5,6 +5,7 @@ from datetime import datetime
 from logging import Logger
 from pathlib import Path
 from typing import (
+    Any,
     Literal,
     Optional,
     Self,
@@ -149,7 +150,29 @@ class EpisodeContent(Content):
         # note, reset other metadata here, once new one is added
 
     def __metadata_for_file(self: Self) -> str:
-        return json.dumps({})
+        metadata: dict[str, str | int | dict[str, Any] | dict[str, str | int]] = {
+            "original_path": str(self.scanned_file.path.absolute()),
+            "description": {
+                "name": self.__description.name,
+                "season": self.__description.season,
+                "episode": self.__description.episode,
+            },
+            "language": {
+                "short": self.language.short,
+                "long": self.language.long,
+            },
+        }
+
+        if self.scanned_file.stats.checksum is not None:
+            metadata["checksum"] = self.scanned_file.stats.checksum
+
+        serialized_metadata = (
+            None if self.metadata is None else self.metadata.serialize()
+        )
+        if serialized_metadata is not None:
+            metadata["metadata"] = serialized_metadata
+
+        return json.dumps(metadata)
 
     def update_video_metadata(
         self: Self,
@@ -224,7 +247,7 @@ class EpisodeContent(Content):
                         error_mode=error_mode,
                     )
                     bar.close(clear=True)
-                    print(self.__video_metadata)
+                    print("video_metadata", self.__video_metadata)
             except RuntimeError:
                 logger.exception("Analyze Video Metadata")
 
