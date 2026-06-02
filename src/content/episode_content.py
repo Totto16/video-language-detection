@@ -242,6 +242,8 @@ class EpisodeContent(Content):
                 if (
                     self.__video_metadata is None
                     or self.__video_metadata.dimensions is None
+                    or self.__video_metadata.size is None
+                    or self.__video_metadata.bit_rate is None
                 ):
                     bar: CounterInterface = manager.counter(
                         total=1,

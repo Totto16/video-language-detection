@@ -94,9 +94,14 @@ class VideoDimension:
 class VideoMetadata:
     __duration: float = field(metadata=alias("duration"))
     __streams: list[VideoStream] = field(metadata=alias("streams"))
-    __dimensions: Optional[VideoDimension] = field(
+    __dimensions: VideoDimension = field(metadata=alias("dimensions"))
+    __size: Optional[int] = field(
         default=None,
-        metadata=alias("dimensions") | none_as_undefined,
+        metadata=alias("size") | none_as_undefined,
+    )
+    __bit_rate: Optional[float] = field(
+        default=None,
+        metadata=alias("bit_rate") | none_as_undefined,
     )
 
     @property
@@ -110,6 +115,14 @@ class VideoMetadata:
     @property
     def dimensions(self: Self) -> Optional[VideoDimension]:
         return self.__dimensions
+
+    @property
+    def size(self: Self) -> Optional[int]:
+        return self.__size
+
+    @property
+    def bit_rate(self: Self) -> Optional[float]:
+        return self.__bit_rate
 
     @staticmethod
     def __read_metadata(file: Path, error_mode: ErrorMode) -> Optional["VideoMetadata"]:
@@ -185,10 +198,16 @@ class VideoMetadata:
                 map_stream(stream) for stream in metadata.streams
             ]
 
+            size: int = metadata.file_info.size() or file.stat().st_size
+
+            bit_rate: Optional[float] = metadata.file_info.bit_rate()
+
             return VideoMetadata(
                 file_duration,
-                dimensions,
                 streams,
+                dimensions,
+                size,
+                bit_rate,
             )
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400

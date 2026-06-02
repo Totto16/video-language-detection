@@ -89,7 +89,7 @@ class FFprobeStream:
         """
         if self.is_video() or self.is_audio():
             val: Optional[Any] = self.__stream.get("duration", None)
-            return parse_float_safely(val) if isinstance(val, str) else None
+            return optional_float(val)
 
         return None
 
@@ -97,18 +97,9 @@ class FFprobeStream:
         if self.is_video():
             width: Optional[Any] = self.__stream.get("width", None)
             height: Optional[Any] = self.__stream.get("height", None)
-            print("width", width, height, type(width))
 
-            if not isinstance(width, (str, int)) or not isinstance(height, (str, int)):
-                return None
-
-            def to_int(val: int | str) -> Optional[int]:
-                if isinstance(val, int):
-                    return val
-                return parse_int_safely(val)
-
-            width_val = to_int(width)
-            height_val = to_int(height)
+            width_val = optional_int(width)
+            height_val = optional_int(height)
 
             if width_val is None or height_val is None:
                 return None
@@ -119,6 +110,26 @@ class FFprobeStream:
 
     def __repr__(self: Self) -> str:
         return json.dumps(self.__stream)
+
+
+def optional_int(val: Any) -> Optional[int]:
+    if isinstance(val, int):
+        return val
+
+    if isinstance(val, str):
+        return parse_int_safely(val)
+
+    return None
+
+
+def optional_float(val: Any) -> Optional[float]:
+    if isinstance(val, int):
+        return float(val)
+
+    if isinstance(val, str):
+        return parse_float_safely(val)
+
+    return None
 
 
 class FormatInfo:
@@ -133,7 +144,15 @@ class FormatInfo:
         Returns None if the information is not present
         """
         val: Optional[Any] = self.__raw.get("duration", None)
-        return parse_float_safely(val) if isinstance(val, str) else None
+        return optional_float(val)
+
+    def size(self: Self) -> Optional[int]:
+        val: Optional[Any] = self.__raw.get("size", None)
+        return optional_int(val)
+
+    def bit_rate(self: Self) -> Optional[float]:
+        val: Optional[Any] = self.__raw.get("bit_rate", None)
+        return optional_float(val)
 
 
 class FFProbeRawResult(TypedDict):
