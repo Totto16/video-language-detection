@@ -97,12 +97,18 @@ class FFprobeStream:
         if self.is_video():
             width: Optional[Any] = self.__stream.get("width", None)
             height: Optional[Any] = self.__stream.get("height", None)
+            print("width", width, height, type(width))
 
-            if not isinstance(width, str) or not isinstance(height, str):
+            if not isinstance(width, (str, int)) or not isinstance(height, (str, int)):
                 return None
 
-            width_val = parse_int_safely(width)
-            height_val = parse_int_safely(height)
+            def to_int(val: int | str) -> Optional[int]:
+                if isinstance(val, int):
+                    return val
+                return parse_int_safely(val)
+
+            width_val = to_int(width)
+            height_val = to_int(height)
 
             if width_val is None or height_val is None:
                 return None

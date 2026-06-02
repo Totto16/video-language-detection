@@ -11,6 +11,7 @@ from helper.error import ErrorMode
 from helper.ffprobe import FFprobeStream, StreamType, ffprobe, ffprobe_check
 from helper.log import get_logger
 from helper.translation import get_translator
+from apischema.metadata import none_as_undefined
 
 logger: Logger = get_logger()
 _ = get_translator()
@@ -92,8 +93,23 @@ class VideoDimension:
 @dataclass(slots=True, repr=True)
 class VideoMetadata:
     __duration: float = field(metadata=alias("duration"))
-    __dimensions: VideoDimension = field(metadata=alias("dimensions"))
     __streams: list[VideoStream] = field(metadata=alias("streams"))
+    __dimensions: Optional[VideoDimension] = field(
+        default=None,
+        metadata=alias("dimensions") | none_as_undefined,
+    )
+
+    @property
+    def duration(self: Self) -> float:
+        return self.__duration
+
+    @property
+    def streams(self: Self) -> list[VideoStream]:
+        return self.__streams
+
+    @property
+    def dimensions(self: Self) -> Optional[VideoDimension]:
+        return self.__dimensions
 
     @staticmethod
     def __read_metadata(file: Path, error_mode: ErrorMode) -> Optional["VideoMetadata"]:
