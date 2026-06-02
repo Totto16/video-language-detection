@@ -249,7 +249,6 @@ class MutagenFileWrapper(IOInterface):
 
         if chunk_size < 0:
             result = self.__impl.write(data)
-            # TODO: write in blocks
             self.__emit(IOOpProgress("progress", "write", amount=result))
             return result
 
@@ -340,10 +339,10 @@ class VideoTaggerWriter:
         self.__manager = manager
 
     def __save_impl(self: Self) -> None:
-        size: int = self.__filething.size()
+        total: int = self.__filething.size()
 
         bar: CounterInterface = self.__manager.counter(
-            total=size,
+            total=float(total),
             desc="update video tags",
             unit="B",
             leave=False,
@@ -353,9 +352,9 @@ class VideoTaggerWriter:
         bar.update(0, force=True)
 
         position: int = self.__filething.tell()
-        total = size
 
-        bar.update(position)
+        bar.update(float(position))
+        bar_position: int = position
 
         try:
 
@@ -363,24 +362,23 @@ class VideoTaggerWriter:
                 # NOTE. the progress bar can only go forwards, so the position tracker keeps track of the position and we update the peogress bar only, when we move forwards
 
                 nonlocal position
-                nonlocal total
-                prev_pos = position
+                nonlocal bar_position
 
                 match op.type:
                     case "progress":
-                        bar.update()
                         position += op.amount
                     case "seek":
                         position = op.amount
                     case "truncate":
                         # only the total changed, which we can't adjust
-                        total = op.amount
+                        pass
                     case _:
                         assert_never(op.type)
 
-                if position > prev_pos:
+                if position > bar_position:
                     if position <= total:
-                        bar.update(incr=position - prev_pos)
+                        bar.update(incr=float(position - bar_position))
+                        bar_position = position
                     else:
                         bar.update(0, force=True)
                 else:
@@ -403,7 +401,7 @@ class VideoTaggerWriter:
         if isinstance(self.__instance, mp4.MP4):
             for key, value in metadata.items():
                 self.__instance[f"----:lt.totto:video_language_detect:{key}"] = [
-                    mp4.MP4FreeForm(value, mp4.AtomDataType.IMPLICIT),
+                    mp4.MP4FreeForm(value.encode(), mp4.AtomDataType.IMPLICIT),
                 ]
 
                 self.__instance[key] = value
@@ -431,7 +429,7 @@ class VideoTagger:
 
         filething = MutagenFileWrapper(file=file, chunk_size=PROGRESS_CHUNK_SIZE)
 
-        instance = mutagen.File(filething=filething, easy=False)
+        instance = mutagen.File(filething, easy=False)
 
         if instance is None:
             return None
