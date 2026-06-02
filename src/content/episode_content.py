@@ -190,7 +190,7 @@ class EpisodeContent(Content):
                     with handle.writer(manager=manager) as writer:
                         writer.write_metadata(
                             comment=[
-                                "see other metadata for more info by video_language_detect"
+                                "see other metadata for more info by video_language_detect",
                             ],
                             metadata=metadata,
                         )

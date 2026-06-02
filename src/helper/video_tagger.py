@@ -1,17 +1,17 @@
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-import os
 from pathlib import Path
 from types import TracebackType
 from typing import BinaryIO, Literal, Optional, Self, assert_never, override
 
 import mutagen._file as mutagen
+from mutagen import mp4
 from mutagen._util import MutagenError
 
 from helper.manager import CounterInterface, ManagerInterface
-import mutagen.mp4 as mp4
 
 
 ## see https://mutagen.readthedocs.io/en/latest/user/filelike.html#
@@ -164,16 +164,19 @@ class MutagenFileWrapper(IOInterface):
     __file: Path
     __impl: BinaryIO
     __callbacks: list[OpCallback]
+    __chunk_size: int
 
     def __init__(
         self: Self,
         file: Path,
+        chunk_size: int = 4096,
     ) -> None:
         super().__init__()
 
         self.__file = file
         self.__impl = self.__file.open(mode="rb+")
         self.__callbacks = []
+        self.__chunk_size = chunk_size
 
     def __emit(self: Self, op: IOOp) -> None:
         for callback in self.__callbacks:
@@ -185,10 +188,48 @@ class MutagenFileWrapper(IOInterface):
 
     @override
     def read(self: Self, size: int = -1) -> bytes:
-        data = self.__impl.read(size)
-        # TODO: read in blocks
-        self.__emit(IOOpProgress("progress", "read", amount=len(data)))
-        return data
+
+        chunk_size = self.__chunk_size
+
+        if chunk_size < 0:
+            data = self.__impl.read(size)
+            self.__emit(IOOpProgress("progress", "read", amount=len(data)))
+            return data
+
+        if size < 0:
+            chunks_infinite: list[bytes] = []
+            total_infinite: int = 0
+
+            while True:
+                chunk = self.__impl.read(chunk_size)
+                if not chunk:
+                    break
+
+                chunks_infinite.append(chunk)
+
+                chunk_len = len(chunk)
+                total_infinite += chunk_len
+                self.__emit(IOOpProgress("progress", "read", amount=chunk_len))
+
+            return b"".join(chunks_infinite)
+
+        chunks_limited: list[bytes] = []
+        total_limited: int = 0
+        remaining: int = size
+
+        while remaining > 0:
+            chunk = self.__impl.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+
+            chunks_limited.append(chunk)
+
+            chunk_len = len(chunk)
+            total_limited += chunk_len
+            remaining -= chunk_len
+            self.__emit(IOOpProgress("progress", "read", amount=chunk_len))
+
+        return b"".join(chunks_limited)
 
     @override
     def seek(self: Self, offset: int, whence: int = 0) -> int:
@@ -203,10 +244,26 @@ class MutagenFileWrapper(IOInterface):
 
     @override
     def write(self: Self, data: bytes) -> int:
-        result = self.__impl.write(data)
-        # TODO: write in blocks
-        self.__emit(IOOpProgress("progress", "write", amount=result))
-        return result
+
+        chunk_size = self.__chunk_size
+
+        if chunk_size < 0:
+            result = self.__impl.write(data)
+            # TODO: write in blocks
+            self.__emit(IOOpProgress("progress", "write", amount=result))
+            return result
+
+        total: int = 0
+
+        for offset in range(0, len(data), chunk_size):
+            chunk = data[offset : offset + chunk_size]
+
+            written = self.__impl.write(chunk)
+
+            total += written
+            self.__emit(IOOpProgress("progress", "write", amount=written))
+
+        return total
 
     @override
     def truncate(self: Self, size: Optional[int] = None) -> int:
@@ -363,7 +420,8 @@ class VideoTagger:
         return VideoTagger(filething, instance)
 
     def writer(
-        self: Self, manager: ManagerInterface,
+        self: Self,
+        manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerWriter]:
 
         filething = self.__filething
