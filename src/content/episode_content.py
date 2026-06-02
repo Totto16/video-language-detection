@@ -37,10 +37,12 @@ from helper.apischema import narrow_type
 from helper.error import ErrorMode
 from helper.log import get_logger
 from helper.manager import CounterInterface, ManagerInterface
+from helper.translation import get_translator
 from helper.version import PROGRAM_VERSION
 from helper.video_tagger import VideoTagger
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 # see below on why this hacks is needed
@@ -190,7 +192,11 @@ class EpisodeContent(Content):
 
             handle = VideoTagger.get_handle(self.scanned_file.path)
             if handle is None:
-                logger.error("Can't tag the file '%s'", self.scanned_file.path)
+                logger.error(
+                    _("Can't tag the file '{file}'").format(
+                        file=self.scanned_file.path,
+                    ),
+                )
                 return
 
             try:

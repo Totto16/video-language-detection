@@ -8,13 +8,9 @@ from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.apischema import EmitType, OneOf, get_schema
 from helper.config import SchemaConfig
-from helper.translation import get_translator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-
-_ = get_translator()
 
 
 AllContent = Annotated[

@@ -5,6 +5,9 @@ from typing import Literal, Optional, Self, override
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 from helper.apischema import SchemaType
+from helper.translation import get_translator
+
+_ = get_translator()
 
 
 class Provider(ABC):
@@ -71,7 +74,7 @@ class MissingProvider(Provider):
         season_data: object,
         episode: int,
     ) -> Optional[object]:
-        msg = "Method 'get_episode_metadata' on MissingProvider called"
+        msg = _("Method 'get_episode_metadata' on MissingProvider called")
         raise RuntimeError(msg)
 
     @override
@@ -91,7 +94,7 @@ class MissingProvider(Provider):
         self: Self,
         series_name: str,
     ) -> Optional[object]:
-        msg = "Method 'get_series_metadata' on MissingProvider called"
+        msg = _("Method 'get_series_metadata' on MissingProvider called")
         raise RuntimeError(msg)
 
     @override
@@ -100,11 +103,11 @@ class MissingProvider(Provider):
         series_data: object,
         season: int,
     ) -> Optional[object]:
-        msg = "Method 'get_season_metadata' on MissingProvider called"
+        msg = _("Method 'get_season_metadata' on MissingProvider called")
         raise RuntimeError(msg)
 
     @override
     @staticmethod
     def get_metadata_schema() -> SchemaType:
-        msg = "Method 'get_metadata_schema' on MissingProvider called"
+        msg = _("Method 'get_metadata_schema' on MissingProvider called")
         raise RuntimeError(msg)

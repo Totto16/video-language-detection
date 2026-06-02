@@ -7,8 +7,10 @@ import torch
 
 from helper.gpu import GPU, AvailableMemory
 from helper.log import get_logger
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 class AllocatorType(Enum):
@@ -55,7 +57,9 @@ class DeviceManager:
         gpu_result = GPU.get_best(use_integrated=False)
 
         if gpu_result.is_err():
-            logger.warning("Got GPU error: %s", gpu_result.get_err())
+            logger.warning(
+                _("Got GPU error: {error}").format(error=gpu_result.get_err()),
+            )
             self.__device_allocator = CPUAllocator()
         else:
             self.__device_allocator = GPUAllocator(gpu_result.get_ok())

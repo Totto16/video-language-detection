@@ -36,8 +36,10 @@ from helper.classifier import (
 from helper.error import ErrorMode
 from helper.log import get_logger
 from helper.manager import ManagerInterface
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
@@ -130,7 +132,7 @@ class FailedFor(SummaryResult):
 
     @override
     def get_reason_as_str(self: Self) -> str:
-        return f"Scan failed with reason: {self.__reason!s}"
+        return _("Scan failed with reason: {reason!s}").format(reason=self.__reason)
 
     @override
     def get_reason_identifier(self: Self) -> str:
@@ -138,7 +140,7 @@ class FailedFor(SummaryResult):
 
     @override
     def get_language(self: Self) -> Language:
-        msg = "Failed summaries can't access the language"
+        msg = _("Failed summaries can't access the language")
         raise RuntimeError(msg)
 
     @property
@@ -163,9 +165,17 @@ class FailedForWithLanguage(FailedFor):
     @override
     def get_reason_as_str(self: Self) -> str:
         if self.__best is None:
-            return f"Scan failed with language reason: {self.__reason!s}"
+            return _("Scan failed with language reason: {reason!s}").format(
+                reason=self.__reason,
+            )
 
-        return f"Scan failed with language reason: {self.__reason!s} and the best language was {self.__best.language} with {self.__best.accuracy:.2%}"
+        return _(
+            "Scan failed with language reason: {reason!s} and the best language was {language} with {accuracy:.2%}"  # noqa: COM812
+        ).format(
+            reason=self.__reason,
+            language=self.__best.language,
+            accuracy=self.__best.accuracy,
+        )
 
     @override
     def get_reason_identifier(self: Self) -> str:
@@ -185,11 +195,11 @@ class SuccessFor(SummaryResult):
 
     @override
     def get_reason_as_str(self: Self) -> str:
-        return "Scan was successful"
+        return _("Scan was successful")
 
     @override
     def get_reason_identifier(self: Self) -> str:
-        msg = "Successful summaries can't access the reason identifier"
+        msg = _("Successful summaries can't access the reason identifier")
         raise RuntimeError(msg)
 
     @override
@@ -245,7 +255,7 @@ class LanguageScanner:
             )
             return None  # noqa: TRY300
         except FileMetadataError:
-            logger.exception("Get Language")
+            logger.exception(_("Get Language"))
             self.__summary_manager.add(FailedFor(FailReason.exception, scanned_file))
             return None
 
@@ -494,7 +504,7 @@ def process_folder(
             path,
         )
         if index is None:
-            msg = f"Path to delete wasn't founds: {path}"
+            msg = _("Path to delete wasn't founds: {path}").format(path=path)
             raise RuntimeError(msg)
 
         del rescan[index]

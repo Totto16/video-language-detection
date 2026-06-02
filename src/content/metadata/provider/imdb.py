@@ -60,7 +60,8 @@ class IMDBProvider(Provider):
         self: Self,
         series_name: str,
     ) -> Optional[object]:
-        raise RuntimeError("Not implemented yet")
+        msg = "TODO"
+        raise NotImplementedError(msg)
 
     @override
     def get_season_metadata(
@@ -68,7 +69,8 @@ class IMDBProvider(Provider):
         series_data: object,
         season: int,
     ) -> Optional[object]:
-        raise RuntimeError("Not implemented yet")
+        msg = "TODO"
+        raise NotImplementedError(msg)
 
     @override
     def get_episode_metadata(
@@ -77,4 +79,5 @@ class IMDBProvider(Provider):
         season_data: object,
         episode: int,
     ) -> Optional[object]:
-        raise RuntimeError("Not implemented yet")
+        msg = "TODO"
+        raise NotImplementedError(msg)

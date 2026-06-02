@@ -13,8 +13,10 @@ from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import ScanType
 from helper.apischema import OneOf, SchemaType, get_schema
 from helper.log import get_logger
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 @dataclass
@@ -149,7 +151,7 @@ class TMDBProvider(Provider):
         if isinstance(series_data, SkipMetadata):
             return SkipHandle()
 
-        msg = "Expected SeriesMetadata, but got other metadata data"
+        msg = _("Expected SeriesMetadata, but got other metadata data")
         logger.warning(msg)
 
         return None
@@ -175,7 +177,7 @@ class TMDBProvider(Provider):
         if isinstance(season_data, SkipMetadata):
             return SkipHandle()
 
-        msg = "Expected SeasonMetadata, but got other metadata data"
+        msg = _("Expected SeasonMetadata, but got other metadata data")
         logger.warning(msg)
 
         return None
@@ -301,11 +303,11 @@ class TMDBProvider(Provider):
         metadata_type = data.get("metadata_type")
 
         if metadata_type is None:
-            msg = "Deserialization error: missing property 'metadata_type'"
+            msg = _("Deserialization error: missing property 'metadata_type'")
             raise TypeError(msg)
 
         if not isinstance(metadata_type, str):
-            msg = "Deserialization error: property 'metadata_type' is not a str"
+            msg = _("Deserialization error: property 'metadata_type' is not a str")
             raise TypeError(msg)
 
         match metadata_type:
@@ -318,7 +320,9 @@ class TMDBProvider(Provider):
             case "skip":
                 return deserialize(SkipMetadata, data)
             case _:
-                msg = f"Deserialization error: Unknown metadata_type {metadata_type}"
+                msg = _(
+                    "Deserialization error: Unknown metadata_type {metadata_type}"  # noqa: COM812
+                ).format(metadata_type=metadata_type)
                 raise TypeError(msg)
 
     @override

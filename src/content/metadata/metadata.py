@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING, Annotated, Any, Optional, Self
 from apischema import alias, deserializer, schema, serialize, serializer
 
 from helper.apischema import OneOf
+from helper.translation import get_translator
+
+_ = get_translator()
 
 
 @dataclass(slots=True, repr=True)
@@ -66,26 +69,26 @@ class MetadataHandle:
     @staticmethod
     def deserialize_handle(data_dict: Any) -> "MetadataHandle":
         if not isinstance(data_dict, dict):
-            msg = "Deserialization error: expected input to be dict"
+            msg = _("Deserialization error: expected input to be dict")
             raise TypeError(msg)
 
         if data_dict.get("provider", None) is None:
-            msg = "Deserialization error: missing property 'provider'"
+            msg = _("Deserialization error: missing property 'provider'")
             raise TypeError(msg)
 
         if data_dict.get("data", None) is None:
-            msg = "Deserialization error: missing property 'data'"
+            msg = _("Deserialization error: missing property 'data'")
             raise TypeError(msg)
 
         provider = data_dict["provider"]
         data = data_dict["data"]
 
         if not isinstance(provider, str):
-            msg = "Deserialization error: property 'provider' is not a str"
+            msg = _("Deserialization error: property 'provider' is not a str")
             raise TypeError(msg)
 
         if not isinstance(data, dict):
-            msg = "Deserialization error: property 'data' is not a dict"
+            msg = _("Deserialization error: property 'data' is not a dict")
             raise TypeError(msg)
 
         match provider:
@@ -94,10 +97,14 @@ class MetadataHandle:
 
                 return MetadataHandle(provider, TMDBProvider.deserialize_metadata(data))
             case "imdb":
-                msg = f"Deserialization error: Not implemented for provider {provider}"
+                msg = _(
+                    "Deserialization error: Not implemented for provider {provider}"  # noqa: COM812
+                ).format(provider=provider)
                 raise RuntimeError(msg)
             case _:
-                msg = f"Deserialization error: Unknown provider {provider}"
+                msg = _("Deserialization error: Unknown provider {provider}").format(
+                    provider=provider,
+                )
                 raise TypeError(msg)
 
 

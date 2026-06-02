@@ -1152,7 +1152,9 @@ class ClassifierManager(AbstractContextManager[None]):
             msg = "Couldn't find any audio backends for torchaudio"
             raise RuntimeError(msg)
 
-        logger.debug("Found audio backends: %s", str(backends))
+        logger.debug(
+            _("Found audio backends: {backends}").format(backends=str(backends)),
+        )
 
     def __check_ffprobe(self: Self) -> None:
         is_ffprobe_present = ffprobe_check()
@@ -1225,15 +1227,17 @@ class ClassifierManager(AbstractContextManager[None]):
                 )
 
                 if seconds is None:
-                    msg = "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"
+                    msg = _(
+                        "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"  # noqa: COM812
+                    )
                     raise RuntimeError(msg)
 
                 result: Timestamp = Timestamp.from_seconds(seconds=seconds)
 
                 logger.debug(
-                    "Resolved auto batch settings to timestamp: %s -> %s",
-                    str(batch_settings),
-                    str(result),
+                    _(
+                        "Resolved auto batch settings to timestamp: {settings} -> {result}"  # noqa: COM812
+                    ).format(settings=str(batch_settings), result=str(result)),
                 )
 
                 return result

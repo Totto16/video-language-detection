@@ -333,7 +333,9 @@ def subcommand_run(
         args.template_to_use,
     )
     if parsed_config.is_err():
-        logger.error(_("error while parsing config: %s"), parsed_config.get_err())
+        logger.error(
+            _("error while parsing config: {err}").format(err=parsed_config.get_err()),
+        )
         return 1
 
     parsed_configs = parsed_config.get_ok()
@@ -375,7 +377,7 @@ def subcommand_run(
                     config_paramaters=config_paramaters,
                 )
     except FileLockError as err:
-        logger.error(_("File lock error: %s"), str(err))  # noqa: TRY400
+        logger.error(_("File lock error: {err}").format(err=str(err)))  # noqa: TRY400
         return 1
     return 0
 
@@ -401,7 +403,7 @@ def subcommand_config_check(
     final_config, info = parsed_config.get_ok()
 
     logger.info(_("Config '{config}' is valid!").format(config=config))
-    logger.info(_("Info about config: %s"), info)
+    logger.info(_("Info about config: {info}").format(info=info))
 
     if len(final_config) == 0:
         logger.error(_("parsing returned 0 configs"))

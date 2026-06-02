@@ -10,8 +10,10 @@ from helper.apischema import OneOf, narrow_type
 from helper.error import ErrorMode
 from helper.ffprobe import FFprobeStream, StreamType, ffprobe, ffprobe_check
 from helper.log import get_logger
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 class VideoStreamType(StrEnum):
@@ -102,13 +104,13 @@ class VideoMetadata:
             return None
 
         if not metadata.is_video():
-            logger.error("File is not a video: %s", str(file))
+            logger.error(_("File is not a video: {file}").format(file=str(file)))
             return None
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
         if file_duration is None:
-            logger.error("No video duration was found")
+            logger.error(_("No video duration was found"))
             return None
 
         def map_stream(stream: FFprobeStream) -> VideoStream:
