@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:28+0200\n"
-"PO-Revision-Date: 2026-06-02 20:34+0200\n"
+"POT-Creation-Date: 2026-06-02 20:53+0200\n"
+"PO-Revision-Date: 2026-06-02 22:38+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: Deutsch\n"
 "Language: de\n"
@@ -14,6 +14,125 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: pygettext.py 1.5\n"
 "X-Generator: Poedit 3.9\n"
+
+#: src/content/base_class.py:135
+msgid "Scan failed with reason: {reason!s}"
+msgstr "Scan ist fehlgeschlagen wegen:"
+
+#: src/content/base_class.py:143
+msgid "Failed summaries can't access the language"
+msgstr "Fehlgeschlagene Zusammenfassungen können die Sprache nicht abrufen"
+
+#: src/content/base_class.py:168
+msgid "Scan failed with language reason: {reason!s}"
+msgstr "Der Scan ist aus folgenden Sprach-Grund fehlgeschlagen: {reason!s}"
+
+#: src/content/base_class.py:172
+msgid ""
+"Scan failed with language reason: {reason!s} and the best language was "
+"{language} with {accuracy:.2%}"
+msgstr ""
+"Der Scan ist aus folgenden Sprach-Grund fehlgeschlagen: {reason!s} und die "
+"beste Sprache war {language} mit {accuracy:.2%}"
+
+#: src/content/base_class.py:198
+msgid "Scan was successful"
+msgstr "Scan war erfolgreich"
+
+#: src/content/base_class.py:202
+msgid "Successful summaries can't access the reason identifier"
+msgstr ""
+"Erfolgreiche Zusammenfassungen können nicht auf den Fehlergrund zugreifen"
+
+#: src/content/base_class.py:258
+msgid "Get Language"
+msgstr "Sprache Erkennen"
+
+#: src/content/base_class.py:507
+msgid "Path to delete wasn't found: {path}"
+msgstr "Der zu löschende Pfad wurde nicht gefunden: {path}"
+
+#: src/content/episode_content.py:196
+msgid "Can't tag the file '{file}'"
+msgstr "Kann die Datei '{file}' nicht taggen"
+
+#: src/content/metadata/interfaces.py:77
+msgid "Method 'get_episode_metadata' on MissingProvider called"
+msgstr ""
+"Methode 'get_episode_metadata' auf der Klasse MissingProvider aufgerufen"
+
+#: src/content/metadata/interfaces.py:97
+msgid "Method 'get_series_metadata' on MissingProvider called"
+msgstr ""
+"Methode 'get_series_metadata' auf der Klasse MissingProvider aufgerufen"
+
+#: src/content/metadata/interfaces.py:106
+msgid "Method 'get_season_metadata' on MissingProvider called"
+msgstr ""
+"Methode 'get_season_metadata' auf der Klasse MissingProvider aufgerufen"
+
+#: src/content/metadata/interfaces.py:112
+msgid "Method 'get_metadata_schema' on MissingProvider called"
+msgstr ""
+"Methode 'get_metadata_schema' auf der Klasse MissingProvider aufgerufen"
+
+#: src/content/metadata/metadata.py:72
+msgid "Deserialization error: expected input to be dict"
+msgstr "Deserialisierungfehler: die Eingabe sollte ein 'dict' sein"
+
+#: src/content/metadata/metadata.py:76
+msgid "Deserialization error: missing property 'provider'"
+msgstr "Deserialisierungfehler: fehlendes Attribut 'provider'"
+
+#: src/content/metadata/metadata.py:80
+msgid "Deserialization error: missing property 'data'"
+msgstr "Deserialisierungfehler: fehlendes Attribut 'data'"
+
+#: src/content/metadata/metadata.py:87
+msgid "Deserialization error: property 'provider' is not a str"
+msgstr "Deserialisierungfehler: Attribut 'provider' ist kein 'str'"
+
+#: src/content/metadata/metadata.py:91
+msgid "Deserialization error: property 'data' is not a dict"
+msgstr "Deserialisierungfehler: Attribut 'data' ist kein 'dict'"
+
+#: src/content/metadata/metadata.py:100
+msgid "Deserialization error: Not implemented for provider {provider}"
+msgstr "Deserialization error: Nicht implementiert für Provider {provider}"
+
+#: src/content/metadata/metadata.py:105
+msgid "Deserialization error: Unknown provider {provider}"
+msgstr "Deserialization error: Unbekannter Provider {provider}"
+
+#: src/content/metadata/provider/tmdb.py:154
+msgid "Expected SeriesMetadata, but got other metadata data"
+msgstr ""
+"SeriesMetadata wurde Erwartet, aber andere Metadata Daten sind angekommen"
+
+#: src/content/metadata/provider/tmdb.py:180
+msgid "Expected SeasonMetadata, but got other metadata data"
+msgstr ""
+"SeasonMetadata wurde Erwartet, aber andere Metadata Daten sind angekommen"
+
+#: src/content/metadata/provider/tmdb.py:306
+msgid "Deserialization error: missing property 'metadata_type'"
+msgstr "Deserialisierungfehler: fehlendes Attribut 'metadata'"
+
+#: src/content/metadata/provider/tmdb.py:310
+msgid "Deserialization error: property 'metadata_type' is not a str"
+msgstr "Deserialisierungfehler: Attribut 'metadata_type' ist kein 'str'"
+
+#: src/content/metadata/provider/tmdb.py:323
+msgid "Deserialization error: Unknown metadata_type {metadata_type}"
+msgstr "Deserialisierungfehler: Unbekannter 'metadata_type' {metadata_type}"
+
+#: src/content/video_metadata.py:107
+msgid "File is not a video: {file}"
+msgstr "Datei ist kein Video: {file}"
+
+#: src/content/video_metadata.py:113
+msgid "No video duration was found"
+msgstr "Keine Video Länge gefunden"
 
 #: src/entry.py:97
 msgid "expected the argument to be a port but got: {arg}"
@@ -86,15 +205,15 @@ msgid "error while parsing config: can't load config"
 msgstr ""
 "Fehler beim parsen von der Konfigurationsdatei: kann die Datei nicht laden"
 
-#: src/entry.py:336
-msgid "error while parsing config: %s"
-msgstr "Fehler beim parsen von der Konfigurationsdatei: %s"
+#: src/entry.py:337
+msgid "error while parsing config: {err}"
+msgstr "Fehler beim parsen von der Konfigurationsdatei: {err}"
 
-#: src/entry.py:342 src/entry.py:407
+#: src/entry.py:344 src/entry.py:409
 msgid "parsing returned 0 configs"
 msgstr "parsen hat 0 Konfigurationen ergeben"
 
-#: src/entry.py:349 src/entry.py:414
+#: src/entry.py:351 src/entry.py:416
 msgid ""
 "filtering returned more configs than there are, at least one was used "
 "multiple times"
@@ -102,31 +221,31 @@ msgstr ""
 "Das filtern hat mehr Konfigurationen ergeben, als es insgesamt gibt, "
 "mindestens eine wurde mehrmals benutzt"
 
-#: src/entry.py:356 src/entry.py:421
+#: src/entry.py:358 src/entry.py:423
 msgid "filtering returned 0 configs"
 msgstr "filtern hat 0 Konfigurationen ergeben"
 
-#: src/entry.py:378
-msgid "File lock error: %s"
-msgstr "Datei-sperr Fehler: %s"
+#: src/entry.py:380
+msgid "File lock error: {err}"
+msgstr "Datei-sperr Fehler: {err}"
 
-#: src/entry.py:394
+#: src/entry.py:396
 msgid "Config '{config}' is not valid: {err}"
 msgstr "Die Konfigurationsdatei '{config}' ist ungültig: {err}"
 
-#: src/entry.py:403
+#: src/entry.py:405
 msgid "Config '{config}' is valid!"
 msgstr "Die Konfigurationsdatei '{config}' ist gültig!"
 
-#: src/entry.py:404
-msgid "Info about config: %s"
-msgstr "Informationen über die Konfigurationsdatei: %s"
+#: src/entry.py:406
+msgid "Info about config: {info}"
+msgstr "Informationen über die Konfigurationsdatei: {info}"
 
-#: src/entry.py:428
+#: src/entry.py:430
 msgid "Printing final config as json:"
 msgstr "Gebe die finale Konfiguration als JSON aus:"
 
-#: src/entry.py:465
+#: src/entry.py:467
 msgid "Ctrl + C pressed"
 msgstr "Strg + C gedrückt"
 
@@ -182,7 +301,24 @@ msgstr "Fertig"
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr "Parse Fehler: Konnte Inhalt nicht von '{file}' parsen"
 
-#: src/helper/classifier.py:1598
+#: src/helper/classifier.py:1156
+msgid "Found audio backends: {backends}"
+msgstr "Audio backends gefunden: {backends}"
+
+#: src/helper/classifier.py:1230
+msgid ""
+"failed to calculate the seconds we can use with this available memory, this "
+"is likely an implementation error, or the memory_pattern was set incorrectly"
+msgstr ""
+"Fehler beim berechnen der Zeit die wir benutzen können mit dem verfügbaren "
+"Speicher, das ist wahrscheinlich ein Implementierungsfehler oder das "
+"Speicher Muster wurde inkorrekt gesetzt "
+
+#: src/helper/classifier.py:1238
+msgid "Resolved auto batch settings to timestamp: {settings} -> {result}"
+msgstr "Automatische Batch Einstellungen aufgelöst: {settings} -> {result}"
+
+#: src/helper/classifier.py:1602
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr ""
 "Konnte Sprache von '{path}' nicht bestimmen: Bestes Ergebnis war {best}"
@@ -190,6 +326,10 @@ msgstr ""
 #: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr "Video Sprachen Erkenner"
+
+#: src/helper/devices.py:61
+msgid "Got GPU error: {error}"
+msgstr "GPU Fehler: {error}"
 
 #: src/helper/manager.py:204
 msgid "UNREACHABLE (not runnable in notebooks)"

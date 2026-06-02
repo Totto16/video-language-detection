@@ -3,13 +3,121 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:28+0200\n"
+"POT-Creation-Date: 2026-06-02 20:53+0200\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 
 
+
+#: src/content/base_class.py:135
+msgid "Scan failed with reason: {reason!s}"
+msgstr ""
+
+#: src/content/base_class.py:143
+msgid "Failed summaries can't access the language"
+msgstr ""
+
+#: src/content/base_class.py:168
+msgid "Scan failed with language reason: {reason!s}"
+msgstr ""
+
+#: src/content/base_class.py:172
+msgid "Scan failed with language reason: {reason!s} and the best language was {language} with {accuracy:.2%}"
+msgstr ""
+
+#: src/content/base_class.py:198
+msgid "Scan was successful"
+msgstr ""
+
+#: src/content/base_class.py:202
+msgid "Successful summaries can't access the reason identifier"
+msgstr ""
+
+#: src/content/base_class.py:258
+msgid "Get Language"
+msgstr ""
+
+#: src/content/base_class.py:507
+msgid "Path to delete wasn't found: {path}"
+msgstr ""
+
+#: src/content/episode_content.py:196
+msgid "Can't tag the file '{file}'"
+msgstr ""
+
+#: src/content/metadata/interfaces.py:77
+msgid "Method 'get_episode_metadata' on MissingProvider called"
+msgstr ""
+
+#: src/content/metadata/interfaces.py:97
+msgid "Method 'get_series_metadata' on MissingProvider called"
+msgstr ""
+
+#: src/content/metadata/interfaces.py:106
+msgid "Method 'get_season_metadata' on MissingProvider called"
+msgstr ""
+
+#: src/content/metadata/interfaces.py:112
+msgid "Method 'get_metadata_schema' on MissingProvider called"
+msgstr ""
+
+#: src/content/metadata/metadata.py:72
+msgid "Deserialization error: expected input to be dict"
+msgstr ""
+
+#: src/content/metadata/metadata.py:76
+msgid "Deserialization error: missing property 'provider'"
+msgstr ""
+
+#: src/content/metadata/metadata.py:80
+msgid "Deserialization error: missing property 'data'"
+msgstr ""
+
+#: src/content/metadata/metadata.py:87
+msgid "Deserialization error: property 'provider' is not a str"
+msgstr ""
+
+#: src/content/metadata/metadata.py:91
+msgid "Deserialization error: property 'data' is not a dict"
+msgstr ""
+
+#: src/content/metadata/metadata.py:100
+msgid "Deserialization error: Not implemented for provider {provider}"
+msgstr ""
+
+#: src/content/metadata/metadata.py:105
+msgid "Deserialization error: Unknown provider {provider}"
+msgstr ""
+
+#: src/content/metadata/provider/tmdb.py:154
+msgid "Expected SeriesMetadata, but got other metadata data"
+msgstr ""
+
+#: src/content/metadata/provider/tmdb.py:180
+msgid "Expected SeasonMetadata, but got other metadata data"
+msgstr ""
+
+#: src/content/metadata/provider/tmdb.py:306
+msgid "Deserialization error: missing property 'metadata_type'"
+msgstr ""
+
+#: src/content/metadata/provider/tmdb.py:310
+msgid "Deserialization error: property 'metadata_type' is not a str"
+msgstr ""
+
+#: src/content/metadata/provider/tmdb.py:323
+msgid "Deserialization error: Unknown metadata_type {metadata_type}"
+msgstr ""
+
+#: src/content/video_metadata.py:107
+msgid "File is not a video: {file}"
+msgstr ""
+
+#: src/content/video_metadata.py:113
+msgid "No video duration was found"
+msgstr ""
 
 #: src/entry.py:97
 msgid "expected the argument to be a port but got: {arg}"
@@ -79,43 +187,43 @@ msgstr ""
 msgid "error while parsing config: can't load config"
 msgstr ""
 
-#: src/entry.py:336
-msgid "error while parsing config: %s"
+#: src/entry.py:337
+msgid "error while parsing config: {err}"
 msgstr ""
 
-#: src/entry.py:342 src/entry.py:407
+#: src/entry.py:344 src/entry.py:409
 msgid "parsing returned 0 configs"
 msgstr ""
 
-#: src/entry.py:349 src/entry.py:414
+#: src/entry.py:351 src/entry.py:416
 msgid "filtering returned more configs than there are, at least one was used multiple times"
 msgstr ""
 
-#: src/entry.py:356 src/entry.py:421
+#: src/entry.py:358 src/entry.py:423
 msgid "filtering returned 0 configs"
 msgstr ""
 
-#: src/entry.py:378
-msgid "File lock error: %s"
+#: src/entry.py:380
+msgid "File lock error: {err}"
 msgstr ""
 
-#: src/entry.py:394
+#: src/entry.py:396
 msgid "Config '{config}' is not valid: {err}"
 msgstr ""
 
-#: src/entry.py:403
+#: src/entry.py:405
 msgid "Config '{config}' is valid!"
 msgstr ""
 
-#: src/entry.py:404
-msgid "Info about config: %s"
+#: src/entry.py:406
+msgid "Info about config: {info}"
 msgstr ""
 
-#: src/entry.py:428
+#: src/entry.py:430
 msgid "Printing final config as json:"
 msgstr ""
 
-#: src/entry.py:465
+#: src/entry.py:467
 msgid "Ctrl + C pressed"
 msgstr ""
 
@@ -171,12 +279,28 @@ msgstr ""
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr ""
 
-#: src/helper/classifier.py:1598
+#: src/helper/classifier.py:1156
+msgid "Found audio backends: {backends}"
+msgstr ""
+
+#: src/helper/classifier.py:1230
+msgid "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"
+msgstr ""
+
+#: src/helper/classifier.py:1238
+msgid "Resolved auto batch settings to timestamp: {settings} -> {result}"
+msgstr ""
+
+#: src/helper/classifier.py:1602
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr ""
 
 #: src/helper/constants.py:6
 msgid "Video Language Detector"
+msgstr ""
+
+#: src/helper/devices.py:61
+msgid "Got GPU error: {error}"
 msgstr ""
 
 #: src/helper/manager.py:204

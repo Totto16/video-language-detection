@@ -504,7 +504,7 @@ def process_folder(
             path,
         )
         if index is None:
-            msg = _("Path to delete wasn't founds: {path}").format(path=path)
+            msg = _("Path to delete wasn't found: {path}").format(path=path)
             raise RuntimeError(msg)
 
         del rescan[index]
