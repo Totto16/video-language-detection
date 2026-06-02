@@ -11,7 +11,7 @@ import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
-from helper.manager import CounterInterface, ManagerInterface
+from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 
 
 ## see https://mutagen.readthedocs.io/en/latest/user/filelike.html#
@@ -169,7 +169,7 @@ class MutagenFileWrapper(IOInterface):
     def __init__(
         self: Self,
         file: Path,
-        chunk_size: int = 4096,
+        chunk_size: int,
     ) -> None:
         super().__init__()
 
@@ -340,7 +340,7 @@ class VideoTaggerWriter:
         self.__manager = manager
 
     def __save_impl(self: Self) -> None:
-        size: float = float(self.__filething.size())
+        size: int = self.__filething.size()
 
         bar: CounterInterface = self.__manager.counter(
             total=size,
@@ -352,20 +352,39 @@ class VideoTaggerWriter:
         )
         bar.update(0, force=True)
 
-        bar.update(self.__filething.tell())
+        position: int = self.__filething.tell()
+        total = size
+
+        bar.update(position)
 
         try:
 
             def process_op(op: IOOp) -> None:
+                # NOTE. the progress bar can only go forwards, so the position tracker keeps track of the position and we update the peogress bar only, when we move forwards
+
+                nonlocal position
+                nonlocal total
+                prev_pos = position
+
                 match op.type:
                     case "progress":
-                        bar.update(float(op.amount))
+                        bar.update()
+                        position += op.amount
                     case "seek":
-                        bar.update()
+                        position = op.amount
                     case "truncate":
-                        bar.update()
+                        # only the total changed, which we can't adjust
+                        total = op.amount
                     case _:
                         assert_never(op.type)
+
+                if position > prev_pos:
+                    if position <= total:
+                        bar.update(incr=position - prev_pos)
+                    else:
+                        bar.update(0, force=True)
+                else:
+                    bar.update(0, force=True)
 
             with self.__filething.callback_ctx(process_op):
                 self.__instance.save(self.__filething)
@@ -410,7 +429,7 @@ class VideoTagger:
     @staticmethod
     def get_handle(file: Path) -> Optional["VideoTagger"]:
 
-        filething = MutagenFileWrapper(file=file)
+        filething = MutagenFileWrapper(file=file, chunk_size=PROGRESS_CHUNK_SIZE)
 
         instance = mutagen.File(filething=filething, easy=False)
 

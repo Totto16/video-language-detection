@@ -241,3 +241,7 @@ class TuiManager(ManagerInterface):
         self: Self,
     ) -> None:
         return self.__impl.stop()
+
+
+# 64 KB
+PROGRESS_CHUNK_SIZE: int = 64 * 1024

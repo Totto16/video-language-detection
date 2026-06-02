@@ -14,7 +14,7 @@ from apischema import schema
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
-from helper.manager import CounterInterface, ManagerInterface
+from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 
 
 class ScannedFileType(Enum):
@@ -133,8 +133,8 @@ class Stats:
 
         sha256_hash = sha256()
         with file_path.open(mode="rb") as file:
-            # Read and update hash string value in blocks of 4K
-            for byte_block in iter(lambda: file.read(4096), b""):
+            # Read and update hash string value in blocks of <PROGRESS_CHUNK_SIZE>
+            for byte_block in iter(lambda: file.read(PROGRESS_CHUNK_SIZE), b""):
                 sha256_hash.update(byte_block)
 
                 bar.update(float(len(byte_block)))
