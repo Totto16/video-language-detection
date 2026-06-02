@@ -239,12 +239,7 @@ class EpisodeContent(Content):
                 return
 
             try:
-                if (
-                    self.__video_metadata is None
-                    or self.__video_metadata.dimensions is None
-                    or self.__video_metadata.size is None
-                    or self.__video_metadata.bit_rate is None
-                ):
+                if self.__video_metadata is None:
                     bar: CounterInterface = manager.counter(
                         total=1,
                         desc="get video metadata",

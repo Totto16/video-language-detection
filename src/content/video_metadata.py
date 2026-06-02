@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Annotated, Literal, Optional, Self
 
 from apischema import alias, schema
+from apischema.metadata import none_as_undefined
 
 from helper.apischema import OneOf, narrow_type
 from helper.error import ErrorMode
 from helper.ffprobe import FFprobeStream, StreamType, ffprobe, ffprobe_check
 from helper.log import get_logger
 from helper.translation import get_translator
-from apischema.metadata import none_as_undefined
 
 logger: Logger = get_logger()
 _ = get_translator()
@@ -95,9 +95,8 @@ class VideoMetadata:
     __duration: float = field(metadata=alias("duration"))
     __streams: list[VideoStream] = field(metadata=alias("streams"))
     __dimensions: VideoDimension = field(metadata=alias("dimensions"))
-    __size: Optional[int] = field(
-        default=None,
-        metadata=alias("size") | none_as_undefined,
+    __size: int = field(
+        metadata=alias("size"),
     )
     __bit_rate: Optional[float] = field(
         default=None,
@@ -113,11 +112,11 @@ class VideoMetadata:
         return self.__streams
 
     @property
-    def dimensions(self: Self) -> Optional[VideoDimension]:
+    def dimensions(self: Self) -> VideoDimension:
         return self.__dimensions
 
     @property
-    def size(self: Self) -> Optional[int]:
+    def size(self: Self) -> int:
         return self.__size
 
     @property
@@ -203,11 +202,11 @@ class VideoMetadata:
             bit_rate: Optional[float] = metadata.file_info.bit_rate()
 
             return VideoMetadata(
-                file_duration,
-                streams,
-                dimensions,
-                size,
-                bit_rate,
+                __duration=file_duration,
+                __streams=streams,
+                __dimensions=dimensions,
+                __size=size,
+                __bit_rate=bit_rate,
             )
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
