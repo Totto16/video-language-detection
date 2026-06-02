@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from logging import Logger
 from pathlib import Path
 from types import TracebackType
 from typing import BinaryIO, Literal, Optional, Self, assert_never, override
@@ -11,7 +12,10 @@ import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
+from helper.log import get_logger
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
+
+logger: Logger = get_logger()
 
 
 ## see https://mutagen.readthedocs.io/en/latest/user/filelike.html#
@@ -429,12 +433,20 @@ class VideoTagger:
 
         filething = MutagenFileWrapper(file=file, chunk_size=PROGRESS_CHUNK_SIZE)
 
-        instance = mutagen.File(filething, easy=False)
+        try:
 
-        if instance is None:
+            instance = mutagen.File(filething, easy=False)
+
+            if instance is None:
+                return None
+
+            return VideoTagger(filething, instance)
+        except RuntimeError:
+            logger.exception("get tag handle")
             return None
-
-        return VideoTagger(filething, instance)
+        except MutagenError:
+            logger.exception("get tag handle (mutagen impl error)")
+            return None
 
     def writer(
         self: Self,
