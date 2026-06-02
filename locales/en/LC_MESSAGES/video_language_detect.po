@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:16+0200\n"
-"PO-Revision-Date: 2026-06-02 20:21+0200\n"
+"POT-Creation-Date: 2026-06-02 20:28+0200\n"
+"PO-Revision-Date: 2026-06-02 20:30+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -15,75 +15,116 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 "X-Generator: Poedit 3.9\n"
 
-#: src/entry.py:105
+#: src/entry.py:97
+msgid "expected the argument to be a port but got: {arg}"
+msgstr "expected the argument to be a port but got: {arg}"
+
+#: src/entry.py:109
 msgid "Detect video languages"
 msgstr "Detect video languages"
 
-#: src/entry.py:124
+#: src/entry.py:128
 msgid "The loglevel to use"
 msgstr "The loglevel to use"
 
-#: src/entry.py:141
+#: src/entry.py:145
 msgid "Run the whole program in the terminal"
 msgstr "Run the whole program in the terminal"
 
-#: src/entry.py:148 src/entry.py:192 src/entry.py:219
+#: src/entry.py:152 src/entry.py:196 src/entry.py:223
 msgid "The config to use"
 msgstr "The config to use"
 
-#: src/entry.py:155 src/entry.py:253
+#: src/entry.py:159 src/entry.py:257
 msgid "The config template to use, if the config specifies, to use the cli one"
-msgstr "The config template to use, if the config specifies, to use the cli one"
+msgstr ""
+"The config template to use, if the config specifies, to use the cli one"
 
-#: src/entry.py:166 src/entry.py:264
+#: src/entry.py:170 src/entry.py:268
 msgid "Filter the provided configs, allowed are names or indices"
 msgstr "Filter the provided configs, allowed are names or indices"
 
-#: src/entry.py:173
+#: src/entry.py:177
 msgid "Create schemas for config and the resulting data"
 msgstr "Create schemas for config and the resulting data"
 
-#: src/entry.py:180
+#: src/entry.py:184
 msgid "The folder where to put the schemas"
 msgstr "The folder where to put the schemas"
 
-#: src/entry.py:185
+#: src/entry.py:189
 msgid "Run the whole program as GUI"
 msgstr "Run the whole program as GUI"
 
-#: src/entry.py:199 src/entry.py:226
-msgid "Tha host the backend runs on"
-msgstr "Tha host the backend runs on"
+#: src/entry.py:203 src/entry.py:230
+msgid "The host the backend runs on"
+msgstr "The host the backend runs on"
 
-#: src/entry.py:207 src/entry.py:234
-msgid "Tha port the backend runs on"
-msgstr "Tha port the backend runs on"
+#: src/entry.py:211 src/entry.py:238
+msgid "The port the backend runs on"
+msgstr "The port the backend runs on"
 
-#: src/entry.py:212
+#: src/entry.py:216
 msgid "Run the API"
 msgstr "Run the API"
 
-#: src/entry.py:239
+#: src/entry.py:243
 msgid "Check the config for validity"
 msgstr "Check the config for validity"
 
-#: src/entry.py:246
+#: src/entry.py:250
 msgid "The config to check"
 msgstr "The config to check"
 
-#: src/entry.py:281
+#: src/entry.py:285
 msgid "Successfully generated the schemas"
 msgstr "Successfully generated the schemas"
 
-#: src/entry.py:388
+#: src/entry.py:299 src/entry.py:318
+msgid "error while parsing config: can't load config"
+msgstr "error while parsing config: can't load config"
+
+#: src/entry.py:336
+msgid "error while parsing config: %s"
+msgstr "error while parsing config: %s"
+
+#: src/entry.py:342 src/entry.py:407
+msgid "parsing returned 0 configs"
+msgstr "parsing returned 0 configs"
+
+#: src/entry.py:349 src/entry.py:414
+msgid ""
+"filtering returned more configs than there are, at least one was used "
+"multiple times"
+msgstr ""
+"filtering returned more configs than there are, at least one was used "
+"multiple times"
+
+#: src/entry.py:356 src/entry.py:421
+msgid "filtering returned 0 configs"
+msgstr "filtering returned 0 configs"
+
+#: src/entry.py:378
+msgid "File lock error: %s"
+msgstr "File lock error: %s"
+
+#: src/entry.py:394
 msgid "Config '{config}' is not valid: {err}"
 msgstr "Config '{config}' is not valid: {err}"
 
-#: src/entry.py:397
+#: src/entry.py:403
 msgid "Config '{config}' is valid!"
 msgstr "Config '{config}' is valid!"
 
-#: src/entry.py:457
+#: src/entry.py:404
+msgid "Info about config: %s"
+msgstr "Info about config: %s"
+
+#: src/entry.py:428
+msgid "Printing final config as json:"
+msgstr "Printing final config as json:"
+
+#: src/entry.py:465
 msgid "Ctrl + C pressed"
 msgstr "Ctrl + C pressed"
 

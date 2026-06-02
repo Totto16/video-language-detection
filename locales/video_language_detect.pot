@@ -3,82 +3,119 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:16+0200\n"
+"POT-Creation-Date: 2026-06-02 20:28+0200\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: src/entry.py:105
+
+#: src/entry.py:97
+msgid "expected the argument to be a port but got: {arg}"
+msgstr ""
+
+#: src/entry.py:109
 msgid "Detect video languages"
 msgstr ""
 
-#: src/entry.py:124
+#: src/entry.py:128
 msgid "The loglevel to use"
 msgstr ""
 
-#: src/entry.py:141
+#: src/entry.py:145
 msgid "Run the whole program in the terminal"
 msgstr ""
 
-#: src/entry.py:148 src/entry.py:192 src/entry.py:219
+#: src/entry.py:152 src/entry.py:196 src/entry.py:223
 msgid "The config to use"
 msgstr ""
 
-#: src/entry.py:155 src/entry.py:253
+#: src/entry.py:159 src/entry.py:257
 msgid "The config template to use, if the config specifies, to use the cli one"
 msgstr ""
 
-#: src/entry.py:166 src/entry.py:264
+#: src/entry.py:170 src/entry.py:268
 msgid "Filter the provided configs, allowed are names or indices"
 msgstr ""
 
-#: src/entry.py:173
+#: src/entry.py:177
 msgid "Create schemas for config and the resulting data"
 msgstr ""
 
-#: src/entry.py:180
+#: src/entry.py:184
 msgid "The folder where to put the schemas"
 msgstr ""
 
-#: src/entry.py:185
+#: src/entry.py:189
 msgid "Run the whole program as GUI"
 msgstr ""
 
-#: src/entry.py:199 src/entry.py:226
-msgid "Tha host the backend runs on"
+#: src/entry.py:203 src/entry.py:230
+msgid "The host the backend runs on"
 msgstr ""
 
-#: src/entry.py:207 src/entry.py:234
-msgid "Tha port the backend runs on"
+#: src/entry.py:211 src/entry.py:238
+msgid "The port the backend runs on"
 msgstr ""
 
-#: src/entry.py:212
+#: src/entry.py:216
 msgid "Run the API"
 msgstr ""
 
-#: src/entry.py:239
+#: src/entry.py:243
 msgid "Check the config for validity"
 msgstr ""
 
-#: src/entry.py:246
+#: src/entry.py:250
 msgid "The config to check"
 msgstr ""
 
-#: src/entry.py:281
+#: src/entry.py:285
 msgid "Successfully generated the schemas"
 msgstr ""
 
-#: src/entry.py:388
+#: src/entry.py:299 src/entry.py:318
+msgid "error while parsing config: can't load config"
+msgstr ""
+
+#: src/entry.py:336
+msgid "error while parsing config: %s"
+msgstr ""
+
+#: src/entry.py:342 src/entry.py:407
+msgid "parsing returned 0 configs"
+msgstr ""
+
+#: src/entry.py:349 src/entry.py:414
+msgid "filtering returned more configs than there are, at least one was used multiple times"
+msgstr ""
+
+#: src/entry.py:356 src/entry.py:421
+msgid "filtering returned 0 configs"
+msgstr ""
+
+#: src/entry.py:378
+msgid "File lock error: %s"
+msgstr ""
+
+#: src/entry.py:394
 msgid "Config '{config}' is not valid: {err}"
 msgstr ""
 
-#: src/entry.py:397
+#: src/entry.py:403
 msgid "Config '{config}' is valid!"
 msgstr ""
 
-#: src/entry.py:457
+#: src/entry.py:404
+msgid "Info about config: %s"
+msgstr ""
+
+#: src/entry.py:428
+msgid "Printing final config as json:"
+msgstr ""
+
+#: src/entry.py:465
 msgid "Ctrl + C pressed"
 msgstr ""
 

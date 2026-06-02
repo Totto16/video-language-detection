@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:16+0200\n"
-"PO-Revision-Date: 2026-06-02 20:20+0200\n"
+"POT-Creation-Date: 2026-06-02 20:28+0200\n"
+"PO-Revision-Date: 2026-06-02 20:34+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: Deutsch\n"
 "Language: de\n"
@@ -15,77 +15,118 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 "X-Generator: Poedit 3.9\n"
 
-#: src/entry.py:105
+#: src/entry.py:97
+msgid "expected the argument to be a port but got: {arg}"
+msgstr "Das Argument muss ein Port sein, war aber: {arg}"
+
+#: src/entry.py:109
 msgid "Detect video languages"
 msgstr "Video Sprachen erkennen"
 
-#: src/entry.py:124
+#: src/entry.py:128
 msgid "The loglevel to use"
 msgstr "Das Loglevel für die Applikation"
 
-#: src/entry.py:141
+#: src/entry.py:145
 msgid "Run the whole program in the terminal"
 msgstr "Starte das Programm in der Konsole"
 
-#: src/entry.py:148 src/entry.py:192 src/entry.py:219
+#: src/entry.py:152 src/entry.py:196 src/entry.py:223
 msgid "The config to use"
 msgstr "Die Konfigurationsdatei, die benutzt werden soll"
 
-#: src/entry.py:155 src/entry.py:253
+#: src/entry.py:159 src/entry.py:257
 msgid "The config template to use, if the config specifies, to use the cli one"
 msgstr ""
 "Das Konfigurations-template, das benutzt werden soll, Wenn die "
 "Konfigurationsdatei, das CLI Template bevorzugt"
 
-#: src/entry.py:166 src/entry.py:264
+#: src/entry.py:170 src/entry.py:268
 msgid "Filter the provided configs, allowed are names or indices"
 msgstr "Filtere die Konfigurationen, Namen und Indizes sind erlaubt"
 
-#: src/entry.py:173
+#: src/entry.py:177
 msgid "Create schemas for config and the resulting data"
 msgstr "Erstelle Schemata für die Konfigurationsdatei und die erstellten Daten"
 
-#: src/entry.py:180
+#: src/entry.py:184
 msgid "The folder where to put the schemas"
 msgstr "Der Ordner, in der die Schemata gespeichert werden"
 
-#: src/entry.py:185
+#: src/entry.py:189
 msgid "Run the whole program as GUI"
 msgstr "Starte das Programm als GUI"
 
-#: src/entry.py:199 src/entry.py:226
-msgid "Tha host the backend runs on"
+#: src/entry.py:203 src/entry.py:230
+msgid "The host the backend runs on"
 msgstr "Der Host wo das backend läuft"
 
-#: src/entry.py:207 src/entry.py:234
-msgid "Tha port the backend runs on"
+#: src/entry.py:211 src/entry.py:238
+msgid "The port the backend runs on"
 msgstr "Der Port wo das backend läuft"
 
-#: src/entry.py:212
+#: src/entry.py:216
 msgid "Run the API"
 msgstr "Start die API"
 
-#: src/entry.py:239
+#: src/entry.py:243
 msgid "Check the config for validity"
 msgstr "Überprüfe die Konfigurationsdatei auf gültigkeit"
 
-#: src/entry.py:246
+#: src/entry.py:250
 msgid "The config to check"
 msgstr "Die Konfigurationsdatei, die überprüft werden soll"
 
-#: src/entry.py:281
+#: src/entry.py:285
 msgid "Successfully generated the schemas"
 msgstr "Schemata erfolgreich generiert"
 
-#: src/entry.py:388
+#: src/entry.py:299 src/entry.py:318
+msgid "error while parsing config: can't load config"
+msgstr ""
+"Fehler beim parsen von der Konfigurationsdatei: kann die Datei nicht laden"
+
+#: src/entry.py:336
+msgid "error while parsing config: %s"
+msgstr "Fehler beim parsen von der Konfigurationsdatei: %s"
+
+#: src/entry.py:342 src/entry.py:407
+msgid "parsing returned 0 configs"
+msgstr "parsen hat 0 Konfigurationen ergeben"
+
+#: src/entry.py:349 src/entry.py:414
+msgid ""
+"filtering returned more configs than there are, at least one was used "
+"multiple times"
+msgstr ""
+"Das filtern hat mehr Konfigurationen ergeben, als es insgesamt gibt, "
+"mindestens eine wurde mehrmals benutzt"
+
+#: src/entry.py:356 src/entry.py:421
+msgid "filtering returned 0 configs"
+msgstr "filtern hat 0 Konfigurationen ergeben"
+
+#: src/entry.py:378
+msgid "File lock error: %s"
+msgstr "Datei-sperr Fehler: %s"
+
+#: src/entry.py:394
 msgid "Config '{config}' is not valid: {err}"
 msgstr "Die Konfigurationsdatei '{config}' ist ungültig: {err}"
 
-#: src/entry.py:397
+#: src/entry.py:403
 msgid "Config '{config}' is valid!"
 msgstr "Die Konfigurationsdatei '{config}' ist gültig!"
 
-#: src/entry.py:457
+#: src/entry.py:404
+msgid "Info about config: %s"
+msgstr "Informationen über die Konfigurationsdatei: %s"
+
+#: src/entry.py:428
+msgid "Printing final config as json:"
+msgstr "Gebe die finale Konfiguration als JSON aus:"
+
+#: src/entry.py:465
 msgid "Ctrl + C pressed"
 msgstr "Strg + C gedrückt"
 

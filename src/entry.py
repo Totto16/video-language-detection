@@ -93,7 +93,11 @@ _ = get_translator()
 def parse_port(arg: str) -> int:
     value = parse_int_safely(arg)
     if value is None:
-        msg = f"expected the argument to be a port but got: {arg}"
+        msg = (
+            _("expected the argument to be a port but got: {arg}").format(
+                arg=arg,
+            ),
+        )
         raise argparse.ArgumentTypeError(msg)
 
     return value
@@ -196,7 +200,7 @@ def parse_args() -> AllParsedNameSpaces:
         "--backend-host",
         dest="backend_host",
         default="127.0.0.1",
-        help=_("Tha host the backend runs on"),
+        help=_("The host the backend runs on"),
     )
     gui_parser.add_argument(
         "-p",
@@ -204,7 +208,7 @@ def parse_args() -> AllParsedNameSpaces:
         dest="backend_port",
         default=4433,
         type=parse_port,
-        help=_("Tha port the backend runs on"),
+        help=_("The port the backend runs on"),
     )
 
     api_parser = subparsers.add_parser(
@@ -223,7 +227,7 @@ def parse_args() -> AllParsedNameSpaces:
         "--host",
         dest="host",
         default="127.0.0.1",
-        help=_("Tha host the backend runs on"),
+        help=_("The host the backend runs on"),
     )
     api_parser.add_argument(
         "-p",
@@ -231,7 +235,7 @@ def parse_args() -> AllParsedNameSpaces:
         dest="port",
         default=4433,
         type=parse_port,
-        help=_("Tha port the backend runs on"),
+        help=_("The port the backend runs on"),
     )
 
     config_check_parser = subparsers.add_parser(
@@ -292,7 +296,7 @@ def subcommand_gui(
         config_file_path,
     )
     if raw_config is None:
-        logger.error("error while parsing config: can't load config")
+        logger.error(_("error while parsing config: can't load config"))
         return 1
 
     address = Address(host=args.backend_host, port=args.backend_port)
@@ -311,7 +315,7 @@ def subcommand_api(
         config_file_path,
     )
     if raw_config is None:
-        logger.error("error while parsing config: can't load config")
+        logger.error(_("error while parsing config: can't load config"))
         return 1
 
     address = Address(host=args.host, port=args.port)
@@ -329,25 +333,27 @@ def subcommand_run(
         args.template_to_use,
     )
     if parsed_config.is_err():
-        logger.error("error while parsing config: %s", parsed_config.get_err())
+        logger.error(_("error while parsing config: %s"), parsed_config.get_err())
         return 1
 
     parsed_configs = parsed_config.get_ok()
 
     if len(parsed_configs) == 0:
-        logger.error("parsing returned 0 configs")
+        logger.error(_("parsing returned 0 configs"))
         return 1
 
     configs = filter_configs(parsed_configs, args.config_filter)
 
     if len(configs) > len(parsed_configs):
         logger.error(
-            "filtering returned more configs than there are, at least one was used multiple times",
+            _(
+                "filtering returned more configs than there are, at least one was used multiple times"  # noqa: COM812
+            ),
         )
         return 1
 
     if len(configs) == 0:
-        logger.error("filtering returned 0 configs")
+        logger.error(_("filtering returned 0 configs"))
         return 1
 
     try:
@@ -369,7 +375,7 @@ def subcommand_run(
                     config_paramaters=config_paramaters,
                 )
     except FileLockError as err:
-        logger.error("File lock error: %s", str(err))  # noqa: TRY400
+        logger.error(_("File lock error: %s"), str(err))  # noqa: TRY400
         return 1
     return 0
 
@@ -395,29 +401,31 @@ def subcommand_config_check(
     final_config, info = parsed_config.get_ok()
 
     logger.info(_("Config '{config}' is valid!").format(config=config))
-    logger.info("Info about config: %s", info)
+    logger.info(_("Info about config: %s"), info)
 
     if len(final_config) == 0:
-        logger.error("parsing returned 0 configs")
+        logger.error(_("parsing returned 0 configs"))
         return 1
 
     configs = filter_configs(final_config, args.config_filter)
 
     if len(configs) > len(final_config):
         logger.error(
-            "filtering returned more configs than there are, at least one was used multiple times",
+            _(
+                "filtering returned more configs than there are, at least one was used multiple times"  # noqa: COM812
+            ),
         )
         return 1
 
     if len(configs) == 0:
-        logger.error("filtering returned 0 configs")
+        logger.error(_("filtering returned 0 configs"))
         return 1
 
     serialized_config: dict[str, Any] = serialize(
         FinalConfig,
         final_config,
     )
-    logger.info("Printing final config as json:")
+    logger.info(_("Printing final config as json:"))
     logger.info(json.dumps(serialized_config, indent=4))
     return 0
 
