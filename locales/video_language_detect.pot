@@ -1,136 +1,152 @@
-# Copyright (C) 2023-2025 Totto16
+# Copyright (C) 2023-2026 Totto16
 # License MIT
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2025-11-04 20:19+0100\n"
+"POT-Creation-Date: 2026-06-02 20:16+0200\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: src/classifier.py:1096
-msgid "Couldn't get Language of '{path}': Best was {best}"
-msgstr ""
-
-#: src/entry.py:145
+#: src/entry.py:105
 msgid "Detect video languages"
 msgstr ""
 
-#: src/entry.py:164
+#: src/entry.py:124
 msgid "The loglevel to use"
 msgstr ""
 
-#: src/entry.py:181
+#: src/entry.py:141
 msgid "Run the whole program in the terminal"
 msgstr ""
 
-#: src/entry.py:188 src/entry.py:221
+#: src/entry.py:148 src/entry.py:192 src/entry.py:219
 msgid "The config to use"
 msgstr ""
 
-#: src/entry.py:195 src/entry.py:240
+#: src/entry.py:155 src/entry.py:253
 msgid "The config template to use, if the config specifies, to use the cli one"
 msgstr ""
 
-#: src/entry.py:202
+#: src/entry.py:166 src/entry.py:264
+msgid "Filter the provided configs, allowed are names or indices"
+msgstr ""
+
+#: src/entry.py:173
 msgid "Create schemas for config and the resulting data"
 msgstr ""
 
-#: src/entry.py:209
+#: src/entry.py:180
 msgid "The folder where to put the schemas"
 msgstr ""
 
-#: src/entry.py:214
+#: src/entry.py:185
 msgid "Run the whole program as GUI"
 msgstr ""
 
-#: src/entry.py:226
+#: src/entry.py:199 src/entry.py:226
+msgid "Tha host the backend runs on"
+msgstr ""
+
+#: src/entry.py:207 src/entry.py:234
+msgid "Tha port the backend runs on"
+msgstr ""
+
+#: src/entry.py:212
+msgid "Run the API"
+msgstr ""
+
+#: src/entry.py:239
 msgid "Check the config for validity"
 msgstr ""
 
-#: src/entry.py:233
+#: src/entry.py:246
 msgid "The config to check"
 msgstr ""
 
-#: src/entry.py:257
+#: src/entry.py:281
 msgid "Successfully generated the schemas"
 msgstr ""
 
-#: src/entry.py:319
+#: src/entry.py:388
 msgid "Config '{config}' is not valid: {err}"
 msgstr ""
 
-#: src/entry.py:328
+#: src/entry.py:397
 msgid "Config '{config}' is valid!"
 msgstr ""
 
-#: src/entry.py:373
+#: src/entry.py:457
 msgid "Ctrl + C pressed"
 msgstr ""
 
-#: src/helper/base.py:52
+#: src/helper/base.py:67
 msgid "Data not saveable to '{suffix}' file!"
 msgstr ""
 
-#: src/helper/base.py:71
+#: src/helper/base.py:86
 msgid "Data not loadable from '{suffix}' file!"
 msgstr ""
 
-#: src/helper/base.py:107
-msgid "UNREACHABLE (not runnable in notebooks)"
-msgstr ""
-
-#: src/helper/base.py:114
-msgid "Stage"
-msgstr ""
-
-#: src/helper/base.py:118
+#: src/helper/base.py:137
 msgid "Scanning"
 msgstr ""
 
-#: src/helper/base.py:171
-msgid "Parse Error: Couldn't parse content from '{file}'"
+#: src/helper/base.py:142
+msgid "Stage"
 msgstr ""
 
-#: src/helper/base.py:211
+#: src/helper/base.py:199
 msgid "series"
 msgstr ""
 
-#: src/helper/base.py:213
+#: src/helper/base.py:201
 msgid "seasons"
 msgstr ""
 
-#: src/helper/base.py:215
+#: src/helper/base.py:203
 msgid "episodes"
 msgstr ""
 
-#: src/helper/base.py:217
+#: src/helper/base.py:205
 msgid "tasks"
 msgstr ""
 
-#: src/helper/base.py:219
+#: src/helper/base.py:207
 msgid "folders"
 msgstr ""
 
-#: src/helper/base.py:244
+#: src/helper/base.py:230
 msgid "No Progressbar, on progress callback"
 msgstr ""
 
-#: src/helper/base.py:258
+#: src/helper/base.py:244
 msgid "No Progressbar, on progress finish"
 msgstr ""
 
-#: src/helper/base.py:265
+#: src/helper/base.py:251
 msgid "finished"
+msgstr ""
+
+#: src/helper/base.py:287 src/helper/base.py:338
+msgid "Parse Error: Couldn't parse content from '{file}'"
+msgstr ""
+
+#: src/helper/classifier.py:1598
+msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr ""
 
 #: src/helper/constants.py:6
 msgid "Video Language Detector"
 msgstr ""
 
-#: src/helper/tui.py:43
+#: src/helper/manager.py:204
+msgid "UNREACHABLE (not runnable in notebooks)"
+msgstr ""
+
+#: src/helper/tui.py:51
 msgid "Aborted scan"
 msgstr ""
 
