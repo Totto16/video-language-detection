@@ -183,11 +183,17 @@ class EpisodeContent(Content):
                     metadata_prefix("iso_time"): now.isoformat(),
                 }
 
+                # TODO: remove
                 global global_counter_wip
 
                 if global_counter_wip > 0:
                     with handle.writer(manager=manager) as writer:
-                        writer.write_metadata(metadata)
+                        writer.write_metadata(
+                            comment=[
+                                "see other metadata for more info by video_language_detect"
+                            ],
+                            metadata=metadata,
+                        )
                         global_counter_wip -= 1
                         print(metadata)
                         self.scanned_file.reset_file_data()
