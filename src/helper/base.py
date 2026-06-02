@@ -12,7 +12,7 @@ from typing import (
 from apischema import deserialize, serialize
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
     Scanner,
@@ -30,6 +30,7 @@ from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.config import ConfigType
 from helper.constants import APP_NAME
+from helper.error import ErrorMode
 from helper.manager import (
     CounterInterface,
     ManagerInterface,
@@ -93,14 +94,16 @@ class ContentOptions(TypedDict):
     parse_error_is_exception: bool
 
 
-class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
+class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     __options: ContentOptions
     __name_parser: NameParser
     __scanner: Scanner
     __progress_bars: dict[str, CounterInterface]
+
     __manager: ManagerInterface
     __status_bar: StatusBarInterface
     __language_picker: LanguagePicker
+    __error_mode: ErrorMode
 
     def __init__(
         self: Self,
@@ -110,6 +113,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         language_picker: LanguagePicker,
         general_info: list[str],
         manager: ManagerInterface,
+        error_mode: ErrorMode,
     ) -> None:
         super().__init__()
 
@@ -117,6 +121,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
         self.__name_parser = name_parser
         self.__scanner = scanner
         self.__progress_bars = {}
+
         self.__manager = manager
 
         info_str: str = ""
@@ -145,10 +150,16 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackTuple]):
             additional_args=info_kw,
         )
         self.__language_picker = language_picker
+        self.__error_mode = error_mode
 
     @override
-    def get_saved(self: Self) -> CallbackTuple:
-        return (self.__manager, self.__scanner, self.__language_picker)
+    def get_saved(self: Self) -> CallbackData:
+        return CallbackData(
+            manager=self.__manager,
+            scanner=self.__scanner,
+            language_picker=self.__language_picker,
+            error_mode=self.__error_mode,
+        )
 
     @override
     def ignore(
@@ -261,6 +272,7 @@ class NormalContentCallback(ContentCallback):
         trailer_names: list[str],
         rescan: Optional[Content] = None,
     ) -> Optional[Content]:
+        manager, _scanner, _language_picker, _error_mode = self.get_saved().as_tuple()
         if rescan is None:
             content: Optional[Content] = normal_content_from_scan(
                 file_path,
@@ -268,6 +280,7 @@ class NormalContentCallback(ContentCallback):
                 parent_folders=parent_folders,
                 name_parser=self.name_parser,
                 trailer_names=trailer_names,
+                manager=manager,
             )
             if content is None:
                 if self.options["parse_error_is_exception"]:
@@ -310,6 +323,7 @@ class NumeratedContentCallback(ContentCallback):
         trailer_names: list[str],
         rescan: Optional[Content] = None,
     ) -> Optional[Content]:
+        manager, _scanner, _language_picker, _error_mode = self.get_saved().as_tuple()
         if rescan is None:
             content: Optional[Content] = numerated_content_from_scan(
                 file_path,
@@ -317,6 +331,7 @@ class NumeratedContentCallback(ContentCallback):
                 parent_folders=parent_folders,
                 name_parser=self.name_parser,
                 trailer_names=trailer_names,
+                manager=manager,
             )
             if content is None:
                 if self.options["parse_error_is_exception"]:
@@ -362,6 +377,7 @@ def parse_contents(
     general_info: list[str],
     config_type: ConfigType,
     manager: ManagerInterface,
+    error_mode: ErrorMode,
 ) -> list[Content]:
 
     callback: ContentCallback
@@ -375,6 +391,7 @@ def parse_contents(
                 language_picker=language_picker,
                 general_info=general_info,
                 manager=manager,
+                error_mode=error_mode,
             )
         case ConfigType.numerated:
             callback = NumeratedContentCallback(
@@ -384,6 +401,7 @@ def parse_contents(
                 language_picker=language_picker,
                 general_info=general_info,
                 manager=manager,
+                error_mode=error_mode,
             )
             # TODO
             return []
@@ -395,6 +413,7 @@ def parse_contents(
                 language_picker=language_picker,
                 general_info=general_info,
                 manager=manager,
+                error_mode=error_mode,
             )
             # TODO
             return []

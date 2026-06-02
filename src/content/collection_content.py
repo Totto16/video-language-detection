@@ -10,7 +10,7 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
     process_folder,
@@ -57,7 +57,7 @@ class CollectionContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],

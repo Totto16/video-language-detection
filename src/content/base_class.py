@@ -33,17 +33,13 @@ from helper.classifier import (
     PredictionFailReason,
     WAVFile,
 )
+from helper.error import ErrorMode
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 
 logger: Logger = get_logger()
 
 type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
-
-
-class ContentDict(TypedDict):
-    type: ContentType
-    scanned_file: ScannedFile
 
 
 class SummaryResult(ABC):
@@ -220,11 +216,12 @@ class LanguageScanner:
         self: Self,
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
+        error_mode: ErrorMode,
         *,
         manager: ManagerInterface,
     ) -> Optional[Language]:
         try:
-            wav_file = WAVFile(scanned_file.path)
+            wav_file = WAVFile(file=scanned_file.path, error_mode=error_mode)
 
             prediction_result = self.__classifier.predict(
                 wav_file,
@@ -256,10 +253,16 @@ class LanguageScanner:
         self: Self,
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
+        error_mode: ErrorMode,
         *,
         manager: ManagerInterface,
     ) -> Language:
-        language = self.get_language(scanned_file, language_picker, manager=manager)
+        language = self.get_language(
+            scanned_file,
+            language_picker,
+            error_mode=error_mode,
+            manager=manager,
+        )
 
         if language is None:
             return Language.get_default()
@@ -306,7 +309,17 @@ class Scanner(ABC):
         return self.__metadata_scanner
 
 
-type CallbackTuple = tuple[ManagerInterface, Scanner, LanguagePicker]
+@dataclass
+class CallbackData:
+    manager: ManagerInterface
+    scanner: Scanner
+    language_picker: LanguagePicker
+    error_mode: ErrorMode
+
+    def as_tuple(
+        self: Self,
+    ) -> tuple[ManagerInterface, Scanner, LanguagePicker, ErrorMode]:
+        return (self.manager, self.scanner, self.language_picker, self.error_mode)
 
 
 @dataclass(slots=True, repr=True)
@@ -355,13 +368,17 @@ class Content(ABC):
     def generate_checksum(self: Self, manager: ManagerInterface) -> None:
         self.__scanned_file.generate_checksum(manager)
 
+    def generate_checksum_if_needed(self: Self, manager: ManagerInterface) -> None:
+        if self.__scanned_file.stats.checksum is None:
+            self.__scanned_file.generate_checksum(manager)
+
     @abstractmethod
     def scan(
         self: Self,
         callback: Callback[
             "Content",
             ContentCharacteristic,
-            CallbackTuple,
+            CallbackData,
         ],
         *,
         handles: HandlesType,
@@ -373,7 +390,7 @@ class Content(ABC):
 
 def process_folder(
     directory: Path,
-    callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+    callback: Callback[Content, ContentCharacteristic, CallbackData],
     *,
     handles: HandlesType,
     parent_folders: list[str],

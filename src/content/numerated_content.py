@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
 from typing import (
-    Annotated,
     Literal,
     Optional,
     Self,
@@ -12,10 +11,9 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
-    ContentDict,
 )
 from content.general import (
     Callback,
@@ -130,14 +128,14 @@ class NumeratedContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],
         trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
-        manager, scanner, language_picker = callback.get_saved()
+        manager, scanner, language_picker, error_mode = callback.get_saved().as_tuple()
 
         current_handles = self.__get_handles(handles)
 
@@ -156,6 +154,7 @@ class NumeratedContent(Content):
                                 scanner.language_scanner.get_language_or_default(
                                     self.scanned_file,
                                     language_picker,
+                                    error_mode=error_mode,
                                     manager=manager,
                                 )
                             )
@@ -203,6 +202,7 @@ class NumeratedContent(Content):
                 self.__language = scanner.language_scanner.get_language_or_default(
                     self.scanned_file,
                     language_picker,
+                    error_mode=error_mode,
                     manager=manager,
                 )
             else:

@@ -186,13 +186,19 @@ class Stats:
             self.mtime = new_stats.mtime
 
             with_checksum: Stats = Stats.from_file(
-                path, _type, generate_checksum=True, manager=manager,
+                path,
+                _type,
+                generate_checksum=True,
+                manager=manager,
             )
             return with_checksum.checksum != self.checksum
 
         msg = "Outdated state for directories is not correctly reported by mtime or similar stats, so it isn't possible"
         raise RuntimeError(msg)
 
+        
+    def reset(self:Self)->None:
+        self.checksum = None
 
 @dataclass(slots=True, repr=True)
 class ScannedFile:
@@ -229,12 +235,18 @@ class ScannedFile:
         file_path: Path,
         file_type: ScannedFileType,
         parent_folders: list[str],
+        manager: ManagerInterface,
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
             msg = "No more than 3 parent folders are allowed: [collection] -> series -> season"
             raise RuntimeError(msg)
 
-        stats: Stats = Stats.from_file(file_path, file_type, generate_checksum=False)
+        stats: Stats = Stats.from_file(
+            file_path,
+            file_type,
+            generate_checksum=False,
+            manager=manager,
+        )
 
         return ScannedFile(
             path=file_path,
@@ -253,6 +265,9 @@ class ScannedFile:
             generate_checksum=True,
             manager=manager,
         )
+
+    def reset_file_data(self: Self) -> None:
+        self.stats.reset()
 
     def is_outdated(self: Self, manager: ManagerInterface) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)

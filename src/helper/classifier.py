@@ -40,6 +40,7 @@ from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.devices import AllocatorType, DeviceManager
+from helper.error import ErrorMode
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
 from helper.manager import CounterInterface, ManagerInterface
@@ -551,24 +552,21 @@ class WAVFile:
     __status: FileStatus
     __runtime: Timestamp
 
-    def __init__(self: Self, file: Path) -> None:
+    def __init__(self: Self, file: Path, error_mode: ErrorMode) -> None:
         if not file.exists():
             raise FileNotFoundError(file)
         self.__file = file
-        info = self.__get_info()
+        info = self.__get_info(error_mode=error_mode)
         if info.is_err():
             raise FileMetadataError(info.get_err())
         status, runtime = info.get_ok()
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(
-        self: Self,
-    ) -> WAVFile__InfoResult:
+    def __get_info(self: Self, error_mode: ErrorMode) -> WAVFile__InfoResult:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
-            with Path("error.log").open(mode="a") as f:
-                print(f'"{self.__file}",', file=f)
+            error_mode.write_error(f'"{self.__file}",')
 
             err_msg: str = (
                 f"Unable to get a valid stream from file '{self.__file}':\n{err}"

@@ -12,7 +12,7 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
     process_folder,
@@ -126,14 +126,14 @@ class SeasonContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],
         trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner, _ = callback.get_saved()
+        _, scanner, _, _ = callback.get_saved().as_tuple()
 
         series_handle = self.__get_handle(handles=handles)
 

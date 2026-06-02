@@ -1,4 +1,5 @@
 from logging import Logger
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,6 +19,7 @@ from content.summary import Summary
 from helper.base import AnyType, parse_contents
 from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
 from helper.devices import DeviceManager
+from helper.error import ErrorModeFile
 from helper.manager import TuiManager
 
 if TYPE_CHECKING:
@@ -79,8 +81,12 @@ def launch_tui(
 
     choice_manager = TUIChoiceManager()
 
+    # TODO: make configurable
+    error_mode = ErrorModeFile(Path("error.log"))
+
     language_picker: LanguagePicker = get_picker_from_config(
-        config=config.picker, choice_manager=choice_manager,
+        config=config.picker,
+        choice_manager=choice_manager,
     )
 
     # TODO: this doesn't work atm
@@ -119,6 +125,7 @@ def launch_tui(
         general_info=general_info,
         config_type=config.config_type,
         manager=manager,
+        error_mode=error_mode,
     )
 
     language_summary, metadata_summary = Summary.combine_summaries(

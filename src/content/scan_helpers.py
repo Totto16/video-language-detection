@@ -17,6 +17,7 @@ from content.numerated_content import NumeratedContent
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.log import get_logger
+from helper.manager import ManagerInterface
 
 logger: Logger = get_logger()
 
@@ -34,11 +35,13 @@ def normal_content_from_scan(
     parent_folders: list[str],
     name_parser: NameParser,
     trailer_names: list[str],
+    manager: ManagerInterface,
 ) -> Optional[Content]:
     scanned_file: ScannedFile = ScannedFile.from_scan(
         file_path,
         file_type,
         parent_folders,
+        manager=manager,
     )
 
     name = file_path.name
@@ -133,11 +136,13 @@ def numerated_content_from_scan(
     parent_folders: list[str],
     name_parser: NameParser,
     trailer_names: list[str],
+    manager: ManagerInterface,
 ) -> Optional[Content]:
     scanned_file: ScannedFile = ScannedFile.from_scan(
         file_path,
         file_type,
         parent_folders,
+        manager=manager,
     )
 
     _ = trailer_names

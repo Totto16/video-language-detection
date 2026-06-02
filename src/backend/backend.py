@@ -71,6 +71,7 @@ from helper.config import (
     filter_configs,
 )
 from helper.devices import DeviceManager
+from helper.error import ErrorModeNone
 from helper.log import get_logger
 from helper.manager import (
     CounterInterface,
@@ -1455,6 +1456,9 @@ class BackendScanner:
             if x is not None
         ]
 
+        # TODO: make configurable
+        error_mode = ErrorModeNone()
+
         contents: list[Content] = parse_contents(
             root_folder=config.parser.root_folder,
             options={
@@ -1471,6 +1475,7 @@ class BackendScanner:
             general_info=general_info,
             config_type=config.config_type,
             manager=manager,
+            error_mode=error_mode,
         )
 
         language_summary, metadata_summary = Summary.combine_summaries(
