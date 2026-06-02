@@ -1,9 +1,9 @@
-from enum import Enum
 import json
 import os
 import platform
 import shlex
 import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 

@@ -33,10 +33,8 @@ from helper.parser import CustomNameParser
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from helper.tui import launch_tui
+from helper.version import PROGRAM_VERSION
 from main import AllContent, generate_schemas
-
-PROGRAM_VERSION: str = "2.5.3"
-
 
 type SubCommand = Literal["run", "schema", "gui", "config_check", "api"]
 

@@ -5,7 +5,6 @@ from enum import Enum, StrEnum
 from hashlib import sha256
 from pathlib import Path
 from typing import (
-    Any,
     Optional,
     Self,
     TypedDict,
@@ -196,9 +195,9 @@ class Stats:
         msg = "Outdated state for directories is not correctly reported by mtime or similar stats, so it isn't possible"
         raise RuntimeError(msg)
 
-        
-    def reset(self:Self)->None:
+    def reset(self: Self) -> None:
         self.checksum = None
+
 
 @dataclass(slots=True, repr=True)
 class ScannedFile:

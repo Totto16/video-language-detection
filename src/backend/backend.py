@@ -1010,7 +1010,8 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
             background_tasks.add_task(fn)
 
         options: StartOptions = StartOptions(
-            config_filter=cfg_filter, template_to_use=start_query.template
+            config_filter=cfg_filter,
+            template_to_use=start_query.template,
         )
 
         result: Optional[str] = backend.scanner.start(
@@ -1390,8 +1391,10 @@ def run_in_thread(
     with backend.thread_logger():
         asyncio.run(
             self.start_run_async(
-                configs=configs, backend=backend, config_file_path=config_file_path
-            )
+                configs=configs,
+                backend=backend,
+                config_file_path=config_file_path,
+            ),
         )
 
     event.set()
@@ -1685,7 +1688,8 @@ class Backend:
         self.__options = options
         self.__manager = WsManager(loop=loop)
         self.__scanner = BackendScanner(
-            raw_config=raw_config, config_file_path=config_file_path
+            raw_config=raw_config,
+            config_file_path=config_file_path,
         )
         self.__ready = asyncio.Event()
 
@@ -1758,7 +1762,9 @@ class Backend:
 
 
 async def start_all(
-    options: BackendOptions, raw_config: RawConfig, config_file_path: Path
+    options: BackendOptions,
+    raw_config: RawConfig,
+    config_file_path: Path,
 ) -> int:
     loop = asyncio.get_running_loop()
 
@@ -1780,7 +1786,9 @@ def suppress_logs() -> None:
 
 
 def launch_api(
-    options: BackendOptions, raw_config: RawConfig, config_file_path: Path
+    options: BackendOptions,
+    raw_config: RawConfig,
+    config_file_path: Path,
 ) -> int:
     suppress_logs()
     return asyncio.run(start_all(options, raw_config, config_file_path))

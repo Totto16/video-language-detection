@@ -35,6 +35,7 @@ prompt-toolkit = "*"
 questionary = "*"
 colorlog = "*"
 pyperclip = "*"
+mutagen = "*"
 
 # fastapi for the backend, using standard feature / configuration
 "fastapi[standard]" = "*"

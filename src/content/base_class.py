@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, override
+from typing import Any, Optional, Self, override
 
 from apischema import alias
 
