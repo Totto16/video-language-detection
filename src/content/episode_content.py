@@ -173,7 +173,7 @@ class EpisodeContent(Content):
             try:
 
                 def metadata_prefix(name: str) -> str:
-                    return f"video_language_scanner_{name}"
+                    return f"video_language_detect_{name}"
 
                 now = datetime.now()  # noqa: DTZ005
 
