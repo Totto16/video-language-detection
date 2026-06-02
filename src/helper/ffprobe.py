@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import os
 import platform
@@ -16,6 +17,14 @@ def parse_float_safely(inp: str) -> Optional[float]:
         return float(inp)
     except ValueError:
         return None
+
+
+class StreamType(Enum):
+    video = "video"
+    audio = "audio"
+    subtitle = "subtitle"
+    attachment = "attachment"
+    unknown = "unknown"
 
 
 # some things here were copied and modified from the original ffprobe-python repo:
@@ -49,6 +58,20 @@ class FFprobeStream:
         Is the stream labelled as a attachment stream.
         """
         return self.__stream.get("codec_type", None) == "attachment"
+
+    def type(self: Self) -> StreamType:
+        if self.is_video():
+            return StreamType.video
+        if self.is_audio():
+            return StreamType.audio
+
+        if self.is_subtitle():
+            return StreamType.subtitle
+
+        if self.is_attachment():
+            return StreamType.attachment
+
+        return StreamType.unknown
 
     def codec(self: Self) -> Optional[str]:
         """
