@@ -35,7 +35,7 @@ from content.video_metadata import VideoMetadata
 from helper.apischema import narrow_type
 from helper.error import ErrorMode
 from helper.log import get_logger
-from helper.manager import ManagerInterface
+from helper.manager import CounterInterface, ManagerInterface
 from helper.version import PROGRAM_VERSION
 from helper.video_tagger import VideoTagger
 
@@ -46,6 +46,9 @@ logger: Logger = get_logger()
 needs_migration_for_video_metadata: bool = os.getenv(
     "VIDEO_LANG_DETECT_MIGRATION_FOR_VIDEO_METADATA",
 ) in ["1", "true", "TRUE"]
+
+
+global_counter_wip = 1
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.episode])))
@@ -141,7 +144,7 @@ class EpisodeContent(Content):
 
     def __reset_metadata_of_file(self: Self) -> None:
         self.__language = Language.get_default()
-        self.__scanned_file.reset_file_data()
+        self.scanned_file.reset_file_data()
         self.__video_metadata = None
         # note, reset other metadata here, once new one is added
 
@@ -179,11 +182,16 @@ class EpisodeContent(Content):
                     metadata_prefix("version"): PROGRAM_VERSION,
                     metadata_prefix("iso_time"): now.isoformat(),
                 }
-                # TODO:
-                # handle.write_metadata({})
-                print(metadata)
-                self.__scanned_file.reset_file_data()
-                changed_file = True
+
+                global global_counter_wip
+
+                if global_counter_wip > 0:
+                    with handle.writer(manager=manager) as writer:
+                        writer.write_metadata(metadata)
+                        global_counter_wip -= 1
+                        print(metadata)
+                        self.scanned_file.reset_file_data()
+                        changed_file = True
             except RuntimeError:
                 logger.exception("Write Video Metadata")
 
@@ -197,10 +205,20 @@ class EpisodeContent(Content):
 
             try:
                 if self.__video_metadata is None:
+                    bar: CounterInterface = manager.counter(
+                        total=1,
+                        desc="get video metadata",
+                        leave=False,
+                        color="red",
+                    )
+                    bar.update(0, force=True)
+
                     self.__video_metadata = VideoMetadata.from_file(
                         file=self.scanned_file.path,
                         error_mode=error_mode,
                     )
+                    bar.close(clear=True)
+                    print(self.__video_metadata)
             except RuntimeError:
                 logger.exception("Analyze Video Metadata")
 

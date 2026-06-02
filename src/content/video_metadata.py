@@ -124,7 +124,7 @@ class VideoMetadata:
                     if duration is None:
                         msg = "No audio duration was found"
                         raise RuntimeError(msg)
-                    return VideoStreamVideo(VideoStreamType.audio, duration)
+                    return VideoStreamAudio(VideoStreamType.audio, duration)
                 case StreamType.subtitle:
                     return VideoStreamSubtitle(VideoStreamType.subtitle)
                 case StreamType.attachment:
