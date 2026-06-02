@@ -7,6 +7,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
+from helper.timestamp import parse_int_safely
+
 
 class FFprobeRawStream(TypedDict):
     pass
@@ -88,6 +90,24 @@ class FFprobeStream:
         if self.is_video() or self.is_audio():
             val: Optional[Any] = self.__stream.get("duration", None)
             return parse_float_safely(val) if isinstance(val, str) else None
+
+        return None
+
+    def video_dimensions(self: Self) -> Optional[tuple[int, int]]:
+        if self.is_video():
+            width: Optional[Any] = self.__stream.get("width", None)
+            height: Optional[Any] = self.__stream.get("height", None)
+
+            if not isinstance(width, str) or not isinstance(height, str):
+                return None
+
+            width_val = parse_int_safely(width)
+            height_val = parse_int_safely(height)
+
+            if width_val is None or height_val is None:
+                return None
+
+            return (width_val, height_val)
 
         return None
 

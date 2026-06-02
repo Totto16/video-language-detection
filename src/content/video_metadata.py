@@ -84,13 +84,16 @@ VideoStream = Annotated[
 
 
 @dataclass(slots=True, repr=True)
+class VideoDimension:
+    width: int
+    height: int
+
+
+@dataclass(slots=True, repr=True)
 class VideoMetadata:
     __duration: float = field(metadata=alias("duration"))
+    __dimensions: VideoDimension = field(metadata=alias("dimensions"))
     __streams: list[VideoStream] = field(metadata=alias("streams"))
-
-    def __init__(self: Self, duration: float, streams: list[VideoStream]) -> None:
-        self.__duration = duration
-        self.__streams = streams
 
     @staticmethod
     def __read_metadata(file: Path, error_mode: ErrorMode) -> Optional["VideoMetadata"]:
@@ -107,6 +110,36 @@ class VideoMetadata:
             logger.error(_("File is not a video: {file}").format(file=str(file)))
             return None
 
+        video_streams = metadata.video_streams()
+        # only one video stream supported
+        if len(video_streams) != 1:
+            logger.error(
+                _("Only one video stream supported, but got {video_streams}").format(
+                    video_streams=len(video_streams),
+                ),
+            )
+            return None
+
+        video_dimensions = video_streams[0].video_dimensions()
+
+        if video_dimensions is None:
+            logger.error(
+                _("Video file has no dimensions: {file}").format(file=str(file)),
+            )
+            return None
+
+        # check if we have enough audio streams
+        audio_streams = metadata.audio_streams()
+
+        # only one audio stream supported atm
+        if len(audio_streams) != 1:
+            logger.error(
+                _("Only one audio stream supported, but got {audio_streams}").format(
+                    audio_streams=len(audio_streams),
+                ),
+            )
+            return None
+
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
         if file_duration is None:
@@ -116,16 +149,10 @@ class VideoMetadata:
         def map_stream(stream: FFprobeStream) -> VideoStream:
             match stream.type():
                 case StreamType.video:
-                    duration = stream.duration_seconds()
-                    if duration is None:
-                        msg = "No video duration was found"
-                        raise RuntimeError(msg)
+                    duration = stream.duration_seconds() or file_duration
                     return VideoStreamVideo(VideoStreamType.video, duration)
                 case StreamType.audio:
-                    duration = stream.duration_seconds()
-                    if duration is None:
-                        msg = "No audio duration was found"
-                        raise RuntimeError(msg)
+                    duration = stream.duration_seconds() or file_duration
                     return VideoStreamAudio(VideoStreamType.audio, duration)
                 case StreamType.subtitle:
                     return VideoStreamSubtitle(VideoStreamType.subtitle)
@@ -135,12 +162,18 @@ class VideoMetadata:
                     return VideoStreamUnknown(VideoStreamType.unknown)
 
         try:
+            width, height = video_dimensions
+            dimensions = VideoDimension(width=width, height=height)
 
             streams: list[VideoStream] = [
                 map_stream(stream) for stream in metadata.streams
             ]
 
-            return VideoMetadata(duration=file_duration, streams=streams)
+            return VideoMetadata(
+                file_duration,
+                dimensions,
+                streams,
+            )
         except RuntimeError as err:
             logger.error(err)  # noqa: TRY400
             return None
