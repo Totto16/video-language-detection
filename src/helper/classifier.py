@@ -246,17 +246,6 @@ class RunOpts(TypedDict, total=False):
     compile_using_dynamic_shape_tracing: str
 
 
-voxlingua107_ecapa_model: Model = Model(
-    name="voxlingua107",
-    sample_count=107,
-    source="speechbrain/lang-id-voxlingua107-ecapa",
-    bitrate=16000,
-    memory_pattern=MemoryPatternLinear(
-        coeffs=LinearCoeffs(c=121287679.99999952, m=12845499.313230773),
-    ),
-)
-
-
 MODEL_SAVEDIR: str = "model"
 
 

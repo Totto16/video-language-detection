@@ -102,7 +102,7 @@ def narrow_type(
             resulting_type, defs = get_sub_schema(type_desc, **options)
 
             if defs is not None:
-                msg = "Error: defs handling not implemented yet"
+                msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
                 raise NotImplementedError(msg)
 
             if cast(dict[str, Any], schema["properties"]).get(name) is None:
@@ -115,11 +115,10 @@ def narrow_type(
 
 
 def define_schema(*fields: ObjectField) -> Callable[[Any], Any]:
-    def decorator(cls: Any) -> Any:
-        set_object_fields(cls, fields)
-        return cls
+    def lazy_fn() -> Sequence[ObjectField]:
+        return fields
 
-    return decorator
+    return define_schema_lazy(lazy_fn)
 
 
 def define_schema_lazy(fn: Callable[[], Sequence[ObjectField]]) -> Callable[[Any], Any]:
@@ -146,7 +145,7 @@ def replace_schema_with(
     def replace_schema_with_impl(schema: dict[str, Any]) -> None:
         resulting_type, defs = get_sub_schema(type_desc, **options)
         if defs is not None:
-            msg = "Error: defs handling not implemented yet"
+            msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
             raise NotImplementedError(msg)
 
         for key in [*schema.keys()]:
