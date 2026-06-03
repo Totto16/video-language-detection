@@ -1,17 +1,19 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from logging import Logger
 from typing import Annotated, Literal, Optional, Self, override
 
-from apischema import deserialize, schema
+from apischema import deserialize, schema, type_name
 from apischema.metadata import none_as_undefined
+from apischema.objects import ObjectField, object_fields
 from requests import HTTPError
 from themoviedb.tmdb import TMDb
 
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType, SkipHandle
 from content.shared import ScanType
-from helper.apischema import OneOf, SchemaType, get_schema
+from helper.apischema import OneOf
 from helper.log import get_logger
 from helper.translation import get_translator
 
@@ -34,6 +36,7 @@ class TMDBMetadataConfig:
 
 @dataclass
 @schema()
+@type_name("TMDBSeriesMetadata")
 class SeriesMetadata:
     episodes_count: Optional[int]
     seasons_count: Optional[int]
@@ -49,6 +52,7 @@ class SeriesMetadata:
 
 @dataclass
 @schema()
+@type_name("TMDBSeasonMetadata")
 class SeasonMetadata:
     air_date: Optional[date]
     episodes_count: Optional[int]
@@ -60,6 +64,7 @@ class SeasonMetadata:
 
 @dataclass
 @schema()
+@type_name("TMDBEpisodeMetadata")
 class EpisodeMetadata:
     air_date: Optional[date]
     runtime: Optional[int]
@@ -72,6 +77,7 @@ class EpisodeMetadata:
 
 @dataclass
 @schema()
+@type_name("TMDBSkipMetadata")
 class SkipMetadata:
     reason: str
     metadata_type: Literal["skip"]
@@ -327,5 +333,5 @@ class TMDBProvider(Provider):
 
     @override
     @staticmethod
-    def get_metadata_schema() -> SchemaType:
-        return get_schema(TMDBMetadataSchema, emit_type="deserialize")
+    def get_metadata_schema() -> Mapping[str, ObjectField]:
+        return object_fields(TMDBMetadataSchema)

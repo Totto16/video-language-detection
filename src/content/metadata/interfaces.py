@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, Optional, Self, override
+
+from apischema.objects import ObjectField
 
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
@@ -54,7 +57,7 @@ class Provider(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_metadata_schema() -> SchemaType: ...
+    def get_metadata_schema() -> Mapping[str, ObjectField]: ...
 
 
 @dataclass

@@ -1,15 +1,17 @@
 # TODO: see: https://github.com/Totto16/imdb-dataset-to-postgresql
 
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal, Optional, Self, override
 
 from apischema import schema
+from apischema.objects import ObjectField, object_fields
 
 from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
-from helper.apischema import OneOf, SchemaType, get_schema
+from helper.apischema import OneOf
 
 
 @dataclass
@@ -52,8 +54,8 @@ class IMDBProvider(Provider):
 
     @override
     @staticmethod
-    def get_metadata_schema() -> SchemaType:
-        return get_schema(IMDBMetadataSchema, emit_type="deserialize")
+    def get_metadata_schema() -> Mapping[str, ObjectField]:
+        return object_fields(IMDBMetadataSchema)
 
     @override
     def get_series_metadata(
