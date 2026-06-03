@@ -5,10 +5,9 @@ from typing import Annotated, NewType, Optional, Self
 
 from annotated_types import GroupedMetadata, Len, Predicate
 from apischema import deserializer, schema, serializer
-from apischema.objects import ObjectField
 
 from content.iso_codes import valid_iso_languages_list
-from helper.apischema import define_schema, replace_schema_with
+from helper.apischema import use_schema_from
 from helper.translation import get_translator
 
 __all__: list[str] = ["ExactLen", "Language"]
@@ -180,10 +179,7 @@ class LanguageSchema:
     long: LongLanguageStr
 
 
-@define_schema(
-    ObjectField("__SHOULD_BE_REPLACED", int),
-)
-@schema(extra=replace_schema_with(LanguageSchema))
+@use_schema_from(LanguageSchema)
 class Language:
     __short: ShortLanguageStr
     __long: LongLanguageStr

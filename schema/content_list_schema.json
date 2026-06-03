@@ -374,11 +374,10 @@
             "type": "object",
             "properties": {
                 "short": {
-                    "type": "string",
-                    "pattern": "^([a-z]{2})$"
+                    "$ref": "#/$defs/ShortLanguageStr"
                 },
                 "long": {
-                    "type": "string"
+                    "$ref": "#/$defs/LongLanguageStr"
                 }
             },
             "required": [
@@ -386,6 +385,13 @@
                 "long"
             ],
             "additionalProperties": false
+        },
+        "ShortLanguageStr": {
+            "type": "string",
+            "pattern": "^([a-z]{2})$"
+        },
+        "LongLanguageStr": {
+            "type": "string"
         },
         "VideoMetadata": {
             "type": "object",
