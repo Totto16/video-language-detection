@@ -18,7 +18,7 @@ voxlingua107_ecapa_languages_count = 107
 # NOTE:
 # Warning: In the dataset and in the defaults of this model (see label_encoder.txt, the used ISO language code for Hebrew is obsolete (should be he instead of iw). The ISO language code for Javanese is incorrect (should be jv instead of jw). See issue #2396. (https://github.com/speechbrain/speechbrain/issues/2396)
 voxlingua107_ecapa_languages: Annotated[
-    list[tuple[Alpha2LanguageStr | Alpha3LanguageStr | str, LongLanguageStr]],
+    list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
     ExactLen(voxlingua107_ecapa_languages_count),
 ] = [
     (
@@ -198,7 +198,7 @@ voxlingua107_ecapa_languages: Annotated[
         LongLanguageStr("Italian"),
     ),
     (
-        "iw",
+        Alpha2LanguageStr.deserialize_str("iw"),
         LongLanguageStr("Hebrew"),
     ),
     (
@@ -206,7 +206,7 @@ voxlingua107_ecapa_languages: Annotated[
         LongLanguageStr("Japanese"),
     ),
     (
-        "jw",
+        Alpha2LanguageStr.deserialize_str("jw"),
         LongLanguageStr("Javanese"),
     ),
     (

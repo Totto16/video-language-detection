@@ -268,6 +268,13 @@ class Alpha2LanguageStr:
         if inp == "un":
             return Alpha2LanguageStr.unknown_lang()
 
+        # some known errors and older codes form models, kept for backwards compatibility of older save data
+        if inp == "iw":
+            return Alpha2LanguageStr.from_str_unsafe("he")
+
+        if inp == "jw":
+            return Alpha2LanguageStr.from_str_unsafe("jv")
+
         return Alpha2LanguageStr.from_str_unsafe(inp)
 
     def __str__(self: Self) -> str:
