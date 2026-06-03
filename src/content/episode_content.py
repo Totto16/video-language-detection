@@ -162,8 +162,8 @@ class EpisodeContent(Content):
                 "episode": self.__description.episode,
             },
             "language": {
-                "short": self.language.short,
-                "long": self.language.long,
+                "short": str(self.language.short),
+                "long": str(self.language.long),
             },
         }
 
