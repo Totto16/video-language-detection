@@ -374,7 +374,8 @@
             "type": "object",
             "properties": {
                 "short": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^([a-z]{2})$"
                 },
                 "long": {
                     "type": "string"
@@ -413,11 +414,22 @@
                             }
                         ]
                     }
+                },
+                "dimensions": {
+                    "$ref": "#/$defs/VideoDimension"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "bit_rate": {
+                    "type": "number"
                 }
             },
             "required": [
                 "duration",
-                "streams"
+                "streams",
+                "dimensions",
+                "size"
             ],
             "additionalProperties": false
         },
@@ -491,6 +503,22 @@
             },
             "required": [
                 "type"
+            ],
+            "additionalProperties": false
+        },
+        "VideoDimension": {
+            "type": "object",
+            "properties": {
+                "width": {
+                    "type": "integer"
+                },
+                "height": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "width",
+                "height"
             ],
             "additionalProperties": false
         },

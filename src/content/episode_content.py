@@ -116,7 +116,9 @@ class EpisodeContent(Content):
             return None
 
         return EpisodeDescription(
-            name=result.name, season=result.season, episode=result.episode,
+            name=result.name,
+            season=result.season,
+            episode=result.episode,
         )
 
     @override

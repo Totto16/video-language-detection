@@ -1,10 +1,14 @@
 import re
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Annotated, NewType, Optional, Self
 
-from annotated_types import Len, Predicate
+from annotated_types import GroupedMetadata, Len, Predicate
 from apischema import deserializer, schema, serializer
+from apischema.objects import ObjectField
 
 from content.iso_codes import valid_iso_languages_list
+from helper.apischema import define_schema, replace_schema_with
 from helper.translation import get_translator
 
 __all__: list[str] = ["ExactLen", "Language"]
@@ -21,10 +25,20 @@ def ExactLen(length: int) -> Len:  # noqa: N802
 # and: https://www.loc.gov/standards/iso639-2/php/code_list.php
 
 
+@dataclass
+class AlphaLanguageCodeAnnnotation(GroupedMetadata):
+    length: int
+
+    def __iter__(self) -> Iterator[object]:
+        yield Predicate(str.islower)
+
+        yield ExactLen(self.length)
+
+
 # this should be ISO 639-2 codes (alpha-3 code)
 Alpha3LanguageCode = NewType(
     "Alpha3LanguageCode",
-    Annotated[str, ExactLen(3) | Predicate(str.islower)],
+    Annotated[str, AlphaLanguageCodeAnnnotation(3)],
 )
 
 SHORT_LANGUAGE_STR_PATTERN = r"^([a-z]{2})$"
@@ -33,10 +47,9 @@ SHORT_LANGUAGE_STR_PATTERN = r"^([a-z]{2})$"
 # this should be ISO 639-1 codes (alpha-2 code)
 @schema(pattern=SHORT_LANGUAGE_STR_PATTERN)
 class ShortLanguageStr:
-
     __PrivateStrImpl = NewType(
         "__PrivateStrImpl",
-        Annotated[str, ExactLen(2) | Predicate(str.islower)],
+        Annotated[str, AlphaLanguageCodeAnnnotation(2)],
     )
 
     __data: __PrivateStrImpl
@@ -161,6 +174,16 @@ class ShortLanguageStr:
 LongLanguageStr = NewType("LongLanguageStr", str)
 
 
+@dataclass
+class LanguageSchema:
+    short: ShortLanguageStr
+    long: LongLanguageStr
+
+
+@define_schema(
+    ObjectField("__SHOULD_BE_REPLACED", int),
+)
+@schema(extra=replace_schema_with(LanguageSchema))
 class Language:
     __short: ShortLanguageStr
     __long: LongLanguageStr

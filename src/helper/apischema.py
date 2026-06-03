@@ -11,6 +11,7 @@ from apischema.json_schema import (
     deserialization_schema,
     serialization_schema,
 )
+from apischema.objects import ObjectField, set_object_fields
 
 type EmitType = Literal["deserialize", "serialize"]
 
@@ -65,6 +66,27 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"][name] = resulting_type
 
     return narrow_schema
+
+
+def define_schema(*fields: ObjectField) -> Callable[[Any], Any]:
+    def decorator(cls: Any) -> Any:
+        set_object_fields(cls, fields)
+        return cls
+
+    return decorator
+
+
+def replace_schema_with(type_desc: Any) -> Callable[[dict[str, Any]], None]:
+    def replace_schema_with_impl(schema: dict[str, Any]) -> None:
+        resulting_type: SchemaType = get_schema(type_desc)
+        del resulting_type["$schema"]
+        for key in [*schema.keys()]:
+            del schema[key]
+
+        for key, value in resulting_type.items():
+            schema[key] = value  # noqa: PERF403
+
+    return replace_schema_with_impl
 
 
 # from: https://wyfo.github.io/apischema/0.18/json_schema/
