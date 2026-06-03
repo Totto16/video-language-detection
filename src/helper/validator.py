@@ -18,14 +18,16 @@ _ = get_translator()
 logger: Logger = get_logger()
 
 type ReporterWhere = tuple[
-    SeriesDescription, SeasonDescription, EpisodeContent,
+    SeriesDescription,
+    SeasonDescription,
+    EpisodeContent,
 ] | tuple[
     SeriesDescription,
     SeasonContent,
 ] | SeriesContent | CollectionContent
 
 
-class ValidatorResporter(ABC):
+class ValidatorReporter(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
 
@@ -64,7 +66,7 @@ class ValidatorResporter(ABC):
     ) -> None: ...
 
 
-class TuiValidatorResporter(ValidatorResporter):
+class TuiValidatorReporter(ValidatorReporter):
     def __init__(self: Self) -> None:
         super().__init__()
 
@@ -86,10 +88,10 @@ class TuiValidatorResporter(ValidatorResporter):
 
 
 class Validator[ED, SD, S2D, CD](ABC):
-    __reporter: ValidatorResporter
+    __reporter: ValidatorReporter
     __name: str
 
-    def __init__(self: Self, reporter: ValidatorResporter, name: str) -> None:
+    def __init__(self: Self, reporter: ValidatorReporter, name: str) -> None:
         super().__init__()
         self.__reporter = reporter
         self.__name = name
@@ -101,21 +103,29 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> None:
         self.__reporter.emit_error(self.__name, where, message)
 
-    def __validate_seasons_impl(self: Self, contents: list[SeasonContent]) -> list[SD]:
+    def __validate_seasons_impl(
+        self: Self, series: SeriesDescription, contents: list[SeasonContent]
+    ) -> list[SD]:
         state: list[SD] = []
 
         for content in contents:
             local_state = [
-                self.validate_episode(episode) for episode in content.episodes
+                self.validate_episode(episode, series, content.description)
+                for episode in content.episodes
             ]
-            state.append(self.validate_season(content, local_state))
+            state.append(
+                self.validate_season(content, series=series, result=local_state)
+            )
         return state
 
     def __validate_series_impl(self: Self, contents: list[SeriesContent]) -> list[S2D]:
         state: list[S2D] = []
 
         for content in contents:
-            local_state = self.__validate_seasons_impl(content.seasons)
+            local_state = self.__validate_seasons_impl(
+                series=content.description,
+                contents=content.seasons,
+            )
             state.append(self.validate_series(content, local_state))
 
         return state
@@ -155,19 +165,31 @@ class Validator[ED, SD, S2D, CD](ABC):
     @staticmethod
     def __validate_multiple_seasons_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        series: SeriesDescription,
         contents: list[SeasonContent],
     ) -> list[list["Validator.__Any2"]]:
         state: list[list[Validator.__Any2]] = []
 
         for content in contents:
             local_states: list[list[Validator.__Any1]] = [
-                [validator.validate_episode(episode) for episode in content.episodes]
+                [
+                    validator.validate_episode(
+                        episode,
+                        series=series,
+                        season=content.description,
+                    )
+                    for episode in content.episodes
+                ]
                 for validator in validators
             ]
 
             state.append(
                 [
-                    validator.validate_season(content, local_state)
+                    validator.validate_season(
+                        content,
+                        series=series,
+                        result=local_state,
+                    )
                     for validator, local_state in zip(
                         validators,
                         local_states,
@@ -187,7 +209,8 @@ class Validator[ED, SD, S2D, CD](ABC):
         for content in contents:
             local_states: list[list[Any]] = Validator.__validate_multiple_seasons_impl(
                 validators,
-                content.seasons,
+                series=content.description,
+                contents=content.seasons,
             )
             state.append(
                 [
@@ -249,10 +272,20 @@ class Validator[ED, SD, S2D, CD](ABC):
         Validator.__validate_multiple_root_impl(validators, contents)
 
     @abstractmethod
-    def validate_episode(self: Self, episode: EpisodeContent) -> ED: ...
+    def validate_episode(
+        self: Self,
+        episode: EpisodeContent,
+        series: SeriesDescription,
+        season: SeasonDescription,
+    ) -> ED: ...
 
     @abstractmethod
-    def validate_season(self: Self, season: SeasonContent, result: list[ED]) -> SD: ...
+    def validate_season(
+        self: Self,
+        season: SeasonContent,
+        series: SeriesDescription,
+        result: list[ED],
+    ) -> SD: ...
 
     @abstractmethod
     def validate_series(
@@ -282,14 +315,19 @@ class LanguageValidator(Validator[None, None, None, None]):
 
     def __init__(
         self: Self,
-        reporter: ValidatorResporter,
+        reporter: ValidatorReporter,
         model_language: ModelLanguage,
     ) -> None:
         super().__init__(reporter, "language")
         self.__model_language = model_language
 
     @override
-    def validate_episode(self: Self, episode: EpisodeContent) -> None:
+    def validate_episode(
+        self: Self,
+        episode: EpisodeContent,
+        series: SeriesDescription,
+        season: SeasonDescription,
+    ) -> None:
         if episode.language in [Language.no_language(), Language.get_default()]:
             return
 
@@ -299,12 +337,14 @@ class LanguageValidator(Validator[None, None, None, None]):
             return
 
         self.emit_error(
-            episode,
+            (series, season, episode),
             _("Invalid language in episode: {err}").format(err=is_valid),
         )
 
     @override
-    def validate_season(self: Self, season: SeasonContent, result: list[None]) -> None:
+    def validate_season(
+        self: Self, season: SeasonContent, series: SeriesDescription, result: list[None]
+    ) -> None:
         pass
 
     @override
@@ -343,13 +383,16 @@ class LanguageConsistencyValidator(
 ):
     def __init__(
         self: Self,
-        reporter: ValidatorResporter,
+        reporter: ValidatorReporter,
     ) -> None:
-        super().__init__(reporter)
+        super().__init__(reporter, "language consistency")
 
     @override
     def validate_episode(
-        self: Self, episode: EpisodeContent
+        self: Self,
+        episode: EpisodeContent,
+        series: SeriesDescription,
+        season: SeasonDescription,
     ) -> tuple[EpisodeContent, Optional[Language]]:
         if episode.language in [Language.no_language(), Language.get_default()]:
             return (episode, None)
@@ -360,6 +403,7 @@ class LanguageConsistencyValidator(
     def validate_season(
         self: Self,
         season: SeasonContent,
+        series: SeriesDescription,
         result: list[tuple[EpisodeContent, Optional[Language]]],
     ) -> tuple[SeasonContent, list[Language]]:
 
@@ -385,8 +429,8 @@ class LanguageConsistencyValidator(
                 acc.append(last_lang)
                 return acc
 
-            self.reporter.emit_error(
-                episode,
+            self.emit_error(
+                (series, season.description, episode),
                 _(
                     "Language in season is not consistent, the last episode had the language {lang1!s} but this one has {lang2!s}"  # noqa: COM812
                 ).format(lang1=last_lang, lang2=language),
@@ -400,7 +444,7 @@ class LanguageConsistencyValidator(
         )
 
         if len(ret) == 0:
-            self.reporter.emit_error(season, _("no language detected in season"))
+            self.emit_error((series, season), _("no language detected in season"))
 
         return (season, ret)
 
@@ -419,7 +463,9 @@ class LanguageConsistencyValidator(
         ) -> list[Language]:
             season, languages = elem
             if len(languages) == 0:
-                self.reporter.emit_error(season, _("no language detected in season"))
+                self.emit_error(
+                    (series.description, season), _("no language detected in season")
+                )
                 return acc
 
             def process_language(lang: Language) -> None:
@@ -435,8 +481,8 @@ class LanguageConsistencyValidator(
                     acc.append(last_lang)
                     return None
 
-                self.reporter.emit_error(
-                    season,
+                self.emit_error(
+                    (series.description, season),
                     _(
                         "Language in series is not consistent, the last season had the language {lang1!s} but this one has {lang2!s}"  # noqa: COM812
                     ).format(lang1=last_lang, lang2=lang),
@@ -456,7 +502,7 @@ class LanguageConsistencyValidator(
         )
 
         if len(ret) == 0:
-            self.reporter.emit_error(series, _("no language detected in series"))
+            self.emit_error(series, _("no language detected in series"))
 
     @override
     def validate_collection(

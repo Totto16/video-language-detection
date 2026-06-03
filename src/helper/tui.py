@@ -22,6 +22,13 @@ from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
 from helper.manager import TuiManager
 from helper.models import voxlingua107_ecapa_model
+from helper.validator import (
+    LanguageConsistencyValidator,
+    LanguageValidator,
+    TuiValidatorReporter,
+    Validator,
+    ValidatorReporter,
+)
 
 if TYPE_CHECKING:
     from content.base_class import Content
@@ -129,14 +136,20 @@ def launch_tui(
         error_mode=error_mode,
     )
 
-    # TODO:validators
-    # language validators, check if the language is a correct one
     # metadata checks, check if no duplicates are found, missing episodes, missing seasons
     # check langauge consistency
 
     # TODO: find duplicates, e.g. simpson s32e10
     # TODO: also display missing episodes / episodes with the "wrong" language etc
-    # should i do that in summary generation or when?
+
+    tui_reporter: ValidatorReporter = TuiValidatorReporter()
+
+    validators: list[Validator[Any, Any, Any, Any]] = [
+        LanguageValidator(tui_reporter, model_language=model.model_languages),
+        LanguageConsistencyValidator(tui_reporter),
+    ]
+
+    Validator.validate_multiple(validators, contents)
 
     language_summary, metadata_summary = Summary.combine_summaries(
         content.summary() for content in contents
