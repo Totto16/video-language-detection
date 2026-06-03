@@ -87,6 +87,7 @@ from helper.manager import (
 from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Result
+from helper.validator import ReporterWhere, Validator, ValidatorReporter, get_validators
 from main import AllContent
 
 if TYPE_CHECKING:
@@ -594,6 +595,25 @@ class ManagerWsScannerMessage(pydantic.BaseModel):
     ]
 
 
+class ManagerWsValidatorMessageError(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["error"] = "error"
+    name: str
+    where: str
+    err: str
+
+
+class ManagerWsValidatorMessage(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    type: Literal["validator"] = "validator"
+    data: Annotated[
+        ManagerWsValidatorMessageError,
+        pydantic.Discriminator(discriminator="type"),
+    ]
+
+
 OutgoingWsData = Annotated[
     (
         ManagerWsGlobalCounterMessage
@@ -601,6 +621,7 @@ OutgoingWsData = Annotated[
         | ManagerWsChoiceMessage
         | ManagerWsLogMessage
         | ManagerWsScannerMessage
+        | ManagerWsValidatorMessage
     ),
     pydantic.Discriminator(discriminator="type"),
 ]
@@ -745,7 +766,7 @@ class ManagerCtx(AbstractContextManager[WsSingleManager]):
         return False
 
 
-class WsManager(ManagerInterface, ChoiceManagerInterface):
+class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
     __instances: list[WsSingleManager]
     __counters: list[CounterType]
     __loop: asyncio.AbstractEventLoop
@@ -948,6 +969,24 @@ class WsManager(ManagerInterface, ChoiceManagerInterface):
         reply_data.event.set()
 
         return None
+
+    @override
+    def emit_error(
+        self: Self,
+        name: str,
+        where: ReporterWhere,
+        message: str,
+    ) -> None:
+        where_str = self.format_where(where)
+
+        data: ManagerWsValidatorMessage = ManagerWsValidatorMessage(
+            data=ManagerWsValidatorMessageError(
+                name=name,
+                where=where_str,
+                err=message,
+            ),
+        )
+        self.send_data_sync(data)
 
 
 class ScanStartQuery(pydantic.BaseModel):
@@ -1488,6 +1527,13 @@ class BackendScanner:
             manager=manager,
             error_mode=error_mode,
         )
+
+        validators = get_validators(
+            reporter=manager,
+            model_language=model.model_language,
+        )
+
+        Validator.validate_multiple(validators, contents)
 
         language_summary, metadata_summary = Summary.combine_summaries(
             content.summary() for content in contents

@@ -104,7 +104,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         self.__reporter.emit_error(self.__name, where, message)
 
     def __validate_seasons_impl(
-        self: Self, series: SeriesDescription, contents: list[SeasonContent]
+        self: Self, series: SeriesDescription, contents: list[SeasonContent],
     ) -> list[SD]:
         state: list[SD] = []
 
@@ -114,7 +114,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 for episode in content.episodes
             ]
             state.append(
-                self.validate_season(content, series=series, result=local_state)
+                self.validate_season(content, series=series, result=local_state),
             )
         return state
 
@@ -343,7 +343,7 @@ class LanguageValidator(Validator[None, None, None, None]):
 
     @override
     def validate_season(
-        self: Self, season: SeasonContent, series: SeriesDescription, result: list[None]
+        self: Self, season: SeasonContent, series: SeriesDescription, result: list[None],
     ) -> None:
         pass
 
@@ -464,7 +464,8 @@ class LanguageConsistencyValidator(
             season, languages = elem
             if len(languages) == 0:
                 self.emit_error(
-                    (series.description, season), _("no language detected in season")
+                    (series.description, season),
+                    _("no language detected in season"),
                 )
                 return acc
 
@@ -519,3 +520,22 @@ class LanguageConsistencyValidator(
         result: list[None],
     ) -> None:
         pass
+
+
+def get_validators(
+    reporter: ValidatorReporter,
+    model_language: ModelLanguage,
+) -> list[Validator[Any, Any, Any, Any]]:
+
+    # TODO: metadata checks, check if no duplicates are found, missing episodes, missing seasons
+    # check langauge consistency
+
+    # TODO: find duplicates, e.g. simpson s32e10
+    # TODO: also display missing episodes / episodes with the "wrong" language etc
+
+    result: list[Validator[Any, Any, Any, Any]] = [
+        LanguageValidator(reporter=reporter, model_language=model_language),
+        LanguageConsistencyValidator(reporter=reporter),
+    ]
+
+    return result

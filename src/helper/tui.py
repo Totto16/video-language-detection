@@ -23,11 +23,10 @@ from helper.error import ErrorModeFile
 from helper.manager import TuiManager
 from helper.models import voxlingua107_ecapa_model
 from helper.validator import (
-    LanguageConsistencyValidator,
-    LanguageValidator,
     TuiValidatorReporter,
     Validator,
     ValidatorReporter,
+    get_validators,
 )
 
 if TYPE_CHECKING:
@@ -136,18 +135,9 @@ def launch_tui(
         error_mode=error_mode,
     )
 
-    # metadata checks, check if no duplicates are found, missing episodes, missing seasons
-    # check langauge consistency
-
-    # TODO: find duplicates, e.g. simpson s32e10
-    # TODO: also display missing episodes / episodes with the "wrong" language etc
-
     tui_reporter: ValidatorReporter = TuiValidatorReporter()
 
-    validators: list[Validator[Any, Any, Any, Any]] = [
-        LanguageValidator(tui_reporter, model_language=model.model_languages),
-        LanguageConsistencyValidator(tui_reporter),
-    ]
+    validators = get_validators(tui_reporter, model.model_language)
 
     Validator.validate_multiple(validators, contents)
 

@@ -232,7 +232,7 @@ class Model:
     sample_count: int
     source: str
     bitrate: int
-    model_languages: ModelLanguage
+    model_language: ModelLanguage
     memory_pattern: Optional[MemoryPattern] = (
         None  # if this is None, it is inferred and printed, so that you can hardcode it!
     )
