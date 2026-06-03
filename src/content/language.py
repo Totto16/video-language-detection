@@ -1,10 +1,16 @@
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Annotated, NewType, Optional, Self
+from typing import Annotated, Any, Literal, NewType, Optional, Self
 
 from annotated_types import GroupedMetadata, Len, Predicate
-from apischema import deserializer, schema, serializer
+from apischema import (
+    deserializer,
+    schema,
+    serialize,
+    serializer,
+    type_name,
+)
 
 from content.iso_codes import valid_iso_languages_list
 from helper.apischema import OneOf, use_schema_from
@@ -253,6 +259,10 @@ class Alpha2LanguageStr:
     @deserializer
     @staticmethod
     def deserialize_str(inp: str) -> "Alpha2LanguageStr":
+        # backwards compatible, as before the enforcing of the two alpha rule, no language wasn't two alpha digits!
+        if inp in ["no_lang", "xx"]:
+            return Alpha2LanguageStr.no_lang()
+
         match = re.match(ALPHA_2_LANGUAGE_STR_PATTERN, inp)
 
         if match is None:
@@ -261,19 +271,15 @@ class Alpha2LanguageStr:
             ).format(inp=inp, pattern=ALPHA_2_LANGUAGE_STR_PATTERN)
             raise TypeError(msg)
 
-        # backwards compatible, as before the enforcing of the two alpha rule, no language wasn't two alpha digits!
-        if inp in ["no_lang", "xx"]:
-            return Alpha2LanguageStr.no_lang()
+        # explicit check for this
 
         if inp == "un":
             return Alpha2LanguageStr.unknown_lang()
 
         # some known errors and older codes form models, kept for backwards compatibility of older save data
-        if inp == "iw":
-            return Alpha2LanguageStr.from_str_unsafe("he")
-
-        if inp == "jw":
-            return Alpha2LanguageStr.from_str_unsafe("jv")
+        mappings: dict[str, str] = {"iw": "he", "jw": "jv"}
+        if inp in mappings:
+            return Alpha2LanguageStr.from_str_unsafe(mappings[inp])
 
         return Alpha2LanguageStr.from_str_unsafe(inp)
 
@@ -299,9 +305,12 @@ class Alpha2LanguageStr:
 LongLanguageStr = NewType("LongLanguageStr", str)
 
 
+# @alias("Language")
+@schema()
+@type_name("LanguageImpl")
 @dataclass
 class LanguageSchema:
-    short: Annotated[Alpha2LanguageStr | Alpha3LanguageStr, OneOf]
+    short: Annotated[Alpha2LanguageStr | Alpha3LanguageStr | Literal["no_lang"], OneOf]
     long: LongLanguageStr
 
 
@@ -318,8 +327,15 @@ class Language:
         short: Alpha2LanguageStr | Alpha3LanguageStr,
         long: LongLanguageStr,
         *,
-        sentinel: __PrivateSentinel,  # noqa: ARG002
+        sentinel: Optional[__PrivateSentinel] = None,
     ) -> None:
+        if sentinel is None:
+            # NOTE: this is for apischema deserialization checks!
+            myself = self.deserialize(LanguageSchema(short, long))
+            self.__short = myself.__short  # noqa: SLF001
+            self.__long = myself.__long  # noqa: SLF001
+            return
+
         self.__short = short
         self.__long = long
 
@@ -417,8 +433,6 @@ class Language:
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
-    # TODO: get all languages somehow, from the classifier, that supports them all
-
     # note this is an implementation detail, that should not leak
     @staticmethod
     def __unknown() -> "Language":
@@ -450,3 +464,23 @@ class Language:
             return self.__short == other.__short and self.__long == other.__long
 
         return False
+
+    @serializer
+    def serialize(self: Self) -> dict[str, Any]:
+        serialized_dict: dict[str, Any] = serialize(
+            LanguageSchema,
+            LanguageSchema(short=self.__short, long=self.__long),
+        )
+        return serialized_dict
+
+    # @deserializer
+    @staticmethod
+    def deserialize(language: LanguageSchema) -> "Language":
+        if language.short == "no_lang":
+            return Language.no_language()
+
+        return Language(
+            language.short,
+            language.long,
+            sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
+        )

@@ -380,6 +380,10 @@
                         },
                         {
                             "$ref": "#/$defs/Alpha3LanguageStr"
+                        },
+                        {
+                            "type": "string",
+                            "const": "no_lang"
                         }
                     ]
                 },
