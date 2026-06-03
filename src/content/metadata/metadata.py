@@ -69,7 +69,7 @@ class MetadataHandle:
     @staticmethod
     def deserialize_handle(data_dict: Any) -> "MetadataHandle":
         if not isinstance(data_dict, dict):
-            msg = _("Deserialization error: expected input to be dict")
+            msg = _("Deserialization error: expected input to be 'dict'")
             raise TypeError(msg)
 
         if data_dict.get("provider", None) is None:
@@ -84,11 +84,11 @@ class MetadataHandle:
         data = data_dict["data"]
 
         if not isinstance(provider, str):
-            msg = _("Deserialization error: property 'provider' is not a str")
+            msg = _("Deserialization error: property 'provider' is not a 'str'")
             raise TypeError(msg)
 
         if not isinstance(data, dict):
-            msg = _("Deserialization error: property 'data' is not a dict")
+            msg = _("Deserialization error: property 'data' is not a 'dict'")
             raise TypeError(msg)
 
         match provider:

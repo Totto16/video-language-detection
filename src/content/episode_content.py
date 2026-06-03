@@ -190,14 +190,17 @@ class EpisodeContent(Content):
         def write_file_metadata() -> None:
             nonlocal changed_file
 
-            handle = VideoTagger.get_handle(self.scanned_file.path)
-            if handle is None:
+            handle_result = VideoTagger.get_handle(self.scanned_file.path)
+            if handle_result.is_err():
                 logger.error(
-                    _("Can't tag the file '{file}'").format(
+                    _("Can't tag the file '{file}': {reason}").format(
                         file=self.scanned_file.path,
+                        reason=handle_result.get_err(),
                     ),
                 )
                 return
+
+            handle = handle_result.get_ok()
 
             try:
 
@@ -221,14 +224,17 @@ class EpisodeContent(Content):
                             comment=[
                                 "see other metadata for more info by video_language_detect",
                             ],
+                            language=self.language,
                             metadata=metadata,
                         )
                         global_counter_wip -= 1
                         print(metadata)
                         self.scanned_file.reset_file_data()
                         changed_file = True
-            except RuntimeError:
-                logger.exception("Write Video Metadata")
+            except RuntimeError as err:
+                logger.error(  # noqa: TRY400
+                    _("Write Video Metadata:{err}").format(err=err),
+                )
 
         def update_checksum() -> None:
             if changed_file:
@@ -248,14 +254,28 @@ class EpisodeContent(Content):
                     )
                     bar.update(0, force=True)
 
-                    self.__video_metadata = VideoMetadata.from_file(
+                    result = VideoMetadata.from_file(
                         file=self.scanned_file.path,
                         error_mode=error_mode,
                     )
+                    if result.is_ok():
+                        self.__video_metadata = result.get_ok()
+                    else:
+                        logger.error(
+                            _(
+                                "Error in getting video metadata for file '{file}': {reason}"  # noqa: COM812
+                            ).format(
+                                file=self.scanned_file.path,
+                                reason=result.get_err(),
+                            ),
+                        )
+
                     bar.close(clear=True)
                     print("video_metadata", self.__video_metadata)
-            except RuntimeError:
-                logger.exception("Analyze Video Metadata")
+            except RuntimeError as err:
+                logger.error(  # noqa: TRY400
+                    _("Analyze Video Metadata: {err}").format(err=err),
+                )
 
         callback_workload: list[CallbackWorkload] = [
             write_file_metadata,

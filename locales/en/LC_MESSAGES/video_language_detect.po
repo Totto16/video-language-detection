@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-02 20:53+0200\n"
-"PO-Revision-Date: 2026-06-02 21:02+0200\n"
+"POT-Creation-Date: 2026-06-03 01:51+0200\n"
+"PO-Revision-Date: 2026-06-03 02:01+0200\n"
 "Last-Translator: Totto16 <32566573+Totto16@users.noreply.github.com>\n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -52,8 +52,20 @@ msgid "Path to delete wasn't found: {path}"
 msgstr "Path to delete wasn't found: {path}"
 
 #: src/content/episode_content.py:196
-msgid "Can't tag the file '{file}'"
-msgstr "Can't tag the file '{file}'"
+msgid "Can't tag the file '{file}': {reason}"
+msgstr "Can't tag the file '{file}': {reason}"
+
+#: src/content/episode_content.py:236
+msgid "Write Video Metadata: {err}"
+msgstr "Write Video Metadata: {err}"
+
+#: src/content/episode_content.py:265
+msgid "Error in getting video metadata for file '{file}': {reason}"
+msgstr "Error in getting video metadata for file '{file}': {reason}"
+
+#: src/content/episode_content.py:277
+msgid "Analyze Video Metadata: {err}"
+msgstr "Analyze Video Metadata: {err}"
 
 #: src/content/metadata/interfaces.py:77
 msgid "Method 'get_episode_metadata' on MissingProvider called"
@@ -72,8 +84,8 @@ msgid "Method 'get_metadata_schema' on MissingProvider called"
 msgstr "Method 'get_metadata_schema' on MissingProvider called"
 
 #: src/content/metadata/metadata.py:72
-msgid "Deserialization error: expected input to be dict"
-msgstr "Deserialization error: expected input to be dict"
+msgid "Deserialization error: expected input to be 'dict'"
+msgstr "Deserialization error: expected input to be 'dict'"
 
 #: src/content/metadata/metadata.py:76
 msgid "Deserialization error: missing property 'provider'"
@@ -84,12 +96,12 @@ msgid "Deserialization error: missing property 'data'"
 msgstr "Deserialization error: missing property 'data'"
 
 #: src/content/metadata/metadata.py:87
-msgid "Deserialization error: property 'provider' is not a str"
-msgstr "Deserialization error: property 'provider' is not a str"
+msgid "Deserialization error: property 'provider' is not a 'str'"
+msgstr "Deserialization error: property 'provider' is not a 'str'"
 
 #: src/content/metadata/metadata.py:91
-msgid "Deserialization error: property 'data' is not a dict"
-msgstr "Deserialization error: property 'data' is not a dict"
+msgid "Deserialization error: property 'data' is not a 'dict'"
+msgstr "Deserialization error: property 'data' is not a 'dict'"
 
 #: src/content/metadata/metadata.py:100
 msgid "Deserialization error: Not implemented for provider {provider}"
@@ -112,18 +124,38 @@ msgid "Deserialization error: missing property 'metadata_type'"
 msgstr "Deserialization error: missing property 'metadata_type'"
 
 #: src/content/metadata/provider/tmdb.py:310
-msgid "Deserialization error: property 'metadata_type' is not a str"
-msgstr "Deserialization error: property 'metadata_type' is not a str"
+msgid "Deserialization error: property 'metadata_type' is not a 'str'"
+msgstr "Deserialization error: property 'metadata_type' is not a 'str'"
 
 #: src/content/metadata/provider/tmdb.py:323
 msgid "Deserialization error: Unknown metadata_type {metadata_type}"
 msgstr "Deserialization error: Unknown metadata_type {metadata_type}"
 
-#: src/content/video_metadata.py:107
-msgid "File is not a video: {file}"
-msgstr "File is not a video: {file}"
+#: src/content/video_metadata.py:137
+msgid ""
+"Unable to get a valid stream from file:\n"
+"{err}"
+msgstr ""
+"Unable to get a valid stream from file:\n"
+"{err}"
 
-#: src/content/video_metadata.py:113
+#: src/content/video_metadata.py:144
+msgid "File is not a video"
+msgstr "File is not a video"
+
+#: src/content/video_metadata.py:151 src/helper/classifier.py:586
+msgid "Only one video stream supported, but got {video_streams}"
+msgstr "Only one video stream supported, but got {video_streams}"
+
+#: src/content/video_metadata.py:160
+msgid "Video file has no dimensions"
+msgstr "Video file has no dimensions"
+
+#: src/content/video_metadata.py:169
+msgid "Only one audio stream supported, but got {audio_streams}"
+msgstr "Only one audio stream supported, but got {audio_streams}"
+
+#: src/content/video_metadata.py:177
 msgid "No video duration was found"
 msgstr "No video duration was found"
 
@@ -292,11 +324,89 @@ msgstr "finished"
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr "Parse Error: Couldn't parse content from '{file}'"
 
-#: src/helper/classifier.py:1156
+#: src/helper/classifier.py:285
+msgid "Not supported torch device: '{device}'"
+msgstr "Not supported torch device: '{device}'"
+
+#: src/helper/classifier.py:573
+msgid ""
+"Unable to get a valid stream from file '{file}':\n"
+"{err}"
+msgstr ""
+"Unable to get a valid stream from file '{file}':\n"
+"{err}"
+
+#: src/helper/classifier.py:614
+msgid "Got a Video with no Audio Stream, aborting: '{file}'"
+msgstr "Got a Video with no Audio Stream, aborting: '{file}'"
+
+#: src/helper/classifier.py:619
+msgid "Got a Video with {audio_streams} Audio Streams, aborting: '{file}'"
+msgstr "Got a Video with {audio_streams} Audio Streams, aborting: '{file}'"
+
+#: src/helper/classifier.py:629
+msgid "Only one audio stream supported, but got {audio_streams}: '{file}'"
+msgstr "Only one audio stream supported, but got {audio_streams}: '{file}'"
+
+#: src/helper/classifier.py:709
+msgid "Segment is not valid: start > end: {start:3n} > {end:3n}"
+msgstr "Segment is not valid: start > end: {start:3n} > {end:3n}"
+
+#: src/helper/classifier.py:777
+msgid "FFmpeg exception in file {file}"
+msgstr "FFmpeg exception in file {file}"
+
+#: src/helper/classifier.py:821
+msgid ""
+"Option {option_name}has to be in percentage (0.0 - 1.0) but was: {value}"
+msgstr ""
+"Option {option_name}has to be in percentage (0.0 - 1.0) but was: {value}"
+
+#: src/helper/classifier.py:849
+msgid ""
+"Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the "
+"pattern '{pattern}'"
+msgstr ""
+"Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the "
+"pattern '{pattern}'"
+
+#: src/helper/classifier.py:881
+msgid "Option has to be in percentage (0.0 - 1.0) but was: {value}"
+msgstr "Option has to be in percentage (0.0 - 1.0) but was: {value}"
+
+#: src/helper/classifier.py:914
+msgid ""
+"'{comparions_desc}' not supported between instances of 'AdvancedPercentage' "
+"and '{name}'"
+msgstr ""
+"'{comparions_desc}' not supported between instances of 'AdvancedPercentage' "
+"and '{name}'"
+
+#: src/helper/classifier.py:1182
 msgid "Found audio backends: {backends}"
 msgstr "Found audio backends: {backends}"
 
-#: src/helper/classifier.py:1230
+#: src/helper/classifier.py:1221
+msgid "failed to derive the memory pattern for the model {name}"
+msgstr "failed to derive the memory pattern for the model {name}"
+
+#: src/helper/classifier.py:1226
+msgid ""
+"No memory_pattern for model {name} defined, use the following derived:\n"
+"{memory_pattern}"
+msgstr ""
+"No memory_pattern for model {name} defined, use the following derived:\n"
+"{memory_pattern}"
+
+#: src/helper/classifier.py:1251
+msgid ""
+"The auto batch settings resolved to a memory, that is not available, "
+"increase or decrease some paramaters: {batch_settings!s}"
+msgstr ""
+"The auto batch settings resolved to a memory, that is not available, "
+"increase or decrease some paramaters: {batch_settings!s}"
+
+#: src/helper/classifier.py:1265
 msgid ""
 "failed to calculate the seconds we can use with this available memory, this "
 "is likely an implementation error, or the memory_pattern was set incorrectly"
@@ -304,11 +414,19 @@ msgstr ""
 "failed to calculate the seconds we can use with this available memory, this "
 "is likely an implementation error, or the memory_pattern was set incorrectly"
 
-#: src/helper/classifier.py:1238
+#: src/helper/classifier.py:1273
 msgid "Resolved auto batch settings to timestamp: {settings} -> {result}"
 msgstr "Resolved auto batch settings to timestamp: {settings} -> {result}"
 
-#: src/helper/classifier.py:1602
+#: src/helper/classifier.py:1300
+msgid "Exceeded retry amount of {amount} for classify"
+msgstr "Exceeded retry amount of {amount} for classify"
+
+#: src/helper/classifier.py:1311
+msgid "Switching the classifier to the cpu"
+msgstr "Switching the classifier to the cpu"
+
+#: src/helper/classifier.py:1639
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr "Couldn't get Language of '{path}': Best was {best}"
 
@@ -327,3 +445,20 @@ msgstr "UNREACHABLE (not runnable in notebooks)"
 #: src/helper/tui.py:51
 msgid "Aborted scan"
 msgstr "Aborted scan"
+
+#: src/helper/video_tagger.py:418
+msgid "Unrecognized mutagen instance, this is an implementation error: {clazz}"
+msgstr ""
+"Unrecognized mutagen instance, this is an implementation error: {clazz}"
+
+#: src/helper/video_tagger.py:454
+msgid "Not supported file type"
+msgstr "Not supported file type"
+
+#: src/helper/video_tagger.py:459
+msgid "get tag handle {err}"
+msgstr "get tag handle {err}"
+
+#: src/helper/video_tagger.py:463
+msgid "get tag handle (mutagen impl error): {err}"
+msgstr "get tag handle (mutagen impl error): {err}"

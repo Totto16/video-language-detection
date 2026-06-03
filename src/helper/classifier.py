@@ -282,7 +282,7 @@ def get_model_run_opts(device_manager: DeviceManager) -> Optional[RunOpts]:
             "jit_module_keys": None,
         }
     else:
-        msg = f"Not supported torch device: '{device}'"
+        msg = _("Not supported torch device: '{device}'").format(device=device)
         raise RuntimeError(msg)
 
     return run_ops
@@ -294,7 +294,7 @@ def get_classifier_from_model(
 ) -> EncoderClassifier:
     classifier: Optional[EncoderClassifier] = EncoderClassifier.from_hparams(
         source=model.source,
-        savedir=MODEL_SAVEDIR,
+        savedir=Path(MODEL_SAVEDIR) / model.name,
         run_opts=run_opts,
     )
     if classifier is None:
@@ -489,7 +489,9 @@ class WAVOptions:
 
 
 class FileMetadataError(ValueError):
-    pass
+
+    def __init__(self: Self, msg: str) -> None:
+        super().__init__(msg)
 
 
 class OriginalWavFileManager(AbstractContextManager[Path]):
@@ -568,9 +570,9 @@ class WAVFile:
         if err is not None or metadata is None:
             error_mode.write_error(f'"{self.__file}",')
 
-            err_msg: str = (
-                f"Unable to get a valid stream from file '{self.__file}':\n{err}"
-            )
+            err_msg: str = _(
+                "Unable to get a valid stream from file '{file}':\n{err}"  # noqa: COM812
+            ).format(err=err, file=self.__file)
             logger.error(err_msg)
 
             return WAVFile__InfoResult.err(err_msg)
@@ -581,7 +583,9 @@ class WAVFile:
             video_streams = metadata.video_streams()
             # only one video stream supported
             if len(video_streams) != 1:
-                msg = f"Only One Video Stream supported, but got {len(video_streams)}"
+                msg = _(
+                    "Only one video stream supported, but got {video_streams}"  # noqa: COM812
+                ).format(video_streams=len(video_streams))
                 raise RuntimeError(msg)
 
             duration = video_streams[0].duration_seconds()
@@ -607,10 +611,14 @@ class WAVFile:
                 )
 
             if len(audio_streams) == 0:
-                err_msg = f"Got a Video with no Audio Stream, aborting: '{self.__file}'"
+                err_msg = _(
+                    "Got a Video with no Audio Stream, aborting: '{file}'"  # noqa: COM812
+                ).format(file=self.__file)
                 return WAVFile__InfoResult.err(err_msg)
 
-            msg = f"Got a Video with {len(audio_streams)} Audio Streams, aborting: '{self.__file}'"
+            msg = _(
+                "Got a Video with {audio_streams} Audio Streams, aborting: '{file}'"  # noqa: COM812
+            ).format(audio_streams=len(audio_streams), file=self.__file)
             raise RuntimeError(msg)
 
         if metadata.is_audio():
@@ -618,7 +626,12 @@ class WAVFile:
 
             # only one audio stream supported atm
             if len(audio_streams) != 1:
-                msg = f"Only One Audio Stream supported, but got {len(audio_streams)}: '{self.__file}'"
+                msg = _(
+                    "Only one audio stream supported, but got {audio_streams}: '{file}'"  # noqa: COM812
+                ).format(
+                    audio_streams=len(audio_streams),
+                    file=self.__file,
+                )
                 raise RuntimeError(msg)
 
             duration = audio_streams[0].duration_seconds()
@@ -693,7 +706,10 @@ class WAVFile:
             return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
 
         if not options.segment.is_valid:
-            msg = f"Segment is not valid: start > end: {options.segment.start:3n} > {options.segment.end:3n}"
+            msg = _("Segment is not valid: start > end: {start:3n} > {end:3n}").format(
+                start=options.segment.start,
+                end=options.segment.end,
+            )
             raise RuntimeError(msg)
 
         total_time: Timestamp = options.segment.timediff(self.runtime)
@@ -758,7 +774,9 @@ class WAVFile:
             try:
                 ffmpeg_proc.execute()
             except FFmpegError:
-                msg = f"FFmpeg exception in file {self.__file.absolute()}"
+                msg = _("FFmpeg exception in file {file}").format(
+                    file=self.__file.absolute(),
+                )
                 logger.exception(msg)
 
                 bar.close(clear=True)
@@ -797,10 +815,12 @@ class AdvancedPercentage:
 
     def __init__(self: Self, value: float, description: str = "") -> None:
 
-        option_name = "" if description == "" else f" '{description}'"
+        option_name = "" if description == "" else f"'{description}' "
 
         if not is_percentage(value):
-            msg = f"Option {option_name} has to be in percentage (0.0 - 1.0) but was: {value}"
+            msg = _(
+                "Option {option_name}has to be in percentage (0.0 - 1.0) but was: {value}"  # noqa: COM812
+            ).format(option_name=option_name, value=value)
             raise RuntimeError(msg)
         self.__value = value
 
@@ -826,7 +846,9 @@ class AdvancedPercentage:
         match = re.match(PERCENTAGE_PATTERN, inp)
 
         if match is None:
-            msg = f"Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the pattern {PERCENTAGE_PATTERN}"
+            msg = _(
+                "Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the pattern '{pattern}'"  # noqa: COM812
+            ).format(inp=inp, pattern=PERCENTAGE_PATTERN)
             raise TypeError(msg)
 
         match_args = match.groups(default=None)
@@ -856,7 +878,9 @@ class AdvancedPercentage:
         final_value = AdvancedPercentage.safe_from_value(value)
 
         if final_value is None:
-            msg = f"Option has to be in percentage (0.0 - 1.0) but was: {value}"
+            msg = _(
+                "Option has to be in percentage (0.0 - 1.0) but was: {value}"  # noqa: COM812
+            ).format(value=value)
             raise TypeError(msg)
 
         return final_value
@@ -887,7 +911,9 @@ class AdvancedPercentage:
         if isinstance(value, float):
             return value
 
-        msg = f"'{comparions_desc}' not supported between instances of 'AdvancedPercentage' and '{value.__class__.__name__}'"
+        msg = _(
+            "'{comparions_desc}' not supported between instances of 'AdvancedPercentage' and '{name}'"  # noqa: COM812
+        ).format(comparions_desc=comparions_desc, name=value.__class__.__name__)
         raise TypeError(msg)
 
     def __lt__(self: Self, value: object) -> bool:
@@ -1192,10 +1218,17 @@ class ClassifierManager(AbstractContextManager[None]):
                     memory_pattern = get_memory_pattern_for_model(self.__model)
 
                     if memory_pattern is None:
-                        msg = f"failed to derive the memory pattern for the model {self.__model.name}"
+                        msg = _(
+                            "failed to derive the memory pattern for the model {name}"  # noqa: COM812
+                        ).format(name=self.__model.name)
                         raise RuntimeError(msg)
 
-                    msg = f"No memory_pattern for model {self.__model.name} defined, use the following derived:\n{memory_pattern.to_constructor_str()}"
+                    msg = _(
+                        "No memory_pattern for model {name} defined, use the following derived:\n{memory_pattern}"  # noqa: COM812
+                    ).format(
+                        name=self.__model.name,
+                        memory_pattern=memory_pattern.to_constructor_str(),
+                    )
                     raise RuntimeError(msg)
 
                 target_fullness: float = get_percentage_value(
@@ -1215,7 +1248,9 @@ class ClassifierManager(AbstractContextManager[None]):
                 )
 
                 if available_memory_for_us < 0:
-                    msg = f"The auto batch settings resolved to a memory, that is not available, increase or decrease some paramaters: {batch_settings!s}"
+                    msg = _(
+                        "The auto batch settings resolved to a memory, that is not available, increase or decrease some paramaters: {batch_settings!s}"  # noqa: COM812
+                    ).format(batch_settings=batch_settings)
                     raise RuntimeError(msg)
 
                 keep_perc: float = get_percentage_value(batch_settings.keep_free)
@@ -1262,7 +1297,9 @@ class ClassifierManager(AbstractContextManager[None]):
 
             if isinstance(exc_val, torch.cuda.OutOfMemoryError):
                 if self.__retry_count >= MAX_RETRY_COUNT:
-                    msg = f"Exceeded retry amount of {MAX_RETRY_COUNT} for classify"
+                    msg = _("Exceeded retry amount of {amount} for classify").format(
+                        amount=MAX_RETRY_COUNT,
+                    )
                     logger.error(msg)
                     self.__failed_too_often = True
                     return True
@@ -1271,7 +1308,7 @@ class ClassifierManager(AbstractContextManager[None]):
                     self.__retry_count >= MAX_RETRY_COUNT_FOR_GPU
                     and self.__device_manager.type == AllocatorType.gpu
                 ):
-                    msg = "Switching the classifier to the cpu"
+                    msg = _("Switching the classifier to the cpu")
                     logger.debug(msg)
 
                     # reinitialize the classifier to use the cpu

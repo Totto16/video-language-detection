@@ -11,6 +11,7 @@ from helper.apischema import OneOf, narrow_type
 from helper.error import ErrorMode
 from helper.ffprobe import FFprobeStream, StreamType, ffprobe, ffprobe_check
 from helper.log import get_logger
+from helper.result import Result
 from helper.translation import get_translator
 
 logger: Logger = get_logger()
@@ -90,6 +91,9 @@ class VideoDimension:
     height: int
 
 
+VideoMetadata__getResult = Result["VideoMetadata", str]
+
+
 @dataclass(slots=True, repr=True)
 class VideoMetadata:
     __duration: float = field(metadata=alias("duration"))
@@ -124,55 +128,53 @@ class VideoMetadata:
         return self.__bit_rate
 
     @staticmethod
-    def __read_metadata(file: Path, error_mode: ErrorMode) -> Optional["VideoMetadata"]:
+    def __read_metadata(file: Path, error_mode: ErrorMode) -> VideoMetadata__getResult:
         metadata, err = ffprobe(file.absolute())
 
         if err is not None or metadata is None:
             error_mode.write_error(f'"{file}",')
 
-            err_msg: str = f"Unable to get a valid stream from file '{file}':\n{err}"
-            logger.error(err_msg)
-            return None
+            err_msg: str = _(
+                "Unable to get a valid stream from file:\n{err}"  # noqa: COM812
+            ).format(err=err)
+            return VideoMetadata__getResult.err(err_msg)
 
         if not metadata.is_video():
-            logger.error(_("File is not a video: {file}").format(file=str(file)))
-            return None
+            return VideoMetadata__getResult.err(
+                _("File is not a video"),
+            )
 
         video_streams = metadata.video_streams()
         # only one video stream supported
         if len(video_streams) != 1:
-            logger.error(
+            return VideoMetadata__getResult.err(
                 _("Only one video stream supported, but got {video_streams}").format(
                     video_streams=len(video_streams),
                 ),
             )
-            return None
 
         video_dimensions = video_streams[0].video_dimensions()
 
         if video_dimensions is None:
-            logger.error(
-                _("Video file has no dimensions: {file}").format(file=str(file)),
+            return VideoMetadata__getResult.err(
+                _("Video file has no dimensions"),
             )
-            return None
 
         # check if we have enough audio streams
         audio_streams = metadata.audio_streams()
 
         # only one audio stream supported atm
         if len(audio_streams) != 1:
-            logger.error(
+            return VideoMetadata__getResult.err(
                 _("Only one audio stream supported, but got {audio_streams}").format(
                     audio_streams=len(audio_streams),
                 ),
             )
-            return None
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
         if file_duration is None:
-            logger.error(_("No video duration was found"))
-            return None
+            return VideoMetadata__getResult.err(_("No video duration was found"))
 
         def map_stream(stream: FFprobeStream) -> VideoStream:
             match stream.type():
@@ -201,16 +203,17 @@ class VideoMetadata:
 
             bit_rate: Optional[float] = metadata.file_info.bit_rate()
 
-            return VideoMetadata(
-                __duration=file_duration,
-                __streams=streams,
-                __dimensions=dimensions,
-                __size=size,
-                __bit_rate=bit_rate,
+            return VideoMetadata__getResult.ok(
+                VideoMetadata(
+                    __duration=file_duration,
+                    __streams=streams,
+                    __dimensions=dimensions,
+                    __size=size,
+                    __bit_rate=bit_rate,
+                ),
             )
         except RuntimeError as err:
-            logger.error(err)  # noqa: TRY400
-            return None
+            return VideoMetadata__getResult.err(str(err))
 
     @staticmethod
     def __check_ffprobe() -> None:
@@ -220,7 +223,7 @@ class VideoMetadata:
             raise RuntimeError(msg)
 
     @staticmethod
-    def from_file(file: Path, error_mode: ErrorMode) -> Optional["VideoMetadata"]:
+    def from_file(file: Path, error_mode: ErrorMode) -> VideoMetadata__getResult:
         VideoMetadata.__check_ffprobe()
 
         return VideoMetadata.__read_metadata(file=file, error_mode=error_mode)

@@ -248,7 +248,7 @@ class TMDBProvider(Provider):
                 result.air_date,
                 len(result.episodes) if result.episodes is not None else None,
                 result.name,
-                result.season_number if result.season_number else season,
+                result.season_number or season,
                 result.id,
                 "season",
             )
@@ -307,7 +307,7 @@ class TMDBProvider(Provider):
             raise TypeError(msg)
 
         if not isinstance(metadata_type, str):
-            msg = _("Deserialization error: property 'metadata_type' is not a str")
+            msg = _("Deserialization error: property 'metadata_type' is not a 'str'")
             raise TypeError(msg)
 
         match metadata_type:

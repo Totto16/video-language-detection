@@ -12,10 +12,14 @@ import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
+from content.language import Language
 from helper.log import get_logger
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
+from helper.result import Result
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 ## see https://mutagen.readthedocs.io/en/latest/user/filelike.html#
@@ -399,6 +403,7 @@ class VideoTaggerWriter:
     def write_metadata(
         self: Self,
         comment: list[str],
+        language: Language,
         metadata: dict[str, str],
     ) -> None:
         self.__instance["\xa9cmt"] = comment
@@ -409,11 +414,19 @@ class VideoTaggerWriter:
                 ]
 
                 self.__instance[key] = value
+        else:
+            msg = _(
+                "Unrecognized mutagen instance, this is an implementation error: {clazz}"  # noqa: COM812
+            ).format(clazz=type(self.__instance))
+            raise TypeError(msg)
 
         for key, value in metadata.items():
             self.__instance[key] = value
 
         self.__save_impl()
+
+
+VideoTagger__HandleResult = Result["VideoTagger", str]
 
 
 class VideoTagger:
@@ -429,7 +442,7 @@ class VideoTagger:
         self.__filething = filething
 
     @staticmethod
-    def get_handle(file: Path) -> Optional["VideoTagger"]:
+    def get_handle(file: Path) -> VideoTagger__HandleResult:
 
         filething = MutagenFileWrapper(file=file, chunk_size=PROGRESS_CHUNK_SIZE)
 
@@ -438,15 +451,17 @@ class VideoTagger:
             instance = mutagen.File(filething, easy=False)
 
             if instance is None:
-                return None
+                return VideoTagger__HandleResult.err(_("Not supported file type"))
 
-            return VideoTagger(filething, instance)
-        except RuntimeError:
-            logger.exception("get tag handle")
-            return None
-        except MutagenError:
-            logger.exception("get tag handle (mutagen impl error)")
-            return None
+            return VideoTagger__HandleResult.ok(VideoTagger(filething, instance))
+        except RuntimeError as err:
+            return VideoTagger__HandleResult.err(
+                _("get tag handle {err}").format(err=err),
+            )
+        except MutagenError as err:
+            return VideoTagger__HandleResult.err(
+                _("get tag handle (mutagen impl error): {err}").format(err=err),
+            )
 
     def writer(
         self: Self,
