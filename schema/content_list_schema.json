@@ -374,7 +374,14 @@
             "type": "object",
             "properties": {
                 "short": {
-                    "$ref": "#/$defs/ShortLanguageStr"
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/Alpha2LanguageStr"
+                        },
+                        {
+                            "$ref": "#/$defs/Alpha3LanguageStr"
+                        }
+                    ]
                 },
                 "long": {
                     "$ref": "#/$defs/LongLanguageStr"
@@ -386,9 +393,13 @@
             ],
             "additionalProperties": false
         },
-        "ShortLanguageStr": {
+        "Alpha2LanguageStr": {
             "type": "string",
             "pattern": "^([a-z]{2})$"
+        },
+        "Alpha3LanguageStr": {
+            "type": "string",
+            "pattern": "^([a-z]{3})$"
         },
         "LongLanguageStr": {
             "type": "string"

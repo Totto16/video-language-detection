@@ -10,7 +10,7 @@ class CustomNameParser(NameParser):
     __season_special_names: list[str]
 
     def __init__(self: Self, season_special_names: list[str]) -> None:
-        super().__init__(Language(ShortLanguageStr("de"), LongLanguageStr("German")))
+        super().__init__(Language.from_values_unsafe("de", "German"))
         self.__season_special_names = season_special_names
 
     @override

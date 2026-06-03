@@ -17,10 +17,11 @@ from content.language_picker import (
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.base import AnyType, parse_contents
-from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
+from helper.classifier import Classifier, Model
 from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
 from helper.manager import TuiManager
+from helper.models import voxlingua107_ecapa_model
 
 if TYPE_CHECKING:
     from content.base_class import Content

@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
-from content.language import Language, LongLanguageStr, ShortLanguageStr
+from content.language import Language, LongLanguageStr
 from content.language_picker import (
     ChoiceColor,
     ChoiceInterface,
@@ -59,7 +59,7 @@ from helper.base import (
     AnyType,
     parse_contents,
 )
-from helper.classifier import Classifier, Model, voxlingua107_ecapa_model
+from helper.classifier import Classifier, Model
 from helper.config import (
     AdvancedConfig,
     ConfigFilter,
@@ -84,6 +84,7 @@ from helper.manager import (
     StatusBarInterfaceUpdateOptions,
     number_like_convert_to_serializable,
 )
+from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Result
 from main import AllContent
@@ -390,9 +391,9 @@ def language_to_serializable_data(language: Language) -> LanguageSerializable:
 
 
 def deserialize_language(language: LanguageSerializable) -> Language:
-    return Language(
-        short=ShortLanguageStr(language.short),
-        long=LongLanguageStr(language.long),
+    return Language.from_values_unsafe(
+        language.short,
+        language.long,
     )
 
 
