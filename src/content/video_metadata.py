@@ -205,11 +205,11 @@ class VideoMetadata:
 
             return VideoMetadata__getResult.ok(
                 VideoMetadata(
-                    __duration=file_duration,
-                    __streams=streams,
-                    __dimensions=dimensions,
-                    __size=size,
-                    __bit_rate=bit_rate,
+                    file_duration,
+                    streams,
+                    dimensions,
+                    size,
+                    bit_rate,
                 ),
             )
         except RuntimeError as err:
