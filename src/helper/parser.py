@@ -1,7 +1,7 @@
 import re as regex
 from typing import Optional, Self, override
 
-from content.general import NameParser
+from content.general import EpisodeName, NameParser
 from content.language import Language
 from helper.timestamp import parse_int_safely
 
@@ -14,7 +14,7 @@ class CustomNameParser(NameParser):
         self.__season_special_names = season_special_names
 
     @override
-    def parse_episode_name(self: Self, name: str) -> Optional[tuple[str, int, int]]:
+    def parse_episode_name(self: Self, name: str) -> Optional[EpisodeName]:
         match = regex.search(r"Episode (\d{2}) - (.*) \[S(\d{2})E(\d{2})\]\.(.*)", name)
         if match is None:
             return None
@@ -32,7 +32,7 @@ class CustomNameParser(NameParser):
         if episode is None:
             return None
 
-        return (name, season, episode)
+        return EpisodeName(name=name, season=season, episode=episode)
 
     @override
     def parse_season_name(self: Self, name: str) -> Optional[tuple[int]]:

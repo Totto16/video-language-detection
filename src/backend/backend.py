@@ -74,6 +74,7 @@ from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
 from helper.log import get_logger
 from helper.manager import (
+    ConfigParameters,
     CounterInterface,
     CounterOptions,
     ManagerInterface,
@@ -1063,7 +1064,12 @@ class ScannerStateRunning(pydantic.BaseModel):
     configs: list[FinalConfig]
 
 
-type SummaryTuple = tuple[LanguageDict, MetadataDict, ScanSummaryDetailed]
+@dataclass
+class SummaryData:
+    language: LanguageDict
+    metadata: MetadataDict
+    details: ScanSummaryDetailed
+
 
 # TODO: use the short string
 type LongLanguageStr = str
@@ -1094,7 +1100,7 @@ class ScanSummaryDetailedSerializable(pydantic.BaseModel):
     failure: dict[str, int]
 
 
-class SummaryTupleSerializable(pydantic.BaseModel):
+class SummaryDataSerializable(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
     language: LanguageDictSerializable
@@ -1133,26 +1139,26 @@ def metadata_dict_to_serializable_data(
 
 
 def summary_tuple_to_serializable_data(
-    summary: SummaryTuple,
-) -> SummaryTupleSerializable:
-    return SummaryTupleSerializable(
-        language=language_dict_to_serializable_data(summary[0]),
-        metadata=metadata_dict_to_serializable_data(summary[1]),
-        details=scan_summary_detailed_to_serializable_data(summary[2]),
+    summary: SummaryData,
+) -> SummaryDataSerializable:
+    return SummaryDataSerializable(
+        language=language_dict_to_serializable_data(summary.language),
+        metadata=metadata_dict_to_serializable_data(summary.metadata),
+        details=scan_summary_detailed_to_serializable_data(summary.details),
     )
 
 
 @dataclass
 class ScannerStateFinished:
     type: Literal["finished"]
-    result: list[SummaryTuple]
+    result: list[SummaryData]
 
 
 class ScannerStateFinishedSerializable(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
     type: Literal["finished"] = "finished"
-    result: list[SummaryTupleSerializable]
+    result: list[SummaryDataSerializable]
 
 
 @dataclass
@@ -1418,9 +1424,9 @@ class BackendScanner:
         config: FinalConfig,
         name_parser: NameParser,
         all_content_type: AnyType,
-        config_paramaters: Optional[tuple[int, int]],
+        config_paramaters: Optional[ConfigParameters],
         manager: WsManager,
-    ) -> SummaryTuple:
+    ) -> SummaryData:
         device_manager: DeviceManager = DeviceManager()
 
         model: Model = voxlingua107_ecapa_model
@@ -1487,15 +1493,19 @@ class BackendScanner:
 
         scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
-        return (language_summary, metadata_summary, scan_summary)
+        return SummaryData(
+            language=language_summary,
+            metadata=metadata_summary,
+            details=scan_summary,
+        )
 
     async def __start_coroutine(
         self: Self,
         configs: list[FinalConfig],
         manager: WsManager,
         config_file_path: Path,
-    ) -> list[SummaryTuple]:
-        result: list[SummaryTuple] = []
+    ) -> list[SummaryData]:
+        result: list[SummaryData] = []
 
         try:
             with LockFile.for_file(config_file_path):
@@ -1505,7 +1515,7 @@ class BackendScanner:
                         season_special_names=config.parser.special,
                     )
 
-                    config_paramaters: Optional[tuple[int, int]] = (
+                    config_paramaters: Optional[ConfigParameters] = (
                         None if len(configs) == 1 else (index, len(configs))
                     )
 
@@ -1540,7 +1550,7 @@ class BackendScanner:
             backend.manager.send_data_sync(data)
 
         try:
-            result: list[SummaryTuple] = await self.__start_coroutine(
+            result: list[SummaryData] = await self.__start_coroutine(
                 configs=configs,
                 manager=backend.manager,
                 config_file_path=config_file_path,

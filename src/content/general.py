@@ -272,6 +272,13 @@ class ScannedFile:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 
+@dataclass
+class EpisodeName:
+    name: str
+    season: int
+    episode: int
+
+
 class NameParser(ABC):
     __language: Language
 
@@ -287,7 +294,7 @@ class NameParser(ABC):
     def parse_episode_name(
         self: Self,
         _name: str,
-    ) -> Optional[tuple[str, int, int]]: ...
+    ) -> Optional[EpisodeName]: ...
 
     @abstractmethod
     def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]: ...

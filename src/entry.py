@@ -8,6 +8,7 @@ import sys
 from logging import Logger
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Literal,
     Optional,
@@ -35,6 +36,9 @@ from helper.translation import get_translator
 from helper.tui import launch_tui
 from helper.version import PROGRAM_VERSION
 from main import AllContent, generate_schemas
+
+if TYPE_CHECKING:
+    from helper.manager import ConfigParameters
 
 type SubCommand = Literal["run", "schema", "gui", "config_check", "api"]
 
@@ -365,7 +369,7 @@ def subcommand_run(
                     season_special_names=config.parser.special,
                 )
 
-                config_paramaters: Optional[tuple[int, int]] = (
+                config_paramaters: Optional[ConfigParameters] = (
                     None if len(configs) == 1 else (index, len(configs))
                 )
 
