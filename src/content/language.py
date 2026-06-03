@@ -1,3 +1,4 @@
+from enum import StrEnum
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -305,12 +306,18 @@ class Alpha2LanguageStr:
 LongLanguageStr = NewType("LongLanguageStr", str)
 
 
-# @alias("Language")
+class NoLangDeprecatedType(StrEnum):
+    no_lang = "no_lang"
+
+
 @schema()
 @type_name("LanguageImpl")
 @dataclass
 class LanguageSchema:
-    short: Annotated[Alpha2LanguageStr | Alpha3LanguageStr | Literal["no_lang"], OneOf]
+    short: Annotated[
+        Alpha2LanguageStr | Alpha3LanguageStr | NoLangDeprecatedType,
+        OneOf,
+    ]
     long: LongLanguageStr
 
 
