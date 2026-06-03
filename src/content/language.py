@@ -7,6 +7,9 @@ from apischema import deserializer, schema, serializer
 
 from helper.translation import get_translator
 
+__all__: list[str] = ["ExactLen", "Language"]
+
+
 _ = get_translator()
 
 
@@ -37,38 +40,55 @@ class ShortLanguageStr:
 
     __data: __PrivateStrImpl
 
-    def __init__(self: Self, inp: str | __PrivateStrImpl) -> None:
-        data = ShortLanguageStr.__from_raw_str_checked(inp)
-        if data is None:
-            msg = _("Couldn't get the Short Language String from str '{inp}'").format(
-                inp=inp,
-            )
-            raise RuntimeError(msg)
+    # this is used, so that init is only callable from the internal class, so that it only gets checked values!
+    __PrivateSentinel = NewType("__PrivateSentinel", bool)
 
+    def __init__(
+        self: Self,
+        data: __PrivateStrImpl,
+        *,
+        sentinel: __PrivateSentinel,
+    ) -> None:
         self.__data = data
 
     @staticmethod
-    def __from_raw_str_checked(val: str) -> Optional[__PrivateStrImpl]:
+    def __from_raw_str_checked(
+        val: str,
+        *,
+        valid_check: bool,
+    ) -> Optional[__PrivateStrImpl]:
         if len(val) != 2:
             return None
 
         if not val.islower():
             return None
 
+        if valid_check:
+            raise NotImplementedError("TODO")
+
         return ShortLanguageStr.__PrivateStrImpl(val)
 
     @staticmethod
-    def from_str(inp: str) -> Optional["ShortLanguageStr"]:
-        val = ShortLanguageStr.__from_raw_str_checked(inp)
+    def __from_str_impl(inp: str, *, valid_check: bool) -> Optional["ShortLanguageStr"]:
+        val = ShortLanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
 
         if val is None:
             return None
 
-        return ShortLanguageStr(val)
+        return ShortLanguageStr(
+            data=val,
+            sentinel=ShortLanguageStr.__PrivateSentinel(True),
+        )
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "ShortLanguageStr":
-        val: Optional[ShortLanguageStr] = ShortLanguageStr.from_str(inp)
+    def from_str(inp: str) -> Optional["ShortLanguageStr"]:
+        return ShortLanguageStr.__from_str_impl(inp, valid_check=True)
+
+    @staticmethod
+    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "ShortLanguageStr":
+        val: Optional[ShortLanguageStr] = ShortLanguageStr.__from_str_impl(
+            inp, valid_check=True
+        )
         if val is None:
             msg = _("Couldn't get the Short Language String from str '{inp}'").format(
                 inp=inp,
@@ -77,17 +97,21 @@ class ShortLanguageStr:
 
         return val
 
+    @staticmethod
+    def from_str_unsafe(inp: str) -> "ShortLanguageStr":
+        return ShortLanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
+
     @serializer
     def serialize(self: Self) -> str:
         return self.__data
 
     @staticmethod
     def no_lang() -> "ShortLanguageStr":
-        return ShortLanguageStr.from_str_unsafe("xx")
+        return ShortLanguageStr.__impl_from_str_unsafe("xx", valid_check=False)
 
     @staticmethod
     def unknown_lang() -> "ShortLanguageStr":
-        return ShortLanguageStr.from_str_unsafe("un")
+        return ShortLanguageStr.__impl_from_str_unsafe("un", valid_check=False)
 
     @deserializer
     @staticmethod
@@ -131,10 +155,30 @@ class ShortLanguageStr:
 LongLanguageStr = NewType("LongLanguageStr", str)
 
 
-@dataclass
 class Language:
-    short: ShortLanguageStr
-    long: LongLanguageStr
+    __short: ShortLanguageStr
+    __long: LongLanguageStr
+
+    # this is used, so that init is only callable from the internal class, so that it only gets checked values!
+    __PrivateSentinel = NewType("__PrivateSentinel", bool)
+
+    def __init__(
+        self: Self,
+        short: ShortLanguageStr,
+        long: LongLanguageStr,
+        *,
+        sentinel: __PrivateSentinel,
+    ) -> None:
+        self.__short = short
+        self.__long = long
+
+    @property
+    def short(self: Self) -> ShortLanguageStr:
+        return self.__short
+
+    @property
+    def long(self: Self) -> LongLanguageStr:
+        return self.__long
 
     @staticmethod
     def from_str(inp: str) -> Optional["Language"]:
@@ -142,18 +186,59 @@ class Language:
         if len(arr) != 2:
             return None
 
-        short = ShortLanguageStr.from_str(arr[0])
+        return Language.from_values(short=arr[0], long=arr[1])
 
-        if short is None:
+    @staticmethod
+    def __from_values_impl(
+        short: str,
+        long: str,
+        *,
+        valid_check: bool,
+    ) -> Optional["Language"]:
+        short_val = ShortLanguageStr.from_str(short)
+
+        if short_val is None:
             return None
 
-        return Language(short=short, long=LongLanguageStr(arr[1]))
+        long_val: LongLanguageStr
+        if valid_check:
+            raise NotImplementedError("TODO")
+        else:
+            long_val = LongLanguageStr(long)
+
+        return Language(
+            short=short_val,
+            long=long_val,
+            sentinel=Language.__PrivateSentinel(True),
+        )
+
+    @staticmethod
+    def from_values(
+        short: str,
+        long: str,
+    ) -> Optional["Language"]:
+        return Language.__from_values_impl(short=short, long=long, valid_check=True)
 
     @staticmethod
     def from_str_unsafe(inp: str) -> "Language":
         lan: Optional[Language] = Language.from_str(inp)
         if lan is None:
-            msg = _("Couldn't get the Language from str '{inp}'").format(inp=inp)
+            msg = _("Couldn't get the Language from str: '{inp}'").format(inp=inp)
+            raise RuntimeError(msg)
+
+        return lan
+
+    @staticmethod
+    def from_values_unsafe(short: str, long: str) -> "Language":
+        lan: Optional[Language] = Language.from_values(
+            short,
+            long,
+        )
+        if lan is None:
+            msg = _("Couldn't get the Language from values: '{short}' '{long}'").format(
+                short=short,
+                long=long,
+            )
             raise RuntimeError(msg)
 
         return lan
@@ -161,14 +246,22 @@ class Language:
     # this is for episodes, that have no real language, for some special episodes of some tv series
     @staticmethod
     def no_language() -> "Language":
-        return Language(ShortLanguageStr.no_lang(), LongLanguageStr("No Language"))
+        return Language(
+            ShortLanguageStr.no_lang(),
+            LongLanguageStr("No Language"),
+            sentinel=Language.__PrivateSentinel(True),
+        )
 
     # TODO: get all languages somehow, from the classifier, that supports them all
 
     # note this is an implementation detail, that should not leak
     @staticmethod
     def __unknown() -> "Language":
-        return Language(ShortLanguageStr.unknown_lang(), LongLanguageStr("Unknown"))
+        return Language(
+            ShortLanguageStr.unknown_lang(),
+            LongLanguageStr("Unknown"),
+            sentinel=Language.__PrivateSentinel(True),
+        )
 
     @staticmethod
     def get_default() -> "Language":
@@ -179,16 +272,16 @@ class Language:
         return language == Language.__unknown()
 
     def __str__(self: Self) -> str:
-        return self.long
+        return self.__long
 
     def __repr__(self: Self) -> str:
-        return f"<Language short: {self.short!r} long: {self.long!r}>"
+        return f"<Language short: {self.__short!r} long: {self.__long!r}>"
 
     def __hash__(self: Self) -> int:
-        return hash((self.short, self.long))
+        return hash((self.__short, self.__long))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Language):
-            return self.short == other.short and self.long == other.long
+            return self.__short == other.__short and self.__long == other.__long
 
         return False
