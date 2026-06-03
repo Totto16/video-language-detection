@@ -1,10 +1,10 @@
 import re
-from dataclasses import dataclass
 from typing import Annotated, NewType, Optional, Self
 
 from annotated_types import Len, Predicate
 from apischema import deserializer, schema, serializer
 
+from content.iso_codes import valid_iso_languages_list
 from helper.translation import get_translator
 
 __all__: list[str] = ["ExactLen", "Language"]
@@ -19,6 +19,7 @@ def ExactLen(length: int) -> Len:  # noqa: N802
 
 # see https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes
 # and: https://www.loc.gov/standards/iso639-2/php/code_list.php
+
 
 # this should be ISO 639-2 codes (alpha-3 code)
 Alpha3LanguageCode = NewType(
@@ -64,7 +65,12 @@ class ShortLanguageStr:
             return None
 
         if valid_check:
-            raise NotImplementedError("TODO")
+            allowed_short_names = [entry[1] for entry in valid_iso_languages_list]
+            if val not in allowed_short_names:
+                msg = _(
+                    "Short Language string is invalid according to ISO: '{short}'"
+                ).format(short=val)
+                raise RuntimeError(msg)
 
         return ShortLanguageStr.__PrivateStrImpl(val)
 
@@ -200,15 +206,17 @@ class Language:
         if short_val is None:
             return None
 
-        long_val: LongLanguageStr
         if valid_check:
-            raise NotImplementedError("TODO")
-        else:
-            long_val = LongLanguageStr(long)
+            allowed_long_names = [entry[2] for entry in valid_iso_languages_list]
+            if long not in allowed_long_names:
+                msg = _(
+                    "Long Language string is invalid according to ISO: '{long}'"
+                ).format(long=long)
+                raise RuntimeError(msg)
 
         return Language(
             short=short_val,
-            long=long_val,
+            long=LongLanguageStr(long),
             sentinel=Language.__PrivateSentinel(True),
         )
 
