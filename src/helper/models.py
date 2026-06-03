@@ -1,16 +1,19 @@
-from typing import Annotated
-
-from attr import dataclass
+from typing import Annotated, Optional, Self, override
 
 from content.language import (
     Alpha2LanguageStr,
     Alpha3LanguageStr,
     ExactLen,
+    Language,
     LongLanguageStr,
 )
-from helper.classifier import LinearCoeffs, MemoryPatternLinear, Model
+from helper.classifier import LinearCoeffs, MemoryPatternLinear, Model, ModelLanguage
+from helper.translation import get_translator
 
 __all__: list[str] = ["voxlingua107_ecapa_model"]
+
+_ = get_translator()
+
 
 voxlingua107_ecapa_languages_count = 107
 
@@ -452,21 +455,32 @@ voxlingua107_ecapa_languages: Annotated[
 ]
 
 
-class ModelLanguageHelper:
-    pass
+if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
+    raise RuntimeError("UNREACHABLE")  # noqa: EM101
 
 
-voxlingua107_ecapa_language_helper = ModelLanguageHelper()
+class ModelLanguageVoxlingua107Ecapa(ModelLanguage):
+
+    @override
+    def is_valid_language(self: Self, language: Language) -> Optional[str]:
+        for short_str, long_str in voxlingua107_ecapa_languages:
+            if short_str == language.short:
+                if language.long != long_str:
+                    return _("Long language doesn't match")
+                return None
+
+        return _("This dataset has no such language")
+
 
 voxlingua107_ecapa_model: Model = Model(
     name="voxlingua107",
     sample_count=voxlingua107_ecapa_languages_count,
     source="speechbrain/lang-id-voxlingua107-ecapa",
     bitrate=16000,
+    model_languages=ModelLanguageVoxlingua107Ecapa(),
     memory_pattern=MemoryPatternLinear(
         coeffs=LinearCoeffs(c=121287679.99999952, m=12845499.313230773),
     ),
-    # language_helper=voxlingua107_ecapa_language_helper,
 )
 
 

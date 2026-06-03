@@ -220,12 +220,19 @@ class MemoryPatternQuadratic(MemoryPattern):
         return f"MemoryPatternQuadratic(coeffs=QuadraticCoeffs(c={self.__coeffs.c}, b={self.__coeffs.b}, a={self.__coeffs.a}))"
 
 
+class ModelLanguage(ABC):
+
+    @abstractmethod
+    def is_valid_language(self: Self, language: Language) -> Optional[str]: ...
+
+
 @dataclass
 class Model:
     name: str
     sample_count: int
     source: str
     bitrate: int
+    model_languages: ModelLanguage
     memory_pattern: Optional[MemoryPattern] = (
         None  # if this is None, it is inferred and printed, so that you can hardcode it!
     )
