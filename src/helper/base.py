@@ -52,16 +52,17 @@ def save_to_file(
     if not file_path.parent.exists():
         file_path.parent.mkdir(parents=True)
 
+    encoded_dict: dict[str, Any] = serialize(
+        list[serialize_type],
+        contents,
+    )
+
     with file_path.open(
         mode="w",
     ) as file:
         suffix: str = file_path.suffix[1:]
         match suffix:
             case "json":
-                encoded_dict: dict[str, Any] = serialize(
-                    list[serialize_type],
-                    contents,
-                )
                 json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
             case _:
                 msg = _("Data not saveable to '{suffix}' file!").format(suffix=suffix)
