@@ -2,7 +2,7 @@ import re as regex
 from typing import Optional, Self, override
 
 from content.general import EpisodeName, NameParser
-from content.language import Language
+from content.language import Language, LongLanguageStr, ShortLanguageStr
 from helper.timestamp import parse_int_safely
 
 
@@ -10,7 +10,7 @@ class CustomNameParser(NameParser):
     __season_special_names: list[str]
 
     def __init__(self: Self, season_special_names: list[str]) -> None:
-        super().__init__(Language("de", "German"))
+        super().__init__(Language(ShortLanguageStr("de"), LongLanguageStr("German")))
         self.__season_special_names = season_special_names
 
     @override

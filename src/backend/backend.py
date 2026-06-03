@@ -38,7 +38,7 @@ from fastapi.responses import JSONResponse
 
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
-from content.language import Language
+from content.language import Language, LongLanguageStr, ShortLanguageStr
 from content.language_picker import (
     ChoiceColor,
     ChoiceInterface,
@@ -386,11 +386,14 @@ class LanguageSerializable(pydantic.BaseModel):
 
 
 def language_to_serializable_data(language: Language) -> LanguageSerializable:
-    return LanguageSerializable(short=language.short, long=language.long)
+    return LanguageSerializable(short=str(language.short), long=str(language.long))
 
 
 def deserialize_language(language: LanguageSerializable) -> Language:
-    return Language(short=language.short, long=language.long)
+    return Language(
+        short=ShortLanguageStr(language.short),
+        long=LongLanguageStr(language.long),
+    )
 
 
 class PredictionBestSerializable(pydantic.BaseModel):
@@ -1072,8 +1075,6 @@ class SummaryData:
 
 
 # TODO: use the short string
-type LongLanguageStr = str
-
 type LanguageDictSerializable = dict[LongLanguageStr, int]
 
 

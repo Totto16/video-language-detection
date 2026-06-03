@@ -36,6 +36,7 @@ questionary = "*"
 colorlog = "*"
 pyperclip = "*"
 mutagen = "*"
+annotated-types = "*"
 
 # fastapi for the backend, using standard feature / configuration
 "fastapi[standard]" = "*"

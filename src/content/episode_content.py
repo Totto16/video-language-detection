@@ -115,9 +115,9 @@ class EpisodeContent(Content):
         if result is None:
             return None
 
-        name, season, episode = result
-
-        return EpisodeDescription(name, season, episode)
+        return EpisodeDescription(
+            name=result.name, season=result.season, episode=result.episode,
+        )
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
@@ -233,7 +233,7 @@ class EpisodeContent(Content):
                         changed_file = True
             except RuntimeError as err:
                 logger.error(  # noqa: TRY400
-                    _("Write Video Metadata:{err}").format(err=err),
+                    _("Write Video Metadata: {err}").format(err=err),
                 )
 
         def update_checksum() -> None:
