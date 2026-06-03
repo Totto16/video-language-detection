@@ -483,7 +483,10 @@ class Language:
     # @deserializer
     @staticmethod
     def deserialize(language: LanguageSchema) -> "Language":
-        if language.short == "no_lang":
+        if (
+            language.short == "no_lang"  # noqa: PLR1714
+            or language.short == NoLangDeprecatedType.no_lang
+        ):
             return Language.no_language()
 
         return Language(
