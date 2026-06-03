@@ -7,7 +7,7 @@ from annotated_types import GroupedMetadata, Len, Predicate
 from apischema import deserializer, schema, serializer
 
 from content.iso_codes import valid_iso_languages_list
-from helper.apischema import use_schema_from
+from helper.apischema import OneOf, use_schema_from
 from helper.translation import get_translator
 
 __all__: list[str] = ["ExactLen", "Language"]
@@ -34,18 +34,132 @@ class AlphaLanguageCodeAnnnotation(GroupedMetadata):
         yield ExactLen(self.length)
 
 
-# this should be ISO 639-2 codes (alpha-3 code)
-Alpha3LanguageCode = NewType(
-    "Alpha3LanguageCode",
-    Annotated[str, AlphaLanguageCodeAnnnotation(3)],
-)
+ALPHA_3_LANGUAGE_STR_PATTERN = r"^([a-z]{3})$"
 
-SHORT_LANGUAGE_STR_PATTERN = r"^([a-z]{2})$"
+
+# this should be ISO 639-2 codes (alpha-3 code)
+@schema(pattern=ALPHA_3_LANGUAGE_STR_PATTERN)
+class Alpha3LanguageStr:
+    __PrivateStrImpl = NewType(
+        "__PrivateStrImpl",
+        Annotated[str, AlphaLanguageCodeAnnnotation(3)],
+    )
+
+    __data: __PrivateStrImpl
+
+    # this is used, so that init is only callable from the internal class, so that it only gets checked values!
+    __PrivateSentinel = NewType("__PrivateSentinel", bool)
+
+    def __init__(
+        self: Self,
+        data: __PrivateStrImpl,
+        *,
+        sentinel: __PrivateSentinel,  # noqa: ARG002
+    ) -> None:
+        self.__data = data
+
+    @staticmethod
+    def __from_raw_str_checked(
+        val: str,
+        *,
+        valid_check: bool,
+    ) -> Optional[__PrivateStrImpl]:
+        if len(val) != 3:
+            return None
+
+        if not val.islower():
+            return None
+
+        if valid_check:
+            allowed_short_names = [entry[0] for entry in valid_iso_languages_list]
+            if val not in allowed_short_names:
+                msg = _(
+                    "Short Language string is invalid according to ISO (3 alpha): '{short}'"  # noqa: COM812
+                ).format(short=val)
+                raise RuntimeError(msg)
+
+        return Alpha3LanguageStr.__PrivateStrImpl(val)
+
+    @staticmethod
+    def __from_str_impl(
+        inp: str,
+        *,
+        valid_check: bool,
+    ) -> Optional["Alpha3LanguageStr"]:
+        val = Alpha3LanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
+
+        if val is None:
+            return None
+
+        return Alpha3LanguageStr(
+            data=val,
+            sentinel=Alpha3LanguageStr.__PrivateSentinel(True),  # noqa: FBT003
+        )
+
+    @staticmethod
+    def from_str(inp: str) -> Optional["Alpha3LanguageStr"]:
+        return Alpha3LanguageStr.__from_str_impl(inp, valid_check=True)
+
+    @staticmethod
+    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "Alpha3LanguageStr":
+        val: Optional[Alpha3LanguageStr] = Alpha3LanguageStr.__from_str_impl(
+            inp,
+            valid_check=valid_check,
+        )
+        if val is None:
+            msg = _("Couldn't get the Short Language String from str '{inp}'").format(
+                inp=inp,
+            )
+            raise RuntimeError(msg)
+
+        return val
+
+    @staticmethod
+    def from_str_unsafe(inp: str) -> "Alpha3LanguageStr":
+        return Alpha3LanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
+
+    @serializer
+    def serialize(self: Self) -> str:
+        return self.__data
+
+    @deserializer
+    @staticmethod
+    def deserialize_str(inp: str) -> "Alpha3LanguageStr":
+        match = re.match(ALPHA_3_LANGUAGE_STR_PATTERN, inp)
+
+        if match is None:
+            msg = _(
+                "Invalid pattern for Alpha3LanguageStr: got '{inp}', this didn't match the pattern '{pattern}'"  # noqa: COM812
+            ).format(inp=inp, pattern=ALPHA_3_LANGUAGE_STR_PATTERN)
+            raise TypeError(msg)
+
+        return Alpha3LanguageStr.from_str_unsafe(inp)
+
+    def __str__(self: Self) -> str:
+        return self.__data
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.__data)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, Alpha3LanguageStr):
+            return self.__data == other.__data
+
+        if isinstance(other, str):
+            return self.__data == Alpha3LanguageStr.from_str(other)
+
+        return False
+
+
+ALPHA_2_LANGUAGE_STR_PATTERN = r"^([a-z]{2})$"
 
 
 # this should be ISO 639-1 codes (alpha-2 code)
-@schema(pattern=SHORT_LANGUAGE_STR_PATTERN)
-class ShortLanguageStr:
+@schema(pattern=ALPHA_2_LANGUAGE_STR_PATTERN)
+class Alpha2LanguageStr:
     __PrivateStrImpl = NewType(
         "__PrivateStrImpl",
         Annotated[str, AlphaLanguageCodeAnnnotation(2)],
@@ -60,7 +174,7 @@ class ShortLanguageStr:
         self: Self,
         data: __PrivateStrImpl,
         *,
-        sentinel: __PrivateSentinel,
+        sentinel: __PrivateSentinel,  # noqa: ARG002
     ) -> None:
         self.__data = data
 
@@ -80,32 +194,37 @@ class ShortLanguageStr:
             allowed_short_names = [entry[1] for entry in valid_iso_languages_list]
             if val not in allowed_short_names:
                 msg = _(
-                    "Short Language string is invalid according to ISO: '{short}'"
+                    "Short Language string is invalid according to ISO (2 alpha): '{short}'"  # noqa: COM812
                 ).format(short=val)
                 raise RuntimeError(msg)
 
-        return ShortLanguageStr.__PrivateStrImpl(val)
+        return Alpha2LanguageStr.__PrivateStrImpl(val)
 
     @staticmethod
-    def __from_str_impl(inp: str, *, valid_check: bool) -> Optional["ShortLanguageStr"]:
-        val = ShortLanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
+    def __from_str_impl(
+        inp: str,
+        *,
+        valid_check: bool,
+    ) -> Optional["Alpha2LanguageStr"]:
+        val = Alpha2LanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
 
         if val is None:
             return None
 
-        return ShortLanguageStr(
+        return Alpha2LanguageStr(
             data=val,
-            sentinel=ShortLanguageStr.__PrivateSentinel(True),
+            sentinel=Alpha2LanguageStr.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     @staticmethod
-    def from_str(inp: str) -> Optional["ShortLanguageStr"]:
-        return ShortLanguageStr.__from_str_impl(inp, valid_check=True)
+    def from_str(inp: str) -> Optional["Alpha2LanguageStr"]:
+        return Alpha2LanguageStr.__from_str_impl(inp, valid_check=True)
 
     @staticmethod
-    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "ShortLanguageStr":
-        val: Optional[ShortLanguageStr] = ShortLanguageStr.__from_str_impl(
-            inp, valid_check=True
+    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "Alpha2LanguageStr":
+        val: Optional[Alpha2LanguageStr] = Alpha2LanguageStr.__from_str_impl(
+            inp,
+            valid_check=valid_check,
         )
         if val is None:
             msg = _("Couldn't get the Short Language String from str '{inp}'").format(
@@ -116,40 +235,40 @@ class ShortLanguageStr:
         return val
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "ShortLanguageStr":
-        return ShortLanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
+    def from_str_unsafe(inp: str) -> "Alpha2LanguageStr":
+        return Alpha2LanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
 
     @serializer
     def serialize(self: Self) -> str:
         return self.__data
 
     @staticmethod
-    def no_lang() -> "ShortLanguageStr":
-        return ShortLanguageStr.__impl_from_str_unsafe("xx", valid_check=False)
+    def no_lang() -> "Alpha2LanguageStr":
+        return Alpha2LanguageStr.__impl_from_str_unsafe("xx", valid_check=False)
 
     @staticmethod
-    def unknown_lang() -> "ShortLanguageStr":
-        return ShortLanguageStr.__impl_from_str_unsafe("un", valid_check=False)
+    def unknown_lang() -> "Alpha2LanguageStr":
+        return Alpha2LanguageStr.__impl_from_str_unsafe("un", valid_check=False)
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "ShortLanguageStr":
-        match = re.match(SHORT_LANGUAGE_STR_PATTERN, inp)
+    def deserialize_str(inp: str) -> "Alpha2LanguageStr":
+        match = re.match(ALPHA_2_LANGUAGE_STR_PATTERN, inp)
 
         if match is None:
             msg = _(
-                "Invalid pattern for ShortLanguageStr: got '{inp}', this didn't match the pattern '{pattern}'"  # noqa: COM812
-            ).format(inp=inp, pattern=SHORT_LANGUAGE_STR_PATTERN)
+                "Invalid pattern for Alpha2LanguageStr: got '{inp}', this didn't match the pattern '{pattern}'"  # noqa: COM812
+            ).format(inp=inp, pattern=ALPHA_2_LANGUAGE_STR_PATTERN)
             raise TypeError(msg)
 
         # backwards compatible, as before the enforcing of the two alpha rule, no language wasn't two alpha digits!
         if inp in ["no_lang", "xx"]:
-            return ShortLanguageStr.no_lang()
+            return Alpha2LanguageStr.no_lang()
 
         if inp == "un":
-            return ShortLanguageStr.unknown_lang()
+            return Alpha2LanguageStr.unknown_lang()
 
-        return ShortLanguageStr.from_str_unsafe(inp)
+        return Alpha2LanguageStr.from_str_unsafe(inp)
 
     def __str__(self: Self) -> str:
         return self.__data
@@ -161,11 +280,11 @@ class ShortLanguageStr:
         return hash(self.__data)
 
     def __eq__(self: Self, other: object) -> bool:
-        if isinstance(other, ShortLanguageStr):
+        if isinstance(other, Alpha2LanguageStr):
             return self.__data == other.__data
 
         if isinstance(other, str):
-            return self.__data == ShortLanguageStr.from_str(other)
+            return self.__data == Alpha2LanguageStr.from_str(other)
 
         return False
 
@@ -175,13 +294,13 @@ LongLanguageStr = NewType("LongLanguageStr", str)
 
 @dataclass
 class LanguageSchema:
-    short: ShortLanguageStr
+    short: Annotated[Alpha2LanguageStr | Alpha3LanguageStr, OneOf]
     long: LongLanguageStr
 
 
 @use_schema_from(LanguageSchema)
 class Language:
-    __short: ShortLanguageStr
+    __short: Alpha2LanguageStr | Alpha3LanguageStr
     __long: LongLanguageStr
 
     # this is used, so that init is only callable from the internal class, so that it only gets checked values!
@@ -189,16 +308,16 @@ class Language:
 
     def __init__(
         self: Self,
-        short: ShortLanguageStr,
+        short: Alpha2LanguageStr | Alpha3LanguageStr,
         long: LongLanguageStr,
         *,
-        sentinel: __PrivateSentinel,
+        sentinel: __PrivateSentinel,  # noqa: ARG002
     ) -> None:
         self.__short = short
         self.__long = long
 
     @property
-    def short(self: Self) -> ShortLanguageStr:
+    def short(self: Self) -> Alpha2LanguageStr | Alpha3LanguageStr:
         return self.__short
 
     @property
@@ -214,13 +333,25 @@ class Language:
         return Language.from_values(short=arr[0], long=arr[1])
 
     @staticmethod
+    def __short_from_str(val: str) -> Optional[Alpha2LanguageStr | Alpha3LanguageStr]:
+        if len(val) == 2:
+            return Alpha2LanguageStr.from_str(val)
+
+        if len(val) == 3:
+            return Alpha3LanguageStr.from_str(val)
+
+        return None
+
+    @staticmethod
     def __from_values_impl(
         short: str,
         long: str,
         *,
         valid_check: bool,
     ) -> Optional["Language"]:
-        short_val = ShortLanguageStr.from_str(short)
+        short_val: Optional[Alpha2LanguageStr | Alpha3LanguageStr] = (
+            Language.__short_from_str(short)
+        )
 
         if short_val is None:
             return None
@@ -229,14 +360,14 @@ class Language:
             allowed_long_names = [entry[2] for entry in valid_iso_languages_list]
             if long not in allowed_long_names:
                 msg = _(
-                    "Long Language string is invalid according to ISO: '{long}'"
+                    "Long Language string is invalid according to ISO: '{long}'"  # noqa: COM812
                 ).format(long=long)
                 raise RuntimeError(msg)
 
         return Language(
             short=short_val,
             long=LongLanguageStr(long),
-            sentinel=Language.__PrivateSentinel(True),
+            sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     @staticmethod
@@ -274,9 +405,9 @@ class Language:
     @staticmethod
     def no_language() -> "Language":
         return Language(
-            ShortLanguageStr.no_lang(),
+            Alpha2LanguageStr.no_lang(),
             LongLanguageStr("No Language"),
-            sentinel=Language.__PrivateSentinel(True),
+            sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     # TODO: get all languages somehow, from the classifier, that supports them all
@@ -285,9 +416,9 @@ class Language:
     @staticmethod
     def __unknown() -> "Language":
         return Language(
-            ShortLanguageStr.unknown_lang(),
+            Alpha2LanguageStr.unknown_lang(),
             LongLanguageStr("Unknown"),
-            sentinel=Language.__PrivateSentinel(True),
+            sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     @staticmethod
