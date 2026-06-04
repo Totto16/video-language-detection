@@ -440,7 +440,8 @@ class RegionLanguageStrAnnnotation(GroupedMetadata):
 
 
 RegionLanguageStr = NewType(
-    "RegionLanguageStr", Annotated[str, RegionLanguageStrAnnnotation()]
+    "RegionLanguageStr",
+    Annotated[str, RegionLanguageStrAnnnotation()],
 )
 
 
@@ -597,6 +598,16 @@ class Alpha2LanguageStrRegional:
 LongLanguageStr = NewType("LongLanguageStr", str)
 
 
+def long_string_checked(long: str) -> LongLanguageStr:
+    if long not in lang_code_validation_list_impl.long_names:
+        msg = _(
+            "Long Language string is invalid according to ISO: '{long}'"  # noqa: COM812
+        ).format(long=long)
+        raise RuntimeError(msg)
+
+    return LongLanguageStr(long)
+
+
 class NoLangDeprecatedType(StrEnum):
     no_lang = "no_lang"
 
@@ -687,15 +698,11 @@ class Language:
         if short_val is None:
             return None
 
-        if valid_check and long not in lang_code_validation_list_impl.long_names:
-            msg = _(
-                "Long Language string is invalid according to ISO: '{long}'"  # noqa: COM812
-            ).format(long=long)
-            raise RuntimeError(msg)
+        long_val = long_string_checked(long) if valid_check else LongLanguageStr(long)
 
         return Language(
             short=short_val,
-            long=LongLanguageStr(long),
+            long=long_val,
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
