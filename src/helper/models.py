@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Annotated, Optional, Self, override
 
 from content.language import (
@@ -15,13 +16,78 @@ __all__: list[str] = ["voxlingua107_ecapa_model"]
 _ = get_translator()
 
 
+# language_bcp47 encoding
+@dataclass
+class Alpha2LanguageStrRegional:
+    lang: Alpha2LanguageStr
+    region: str
+
+    @staticmethod
+    def __from_values_impl(
+        lang: str,
+        region: str,
+        *,
+        valid_check: bool,
+    ) -> Optional["Alpha2LanguageStrRegional"]:
+        lang_val: Optional[Alpha2LanguageStr] = Alpha2LanguageStr.from_str(lang)
+
+        if lang_val is None:
+            return None
+
+        if valid_check:
+            pass
+            # TODO: check region str
+
+        return Alpha2LanguageStrRegional(
+            lang=lang_val,
+            region=region,
+        )
+
+    @staticmethod
+    def from_values(
+        lang: str,
+        region: str,
+    ) -> Optional["Alpha2LanguageStrRegional"]:
+        return Alpha2LanguageStrRegional.__from_values_impl(
+            lang=lang,
+            region=region,
+            valid_check=True,
+        )
+
+    @staticmethod
+    def from_str(inp: str) -> Optional["Alpha2LanguageStrRegional"]:
+        arr: list[str] = [a.strip() for a in inp.split("-")]
+        if len(arr) != 2:
+            return None
+
+        return Alpha2LanguageStrRegional.from_values(lang=arr[0], region=arr[1])
+
+    @staticmethod
+    def from_str_unsafe(inp: str) -> "Alpha2LanguageStrRegional":
+        lan: Optional[Alpha2LanguageStrRegional] = Alpha2LanguageStrRegional.from_str(
+            inp,
+        )
+        if lan is None:
+            msg = _(
+                "Couldn't get the Regional Language String from str: '{inp}'"  # noqa: COM812
+            ).format(inp=inp)
+            raise RuntimeError(msg)
+
+        return lan
+
+
 voxlingua107_ecapa_languages_count = 107
 
 
 # NOTE:
 # Warning: In the dataset and in the defaults of this model (see label_encoder.txt, the used ISO language code for Hebrew is obsolete (should be he instead of iw). The ISO language code for Javanese is incorrect (should be jv instead of jw). See issue #2396. (https://github.com/speechbrain/speechbrain/issues/2396)
 voxlingua107_ecapa_languages: Annotated[
-    list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
+    list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ],
     ExactLen(voxlingua107_ecapa_languages_count),
 ] = [
     (
@@ -460,11 +526,21 @@ if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
 
 
 class ModelLanguageForList(ModelLanguage):
-    __languages: list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]]
+    __languages: list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ]
 
     def __init__(
         self: Self,
-        languages: list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
+        languages: list[
+            tuple[
+                Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+                LongLanguageStr,
+            ]
+        ],
     ) -> None:
         super().__init__()
         self.__languages = languages
@@ -495,11 +571,13 @@ voxlingua107_ecapa_model: Model = Model(
 commonlanguage_ecapa_languages_count = 45
 
 
-# TODO
-Alpha2LanguageStrRegional = Alpha2LanguageStr
-
 commonlanguage_ecapa_languages: Annotated[
-    list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
+    list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ],
     ExactLen(commonlanguage_ecapa_languages_count),
 ] = [
     (
