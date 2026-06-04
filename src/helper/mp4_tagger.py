@@ -119,6 +119,31 @@ class MP4Box:
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4Box":
         f.seek(offset)
 
+        # spec: ISO/IEC 14496-12
+        # MP4 atom / ISO box structure:
+        # size | 4 bytes | unsigned integer
+        # type | 4 bytes | char[4]
+        # ..., extension, dependent on size
+
+        # aligned(8) class Box (
+        #     unsigned int(32) boxtype,
+        #      optional unsigned int(8)[16] extended_type
+        #      )
+        # {
+        #     unsigned int(32) size;
+        #     unsigned int(32) type = boxtype;
+
+        #     if (size==1) {
+        #         unsigned int(64) largesize;
+        #     } else if (size==0) {
+        #         # box extends to end of file
+        #     }
+
+        #     if (boxtype=="uuid") {
+        #         unsigned int(8)[16] usertype = extended_type;
+        #     }
+        # }
+
         hdr = read_checked(f, 8)
 
         size, typ = Unpacker.unpack_default_sized("I4s", hdr, size=2)
@@ -132,14 +157,32 @@ class MP4Box:
                 msg = f"Invalid extended box size {largesize}"
                 raise RuntimeError(msg)
 
-            return MP4Box(typ, offset, largesize, 16)
+            return MP4Box(typ, offset, largesize, header_size=16)
 
         if size == 0:
             f.seek(0, 2)
             eof = f.tell()
             return MP4Box(typ, offset, eof - offset, 8)
 
-        return MP4Box(typ, offset, size, 8)
+        if typ == b"uuid":
+            msg = "'uuid' type not implemented, the box size differs"
+            raise RuntimeError(msg)
+
+        return MP4Box(typ, offset, size, header_size=8)
+
+    @staticmethod
+    def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator["MP4Box"]:
+        pos = start
+
+        while pos < end:
+            box = MP4Box.read_from_stream(f, pos)
+
+            if pos + box.size > end:
+                msg = f"Box {box.type!r} at {pos} extends past parent boundary"
+                raise RuntimeError(msg)
+
+            yield box
+            pos += box.size
 
 
 CONTAINER_BOXES: set[bytes] = {
@@ -156,21 +199,6 @@ CONTAINER_BOXES: set[bytes] = {
     b"traf",
     b"mfra",
 }
-
-
-def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
-    pos = start
-
-    while pos < end:
-        box = MP4Box.read_from_stream(f, pos)
-
-        if pos + box.size > end:
-            raise RuntimeError(
-                f"Box {box.type!r} at {pos} extends past parent boundary"
-            )
-
-        yield box
-        pos += box.size
 
 
 class MHDBox(MP4Box):
@@ -194,29 +222,30 @@ class MHDBox(MP4Box):
         while stack:
             start, end, path = stack.pop()
 
-            for box in iter_boxes(f, start, end):
+            for box in MP4Box.iter_boxes(f, start, end):
 
                 if box.type == b"trak":
-                    trak_box = TrakBox.get_from_normal_box(box)
+                    trak_box: TrakBox = TrakBox.get_from_normal_box(box)
 
                     hdlr = trak_box.get_hdlr_type(f)
 
                     if hdlr is None:
-                        raise RuntimeError("Missing hdlr box in trak")
+                        msg = "Missing hdlr box in trak"
+                        raise RuntimeError(msg)
 
                     if hdlr != b"soun":
-                        print("Non sound trak", hdlr)
-                        # skip non-audio tracks
                         continue
 
                 if box.type == b"mdhd":
-                    current = path[-2:]
+                    print(path)
+                    current = path
                     if current != [
+                        b"moov",
                         b"trak",
                         b"mdia",
                     ]:
-                        print(current)
-                        raise RuntimeError("invalid box hierarchy")
+                        msg = f"invalid mdhd box hierarchy: {current}"
+                        raise RuntimeError(msg)
 
                     yield MHDBox.get_from_normal_box(box)
 
@@ -264,8 +293,6 @@ class MHDBox(MP4Box):
         # TODO: define the structs for the size!
         MIN_MDHD_V0 = 24
         MIN_MDHD_V1 = 36
-
-        print("mdhd version: ", version)
 
         payload_size = self.size - self.header_size
 
@@ -344,7 +371,7 @@ class TrakBox(MP4Box):
         """
         mdia_start = None
 
-        for box in iter_boxes(f, self.payload_start, end=self.end):
+        for box in MP4Box.iter_boxes(f, self.payload_start, end=self.end):
             if box.type == b"mdia":
                 mdia_start = box
                 break
@@ -352,7 +379,7 @@ class TrakBox(MP4Box):
         if not mdia_start:
             return None
 
-        for box in iter_boxes(f, mdia_start.payload_start, mdia_start.end):
+        for box in MP4Box.iter_boxes(f, mdia_start.payload_start, mdia_start.end):
             if box.type == b"hdlr":
                 # skip version(1)+flags(3)+predefined(4)
                 f.seek(box.payload_start + 8)
@@ -387,11 +414,11 @@ def patch_languages(path: Path, new_language: str) -> list[tuple[int, str]]:
 if __name__ == "__main__":
     mp4 = Path("test.mp4")
 
-    list_languages(mp4)
+    languages = list_languages(mp4)
+    print("prev", languages)
 
-    patch_languages(mp4, "ger")
+    languages = patch_languages(mp4, "ger")
+    print("old", languages)
 
-    list_languages(mp4)
-
-
-# TODO every read has to be checked, every struct unpack has to be checked, every [0] has to be checked!
+    languages = list_languages(mp4)
+    print("new", languages)
