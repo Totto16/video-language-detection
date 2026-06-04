@@ -73,15 +73,74 @@ class Unpacker:
         return result[0]
 
 
+class ISOAtomName:
+    __value: bytes
+
+    def __init__(self: Self, value: bytes) -> None:
+        self.__value = value
+
+        if len(value) != 4:
+            msg = f"Invalid atom name length {len(value)}"
+            raise ValueError(msg)
+
+        if not value.islower():
+            msg = f"Atom name is not lowercase {value!s}"
+            raise ValueError(msg)
+
+    @property
+    def value(self: Self) -> bytes:
+        return self.__value
+
+    def __str__(self: Self) -> str:
+        return str(self.__value)
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__value)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.__value)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, ISOAtomName):
+            return self.__value == other.__value
+
+        if isinstance(other, str):
+            return self.__value == other.encode()
+
+        if isinstance(other, bytes):
+            return self.__value == other
+
+        return False
+
+
+CMOV_ATOM_NAME: ISOAtomName = ISOAtomName(b"cmov")
+MOOF_ATOM_NAME: ISOAtomName = ISOAtomName(b"moof")
+MOOV_ATOM_NAME: ISOAtomName = ISOAtomName(b"moov")
+UUID_ATOM_NAME: ISOAtomName = ISOAtomName(b"uuid")
+TRAK_ATOM_NAME: ISOAtomName = ISOAtomName(b"trak")
+MDIA_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdia")
+MINF_ATOM_NAME: ISOAtomName = ISOAtomName(b"minf")
+STBL_ATOM_NAME: ISOAtomName = ISOAtomName(b"stbl")
+EDTS_ATOM_NAME: ISOAtomName = ISOAtomName(b"edts")
+DINF_ATOM_NAME: ISOAtomName = ISOAtomName(b"dinf")
+UDTA_ATOM_NAME: ISOAtomName = ISOAtomName(b"udta")
+META_ATOM_NAME: ISOAtomName = ISOAtomName(b"meta")
+TRAF_ATOM_NAME: ISOAtomName = ISOAtomName(b"traf")
+MFRA_ATOM_NAME: ISOAtomName = ISOAtomName(b"mfra")
+MDHD_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdhd")
+SOUN_ATOM_NAME: ISOAtomName = ISOAtomName(b"soun")
+HDLR_ATOM_NAME: ISOAtomName = ISOAtomName(b"hdlr")
+
+
 class MP4Box:
-    type: bytes
+    type: ISOAtomName
     start: int
     size: int
     header_size: int
 
     def __init__(
         self: Self,
-        typ: bytes,
+        typ: ISOAtomName,
         start: int,
         size: int,
         header_size: int,
@@ -99,12 +158,12 @@ class MP4Box:
             msg = f"Invalid box size {self.size} for {self.type!r} at {self.start}"
             raise RuntimeError(msg)
 
-        if self.type == b"cmov":
-            msg = "Compressed movie box (cmov) not supported"
+        if self.type == CMOV_ATOM_NAME:
+            msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
             raise RuntimeError(msg)
 
-        if self.type == b"moof":
-            msg = "Fragmented MP4 (moof) not supported"
+        if self.type == MOOF_ATOM_NAME:
+            msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
             raise RuntimeError(msg)
 
     @property
@@ -117,8 +176,6 @@ class MP4Box:
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4Box":
-        f.seek(offset)
-
         # spec: ISO/IEC 14496-12
         # MP4 atom / ISO box structure:
         # size | 4 bytes | unsigned integer
@@ -127,9 +184,8 @@ class MP4Box:
 
         # aligned(8) class Box (
         #     unsigned int(32) boxtype,
-        #      optional unsigned int(8)[16] extended_type
-        #      )
-        # {
+        #     optional unsigned int(8)[16] extended_type
+        # ) {
         #     unsigned int(32) size;
         #     unsigned int(32) type = boxtype;
 
@@ -144,9 +200,15 @@ class MP4Box:
         #     }
         # }
 
+        f.seek(offset)
+
         hdr = read_checked(f, 8)
 
         size, typ = Unpacker.unpack_default_sized("I4s", hdr, size=2)
+
+        if typ == UUID_ATOM_NAME:
+            msg = "'uuid' type not implemented, the box size differs"
+            raise RuntimeError(msg)
 
         if size == 1:
             ext = read_checked(f, 8)
@@ -163,10 +225,6 @@ class MP4Box:
             f.seek(0, 2)
             eof = f.tell()
             return MP4Box(typ, offset, eof - offset, 8)
-
-        if typ == b"uuid":
-            msg = "'uuid' type not implemented, the box size differs"
-            raise RuntimeError(msg)
 
         return MP4Box(typ, offset, size, header_size=8)
 
@@ -185,19 +243,59 @@ class MP4Box:
             pos += box.size
 
 
-CONTAINER_BOXES: set[bytes] = {
-    b"moov",
-    b"trak",
-    b"mdia",
-    b"minf",
-    b"stbl",
-    b"edts",
-    b"dinf",
-    b"udta",
-    b"meta",
-    b"moof",
-    b"traf",
-    b"mfra",
+class MP4FullBox(MP4Box):
+    version: int
+    flags: bytes
+
+    def __init__(self: Self, parent: MP4Box, version: int, flags: bytes) -> None:
+        super().__init__(parent.type, parent.start, parent.size, parent.header_size)
+        self.version = version
+        self.flags = flags
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MP4FullBox":
+        # spec: ISO/IEC 14496-12
+        # ISO full box structure:
+        # box     | header_size bytes | parent box
+        # version | 1 byte | unsigned char
+        # flags   | 3 bytes | unsigned char[3]
+
+        # aligned(8) class FullBox(
+        #     unsigned int(32) boxtype,
+        #     unsigned int(8) v,
+        #     bit(24) f
+        # ) extends Box(boxtype) {
+        #     unsigned int(8) version = v;
+        #     bit(24) flags = f;
+        # }
+
+        f.seek(parent.payload_start)
+
+        version = read_checked(f, 1)[0]
+
+        flags = read_checked(f, 3)
+
+        return MP4FullBox(parent, version, flags)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4FullBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return MP4FullBox.__read_from_stream_impl(f, box)
+
+
+CONTAINER_BOXES: set[ISOAtomName] = {
+    MOOV_ATOM_NAME,
+    TRAK_ATOM_NAME,
+    MDIA_ATOM_NAME,
+    MINF_ATOM_NAME,
+    STBL_ATOM_NAME,
+    EDTS_ATOM_NAME,
+    DINF_ATOM_NAME,
+    UDTA_ATOM_NAME,
+    META_ATOM_NAME,
+    MOOF_ATOM_NAME,
+    TRAF_ATOM_NAME,
+    MFRA_ATOM_NAME,
 }
 
 
@@ -207,7 +305,7 @@ class MHDBox(MP4Box):
 
     @staticmethod
     def get_from_normal_box(box: MP4Box) -> "MHDBox":
-        if box.type != b"mdhd":
+        if box.type != MDHD_ATOM_NAME:
             msg = f"Invalid MHDBox box with type: {box.type!s}"
             raise RuntimeError(msg)
         return MHDBox(box)
@@ -217,14 +315,14 @@ class MHDBox(MP4Box):
         f.seek(0, 2)
         filesize = f.tell()
 
-        stack: list[tuple[int, int, list[bytes]]] = [(0, filesize, [])]
+        stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
 
         while stack:
             start, end, path = stack.pop()
 
             for box in MP4Box.iter_boxes(f, start, end):
 
-                if box.type == b"trak":
+                if box.type == TRAK_ATOM_NAME:
                     trak_box: TrakBox = TrakBox.get_from_normal_box(box)
 
                     hdlr = trak_box.get_hdlr_type(f)
@@ -233,16 +331,15 @@ class MHDBox(MP4Box):
                         msg = "Missing hdlr box in trak"
                         raise RuntimeError(msg)
 
-                    if hdlr != b"soun":
+                    if hdlr != SOUN_ATOM_NAME:
                         continue
 
-                if box.type == b"mdhd":
-                    print(path)
+                if box.type == MDHD_ATOM_NAME:
                     current = path
                     if current != [
-                        b"moov",
-                        b"trak",
-                        b"mdia",
+                        MOOV_ATOM_NAME,
+                        TRAK_ATOM_NAME,
+                        MDIA_ATOM_NAME,
                     ]:
                         msg = f"invalid mdhd box hierarchy: {current}"
                         raise RuntimeError(msg)
@@ -288,6 +385,7 @@ class MHDBox(MP4Box):
     def read_mdhd_language(self: Self, f: BufferedIOBase) -> tuple[int, str]:
         f.seek(self.payload_start)
 
+        # TODO: full box!
         version = read_checked(f, 1)[0]
 
         # TODO: define the structs for the size!
@@ -360,7 +458,7 @@ class TrakBox(MP4Box):
 
     @staticmethod
     def get_from_normal_box(box: MP4Box) -> "TrakBox":
-        if box.type != b"trak":
+        if box.type != TRAK_ATOM_NAME:
             msg = f"Invalid TrakBox box with type: {box.type!s}"
             raise RuntimeError(msg)
         return TrakBox(box)
@@ -372,7 +470,7 @@ class TrakBox(MP4Box):
         mdia_start = None
 
         for box in MP4Box.iter_boxes(f, self.payload_start, end=self.end):
-            if box.type == b"mdia":
+            if box.type == MDIA_ATOM_NAME:
                 mdia_start = box
                 break
 
@@ -380,7 +478,7 @@ class TrakBox(MP4Box):
             return None
 
         for box in MP4Box.iter_boxes(f, mdia_start.payload_start, mdia_start.end):
-            if box.type == b"hdlr":
+            if box.type == HDLR_ATOM_NAME:
                 # skip version(1)+flags(3)+predefined(4)
                 f.seek(box.payload_start + 8)
                 return read_checked(f, 4)
