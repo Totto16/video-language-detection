@@ -250,7 +250,7 @@ class MP4Box:
             span = BoxSpan(offset, eof - offset, header_size=8)
             return MP4Box(typ, span)
 
-        span = BoxSpan(offset, largesize, header_size=8)
+        span = BoxSpan(offset, size, header_size=8)
         return MP4Box(typ, span)
 
 
@@ -432,41 +432,6 @@ class MediaHeaderBox(MP4FullBox):
             msg = "Invalid overwrite"
             raise RuntimeError(msg)
 
-    @staticmethod
-    def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
-        f.seek(0, 2)
-        filesize = f.tell()
-
-        stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
-
-        while stack:
-            start, end, path = stack.pop()
-
-            for box in iter_boxes(f, start, end):
-
-                if box.type == TRAK_ATOM_NAME:
-                    trak_box: TrakBox = TrakBox.get_from_normal_box(box)
-
-                    hdlr = trak_box.get_hdlr_type(f)
-
-                    if hdlr != SOUN_ATOM_NAME:
-                        continue
-
-                if box.type == MDHD_ATOM_NAME:
-                    current = path
-                    if current != [
-                        MOOV_ATOM_NAME,
-                        TRAK_ATOM_NAME,
-                        MDIA_ATOM_NAME,
-                    ]:
-                        msg = f"invalid mdhd box hierarchy: {current}"
-                        raise RuntimeError(msg)
-
-                    yield MHDBox.get_from_normal_box(box)
-
-                if box.type in CONTAINER_BOXES:
-                    stack.append((box.payload_start, box.end, [*path, box.type]))
-
 
 class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
@@ -608,8 +573,19 @@ CONTAINER_BOXES: set[ISOAtomName] = {
 
 
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
-    # TODO
-    return MP4Box.read_from_stream(f, pos)
+    box = MP4Box.read_from_stream(f, pos)
+
+    match box.type:
+        case b"mdhd":
+            return MediaHeaderBox.read_from_stream(f, pos)
+        case b"mdia":
+            return MediaBox.read_from_stream(f, pos)
+        case b"hdlr":
+            return HandlerBox.read_from_stream(f, pos)
+        case b"trak":
+            return TrackBox.read_from_stream(f, pos)
+        case _:
+            return box
 
 
 def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
@@ -630,13 +606,54 @@ def iter_boxes_span(f: BufferedIOBase, span: BoxSpan) -> Generator["MP4Box"]:
     return iter_boxes(f, span.start, span.end)
 
 
+def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
+    f.seek(0, 2)
+    filesize = f.tell()
+
+    stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
+
+    while stack:
+        start, end, path = stack.pop()
+
+        for box in iter_boxes(f, start, end):
+
+            if box.type == TRAK_ATOM_NAME:
+                if not isinstance(box, TrackBox):
+                    msg = "Invalid TrackBox: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                hdlr = box.hdlr.handler_type
+
+                if hdlr != SOUN_ATOM_NAME:
+                    continue
+
+            if box.type == MDHD_ATOM_NAME:
+                if not isinstance(box, MediaHeaderBox):
+                    msg = "Invalid MediaHeaderBox: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                current = path
+                if current != [
+                    MOOV_ATOM_NAME,
+                    TRAK_ATOM_NAME,
+                    MDIA_ATOM_NAME,
+                ]:
+                    msg = f"invalid mdhd box hierarchy: {current}"
+                    raise RuntimeError(msg)
+
+                yield box
+
+            if box.type in CONTAINER_BOXES:
+                stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
+
+
 def list_languages(path: Path) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
 
     with path.open("rb") as f:
 
-        for i, mdhd in enumerate(MHDBox.find_audio_mdhd_boxes(f), start=1):
-            _, lang = mdhd.read_mdhd_language(f)
+        for i, mdhd in enumerate(find_audio_mdhd_boxes(f), start=1):
+            lang = mdhd.read_language(f)
             result.append((i, lang))
 
     return result
@@ -645,9 +662,10 @@ def list_languages(path: Path) -> list[tuple[int, str]]:
 def patch_languages(path: Path, new_language: str) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
 
-    with path.open("rb+") as f:
-        for i, mdhd in enumerate(MHDBox.find_audio_mdhd_boxes(f), start=1):
-            old = mdhd.patch_mdhd_language(f, new_language)
+    with path.open("rüüüb+") as f:
+        for i, mdhd in enumerate(find_audio_mdhd_boxes(f), start=1):
+            old = mdhd.read_language(f)
+            mdhd.patch_language(f, new_language)
             result.append((i, old))
 
     return result
@@ -659,8 +677,8 @@ if __name__ == "__main__":
     languages = list_languages(mp4)
     print("prev", languages)
 
-    languages = patch_languages(mp4, "ger")
-    print("old", languages)
+    # languages = patch_languages(mp4, "ger")
+    # print("old", languages)
 
     languages = list_languages(mp4)
     print("new", languages)
