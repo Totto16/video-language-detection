@@ -10,6 +10,7 @@ from content.language import Alpha3LanguageStr, Language
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     VideoTagger,
+    VideoTagger__HandleResult,
     VideoTaggerWriter,
 )
 from helper.manager import CounterInterface, ManagerInterface
@@ -309,6 +310,106 @@ class MP4FullBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4FullBox":
         box = MP4Box.read_from_stream(f, offset)
         return MP4FullBox.__read_from_stream_impl(f, box)
+
+
+class FileTypeBox(MP4Box):
+    major_brand: ISOAtomName
+    minor_version: int
+    compatible_brands: bytes
+
+    def __init__(
+        self: Self,
+        parent: MP4Box,
+        major_brand: ISOAtomName,
+        minor_version: int,
+        compatible_brands: bytes,
+    ) -> None:
+        super().__init__(parent.type, parent.span, container=False)
+
+        self.major_brand = major_brand
+        self.minor_version = minor_version
+        self.compatible_brands = compatible_brands
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "FileTypeBox":
+        # spec: ISO/IEC 14496-12
+        # ISO file type structure:
+        # box     | <box size> bytes | parent box
+        # major_brand   | 4 bytes | char[4]
+        # minor_version   | 4 bytes | char[4]
+        # .. string data for the rest of the size
+
+        # aligned(8) class FileTypeBox extends Box(
+        #     ‘ftyp’
+        # ) {
+        #     unsigned int(32) major_brand;
+        #     unsigned int(32) minor_version;
+        #     unsigned int(32) compatible_brands[];
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        major_brand_raw = read_checked(f, 4)
+        major_brand = ISOAtomName(major_brand_raw)
+
+        minor_version_bytes = read_checked(f, 4)
+
+        minor_version = Unpacker.unpack_default_one("I", minor_version_bytes)
+
+        compatible_brands_size = parent.span.payload_size - (4 + 4)
+
+        compatible_brands = read_checked(f, compatible_brands_size)
+
+        additional_header_size = 4 + 4 + compatible_brands_size
+
+        parent.span.add_header_size(additional_header_size)
+
+        return FileTypeBox(parent, major_brand, minor_version, compatible_brands)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "FileTypeBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return FileTypeBox.__read_from_stream_impl(f, box)
+
+
+class FreeSpaceBox(MP4Box):
+    data: bytes
+
+    def __init__(
+        self: Self,
+        parent: MP4Box,
+        data: bytes,
+    ) -> None:
+        super().__init__(parent.type, parent.span, container=False)
+
+        self.data = data
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "FreeSpaceBox":
+        # spec: ISO/IEC 14496-12
+        # ISO free space structure:
+        # box     | <box size> bytes | parent box
+        # .. string data for the rest of the size
+
+        # free_type may be ‘free’ or ‘skip’.
+        # aligned(8) class FreeSpaceBox extends Box(
+        #     free_type
+        # ) {
+        #     unsigned int(8) data[];
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        data = read_checked(f, parent.span.payload_size)
+
+        parent.span.add_header_size(parent.span.payload_size)
+
+        return FreeSpaceBox(parent, data)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "FreeSpaceBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return FreeSpaceBox.__read_from_stream_impl(f, box)
 
 
 class MediaHeaderBox(MP4FullBox):
@@ -619,6 +720,12 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             return TrackBox.read_from_stream(f, pos)
         case b"moov":
             return MovieBox.read_from_stream(f, pos)
+        case b"ftyp":
+            return FileTypeBox.read_from_stream(f, pos)
+        case b"free":
+            return FreeSpaceBox.read_from_stream(f, pos)
+        case b"skip":
+            return FreeSpaceBox.read_from_stream(f, pos)
         case _:
             return box
 
@@ -683,14 +790,20 @@ def find_mdhd_boxes_with_type(
 
 class VideoTaggerWriterMp4(VideoTaggerWriter):
     __writer: BufferedIOBase
+    __streams: int
+    __types: list[ISOAtomName]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
         writer: BufferedIOBase,
+        streams: int,
+        types: list[ISOAtomName],
     ) -> None:
         super().__init__(manager)
         self.__writer = writer
+        self.__streams = streams
+        self.__types = types
 
     @override
     def write_metadata(
@@ -699,27 +812,11 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
         language: Language,
         metadata: dict[str, str],
     ) -> None:
-        types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
 
         new_language = language.to_alpha3()
 
-        total = 0
-
-        # read the file, so that we check if we can parse it correctly
-        for mdhd in find_mdhd_boxes_with_type(self.__writer, types):
-            total = total + 1
-            lang = mdhd.read_language(self.__writer)
-            # check if this lang is valid
-            validated_lang = Alpha3LanguageStr.from_str(lang)
-
-            if validated_lang is None:
-                msg = _("Invalid language in mp4 detected: {lang}").format(
-                    lang=lang,
-                )
-                raise RuntimeError(msg)
-
         bar: CounterInterface = self.__manager.counter(
-            total=float(total),
+            total=float(self.__streams),
             desc="update mp4 language",
             unit="B",
             leave=False,
@@ -730,7 +827,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
         try:
             self.__writer.seek(0)
-            for mdhd in find_mdhd_boxes_with_type(self.__writer, types):
+            for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
         finally:
@@ -738,8 +835,55 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
 
 class VideoTaggerMp4(VideoTagger):
-    def __init__(self: Self, file: Path) -> None:
+    __streams: int
+    __types: list[ISOAtomName]
+
+    def __init__(
+        self: Self,
+        file: Path,
+        streams: int,
+        types: list[ISOAtomName],
+    ) -> None:
         super().__init__(file)
+        self.__streams = streams
+        self.__types = types
+
+        streams = 0
+
+    @staticmethod
+    def get_handle(file: Path) -> VideoTagger__HandleResult:
+
+        with file.open("rb") as f:
+
+            first_box = read_box_from_stream(f, 0)
+
+            if not isinstance(first_box, FileTypeBox):
+                return VideoTagger__HandleResult.err(_("Not a valid ISOM / MP4 file"))
+
+            if first_box.major_brand != b"isom":
+                return VideoTagger__HandleResult.err(
+                    _("ISOM file has valid box, but invalid major_brand"),
+                )
+
+            f.seek(0)
+
+            streams = 0
+            types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+
+            # read the file, so that we check if we can parse it correctly and that it is an mp4
+            for mdhd in find_mdhd_boxes_with_type(f, types):
+                streams = streams + 1
+                lang = mdhd.read_language(f)
+                # check if this lang is valid
+                validated_lang = Alpha3LanguageStr.from_str(lang)
+
+                if validated_lang is None:
+                    msg = _("Invalid language in mp4 detected: {lang}").format(
+                        lang=lang,
+                    )
+                    raise RuntimeError(msg)
+
+            return VideoTagger__HandleResult.ok(VideoTaggerMp4(file, streams, types))
 
     @override
     def writer(
@@ -748,6 +892,8 @@ class VideoTaggerMp4(VideoTagger):
     ) -> AbstractContextManager[VideoTaggerWriter]:
 
         file = self.file
+        streams = self.__streams
+        types = self.__types
 
         class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
             __writer: Optional[BufferedIOBase]
@@ -760,7 +906,7 @@ class VideoTaggerMp4(VideoTagger):
             def __enter__(self: Self) -> VideoTaggerWriter:
                 self.__writer = file.open("rb+")
 
-                return VideoTaggerWriterMp4(manager, self.__writer)
+                return VideoTaggerWriterMp4(manager, self.__writer, streams, types)
 
             @override
             def __exit__(

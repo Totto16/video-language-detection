@@ -23,7 +23,12 @@ def get_tagger_for_mp4_file(file: Path) -> VideoTagger__HandleResult:
 
     tagger.append(mutagen_handle.get_ok())
 
-    tagger.append(VideoTaggerMp4(file))
+    mp4_handle = VideoTaggerMp4.get_handle(file)
+
+    if mp4_handle.is_err():
+        return VideoTagger__HandleResult.err(mp4_handle.get_err())
+
+    tagger.append(mp4_handle.get_ok())
 
     result = VideoTaggerMultiple(file, tagger)
 
