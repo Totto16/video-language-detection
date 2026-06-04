@@ -130,6 +130,7 @@ MFRA_ATOM_NAME: ISOAtomName = ISOAtomName(b"mfra")
 MDHD_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdhd")
 SOUN_ATOM_NAME: ISOAtomName = ISOAtomName(b"soun")
 HDLR_ATOM_NAME: ISOAtomName = ISOAtomName(b"hdlr")
+VIDE_ATOM_NAME: ISOAtomName = ISOAtomName(b"vide")
 
 
 class BoxSpan:
@@ -623,7 +624,10 @@ def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
         pos += box.span.size
 
 
-def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
+def find_mdhd_boxes_with_type(
+    f: BufferedIOBase,
+    types: list[ISOAtomName],
+) -> Generator["MediaHeaderBox"]:
     f.seek(0, 2)
     filesize = f.tell()
 
@@ -641,7 +645,7 @@ def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
 
                 hdlr = box.hdlr.handler_type
 
-                if hdlr != SOUN_ATOM_NAME:
+                if hdlr not in types:
                     continue
 
             if box.type == MDHD_ATOM_NAME:
@@ -667,9 +671,11 @@ def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
 def list_languages(path: Path) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
 
+    types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+
     with path.open("rb") as f:
 
-        for i, mdhd in enumerate(find_audio_mdhd_boxes(f), start=1):
+        for i, mdhd in enumerate(find_mdhd_boxes_with_type(f, types), start=1):
             lang = mdhd.read_language(f)
             result.append((i, lang))
 
@@ -679,23 +685,12 @@ def list_languages(path: Path) -> list[tuple[int, str]]:
 def patch_languages(path: Path, new_language: str) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
 
+    types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+
     with path.open("rb+") as f:
-        for i, mdhd in enumerate(find_audio_mdhd_boxes(f), start=1):
+        for i, mdhd in enumerate(find_mdhd_boxes_with_type(f, types), start=1):
             old = mdhd.read_language(f)
             mdhd.patch_language(f, new_language)
             result.append((i, old))
 
     return result
-
-
-if __name__ == "__main__":
-    mp4 = Path("test.mp4")
-
-    languages = list_languages(mp4)
-    print("prev", languages)
-
-    languages = patch_languages(mp4, "jap")
-    print("old", languages)
-
-    languages = list_languages(mp4)
-    print("new", languages)
