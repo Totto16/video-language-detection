@@ -1,9 +1,8 @@
-from operator import add
 import struct
 from collections.abc import Generator
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Any, Literal, Optional, Self, override
+from typing import Any, Literal, Optional, Self
 
 
 def read_checked(f: BufferedIOBase, amount: int) -> bytes:
@@ -217,7 +216,9 @@ class MP4Box:
 
         hdr = read_checked(f, 8)
 
-        size, typ = Unpacker.unpack_default_sized("I4s", hdr, size=2)
+        size, typ_raw = Unpacker.unpack_default_sized("I4s", hdr, size=2)
+
+        typ = ISOAtomName(typ_raw)
 
         if typ == UUID_ATOM_NAME:
             msg = "'uuid' type not implemented, the box header size differs with that type"
@@ -296,7 +297,7 @@ class MP4FullBox(MP4Box):
         return MP4FullBox.__read_from_stream_impl(f, box)
 
 
-class MHDBox(MP4FullBox):
+class MediaHeaderBox(MP4FullBox):
     language_offset: int
 
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
@@ -304,9 +305,11 @@ class MHDBox(MP4FullBox):
         self.language_offset = language_offset
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4FullBox) -> "MHDBox":
+    def __read_from_stream_impl(
+        f: BufferedIOBase, parent: MP4FullBox
+    ) -> "MediaHeaderBox":
         # spec: ISO/IEC 14496-12
-        # ISO media box structure:
+        # ISO media header box structure:
         # full_box     | <full box size> bytes | parent full box
         # ... data, dependent on version
 
@@ -360,12 +363,12 @@ class MHDBox(MP4FullBox):
 
         parent.span.add_header_size(additional_header_size)
 
-        return MHDBox(parent, language_offset)
+        return MediaHeaderBox(parent, language_offset)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "MHDBox":
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaHeaderBox":
         box = MP4FullBox.read_from_stream(f, offset)
-        return MHDBox.__read_from_stream_impl(f, box)
+        return MediaHeaderBox.__read_from_stream_impl(f, box)
 
     @staticmethod
     def decode_language(value: int) -> str:
@@ -406,10 +409,10 @@ class MHDBox(MP4FullBox):
         lang_bytes = read_checked(f, 2)
         packed = Unpacker.unpack_default_one("H", lang_bytes)
 
-        return MHDBox.decode_language(packed)
+        return MediaHeaderBox.decode_language(packed)
 
     def patch_language(self: Self, f: BufferedIOBase, new_language: str) -> None:
-        packed = MHDBox.encode_language(new_language)
+        packed = MediaHeaderBox.encode_language(new_language)
 
         f.seek(self.span.start + self.language_offset)
 
@@ -430,7 +433,7 @@ class MHDBox(MP4FullBox):
             raise RuntimeError(msg)
 
     @staticmethod
-    def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MHDBox"]:
+    def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
         f.seek(0, 2)
         filesize = f.tell()
 
@@ -439,16 +442,12 @@ class MHDBox(MP4FullBox):
         while stack:
             start, end, path = stack.pop()
 
-            for box in MP4Box.iter_boxes(f, start, end):
+            for box in iter_boxes(f, start, end):
 
                 if box.type == TRAK_ATOM_NAME:
                     trak_box: TrakBox = TrakBox.get_from_normal_box(box)
 
                     hdlr = trak_box.get_hdlr_type(f)
-
-                    if hdlr is None:
-                        msg = "Missing hdlr box in trak"
-                        raise RuntimeError(msg)
 
                     if hdlr != SOUN_ATOM_NAME:
                         continue
@@ -469,31 +468,127 @@ class MHDBox(MP4FullBox):
                     stack.append((box.payload_start, box.end, [*path, box.type]))
 
 
-class TrakBox(MP4Box):
+class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
-        super().__init__(parent.type, parent.start, parent.size, parent.header_size)
+        super().__init__(parent.type, parent.span)
 
-    def get_hdlr_type(self: Self, f: BufferedIOBase) -> Optional[bytes]:
-        """
-        Returns handler type like b'soun', b'vide', etc.
-        """
-        mdia_start = None
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
+        # spec: ISO/IEC 14496-12
+        # ISO media box structure:
+        # box     | <box size> bytes | parent box
 
-        for box in iter_boxes(f, self.payload_start, end=self.end):
+        # aligned(8) class MediaBox extends Box(
+        #     ‘mdia’
+        #     ) {
+        # }
+
+        return MediaBox(parent)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return MediaBox.__read_from_stream_impl(f, box)
+
+
+class HandlerBox(MP4FullBox):
+    handler_type: ISOAtomName
+
+    def __init__(self: Self, parent: MP4FullBox, handler_type: ISOAtomName) -> None:
+        super().__init__(parent, parent.version, parent.flags)
+        self.handler_type = handler_type
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4FullBox) -> "HandlerBox":
+        # spec: ISO/IEC 14496-12
+        # ISO handler box structure:
+        # box     | <full box size> bytes | parent full box
+        # ... data, see below
+
+        # aligned(8) class HandlerBox extends FullBox(
+        #     ‘hdlr’,
+        #     version = 0,
+        #     0)
+        # {
+        #     unsigned int(32) pre_defined = 0;
+        #     unsigned int(32) handler_type;
+        #     const unsigned int(32)[3] reserved = 0;
+        #     string name;
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        if parent.version != 0:
+            msg = "Invalid hdlr version"
+            raise RuntimeError(msg)
+
+        f.seek(parent.span.payload_start + 4)
+
+        handler_type_raw = read_checked(f, 8)
+        handler_type = ISOAtomName(handler_type_raw)
+
+        # omitting dynamic sized string "name"
+        additional_header_size = 4 + 4 + (4 * 3)
+
+        parent.span.add_header_size(additional_header_size)
+
+        return HandlerBox(parent, handler_type)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "HandlerBox":
+        box = MP4FullBox.read_from_stream(f, offset)
+        return HandlerBox.__read_from_stream_impl(f, box)
+
+
+class TrackBox(MP4Box):
+    hdlr: HandlerBox
+
+    def __init__(self: Self, parent: MP4Box, hdlr: HandlerBox) -> None:
+        super().__init__(parent.type, parent.span)
+
+        self.hdlr = hdlr
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "TrackBox":
+        # spec: ISO/IEC 14496-12
+        # ISO track box structure:
+        # box     | <box size> bytes | parent box
+
+        # aligned(8) class TrackBox extends Box(
+        #     ‘trak’
+        # ) {
+        # }
+
+        mdia_box: Optional[MediaBox] = None
+
+        for box in iter_boxes_span(f, parent.span):
             if box.type == MDIA_ATOM_NAME:
-                mdia_start = box
+                if not isinstance(box, MediaBox):
+                    msg = "Invalid MediaBox: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                mdia_box = box
                 break
 
-        if not mdia_start:
-            return None
+        if mdia_box is None:
+            msg = "Missing mdia box in trak"
+            raise RuntimeError(msg)
 
-        for box in iter_boxes(f, mdia_start.payload_start, mdia_start.end):
+        for box in iter_boxes_span(f, mdia_box.span):
             if box.type == HDLR_ATOM_NAME:
-                # skip version(1)+flags(3)+predefined(4)
-                f.seek(box.payload_start + 8)
-                return read_checked(f, 4)
+                if not isinstance(box, HandlerBox):
+                    msg = "Invalid HandlerBox: type not dispatched to correct class"
+                    raise ValueError(msg)
 
-        return None
+                return TrackBox(parent, box)
+
+        msg = "Missing hdlr box in trak"
+        raise RuntimeError(msg)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "TrackBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return TrackBox.__read_from_stream_impl(f, box)
 
 
 CONTAINER_BOXES: set[ISOAtomName] = {
@@ -512,11 +607,16 @@ CONTAINER_BOXES: set[ISOAtomName] = {
 }
 
 
-def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator["MP4Box"]:
+def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
+    # TODO
+    return MP4Box.read_from_stream(f, pos)
+
+
+def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
     pos = start
 
     while pos < end:
-        box = MP4Box.read_from_stream(f, pos)
+        box = read_box_from_stream(f, pos)
 
         if pos + box.span.size > end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
@@ -524,6 +624,10 @@ def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator["MP4Box"]:
 
         yield box
         pos += box.span.size
+
+
+def iter_boxes_span(f: BufferedIOBase, span: BoxSpan) -> Generator["MP4Box"]:
+    return iter_boxes(f, span.start, span.end)
 
 
 def list_languages(path: Path) -> list[tuple[int, str]]:
