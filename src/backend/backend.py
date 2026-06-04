@@ -93,12 +93,16 @@ from helper.manager import (
 from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Result
+from helper.translation import get_translator
 from helper.validator import ReporterWhere, Validator, ValidatorReporter, get_validators
 from main import AllContent
 
 if TYPE_CHECKING:
 
     from content.metadata.scanner import MetadataScanner
+
+
+_ = get_translator()
 
 
 class BackendRef:
@@ -1516,13 +1520,18 @@ class BackendScanner:
         general_info: list[str] = [
             x
             for x in [
-                f"Config: {config.config_name}",
+                _("Config: '{config_name}'").format(config_name=config.config_name),
                 (
                     None
                     if config_paramaters is None
-                    else f"Config progress: {config_paramaters[0]+1} / {config_paramaters[1]}"
+                    else _("Config progress: {start} / {end}").format(
+                        start=config_paramaters[0] + 1,
+                        end=config_paramaters[1],
+                    )
                 ),
-                f"Config type: {config.config_type.value}",
+                _("Config type: '{config_type}'").format(
+                    config_type=config.config_type.value,
+                ),
             ]
             if x is not None
         ]

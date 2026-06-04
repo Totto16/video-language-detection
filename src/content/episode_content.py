@@ -75,11 +75,13 @@ class EpisodeContent(Content):
             name_parser,
         )
         if description is None:
-            msg = f"Couldn't get EpisodeDescription from '{path}'"
+            msg = _("Couldn't get EpisodeDescription from '{path}'").format(path=path)
             raise NameError(msg, name="EpisodeDescription")
 
         if description.episode < 1:
-            msg = f"EpisodeDescription is invalid, episode number is < 1: {description} -> '{path}'"
+            msg = _(
+                "EpisodeDescription is invalid, episode number is < 1: {description} -> '{path}'"  # noqa: COM812
+            ).format(description=description, path=path)
             raise NameError(msg, name="EpisodeDescription")
 
         return EpisodeContent(
@@ -142,7 +144,9 @@ class EpisodeContent(Content):
             return SkipHandle()
 
         if len(handles) != 2:
-            msg = f"Length of handles is invalid, expected 2 but got {len(handles)}"
+            msg = _("Length of handles is invalid, expected 2 but got {length}").format(
+                length=len(handles),
+            )
             logger.warning(msg)
             return None
 

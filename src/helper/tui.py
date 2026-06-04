@@ -103,13 +103,18 @@ def launch_tui(
     general_info: list[str] = [
         x
         for x in [
-            f"Config: {config.config_name}",
+            _("Config: '{config_name}'").format(config_name=config.config_name),
             (
                 None
                 if config_paramaters is None
-                else f"Config progress: {config_paramaters[0]+1} / {config_paramaters[1]}"
+                else _("Config progress: {start} / {end}").format(
+                    start=config_paramaters[0] + 1,
+                    end=config_paramaters[1],
+                )
             ),
-            f"Config type: {config.config_type.value}",
+            _("Config type: '{config_type}'").format(
+                config_type=config.config_type.value,
+            ),
         ]
         if x is not None
     ]
