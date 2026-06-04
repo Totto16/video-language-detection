@@ -141,12 +141,13 @@ def launch_tui(
 
     Validator.validate_multiple(validators, contents)
 
-    language_summary, metadata_summary = Summary.combine_summaries(
-        content.summary() for content in contents
+    language_summary, metadata_summary, video_metadata_summary = (
+        Summary.combine_summaries(content.summary() for content in contents)
     )
 
     scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
     logger.info(language_summary)
     logger.info(metadata_summary)
+    logger.info(video_metadata_summary)
     logger.info(scan_summary)

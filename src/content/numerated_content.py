@@ -95,7 +95,7 @@ class NumeratedContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        return Summary(languages=[], metadatas=[], descriptions=[])
+        return Summary(languages=[], metadatas=[], video_metadata=[], descriptions=[])
         # TODO
         # return Summary.construct_for_episode(
         #    self.__language,

@@ -36,6 +36,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
+from content import video_metadata
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
 from content.language import Language, LongLanguageStr
@@ -54,7 +55,13 @@ from content.language_picker import (
 from content.metadata.config import get_metadata_scanner_from_config
 from content.prediction import PredictionBest
 from content.scanner import get_scanner_from_config
-from content.summary import LanguageDict, MetadataDict, MetadataSubDict, Summary
+from content.summary import (
+    LanguageDict,
+    MetadataDict,
+    MetadataSubDict,
+    Summary,
+    VideoMetadataDict,
+)
 from helper.base import (
     AnyType,
     parse_contents,
@@ -1112,6 +1119,7 @@ class SummaryData:
     language: LanguageDict
     metadata: MetadataDict
     details: ScanSummaryDetailed
+    video_metadata: VideoMetadataDict
 
 
 # TODO: use the short string
@@ -1141,11 +1149,19 @@ class ScanSummaryDetailedSerializable(pydantic.BaseModel):
     failure: dict[str, int]
 
 
+class VideoMetadataDictSerializable(pydantic.BaseModel):
+    model_config = DEFAULT_MODEL_CONFIG
+
+    ok: int
+    missing: int
+
+
 class SummaryDataSerializable(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
     language: LanguageDictSerializable
     metadata: MetadataDictSerializable
+    video_metadata: VideoMetadataDictSerializable
     details: ScanSummaryDetailedSerializable
 
 
@@ -1179,12 +1195,19 @@ def metadata_dict_to_serializable_data(
     )
 
 
+def video_metadata_dict_to_serializable_data(
+    obj: VideoMetadataDict,
+) -> VideoMetadataDictSerializable:
+    return cast(VideoMetadataDictSerializable, {k.value: v for k, v in obj.items()})
+
+
 def summary_tuple_to_serializable_data(
     summary: SummaryData,
 ) -> SummaryDataSerializable:
     return SummaryDataSerializable(
         language=language_dict_to_serializable_data(summary.language),
         metadata=metadata_dict_to_serializable_data(summary.metadata),
+        video_metadata=video_metadata_dict_to_serializable_data(summary.video_metadata),
         details=scan_summary_detailed_to_serializable_data(summary.details),
     )
 
@@ -1535,8 +1558,8 @@ class BackendScanner:
 
         Validator.validate_multiple(validators, contents)
 
-        language_summary, metadata_summary = Summary.combine_summaries(
-            content.summary() for content in contents
+        language_summary, metadata_summary, video_metadata_summary = (
+            Summary.combine_summaries(content.summary() for content in contents)
         )
 
         scan_summary = language_scanner.summary_manager.get_detailed_summary()
@@ -1544,6 +1567,7 @@ class BackendScanner:
         return SummaryData(
             language=language_summary,
             metadata=metadata_summary,
+            video_metadata=video_metadata_summary,
             details=scan_summary,
         )
 

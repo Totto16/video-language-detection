@@ -124,9 +124,10 @@ class EpisodeContent(Content):
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
         return Summary.construct_for_episode(
-            self.__language,
-            self.metadata,
-            self.__description,
+            language=self.__language,
+            metadata=self.metadata,
+            description=self.__description,
+            video_metadata=self.__video_metadata,
             detailed=detailed,
         )
 
@@ -148,6 +149,7 @@ class EpisodeContent(Content):
         return (handles[0], handles[1])
 
     def __reset_metadata_of_file(self: Self) -> None:
+        print("RESET OF THE METADATA")
         self.__language = Language.get_default()
         self.scanned_file.reset_file_data()
         self.__video_metadata = None
