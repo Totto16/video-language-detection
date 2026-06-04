@@ -1,8 +1,21 @@
 import struct
 from collections.abc import Generator
+from contextlib import AbstractContextManager
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Any, Literal, Optional, Self
+from types import TracebackType
+from typing import Any, Literal, Optional, Self, override
+
+from content.language import Alpha3LanguageStr, Language
+from content.tagger.video_tagger import (
+    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    VideoTagger,
+    VideoTaggerWriter,
+)
+from helper.manager import CounterInterface, ManagerInterface
+from helper.translation import get_translator
+
+_ = get_translator()
 
 
 def read_checked(f: BufferedIOBase, amount: int) -> bytes:
@@ -668,29 +681,96 @@ def find_mdhd_boxes_with_type(
                 stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
 
 
-def list_languages(path: Path) -> list[tuple[int, str]]:
-    result: list[tuple[int, str]] = []
+class VideoTaggerWriterMp4(VideoTaggerWriter):
+    __writer: BufferedIOBase
 
-    types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+    def __init__(
+        self: Self,
+        manager: ManagerInterface,
+        writer: BufferedIOBase,
+    ) -> None:
+        super().__init__(manager)
+        self.__writer = writer
 
-    with path.open("rb") as f:
+    @override
+    def write_metadata(
+        self: Self,
+        comment: list[str],
+        language: Language,
+        metadata: dict[str, str],
+    ) -> None:
+        types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
 
-        for i, mdhd in enumerate(find_mdhd_boxes_with_type(f, types), start=1):
-            lang = mdhd.read_language(f)
-            result.append((i, lang))
+        new_language = language.to_alpha3()
 
-    return result
+        total = 0
+
+        # read the file, so that we check if we can parse it correctly
+        for mdhd in find_mdhd_boxes_with_type(self.__writer, types):
+            total = total + 1
+            lang = mdhd.read_language(self.__writer)
+            # check if this lang is valid
+            validated_lang = Alpha3LanguageStr.from_str(lang)
+
+            if validated_lang is None:
+                msg = _("Invalid language in mp4 detected: {lang}").format(
+                    lang=lang,
+                )
+                raise RuntimeError(msg)
+
+        bar: CounterInterface = self.__manager.counter(
+            total=float(total),
+            desc="update mp4 language",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
+        try:
+            self.__writer.seek(0)
+            for mdhd in find_mdhd_boxes_with_type(self.__writer, types):
+                mdhd.patch_language(self.__writer, str(new_language))
+                bar.update(1, force=True)
+        finally:
+            bar.close(clear=True)
 
 
-def patch_languages(path: Path, new_language: str) -> list[tuple[int, str]]:
-    result: list[tuple[int, str]] = []
+class VideoTaggerMp4(VideoTagger):
+    def __init__(self: Self, file: Path) -> None:
+        super().__init__(file)
 
-    types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+    @override
+    def writer(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerWriter]:
 
-    with path.open("rb+") as f:
-        for i, mdhd in enumerate(find_mdhd_boxes_with_type(f, types), start=1):
-            old = mdhd.read_language(f)
-            mdhd.patch_language(f, new_language)
-            result.append((i, old))
+        file = self.file
 
-    return result
+        class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
+            __writer: Optional[BufferedIOBase]
+
+            def __init__(self: Self) -> None:
+                super().__init__()
+                self.__writer = None
+
+            @override
+            def __enter__(self: Self) -> VideoTaggerWriter:
+                self.__writer = file.open("rb+")
+
+                return VideoTaggerWriterMp4(manager, self.__writer)
+
+            @override
+            def __exit__(
+                self: Self,
+                _exc_type: Optional[type[BaseException]],
+                _exc_val: Optional[BaseException],
+                _exc_tb: Optional[TracebackType],
+            ) -> Literal[False]:  # actually bool
+                if self.__writer is not None:
+                    self.__writer.close()
+                return False
+
+        return VideoTaggerWriterCtx()

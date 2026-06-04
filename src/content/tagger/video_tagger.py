@@ -39,6 +39,10 @@ class VideoTaggerWriter(ABC):
         metadata: dict[str, str],
     ) -> None: ...
 
+    @property
+    def manager(self: Self) -> ManagerInterface:
+        return self.__manager
+
 
 VideoTagger__HandleResult = Result["VideoTagger", str]
 
@@ -55,6 +59,10 @@ class VideoTagger(ABC):
         self: Self,
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerWriter]: ...
+
+    @property
+    def file(self: Self) -> Path:
+        return self.__file
 
 
 class VideoTaggerWriterMultiple(VideoTaggerWriter):
@@ -87,7 +95,7 @@ class VideoTaggerMultiple(VideoTagger):
         super().__init__(file)
         self.__tagger = tagger
 
-    @abstractmethod
+    @override
     def writer(
         self: Self,
         manager: ManagerInterface,

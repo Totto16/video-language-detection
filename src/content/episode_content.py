@@ -32,6 +32,7 @@ from content.language import Language
 from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
 from content.shared import ScanType
 from content.summary import Summary
+from content.tagger.tagger import get_tagger_for_file
 from content.video_metadata import VideoMetadata
 from helper.apischema import narrow_type
 from helper.error import ErrorMode
@@ -39,7 +40,6 @@ from helper.log import get_logger
 from helper.manager import CounterInterface, ManagerInterface
 from helper.translation import get_translator
 from helper.version import PROGRAM_VERSION
-from content.tagger.video_tagger import VideoTagger
 
 logger: Logger = get_logger()
 _ = get_translator()
@@ -198,7 +198,7 @@ class EpisodeContent(Content):
         def write_file_metadata() -> None:
             nonlocal changed_file
 
-            handle_result = VideoTagger.get_handle(self.scanned_file.path)
+            handle_result = get_tagger_for_file(self.scanned_file.path)
             if handle_result.is_err():
                 logger.error(
                     _("Can't tag the file '{file}': {reason}").format(
