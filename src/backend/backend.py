@@ -36,10 +36,9 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
-from content import video_metadata
 from content.base_class import Content, LanguageScanner, Scanner, ScanSummaryDetailed
 from content.general import NameParser
-from content.language import Language, LongLanguageStr
+from content.language import Language
 from content.language_picker import (
     ChoiceColor,
     ChoiceInterface,
@@ -1122,8 +1121,7 @@ class SummaryData:
     video_metadata: VideoMetadataDict
 
 
-# TODO: use the short string
-type LanguageDictSerializable = dict[LongLanguageStr, int]
+type LanguageDictSerializable = dict[str, int]
 
 
 class MetadataSubDictSerializable(pydantic.BaseModel):
@@ -1168,7 +1166,7 @@ class SummaryDataSerializable(pydantic.BaseModel):
 def language_dict_to_serializable_data(
     language_dict: LanguageDict,
 ) -> LanguageDictSerializable:
-    return {k.long: v for k, v in language_dict.items()}
+    return {str(k.short): v for k, v in language_dict.items()}
 
 
 def scan_summary_detailed_to_serializable_data(
