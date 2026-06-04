@@ -35,7 +35,6 @@ prompt-toolkit = "*"
 questionary = "*"
 colorlog = "*"
 pyperclip = "*"
-mutagen = "*"
 annotated-types = "*"
 
 # fastapi for the backend, using standard feature / configuration
@@ -46,6 +45,9 @@ websockets = "*"
 ## generic opencl
 pyopencl = "*"
 siphash24 = "*"
+
+# video tag creation
+mutagen = "*"
 
 ##no dedicated gpu
 [integrated]
