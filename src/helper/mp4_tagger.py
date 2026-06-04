@@ -1,8 +1,9 @@
+from operator import add
 import struct
 from collections.abc import Generator
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Any, Literal, Optional, Self
+from typing import Any, Literal, Optional, Self, override
 
 
 def read_checked(f: BufferedIOBase, amount: int) -> bytes:
@@ -132,20 +133,17 @@ SOUN_ATOM_NAME: ISOAtomName = ISOAtomName(b"soun")
 HDLR_ATOM_NAME: ISOAtomName = ISOAtomName(b"hdlr")
 
 
-class MP4Box:
-    type: ISOAtomName
+class BoxSpan:
     start: int
     size: int
     header_size: int
 
     def __init__(
         self: Self,
-        typ: ISOAtomName,
         start: int,
         size: int,
         header_size: int,
     ) -> None:
-        self.type = typ
         self.start = start
         self.size = size
         self.header_size = header_size
@@ -155,24 +153,39 @@ class MP4Box:
             raise RuntimeError(msg)
 
         if self.size < self.header_size:
-            msg = f"Invalid box size {self.size} for {self.type!r} at {self.start}"
-            raise RuntimeError(msg)
-
-        if self.type == CMOV_ATOM_NAME:
-            msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
-            raise RuntimeError(msg)
-
-        if self.type == MOOF_ATOM_NAME:
-            msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
+            msg = f"Invalid box size {self.size} at {self.start}"
             raise RuntimeError(msg)
 
     @property
-    def end(self) -> int:
+    def end(self: Self) -> int:
         return self.start + self.size
 
     @property
-    def payload_start(self) -> int:
+    def payload_start(self: Self) -> int:
         return self.start + self.header_size
+
+    @property
+    def payload_size(self: Self) -> int:
+        return self.size - self.header_size
+
+    def add_header_size(self: Self, header_size: int) -> None:
+        self.header_size = self.header_size + header_size
+        if self.size < self.header_size:
+            msg = f"Invalid box size {self.size} at {self.start}"
+            raise RuntimeError(msg)
+
+
+class MP4Box:
+    type: ISOAtomName
+    span: BoxSpan
+
+    def __init__(
+        self: Self,
+        typ: ISOAtomName,
+        span: BoxSpan,
+    ) -> None:
+        self.type = typ
+        self.span = span
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4Box":
@@ -180,7 +193,7 @@ class MP4Box:
         # MP4 atom / ISO box structure:
         # size | 4 bytes | unsigned integer
         # type | 4 bytes | char[4]
-        # ..., extension, dependent on size
+        # ... extension, dependent on size
 
         # aligned(8) class Box (
         #     unsigned int(32) boxtype,
@@ -207,7 +220,15 @@ class MP4Box:
         size, typ = Unpacker.unpack_default_sized("I4s", hdr, size=2)
 
         if typ == UUID_ATOM_NAME:
-            msg = "'uuid' type not implemented, the box size differs"
+            msg = "'uuid' type not implemented, the box header size differs with that type"
+            raise RuntimeError(msg)
+
+        if typ == CMOV_ATOM_NAME:
+            msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
+            raise RuntimeError(msg)
+
+        if typ == MOOF_ATOM_NAME:
+            msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
             raise RuntimeError(msg)
 
         if size == 1:
@@ -219,28 +240,17 @@ class MP4Box:
                 msg = f"Invalid extended box size {largesize}"
                 raise RuntimeError(msg)
 
-            return MP4Box(typ, offset, largesize, header_size=16)
+            span = BoxSpan(offset, largesize, header_size=16)
+            return MP4Box(typ, span)
 
         if size == 0:
             f.seek(0, 2)
             eof = f.tell()
-            return MP4Box(typ, offset, eof - offset, 8)
+            span = BoxSpan(offset, eof - offset, header_size=8)
+            return MP4Box(typ, span)
 
-        return MP4Box(typ, offset, size, header_size=8)
-
-    @staticmethod
-    def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator["MP4Box"]:
-        pos = start
-
-        while pos < end:
-            box = MP4Box.read_from_stream(f, pos)
-
-            if pos + box.size > end:
-                msg = f"Box {box.type!r} at {pos} extends past parent boundary"
-                raise RuntimeError(msg)
-
-            yield box
-            pos += box.size
+        span = BoxSpan(offset, largesize, header_size=8)
+        return MP4Box(typ, span)
 
 
 class MP4FullBox(MP4Box):
@@ -248,7 +258,8 @@ class MP4FullBox(MP4Box):
     flags: bytes
 
     def __init__(self: Self, parent: MP4Box, version: int, flags: bytes) -> None:
-        super().__init__(parent.type, parent.start, parent.size, parent.header_size)
+        super().__init__(parent.type, parent.span)
+
         self.version = version
         self.flags = flags
 
@@ -256,7 +267,7 @@ class MP4FullBox(MP4Box):
     def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MP4FullBox":
         # spec: ISO/IEC 14496-12
         # ISO full box structure:
-        # box     | header_size bytes | parent box
+        # box     | <box size> bytes | parent box
         # version | 1 byte | unsigned char
         # flags   | 3 bytes | unsigned char[3]
 
@@ -269,11 +280,13 @@ class MP4FullBox(MP4Box):
         #     bit(24) flags = f;
         # }
 
-        f.seek(parent.payload_start)
+        f.seek(parent.span.payload_start)
 
         version = read_checked(f, 1)[0]
 
         flags = read_checked(f, 3)
+
+        parent.span.add_header_size(4)
 
         return MP4FullBox(parent, version, flags)
 
@@ -283,32 +296,138 @@ class MP4FullBox(MP4Box):
         return MP4FullBox.__read_from_stream_impl(f, box)
 
 
-CONTAINER_BOXES: set[ISOAtomName] = {
-    MOOV_ATOM_NAME,
-    TRAK_ATOM_NAME,
-    MDIA_ATOM_NAME,
-    MINF_ATOM_NAME,
-    STBL_ATOM_NAME,
-    EDTS_ATOM_NAME,
-    DINF_ATOM_NAME,
-    UDTA_ATOM_NAME,
-    META_ATOM_NAME,
-    MOOF_ATOM_NAME,
-    TRAF_ATOM_NAME,
-    MFRA_ATOM_NAME,
-}
+class MHDBox(MP4FullBox):
+    language_offset: int
 
-
-class MHDBox(MP4Box):
-    def __init__(self: Self, parent: MP4Box) -> None:
-        super().__init__(parent.type, parent.start, parent.size, parent.header_size)
+    def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
+        super().__init__(parent, parent.version, parent.flags)
+        self.language_offset = language_offset
 
     @staticmethod
-    def get_from_normal_box(box: MP4Box) -> "MHDBox":
-        if box.type != MDHD_ATOM_NAME:
-            msg = f"Invalid MHDBox box with type: {box.type!s}"
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4FullBox) -> "MHDBox":
+        # spec: ISO/IEC 14496-12
+        # ISO media box structure:
+        # full_box     | <full box size> bytes | parent full box
+        # ... data, dependent on version
+
+        # aligned(8) class MediaHeaderBox
+        # extends FullBox(
+        #     ‘mdhd’,
+        #     version,
+        #     0
+        # ) {
+        #     if (version==1) {
+        #         unsigned int(64) creation_time;
+        #         unsigned int(64) modification_time;
+        #         unsigned int(32) timescale;
+        #         unsigned int(64) duration;
+        #     } else { # version==0
+        #         unsigned int(32) creation_time;
+        #         unsigned int(32) modification_time;
+        #         unsigned int(32) timescale;
+        #         unsigned int(32) duration;
+        #     }
+        #     bit(1) pad = 0;
+        #     unsigned int(5)[3] language;
+        #     # ISO-639-2/T language code
+        #     unsigned int(16) pre_defined = 0;
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        version_dependend_size: int
+
+        if parent.version == 0:
+            version_dependend_size = 4 + 4 + 4 + 4
+        elif parent.version == 1:
+            additional_header_size = 1
+            version_dependend_size = 8 + 8 + 4 + 8
+        else:
+            msg = "Invalid mdhd version"
             raise RuntimeError(msg)
-        return MHDBox(box)
+
+        additional_header_size = version_dependend_size + (2 + 2)
+
+        if parent.span.payload_size < additional_header_size:
+            msg = f"Truncated mdhd header {parent.span.payload_size} < {additional_header_size}"
+            raise RuntimeError(msg)
+
+        language_offset = parent.span.header_size + version_dependend_size
+
+        if parent.span.start + language_offset + 2 > parent.span.end:
+            msg = "Language field outside mdhd bounds"
+            raise RuntimeError(msg)
+
+        parent.span.add_header_size(additional_header_size)
+
+        return MHDBox(parent, language_offset)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MHDBox":
+        box = MP4FullBox.read_from_stream(f, offset)
+        return MHDBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def decode_language(value: int) -> str:
+        chars = []
+
+        for shift in (10, 5, 0):
+            v = (value >> shift) & 0x1F
+
+            if v < 1 or v > 26:
+                msg = f"Invalid ISO639 character value {v}"
+                raise RuntimeError(msg)
+
+            chars.append(chr(v + 0x60))
+
+        return "".join(chars)
+
+    @staticmethod
+    def encode_language(code: str) -> int:
+        if len(code) != 3:
+            msg = "language code must be 3 characters"
+            raise ValueError(msg)
+
+        code = code.lower()
+
+        value = 0
+        for ch in code:
+            n = ord(ch) - 0x60
+            if not (1 <= n <= 26):
+                msg = f"invalid language character: {ch}"
+                raise ValueError(msg)
+            value = (value << 5) | n
+
+        return value
+
+    def read_language(self: Self, f: BufferedIOBase) -> str:
+        f.seek(self.span.start + self.language_offset)
+
+        lang_bytes = read_checked(f, 2)
+        packed = Unpacker.unpack_default_one("H", lang_bytes)
+
+        return MHDBox.decode_language(packed)
+
+    def patch_language(self: Self, f: BufferedIOBase, new_language: str) -> None:
+        packed = MHDBox.encode_language(new_language)
+
+        f.seek(self.span.start + self.language_offset)
+
+        packed_bytes = struct.pack(">H", packed)
+        if len(packed_bytes) != 2:
+            msg = "packed bytes are not of correct size"
+            raise RuntimeError(msg)
+
+        f.write(packed_bytes)
+        f.flush()
+
+        f.seek(self.span.start + self.language_offset)
+        verify_bytes = read_checked(f, 2)
+        verify = Unpacker.unpack_default_one("H", verify_bytes)
+
+        if verify != packed:
+            msg = "Invalid overwrite"
+            raise RuntimeError(msg)
 
     @staticmethod
     def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MHDBox"]:
@@ -349,119 +468,10 @@ class MHDBox(MP4Box):
                 if box.type in CONTAINER_BOXES:
                     stack.append((box.payload_start, box.end, [*path, box.type]))
 
-    @staticmethod
-    def decode_language(value: int) -> str:
-        chars = []
-
-        for shift in (10, 5, 0):
-            v = (value >> shift) & 0x1F
-
-            if v < 1 or v > 26:
-                msg = f"Invalid ISO639 character value {v}"
-                raise RuntimeError(msg)
-
-            chars.append(chr(v + 0x60))
-
-        return "".join(chars)
-
-    @staticmethod
-    def encode_language(code: str) -> int:
-        if len(code) != 3:
-            msg = "language code must be 3 characters"
-            raise ValueError(msg)
-
-        code = code.lower()
-
-        value = 0
-        for ch in code:
-            n = ord(ch) - 0x60
-            if not (1 <= n <= 26):
-                msg = f"invalid language character: {ch}"
-                raise ValueError(msg)
-            value = (value << 5) | n
-
-        return value
-
-    def read_mdhd_language(self: Self, f: BufferedIOBase) -> tuple[int, str]:
-        f.seek(self.payload_start)
-
-        # TODO: full box!
-        version = read_checked(f, 1)[0]
-
-        # TODO: define the structs for the size!
-        MIN_MDHD_V0 = 24
-        MIN_MDHD_V1 = 36
-
-        payload_size = self.size - self.header_size
-
-        if version == 0:
-            if payload_size < MIN_MDHD_V0:
-                raise RuntimeError("Truncated mdhd v0")
-        elif version == 1:
-            if payload_size < MIN_MDHD_V1:
-                raise RuntimeError("Truncated mdhd v1")
-        else:
-            msg = "Invalid mdhd version"
-            raise RuntimeError(msg)
-
-        # flags
-        read_checked(f, 3)
-
-        if version == 1:
-            language_offset = self.payload_start + 4 + 8 + 8 + 4 + 8
-        elif version == 0:
-            language_offset = self.payload_start + 4 + 4 + 4 + 4 + 4
-        else:
-            msg = "Invalid mdhd version"
-            raise RuntimeError(msg)
-
-        if language_offset + 2 > self.end:
-            msg = "Language field outside mdhd bounds"
-            raise RuntimeError(msg)
-
-        f.seek(language_offset)
-
-        lang_bytes = read_checked(f, 2)
-        packed = Unpacker.unpack_default_one("H", lang_bytes)
-
-        return language_offset, MHDBox.decode_language(packed)
-
-    def patch_mdhd_language(self: Self, f: BufferedIOBase, new_language: str) -> str:
-        offset, old_language = self.read_mdhd_language(f)
-
-        packed = MHDBox.encode_language(new_language)
-
-        f.seek(offset)
-
-        packed_bytes = struct.pack(">H", packed)
-        if len(packed_bytes) != 2:
-            msg = "packed bytes are not of correct size"
-            raise RuntimeError(msg)
-
-        f.write(packed_bytes)
-        f.flush()
-
-        f.seek(offset)
-        verify_bytes = read_checked(f, 2)
-        verify = Unpacker.unpack_default_one("H", verify_bytes)
-
-        if verify != packed:
-            msg = "Invalid overwrite"
-            raise RuntimeError(msg)
-
-        return old_language
-
 
 class TrakBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.start, parent.size, parent.header_size)
-
-    @staticmethod
-    def get_from_normal_box(box: MP4Box) -> "TrakBox":
-        if box.type != TRAK_ATOM_NAME:
-            msg = f"Invalid TrakBox box with type: {box.type!s}"
-            raise RuntimeError(msg)
-        return TrakBox(box)
 
     def get_hdlr_type(self: Self, f: BufferedIOBase) -> Optional[bytes]:
         """
@@ -469,7 +479,7 @@ class TrakBox(MP4Box):
         """
         mdia_start = None
 
-        for box in MP4Box.iter_boxes(f, self.payload_start, end=self.end):
+        for box in iter_boxes(f, self.payload_start, end=self.end):
             if box.type == MDIA_ATOM_NAME:
                 mdia_start = box
                 break
@@ -477,13 +487,43 @@ class TrakBox(MP4Box):
         if not mdia_start:
             return None
 
-        for box in MP4Box.iter_boxes(f, mdia_start.payload_start, mdia_start.end):
+        for box in iter_boxes(f, mdia_start.payload_start, mdia_start.end):
             if box.type == HDLR_ATOM_NAME:
                 # skip version(1)+flags(3)+predefined(4)
                 f.seek(box.payload_start + 8)
                 return read_checked(f, 4)
 
         return None
+
+
+CONTAINER_BOXES: set[ISOAtomName] = {
+    MOOV_ATOM_NAME,
+    TRAK_ATOM_NAME,
+    MDIA_ATOM_NAME,
+    MINF_ATOM_NAME,
+    STBL_ATOM_NAME,
+    EDTS_ATOM_NAME,
+    DINF_ATOM_NAME,
+    UDTA_ATOM_NAME,
+    META_ATOM_NAME,
+    MOOF_ATOM_NAME,
+    TRAF_ATOM_NAME,
+    MFRA_ATOM_NAME,
+}
+
+
+def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator["MP4Box"]:
+    pos = start
+
+    while pos < end:
+        box = MP4Box.read_from_stream(f, pos)
+
+        if pos + box.span.size > end:
+            msg = f"Box {box.type!r} at {pos} extends past parent boundary"
+            raise RuntimeError(msg)
+
+        yield box
+        pos += box.span.size
 
 
 def list_languages(path: Path) -> list[tuple[int, str]]:
