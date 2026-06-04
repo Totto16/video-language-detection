@@ -1,8 +1,9 @@
-from enum import StrEnum
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal, NewType, Optional, Self
+from enum import StrEnum
+from functools import reduce
+from typing import Annotated, Any, NewType, Optional, Self, assert_never, cast
 
 from annotated_types import GroupedMetadata, Len, Predicate
 from apischema import (
@@ -13,7 +14,7 @@ from apischema import (
     type_name,
 )
 
-from content.iso_codes import valid_iso_languages_list
+from content.iso_codes import Iso_3Alpha, valid_iso_languages_list
 from helper.apischema import OneOf, use_schema_from
 from helper.translation import get_translator
 
@@ -78,7 +79,22 @@ class Alpha3LanguageStr:
             return None
 
         if valid_check:
-            allowed_short_names = [entry[0] for entry in valid_iso_languages_list]
+
+            def extract_names(acc: list[str], inp: Iso_3Alpha) -> list[str]:
+                if isinstance(inp, str):
+                    acc.append(inp)
+                    return acc
+                if isinstance(inp, tuple):
+                    acc.extend([inp[0], inp[1]])
+                    return acc
+
+                assert_never(inp)
+
+            allowed_short_names: list[str] = reduce(
+                extract_names,
+                [entry[0] for entry in valid_iso_languages_list],
+                cast(list[str], []),
+            )
             if val not in allowed_short_names:
                 msg = _(
                     "Short Language string is invalid according to ISO (3 alpha): '{short}'"  # noqa: COM812
@@ -198,7 +214,9 @@ class Alpha2LanguageStr:
             return None
 
         if valid_check:
-            allowed_short_names = [entry[1] for entry in valid_iso_languages_list]
+            allowed_short_names: list[Optional[str]] = [
+                entry[1] for entry in valid_iso_languages_list
+            ]
             if val not in allowed_short_names:
                 msg = _(
                     "Short Language string is invalid according to ISO (2 alpha): '{short}'"  # noqa: COM812
@@ -387,7 +405,9 @@ class Language:
             return None
 
         if valid_check:
-            allowed_long_names = [entry[2] for entry in valid_iso_languages_list]
+            allowed_long_names: list[str] = [
+                entry[2] for entry in valid_iso_languages_list
+            ]
             if long not in allowed_long_names:
                 msg = _(
                     "Long Language string is invalid according to ISO: '{long}'"  # noqa: COM812
