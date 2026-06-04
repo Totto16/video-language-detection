@@ -2,7 +2,7 @@ import struct
 from collections.abc import Generator
 from io import BufferedIOBase
 from pathlib import Path
-from typing import Optional, Self
+from typing import Any, Literal, Optional, Self
 
 
 def read_checked(f: BufferedIOBase, amount: int) -> bytes:
@@ -18,6 +18,61 @@ def read_checked(f: BufferedIOBase, amount: int) -> bytes:
     return value
 
 
+BytesOrder = Literal[
+    "@",
+    "=",
+    "<",
+    ">",
+    "!",
+]
+
+
+class Unpacker:
+
+    @staticmethod
+    def __unpack_impl(
+        byte_order: BytesOrder,
+        formats: str,
+        value: bytes,
+    ) -> tuple[Any, ...]:
+
+        fmt: str = f"{byte_order}{formats}"
+
+        size = struct.calcsize(fmt)
+
+        if len(value) != size:
+            msg = f"Unpacking has wrong input: expected bytes with size {size} but got {len(value)}"
+            raise RuntimeError(msg)
+
+        return struct.unpack(fmt, value)
+
+    @staticmethod
+    def unpack_default(
+        formats: str,
+        value: bytes,
+    ) -> tuple[Any, ...]:
+        return Unpacker.__unpack_impl(">", formats, value)
+
+    @staticmethod
+    def unpack_default_sized(formats: str, value: bytes, size: int) -> tuple[Any, ...]:
+        result = Unpacker.unpack_default(formats, value)
+
+        if len(result) != size:
+            msg = f"Expected unpack to produce {size} values, but got {len(result)}"
+            raise RuntimeError(msg)
+
+        return result
+
+    @staticmethod
+    def unpack_default_one(
+        formats: str,
+        value: bytes,
+    ) -> Any:
+        result = Unpacker.unpack_default_sized(formats, value, size=1)
+
+        return result[0]
+
+
 class MP4Box:
     type: bytes
     start: int
@@ -25,12 +80,32 @@ class MP4Box:
     header_size: int
 
     def __init__(
-        self: Self, typ: bytes, start: int, size: int, header_size: int,
+        self: Self,
+        typ: bytes,
+        start: int,
+        size: int,
+        header_size: int,
     ) -> None:
         self.type = typ
         self.start = start
         self.size = size
         self.header_size = header_size
+
+        if self.size < 8:
+            msg = f"Invalid box: sitze too small: {self.size}"
+            raise RuntimeError(msg)
+
+        if self.size < self.header_size:
+            msg = f"Invalid box size {self.size} for {self.type!r} at {self.start}"
+            raise RuntimeError(msg)
+
+        if self.type == b"cmov":
+            msg = "Compressed movie box (cmov) not supported"
+            raise RuntimeError(msg)
+
+        if self.type == b"moof":
+            msg = "Fragmented MP4 (moof) not supported"
+            raise RuntimeError(msg)
 
     @property
     def end(self) -> int:
@@ -46,12 +121,12 @@ class MP4Box:
 
         hdr = read_checked(f, 8)
 
-        size, typ = struct.unpack(">I4s", hdr)
+        size, typ = Unpacker.unpack_default_sized("I4s", hdr, size=2)
 
         if size == 1:
             ext = read_checked(f, 8)
 
-            largesize = struct.unpack(">Q", ext)[0]
+            largesize = Unpacker.unpack_default_one("Q", ext)
 
             if largesize < 16:
                 msg = f"Invalid extended box size {largesize}"
@@ -89,22 +164,10 @@ def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
     while pos < end:
         box = MP4Box.read_from_stream(f, pos)
 
-        if box.size < 8:
-            raise RuntimeError(f"Invalid box")
-
-        if box.size < box.header_size:
-            raise RuntimeError(f"Invalid box size {box.size} for {box.type!r} at {pos}")
-
         if pos + box.size > end:
             raise RuntimeError(
                 f"Box {box.type!r} at {pos} extends past parent boundary"
             )
-
-        if box.type == b"cmov":
-            raise RuntimeError("Compressed movie box (cmov) not supported")
-
-        if box.type == b"moof":
-            raise RuntimeError("Fragmented MP4 (moof) not supported")
 
         yield box
         pos += box.size
@@ -234,7 +297,7 @@ class MHDBox(MP4Box):
         f.seek(language_offset)
 
         lang_bytes = read_checked(f, 2)
-        packed = struct.unpack(">H", lang_bytes)[0]
+        packed = Unpacker.unpack_default_one("H", lang_bytes)
 
         return language_offset, MHDBox.decode_language(packed)
 
@@ -244,12 +307,18 @@ class MHDBox(MP4Box):
         packed = MHDBox.encode_language(new_language)
 
         f.seek(offset)
-        f.write(struct.pack(">H", packed))
+
+        packed_bytes = struct.pack(">H", packed)
+        if len(packed_bytes) != 2:
+            msg = "packed bytes are not of correct size"
+            raise RuntimeError(msg)
+
+        f.write(packed_bytes)
         f.flush()
 
         f.seek(offset)
         verify_bytes = read_checked(f, 2)
-        verify = struct.unpack(">H", verify_bytes)[0]
+        verify = Unpacker.unpack_default_one("H", verify_bytes)
 
         if verify != packed:
             msg = "Invalid overwrite"
