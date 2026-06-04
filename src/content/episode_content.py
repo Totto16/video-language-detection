@@ -39,7 +39,7 @@ from helper.log import get_logger
 from helper.manager import CounterInterface, ManagerInterface
 from helper.translation import get_translator
 from helper.version import PROGRAM_VERSION
-from helper.video_tagger import VideoTagger
+from content.tagger.video_tagger import VideoTagger
 
 logger: Logger = get_logger()
 _ = get_translator()

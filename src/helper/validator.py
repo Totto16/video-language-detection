@@ -104,7 +104,9 @@ class Validator[ED, SD, S2D, CD](ABC):
         self.__reporter.emit_error(self.__name, where, message)
 
     def __validate_seasons_impl(
-        self: Self, series: SeriesDescription, contents: list[SeasonContent],
+        self: Self,
+        series: SeriesDescription,
+        contents: list[SeasonContent],
     ) -> list[SD]:
         state: list[SD] = []
 
@@ -170,18 +172,19 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> list[list["Validator.__Any2"]]:
         state: list[list[Validator.__Any2]] = []
 
-        for content in contents:
-            local_states: list[list[Validator.__Any1]] = [
-                [
-                    validator.validate_episode(
-                        episode,
-                        series=series,
-                        season=content.description,
-                    )
-                    for episode in content.episodes
-                ]
-                for validator in validators
-            ]
+        for validator in validators:
+            local_states: list[list[Validator.__Any1]] = []
+            for content in contents:
+                local_states.append(
+                    [
+                        validator.validate_episode(
+                            episode,
+                            series=series,
+                            season=content.description,
+                        )
+                        for episode in content.episodes
+                    ],
+                )
 
             state.append(
                 [
@@ -343,7 +346,10 @@ class LanguageValidator(Validator[None, None, None, None]):
 
     @override
     def validate_season(
-        self: Self, season: SeasonContent, series: SeriesDescription, result: list[None],
+        self: Self,
+        season: SeasonContent,
+        series: SeriesDescription,
+        result: list[None],
     ) -> None:
         pass
 

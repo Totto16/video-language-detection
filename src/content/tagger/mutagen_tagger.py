@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from logging import Logger
 from pathlib import Path
 from types import TracebackType
 from typing import BinaryIO, Literal, Optional, Self, assert_never, override
@@ -13,12 +12,15 @@ from mutagen import mp4
 from mutagen._util import MutagenError
 
 from content.language import Language
-from helper.log import get_logger
+from content.tagger.video_tagger import (
+    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    VideoTagger,
+    VideoTagger__HandleResult,
+    VideoTaggerWriter,
+)
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
-from helper.result import Result
 from helper.translation import get_translator
 
-logger: Logger = get_logger()
 _ = get_translator()
 
 
@@ -325,16 +327,9 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
-VIDEO_FILE_TAG_UPDATE_BAR_FORMAT: str = (
-    "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:!.2j}{unit} / {total:!.2j}{unit} "
-    "[{elapsed}<{eta}, {rate:!.2j}{unit}/s]"
-)
-
-
-class VideoTaggerWriter:
+class VideoTaggerWriterMutagen(VideoTaggerWriter):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
-    __manager: ManagerInterface
 
     def __init__(
         self: Self,
@@ -342,9 +337,9 @@ class VideoTaggerWriter:
         instance: mutagen.FileType,
         manager: ManagerInterface,
     ) -> None:
+        super().__init__(manager)
         self.__instance = instance
         self.__filething = filething
-        self.__manager = manager
 
     def __save_impl(self: Self) -> None:
         total: int = self.__filething.size()
@@ -400,6 +395,7 @@ class VideoTaggerWriter:
         finally:
             bar.close(clear=True)
 
+    @override
     def write_metadata(
         self: Self,
         comment: list[str],
@@ -426,33 +422,7 @@ class VideoTaggerWriter:
         self.__save_impl()
 
 
-VideoTagger__HandleResult = Result["VideoTagger", str]
-
-
-def mkv():
-    from pymkv import (
-        MKVFile,
-        get_iso639_2,
-        languages_match,
-        language_equivalents,
-        normalize_language,
-    )
-
-    get_iso639_2("English")        # "eng"
-    get_iso639_2("fra")            # "fre"  (canonical /B)
-    normalize_language("zh-Hans")  # "chi"  (BCP 47 subtag stripped)
-    languages_match("zho", "zh")   # True
-    language_equivalents("eng")    # frozenset({"eng", "en"})
-
-    # MKVTrack setter is now lenient — any recognized form is accepted and
-    # canonicalized to /B on store.
-    mkv = MKVFile("path/to/file.mkv")
-    track = mkv.tracks[1]
-    track.language = "Chinese"        # stored as "chi"
-    track.matches_language("zh")       # True (works against language_ietf too)
-    track.effective_language           # "chi" — normalized /B
-
-class VideoTagger:
+class VideoTaggerMutagen(VideoTagger):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
 
@@ -471,11 +441,11 @@ class VideoTagger:
 
         # TODO:
         # import taglib, https://pypi.org/project/pytaglib/
-        
+
         # import libgpac as gpac
 
         # taglib.File("/path/to/my/file.mp3")
-        #from pymp4.parser import Box
+        # from pymp4.parser import Box
 
         try:
 
@@ -484,7 +454,7 @@ class VideoTagger:
             if instance is None:
                 return VideoTagger__HandleResult.err(_("Not supported file type"))
 
-            return VideoTagger__HandleResult.ok(VideoTagger(filething, instance))
+            return VideoTagger__HandleResult.ok(VideoTaggerMutagen(filething, instance))
         except RuntimeError as err:
             return VideoTagger__HandleResult.err(
                 _("get tag handle {err}").format(err=err),
@@ -494,6 +464,7 @@ class VideoTagger:
                 _("get tag handle (mutagen impl error): {err}").format(err=err),
             )
 
+    @override
     def writer(
         self: Self,
         manager: ManagerInterface,
@@ -509,7 +480,7 @@ class VideoTagger:
 
             @override
             def __enter__(self: Self) -> VideoTaggerWriter:
-                return VideoTaggerWriter(
+                return VideoTaggerWriterMutagen(
                     filething=filething,
                     instance=instance,
                     manager=manager,
