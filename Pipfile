@@ -48,6 +48,7 @@ siphash24 = "*"
 
 # video tag creation
 mutagen = "*"
+pymkv2 = "*"
 
 ##no dedicated gpu
 [integrated]
