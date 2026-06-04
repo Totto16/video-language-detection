@@ -398,6 +398,9 @@
                             "$ref": "#/$defs/Alpha3LanguageStr"
                         },
                         {
+                            "$ref": "#/$defs/Alpha2LanguageStrRegional"
+                        },
+                        {
                             "type": "string",
                             "const": "no_lang"
                         }
@@ -420,6 +423,10 @@
         "Alpha3LanguageStr": {
             "type": "string",
             "pattern": "^([a-z]{3})$"
+        },
+        "Alpha2LanguageStrRegional": {
+            "type": "string",
+            "pattern": "^([a-z]{2}-[A-Z]{2})$"
         },
         "LongLanguageStr": {
             "type": "string"

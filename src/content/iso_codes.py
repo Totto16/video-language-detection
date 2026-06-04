@@ -1,17 +1,24 @@
 from typing import Optional
 
-Iso_3Alpha = str | tuple[str, str]
+Iso_3Alpha = str
+Iso_3AlphaTwoPossibilities = tuple[str, str]
 Iso_2Alpha = str
 EngName = str
 
 
-IsoLanguage = tuple[Iso_3Alpha, Optional[Iso_2Alpha], EngName, str, str]
+IsoLanguage = tuple[
+    Iso_3Alpha | Iso_3AlphaTwoPossibilities,
+    Optional[Iso_2Alpha],
+    EngName | list[EngName],
+    str,
+    str,
+]
 
 # generated from: https://www.loc.gov/standards/iso639-2/php/code_list.php
 # with the js: Array.from(document.querySelectorAll("table")[1].querySelectorAll("tr")).map(tr=>Array.from(tr.querySelectorAll("td")).map(a=>a.textContent.trim()))
 
 
-valid_iso_languages_list: list[IsoLanguage] = [
+valid_iso_639_2_languages_list: list[IsoLanguage] = [
     ("aar", "aa", "Afar", "afar", "Danakil-Sprache"),
     ("abk", "ab", "Abkhazian", "abkhaze", "Abchasisch"),
     ("ace", None, "Achinese", "aceh", "Aceh-Sprache"),
@@ -933,4 +940,11 @@ valid_iso_languages_list: list[IsoLanguage] = [
         "zaza; dimili; dimli; kirdki; kirmanjki; zazaki",
         "Zazaki",
     ),
+]
+
+
+#  a partial list of valid languages from the newer spec, with much more languages, seletec so that some models pass the language check
+valid_iso_639_3_languages_list_partial: list[IsoLanguage] = [
+    # see https://en.wikipedia.org/wiki/ISO_639:c
+    ("cnh", None, ["Haka Chin", "Hakha Chin"], "", ""),
 ]
