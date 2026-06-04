@@ -177,14 +177,12 @@ class BoxSpan:
 class MP4Box:
     type: ISOAtomName
     span: BoxSpan
+    container: bool
 
-    def __init__(
-        self: Self,
-        typ: ISOAtomName,
-        span: BoxSpan,
-    ) -> None:
+    def __init__(self: Self, typ: ISOAtomName, span: BoxSpan, container: bool) -> None:
         self.type = typ
         self.span = span
+        self.container = container
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4Box":
@@ -242,24 +240,26 @@ class MP4Box:
                 raise RuntimeError(msg)
 
             span = BoxSpan(offset, largesize, header_size=16)
-            return MP4Box(typ, span)
+            return MP4Box(typ, span, container=False)
 
         if size == 0:
             f.seek(0, 2)
             eof = f.tell()
             span = BoxSpan(offset, eof - offset, header_size=8)
-            return MP4Box(typ, span)
+            return MP4Box(typ, span, container=False)
 
         span = BoxSpan(offset, size, header_size=8)
-        return MP4Box(typ, span)
+        return MP4Box(typ, span, container=False)
 
 
 class MP4FullBox(MP4Box):
     version: int
     flags: bytes
 
-    def __init__(self: Self, parent: MP4Box, version: int, flags: bytes) -> None:
-        super().__init__(parent.type, parent.span)
+    def __init__(
+        self: Self, parent: MP4Box, container: bool, version: int, flags: bytes
+    ) -> None:
+        super().__init__(parent.type, parent.span, container=container)
 
         self.version = version
         self.flags = flags
@@ -289,7 +289,7 @@ class MP4FullBox(MP4Box):
 
         parent.span.add_header_size(4)
 
-        return MP4FullBox(parent, version, flags)
+        return MP4FullBox(parent, container=False, version=version, flags=flags)
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4FullBox":
@@ -301,7 +301,12 @@ class MediaHeaderBox(MP4FullBox):
     language_offset: int
 
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
-        super().__init__(parent, parent.version, parent.flags)
+        super().__init__(
+            parent,
+            container=False,
+            version=parent.version,
+            flags=parent.flags,
+        )
         self.language_offset = language_offset
 
     @staticmethod
@@ -435,7 +440,7 @@ class MediaHeaderBox(MP4FullBox):
 
 class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
-        super().__init__(parent.type, parent.span)
+        super().__init__(parent.type, parent.span, container=True)
 
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
@@ -460,7 +465,12 @@ class HandlerBox(MP4FullBox):
     handler_type: ISOAtomName
 
     def __init__(self: Self, parent: MP4FullBox, handler_type: ISOAtomName) -> None:
-        super().__init__(parent, parent.version, parent.flags)
+        super().__init__(
+            parent,
+            container=False,
+            version=parent.version,
+            flags=parent.flags,
+        )
         self.handler_type = handler_type
 
     @staticmethod
@@ -489,7 +499,7 @@ class HandlerBox(MP4FullBox):
 
         f.seek(parent.span.payload_start + 4)
 
-        handler_type_raw = read_checked(f, 8)
+        handler_type_raw = read_checked(f, 4)
         handler_type = ISOAtomName(handler_type_raw)
 
         # omitting dynamic sized string "name"
@@ -509,7 +519,7 @@ class TrackBox(MP4Box):
     hdlr: HandlerBox
 
     def __init__(self: Self, parent: MP4Box, hdlr: HandlerBox) -> None:
-        super().__init__(parent.type, parent.span)
+        super().__init__(parent.type, parent.span, container=True)
 
         self.hdlr = hdlr
 
@@ -526,7 +536,7 @@ class TrackBox(MP4Box):
 
         mdia_box: Optional[MediaBox] = None
 
-        for box in iter_boxes_span(f, parent.span):
+        for box in iter_boxes(f, start=parent.span.payload_start, end=parent.span.end):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
                     msg = "Invalid MediaBox: type not dispatched to correct class"
@@ -539,7 +549,9 @@ class TrackBox(MP4Box):
             msg = "Missing mdia box in trak"
             raise RuntimeError(msg)
 
-        for box in iter_boxes_span(f, mdia_box.span):
+        for box in iter_boxes(
+            f, start=mdia_box.span.payload_start, end=mdia_box.span.end
+        ):
             if box.type == HDLR_ATOM_NAME:
                 if not isinstance(box, HandlerBox):
                     msg = "Invalid HandlerBox: type not dispatched to correct class"
@@ -556,19 +568,21 @@ class TrackBox(MP4Box):
         return TrackBox.__read_from_stream_impl(f, box)
 
 
+# NOTE: to make all of them work, we need to define all of those and determine the header size, so that the payload start address is aligned!, otherwise some things might fail!
+# but we don't need all of those, only teh ones, that are needed for finding the language
 CONTAINER_BOXES: set[ISOAtomName] = {
     MOOV_ATOM_NAME,
     TRAK_ATOM_NAME,
     MDIA_ATOM_NAME,
-    MINF_ATOM_NAME,
-    STBL_ATOM_NAME,
-    EDTS_ATOM_NAME,
-    DINF_ATOM_NAME,
-    UDTA_ATOM_NAME,
-    META_ATOM_NAME,
-    MOOF_ATOM_NAME,
-    TRAF_ATOM_NAME,
-    MFRA_ATOM_NAME,
+    # MINF_ATOM_NAME,
+    # STBL_ATOM_NAME,
+    # EDTS_ATOM_NAME,
+    # DINF_ATOM_NAME,
+    # UDTA_ATOM_NAME,
+    # META_ATOM_NAME,
+    # MOOF_ATOM_NAME,
+    # TRAF_ATOM_NAME,
+    # MFRA_ATOM_NAME,
 }
 
 
@@ -600,10 +614,6 @@ def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
 
         yield box
         pos += box.span.size
-
-
-def iter_boxes_span(f: BufferedIOBase, span: BoxSpan) -> Generator["MP4Box"]:
-    return iter_boxes(f, span.start, span.end)
 
 
 def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
