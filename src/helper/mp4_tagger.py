@@ -461,6 +461,29 @@ class MediaBox(MP4Box):
         return MediaBox.__read_from_stream_impl(f, box)
 
 
+class MovieBox(MP4Box):
+    def __init__(self: Self, parent: MP4Box) -> None:
+        super().__init__(parent.type, parent.span, container=True)
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MovieBox":
+        # spec: ISO/IEC 14496-12
+        # ISO movie box structure:
+        # box     | <box size> bytes | parent box
+
+        # aligned(8) class MovieBox extends Box(
+        #     ‘moov’
+        #     ){
+        # }
+
+        return MovieBox(parent)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MovieBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return MovieBox.__read_from_stream_impl(f, box)
+
+
 class HandlerBox(MP4FullBox):
     handler_type: ISOAtomName
 
@@ -568,24 +591,6 @@ class TrackBox(MP4Box):
         return TrackBox.__read_from_stream_impl(f, box)
 
 
-# NOTE: to make all of them work, we need to define all of those and determine the header size, so that the payload start address is aligned!, otherwise some things might fail!
-# but we don't need all of those, only teh ones, that are needed for finding the language
-CONTAINER_BOXES: set[ISOAtomName] = {
-    MOOV_ATOM_NAME,
-    TRAK_ATOM_NAME,
-    MDIA_ATOM_NAME,
-    # MINF_ATOM_NAME,
-    # STBL_ATOM_NAME,
-    # EDTS_ATOM_NAME,
-    # DINF_ATOM_NAME,
-    # UDTA_ATOM_NAME,
-    # META_ATOM_NAME,
-    # MOOF_ATOM_NAME,
-    # TRAF_ATOM_NAME,
-    # MFRA_ATOM_NAME,
-}
-
-
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
     box = MP4Box.read_from_stream(f, pos)
 
@@ -598,6 +603,8 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             return HandlerBox.read_from_stream(f, pos)
         case b"trak":
             return TrackBox.read_from_stream(f, pos)
+        case b"moov":
+            return MovieBox.read_from_stream(f, pos)
         case _:
             return box
 
@@ -653,7 +660,7 @@ def find_audio_mdhd_boxes(f: BufferedIOBase) -> Generator["MediaHeaderBox"]:
 
                 yield box
 
-            if box.type in CONTAINER_BOXES:
+            if box.container:
                 stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
 
 
@@ -672,7 +679,7 @@ def list_languages(path: Path) -> list[tuple[int, str]]:
 def patch_languages(path: Path, new_language: str) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
 
-    with path.open("rüüüb+") as f:
+    with path.open("rb+") as f:
         for i, mdhd in enumerate(find_audio_mdhd_boxes(f), start=1):
             old = mdhd.read_language(f)
             mdhd.patch_language(f, new_language)
@@ -687,8 +694,8 @@ if __name__ == "__main__":
     languages = list_languages(mp4)
     print("prev", languages)
 
-    # languages = patch_languages(mp4, "ger")
-    # print("old", languages)
+    languages = patch_languages(mp4, "jap")
+    print("old", languages)
 
     languages = list_languages(mp4)
     print("new", languages)
