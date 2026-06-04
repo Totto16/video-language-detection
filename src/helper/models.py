@@ -459,11 +459,19 @@ if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
     raise RuntimeError("UNREACHABLE")  # noqa: EM101
 
 
-class ModelLanguageVoxlingua107Ecapa(ModelLanguage):
+class ModelLanguageForList(ModelLanguage):
+    __languages: list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]]
+
+    def __init__(
+        self: Self,
+        languages: list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
+    ) -> None:
+        super().__init__()
+        self.__languages = languages
 
     @override
     def is_valid_language(self: Self, language: Language) -> Optional[str]:
-        for short_str, long_str in voxlingua107_ecapa_languages:
+        for short_str, long_str in self.__languages:
             if short_str == language.short:
                 if language.long != long_str:
                     return _("Long language doesn't match")
@@ -477,57 +485,215 @@ voxlingua107_ecapa_model: Model = Model(
     sample_count=voxlingua107_ecapa_languages_count,
     source="speechbrain/lang-id-voxlingua107-ecapa",
     bitrate=16000,
-    model_language=ModelLanguageVoxlingua107Ecapa(),
+    model_language=ModelLanguageForList(voxlingua107_ecapa_languages),
     memory_pattern=MemoryPatternLinear(
         coeffs=LinearCoeffs(c=121287679.99999952, m=12845499.313230773),
     ),
 )
 
 
-lang_model_2 = [
-    "Arabic",
-    "Basque",
-    "Breton",
-    "Catalan",
-    "Chinese_China",
-    "Chinese_Hongkong",
-    "Chinese_Taiwan",
-    "Chuvash",
-    "Czech",
-    "Dhivehi",
-    "Dutch",
-    "English",
-    "Esperanto",
-    "Estonian",
-    "French",
-    "Frisian",
-    "Georgian",
-    "German",
-    "Greek",
-    "Hakha_Chin",
-    "Indonesian",
-    "Interlingua",
-    "Italian",
-    "Japanese",
-    "Kabyle",
-    "Kinyarwanda",
-    "Kyrgyz",
-    "Latvian",
-    "Maltese",
-    "Mongolian",
-    "Persian",
-    "Polish",
-    "Portuguese",
-    "Romanian",
-    "Romansh_Sursilvan",
-    "Russian",
-    "Sakha",
-    "Slovenian",
-    "Spanish",
-    "Swedish",
-    "Tamil",
-    "Tatar",
-    "Turkish",
-    "Ukrainian",
-    "Welsh",
+commonlanguage_ecapa_languages_count = 45
+
+
+# TODO
+Alpha2LanguageStrRegional = Alpha2LanguageStr
+
+commonlanguage_ecapa_languages: Annotated[
+    list[tuple[Alpha2LanguageStr | Alpha3LanguageStr, LongLanguageStr]],
+    ExactLen(commonlanguage_ecapa_languages_count),
+] = [
+    (
+        Alpha2LanguageStr.from_str_unsafe("ar"),
+        LongLanguageStr("Arabic"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eu"),
+        LongLanguageStr("Basque"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("br"),
+        LongLanguageStr("Breton"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ca"),
+        LongLanguageStr("Catalan"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-CH"),
+        LongLanguageStr("Chinese_China"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-HK"),
+        LongLanguageStr("Chinese_Hongkong"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-TW"),
+        LongLanguageStr("Chinese_Taiwan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cv"),
+        LongLanguageStr("Chuvash"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cs"),
+        LongLanguageStr("Czech"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("dv"),
+        LongLanguageStr("Dhivehi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("nl"),
+        LongLanguageStr("Dutch"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("en"),
+        LongLanguageStr("English"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eo"),
+        LongLanguageStr("Esperanto"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("et"),
+        LongLanguageStr("Estonian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fr"),
+        LongLanguageStr("French"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fy"),
+        LongLanguageStr("Frisian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ka"),
+        LongLanguageStr("Georgian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("de"),
+        LongLanguageStr("German"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("el"),
+        LongLanguageStr("Greek"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("cnh"),
+        LongLanguageStr("Hakha_Chin"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("id"),
+        LongLanguageStr("Indonesian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ia"),
+        LongLanguageStr("Interlingua"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("it"),
+        LongLanguageStr("Italian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ja"),
+        LongLanguageStr("Japanese"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("kab"),
+        LongLanguageStr("Kabyle"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("rw"),
+        LongLanguageStr("Kinyarwanda"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ky"),
+        LongLanguageStr("Kyrgyz"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lv"),
+        LongLanguageStr("Latvian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mt"),
+        LongLanguageStr("Maltese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mn"),
+        LongLanguageStr("Mongolian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fa"),
+        LongLanguageStr("Persian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pl"),
+        LongLanguageStr("Polish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pt"),
+        LongLanguageStr("Portuguese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ro"),
+        LongLanguageStr("Romanian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("rm"),
+        LongLanguageStr("Romansh_Sursilvan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ru"),
+        LongLanguageStr("Russian"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("sah"),
+        LongLanguageStr("Sakha"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sl"),
+        LongLanguageStr("Slovenian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("es"),
+        LongLanguageStr("Spanish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sv"),
+        LongLanguageStr("Swedish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ta"),
+        LongLanguageStr("Tamil"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tt"),
+        LongLanguageStr("Tatar"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tr"),
+        LongLanguageStr("Turkish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("uk"),
+        LongLanguageStr("Ukrainian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cy"),
+        LongLanguageStr("Welsh"),
+    ),
 ]
+
+
+if len(commonlanguage_ecapa_languages) != commonlanguage_ecapa_languages_count:
+    raise RuntimeError("UNREACHABLE")  # noqa: EM101
+
+
+commonlanguage_ecapa_model: Model = Model(
+    name="commonlanguage",
+    sample_count=commonlanguage_ecapa_languages_count,
+    source="speechbrain/lang-id-commonlanguage_ecapa",
+    bitrate=16000,
+    model_language=ModelLanguageForList(commonlanguage_ecapa_languages),
+    memory_pattern=None,  # TODO
+)
