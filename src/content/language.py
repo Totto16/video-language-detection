@@ -50,6 +50,7 @@ class __LangValidationList:
     long_names: list[EngName]
     # maps region names to valid combinations
     region_names: dict[str, list[str]]
+    map_alpha_2_to_alpha3: dict[Iso_2Alpha, Iso_3Alpha]
 
 
 def __generate_lang_code_validation_list() -> __LangValidationList:
@@ -149,11 +150,29 @@ def __generate_lang_code_validation_list() -> __LangValidationList:
     for (region, total), _ in hardcoded_region_strings:
         region_names[region] = total
 
+    def to_single_alpha3(val: Iso_3Alpha | Iso_3AlphaTwoPossibilities) -> Iso_3Alpha:
+        if isinstance(val, str):
+            return val
+        if isinstance(val, tuple):
+            return val[0]
+
+        assert_never(val)
+
+    map_alpha_2_to_alpha3: dict[Iso_2Alpha, Iso_3Alpha] = {
+        entry[1]: to_single_alpha3(entry[0])
+        for entry in [
+            *valid_iso_639_2_languages_list,
+            *valid_iso_639_3_languages_list_partial,
+        ]
+        if entry[1] is not None
+    }
+
     return __LangValidationList(
         short_names_3=short_names_3,
         short_names_2=short_names_2,
         long_names=long_names,
         region_names=region_names,
+        map_alpha_2_to_alpha3=map_alpha_2_to_alpha3,
     )
 
 
@@ -594,6 +613,10 @@ class Alpha2LanguageStrRegional:
 
         return False
 
+    @property
+    def alpha2(self: Self) -> Alpha2LanguageStr:
+        return self.__lang
+
 
 LongLanguageStr = NewType("LongLanguageStr", str)
 
@@ -800,3 +823,28 @@ class Language:
             language.long,
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
+
+    def to_alpha3(self: Self) -> Alpha3LanguageStr:
+        if isinstance(self.__short, Alpha3LanguageStr):
+            return self.__short
+
+        def alpha2_to_3(alpha_2: Alpha2LanguageStr) -> Alpha3LanguageStr:
+            val = lang_code_validation_list_impl.map_alpha_2_to_alpha3.get(
+                str(alpha_2),
+                None,
+            )
+            if val is None:
+                msg = _(
+                    "Can't convert alpha 2 language string {lang} to alpha 3 language string"  # noqa: COM812
+                ).format(lang=alpha_2)
+                raise RuntimeError(msg)
+
+            return Alpha3LanguageStr.from_str_unsafe(val)
+
+        if isinstance(self.__short, Alpha2LanguageStr):
+            return alpha2_to_3(self.__short)
+
+        if isinstance(self.__short, Alpha2LanguageStrRegional):
+            return alpha2_to_3(self.__short.alpha2)
+
+        assert_never(self.__short)
