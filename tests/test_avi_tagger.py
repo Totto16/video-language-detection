@@ -157,6 +157,16 @@ def test_avi_invalid_bytes(
 
     test_data: list[tuple[bytes, str]] = [
         (b"", "Read failed to produce 8 bytes, got 0"),
+        (b"HELLO WORLD", "Not a valid RIFF / AVI file"),
+        (b"LIST WORLD", "Read failed to produce 4 bytes, got 2"),
+        (
+            b"LIST WORLD12",
+            "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: b'LIST'",
+        ),
+        (
+            b"RIFF WORLD12",
+            "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: b'LD12'",
+        ),
     ]
 
     for data, err in test_data:
