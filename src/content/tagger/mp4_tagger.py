@@ -875,7 +875,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
         new_language = language.to_alpha3()
 
-        bar: CounterInterface = self.__manager.counter(
+        bar: CounterInterface = self.manager.counter(
             total=float(self.__streams + 1),
             desc="update mp4 language",
             unit="B",
@@ -937,7 +937,6 @@ class VideoTaggerMp4(VideoTagger):
 
     @staticmethod
     def get_handle(file: Path) -> VideoTagger__HandleResult:
-
         with file.open("rb") as f:
 
             first_box = read_box_from_stream(f, 0)

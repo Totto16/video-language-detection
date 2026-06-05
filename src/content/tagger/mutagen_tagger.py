@@ -344,7 +344,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
     def __save_impl(self: Self) -> None:
         total: int = self.__filething.size()
 
-        bar: CounterInterface = self.__manager.counter(
+        bar: CounterInterface = self.manager.counter(
             total=float(total),
             desc="update video tags",
             unit="B",

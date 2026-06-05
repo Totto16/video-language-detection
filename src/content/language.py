@@ -20,6 +20,7 @@ from content.iso_codes import (
     Iso_2Alpha,
     Iso_3Alpha,
     Iso_3AlphaTwoPossibilities,
+    IsoLanguage,
     valid_iso_639_2_languages_list,
     valid_iso_639_3_languages_list_partial,
 )
@@ -51,6 +52,12 @@ class __LangValidationList:
     # maps region names to valid combinations
     region_names: dict[str, list[str]]
     map_alpha_2_to_alpha3: dict[Iso_2Alpha, Iso_3Alpha]
+
+
+special_languages: list[IsoLanguage] = [
+    ("und", "un", "", "", ""),
+    ("zxx", "xx", "", "", ""),
+]
 
 
 def __generate_lang_code_validation_list() -> __LangValidationList:
@@ -163,6 +170,7 @@ def __generate_lang_code_validation_list() -> __LangValidationList:
         for entry in [
             *valid_iso_639_2_languages_list,
             *valid_iso_639_3_languages_list_partial,
+            *special_languages,
         ]
         if entry[1] is not None
     }
