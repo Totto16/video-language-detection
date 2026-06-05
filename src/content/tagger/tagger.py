@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from content.tagger.mp4_tagger import VideoTaggerMp4
+from content.tagger.mp4_tagger import VideoTaggerMP4
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.video_tagger import (
     VideoTagger,
@@ -25,7 +25,7 @@ def get_tagger_for_mp4_file(file: Path) -> VideoTagger__HandleResult:
 
         tagger.append(mutagen_handle.get_ok())
 
-        mp4_handle = VideoTaggerMp4.get_handle(file)
+        mp4_handle = VideoTaggerMP4.get_handle(file)
 
         if mp4_handle.is_err():
             return VideoTagger__HandleResult.err(mp4_handle.get_err())

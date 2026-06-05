@@ -44,7 +44,7 @@ def video_file_dict() -> dict[str, str]:
         #
         "file_example_MP4_480_1_5MG.mp4": "https://file-examples.com/storage/fe63e83a686a22f89a101a3/2017/04/file_example_MP4_480_1_5MG.mp4",
         "file_example_WEBM_480_900KB.webm": "https://file-examples.com/wp-content/storage/2020/03/file_example_WEBM_480_900KB.webm",
-        "file_example_AVI_480_750kB.avi": "https://file-examples.com/wp-content/storage/2018/04/file_example_AVI_480_750kB.avi",
+        "file_example_AVI_480_750kB.avi": "https://file-examples.com/storage/fe2c4db53a6a2330da0d375/2018/04/file_example_AVI_480_750kB.avi",
         "file_example_MOV_480_700kB.mov": "https://file-examples.com/wp-content/storage/2018/04/file_example_MOV_480_700kB.mov",
         "file_example_WMV_480_1_2MB.wmv": "https://file-examples.com/wp-content/storage/2018/04/file_example_WMV_480_1_2MB.wmv",
     }
@@ -157,6 +157,19 @@ def mp4_test_parse_files(
 
     video_urls = [
         at_video_dict(video_file_dict, "file_example_MP4_480_1_5MG.mp4"),
+    ]
+
+    return TempVideoFiles(temp_video_files(video_urls, cached_file_manager))
+
+
+@pytest.fixture(scope="package")
+def avi_test_parse_files(
+    video_file_dict: dict[str, str],
+    cached_file_manager: CachedFileManager,
+) -> TempVideoFiles:
+
+    video_urls = [
+        at_video_dict(video_file_dict, "file_example_AVI_480_750kB.avi"),
     ]
 
     return TempVideoFiles(temp_video_files(video_urls, cached_file_manager))

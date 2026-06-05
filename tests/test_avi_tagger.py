@@ -1,10 +1,16 @@
 from io import BufferedIOBase, BytesIO
+from pathlib import Path
 from typing import Self
 
+from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
 
 from content.tagger.avi_tagger import AVIChunk, AVIList, avi_iter_chunks, is_avi_file
+from helper.result import Result
 from helper.translation import get_translator
+
+mark_as_used(avi_test_parse_files)
+
 
 # TODO: force locale in test cases!
 _ = get_translator()
@@ -149,6 +155,91 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
                 current_target.append(chunk)
 
     return result
+
+
+AVIChunkStructure__GetResult = Result["AVIChunkStructure", str]
+
+
+class AVIChunkStructure:
+    chunks: RecursiveChunks
+
+    def __init__(self: Self, chunks: RecursiveChunks) -> None:
+        self.chunks = chunks
+
+    @staticmethod
+    def from_file(file: Path) -> AVIChunkStructure__GetResult:
+        try:
+            with file.open("rb") as f:
+                avi_res = is_avi_file(f)
+
+                if avi_res is not None:
+                    return AVIChunkStructure__GetResult.err(avi_res)
+
+                chunks = list_all_chunks_recursively(f)
+                return AVIChunkStructure__GetResult.ok(AVIChunkStructure(chunks))
+        except RuntimeError as err:
+            return AVIChunkStructure__GetResult.err(str(err))
+
+    def __str__(self: Self) -> str:
+        return f"<AVIChunkStructure chunks: {self.chunks!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, RecursiveChunks):
+            return self.chunks == other
+
+        if isinstance(other, AVIChunkStructure):
+            return self.chunks == other.chunks
+
+        return False
+
+    def __hash__(self: Self) -> int:
+        return hash(self.chunks)
+
+
+def test_avi_tagger_parsing(
+    subtests: SubTests,
+    avi_test_parse_files: TempVideoFiles,
+) -> None:
+
+    test_files: list[tuple[Path, AVIChunkStructure]] = list(
+        zip(
+            avi_test_parse_files.data,
+            [AVIChunkStructure(RecursiveChunks([]))],
+            strict=True,
+        ),
+    )
+
+    for file, result in test_files:
+        with subtests.test("video gets parsed correctly"):
+            structure_res = AVIChunkStructure.from_file(file)
+
+            if structure_res.is_err():
+                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+                raise AssertionError(msg)
+
+            structure = structure_res.get_ok()
+
+            top_chunks = structure.chunks.top_chunks()
+
+            start: int = 0
+            for top_chunk in top_chunks:
+                if top_chunk.span.start != start:
+                    msg = f"Next chunk start is invalid, expected {start} but got {top_chunk.span.start}: {top_chunk!s}"
+                    raise AssertionError(msg)
+                start = top_chunk.span.end
+
+            file_size = file.stat().st_size
+
+            if file_size != start:
+                msg = f"chunks don't reach EOF: size is {file_size} but chunks reach only to {start}"
+                raise AssertionError(msg)
+
+            if structure != result:
+                msg = f"Parsing was incorrect:\n{structure!s}"
+                raise AssertionError(msg)
 
 
 def test_avi_invalid_bytes(
