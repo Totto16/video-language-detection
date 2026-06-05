@@ -887,33 +887,56 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
         try:
             self.__writer.seek(0)
+            # NOTE: we always path the language, no matter what
             for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
 
-            # write other metadata into free space box
-
+            end_tag = b"video_language_detect_end_tag"
+            # check if the end already has a freebox with this content
+            last_box: Optional[MP4Box] = None
             self.__writer.seek(0, 2)
+            end = self.__writer.tell()
 
-            data_list: list[bytes] = [
-                *[cmt.encode() for cmt in comment],
-                *[(f"{key}:{val}").encode() for key, val in metadata.items()],
-            ]
-            for data in data_list:
+            self.__writer.seek(0)
+            for box in iter_boxes(self.__writer, 0, end=end):
+                print(box, box.type)
+                last_box = box
 
-                pos = self.__writer.tell()
+            end_tag_found = False
 
-                if (pos % 8) != 0:
-                    msg = f"Can't write to end of the mp4 file, not aligned by 8: {pos}"
-                    raise RuntimeError(msg)
+            if (
+                last_box is not None
+                and isinstance(last_box, FreeSpaceBox)
+                and last_box.data == end_tag
+            ):
+                end_tag_found = True
 
-                buffer = FreeSpaceBox.write_to_buffer(data)
+            if not end_tag_found:
+                # write other metadata into free space box
+                self.__writer.seek(0, 2)
 
-                if (len(buffer) % 8) != 0:
-                    msg = "Error, serialization of FreeSpaceBox invalid, not aligned by 8!"
-                    raise RuntimeError(msg)
+                data_list: list[bytes] = [
+                    *[cmt.encode() for cmt in comment],
+                    *[(f"{key}:{val}").encode() for key, val in metadata.items()],
+                    end_tag,
+                ]
 
-                self.__writer.write(buffer)
+                for data in data_list:
+
+                    pos = self.__writer.tell()
+
+                    if (pos % 8) != 0:
+                        msg = f"Can't write to end of the mp4 file, not aligned by 8: {pos}"
+                        raise RuntimeError(msg)
+
+                    buffer = FreeSpaceBox.write_to_buffer(data)
+
+                    if (len(buffer) % 8) != 0:
+                        msg = "Error, serialization of FreeSpaceBox invalid, not aligned by 8!"
+                        raise RuntimeError(msg)
+
+                    self.__writer.write(buffer)
 
         finally:
             bar.close(clear=True)
