@@ -1033,9 +1033,11 @@ class VideoTaggerMp4(VideoTagger):
                         _("Not a valid ISOM / MP4 file")
                     )
 
-                if first_box.major_brand != b"isom":
+                if first_box.major_brand not in [b"isom", b"mp42"]:
                     return VideoTagger__HandleResult.err(
-                        _("ISOM file has valid box, but invalid major_brand"),
+                        _(
+                            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+                        ).format(major_brand=first_box.major_brand),
                     )
 
                 f.seek(0)
