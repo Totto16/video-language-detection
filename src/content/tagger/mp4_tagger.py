@@ -404,6 +404,10 @@ class FileTypeBox(MP4Box):
 
         compatible_brands_size = parent.span.payload_size - (4 + 4)
 
+        if compatible_brands_size < 0:
+            msg = f"Invalid box size: not enough data for complete FileTypeBox: have {parent.span.payload_size} but need at least {(4 + 4)}"
+            raise RuntimeError(msg)
+
         compatible_brands = read_checked(f, compatible_brands_size)
 
         additional_header_size = 4 + 4 + compatible_brands_size
@@ -883,17 +887,23 @@ def find_mdhd_boxes_with_type(
 def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
     f.seek(0)
 
-    first_box = read_box_from_stream(f, 0)
+    try:
 
-    if not isinstance(first_box, FileTypeBox):
-        return _("Not a valid ISOM / MP4 file")
+        first_box = read_box_from_stream(f, 0)
 
-    if first_box.major_brand not in [b"isom", b"mp42"]:
-        return _(
-            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
-        ).format(major_brand=first_box.major_brand)
+        if not isinstance(first_box, FileTypeBox):
+            return _("Not a valid ISOM / MP4 file")
 
-    f.seek(0)
+        if first_box.major_brand not in [b"isom", b"mp42"]:
+            return _(
+                "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+            ).format(major_brand=first_box.major_brand)
+
+        f.seek(0)
+    except RuntimeError as err:
+        return str(err)
+    except ValueError as err:
+        return str(err)
     return None
 
 

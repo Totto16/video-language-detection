@@ -1,4 +1,4 @@
-from io import BufferedIOBase
+from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
 
@@ -22,8 +22,12 @@ from content.tagger.mp4_tagger import (
     mp4_iter_boxes,
 )
 from helper.result import Result
+from helper.translation import get_translator
 
 mark_as_used(mp4_test_parse_files)
+
+# TODO: force locale in test cases!
+_ = get_translator()
 
 
 class PseudoMp4Box(MP4Box):
@@ -301,3 +305,32 @@ def test_mp4_tagger_parsing(
             if structure != result:
                 msg = f"Parsing was incorrect:\n{structure!s}"
                 raise AssertionError(msg)
+
+
+def test_mp4_invalid_bytes(
+    subtests: SubTests,
+) -> None:
+
+    test_data: list[tuple[bytes, str]] = [
+        (b"", "Read failed to produce 8 bytes, got 0"),
+        (b"hello world", _("Not a valid ISOM / MP4 file")),
+        (b"ftyp    ", "Atom name is not lowercase b'    '"),
+        (b"\x00\x00\x00\x04ftyp", "Invalid box: sitze too small: 4"),
+        (
+            b"\x00\x00\x00\x0eftypabcddcba",
+            "Invalid box size: not enough data for complete FileTypeBox: have 6 but need at least 8",
+        ),
+        (
+            b"\x00\x00\x00\x10ftypabcddcba",
+            "ISOM/MP42 file has valid box, but invalid major_brand: b'abcd'",
+        ),
+    ]
+
+    for data, err in test_data:
+        with subtests.test("invalid video gets detected correctly"):
+            io = BytesIO(data)
+            res = is_mp4_file(io)
+
+            assert res is not None, "valid mp4 is incorrect here"
+
+            assert res == err, "incorrect error"
