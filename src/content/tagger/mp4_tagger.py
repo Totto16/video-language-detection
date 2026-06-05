@@ -291,7 +291,7 @@ class MP4Box:
             additional_size = final_size + 8
             final_size = 1
 
-        hdr = struct.pack(">I4s", (final_size, typ.value))
+        hdr = struct.pack(">I4s", final_size, typ.value)
         if len(hdr) != 8:
             msg = "packed bytes are not of correct size"
             raise RuntimeError(msg)
@@ -310,9 +310,7 @@ class MP4Box:
                 msg = "Error, serialization of MP4Box invalid, not aligned by 8!"
                 raise RuntimeError(msg)
 
-        final_data = align_bytes_to_8(data)
-
-        buf.write(final_data)
+        buf.write(data)
 
         return buf.getvalue()
 
@@ -442,15 +440,6 @@ class FileTypeBox(MP4Box):
         return str(self)
 
 
-def align_bytes_to_8(data: bytes) -> bytes:
-    mod = len(data) % 8
-    if mod == 0:
-        return data
-
-    padding = 8 - mod
-    return data + b"\x00" * padding
-
-
 class FreeSpaceBox(MP4Box):
     data: bytes
 
@@ -493,9 +482,7 @@ class FreeSpaceBox(MP4Box):
     @staticmethod
     def write_to_buffer(data: bytes) -> bytes:
 
-        final_data = align_bytes_to_8(data)
-
-        return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, final_data)
+        return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, data)
 
     def __str__(self: Self) -> str:
         return f"<FileTypeBox parent: {MP4Box.__str__(self)} data: {self.data!s}>"
@@ -954,53 +941,64 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
 
-            # TODO: remove end tags, that are assoicated with this, start them with a string, and search the global list, afterwars remove them and add new ones
-            end_tag = b"video_language_detect_end_tag"
-            # check if the end already has a freebox with this content
-            last_box: Optional[MP4Box] = None
+            free_tag = b"vld\x42\x42\x69"
+
+            # NOTE. there are some old legacy ones, that were only used during testing and the new one (which is shorter)
+            free_tags: list[bytes] = [
+                b"video_language_detect_",
+                b"see other metadata for more info by video_language_detect",
+                free_tag,
+            ]
+
             self.__writer.seek(0, 2)
             end = self.__writer.tell()
 
             self.__writer.seek(0)
-            for box in iter_boxes(self.__writer, 0, end=end):
-                print(box)
-                last_box = box
 
-            end_tag_found = False
+            top_boxes: list[MP4Box] = list(iter_boxes(self.__writer, 0, end=end))
 
-            if (
-                last_box is not None
-                and isinstance(last_box, FreeSpaceBox)
-                and last_box.data == end_tag
-            ):
-                end_tag_found = True
+            first_free_box: Optional[FreeSpaceBox] = None
+            other_box_encountered = False
+            for box in reversed(top_boxes):
+                if other_box_encountered:
+                    continue
 
-            if not end_tag_found:
-                # write other metadata into free space box
-                self.__writer.seek(0, 2)
+                if box.type == FREE_ATOM_NAME:
+                    if not isinstance(box, FreeSpaceBox):
+                        msg = (
+                            "Invalid FreeSpaceBox: type not dispatched to correct class"
+                        )
+                        raise ValueError(msg)
 
-                data_list: list[bytes] = [
-                    *[cmt.encode() for cmt in comment],
-                    *[(f"{key}:{val}").encode() for key, val in metadata.items()],
-                    end_tag,
-                ]
+                    is_tagged_box = any(box.data.startswith(tag) for tag in free_tags)
 
-                for data in data_list:
+                    if not is_tagged_box:
+                        other_box_encountered = True
+                    else:
+                        first_free_box = box
 
-                    pos = self.__writer.tell()
+                else:
+                    other_box_encountered = True
 
-                    if (pos % 8) != 0:
-                        msg = f"Can't write to end of the mp4 file, not aligned by 8: {pos}"
-                        raise RuntimeError(msg)
+            # delete old metadata
+            if first_free_box is not None:
+                self.__writer.truncate(first_free_box.span.start)
 
-                    buffer = FreeSpaceBox.write_to_buffer(data)
+            # write other metadata into free space box
+            self.__writer.seek(0, 2)
 
-                    if (len(buffer) % 8) != 0:
-                        msg = "Error, serialization of FreeSpaceBox invalid, not aligned by 8!"
-                        raise RuntimeError(msg)
+            data_list: list[bytes] = [
+                *[(f"comment:{cmt}").encode() for cmt in comment],
+                *[(f"{key}:{val}").encode() for key, val in metadata.items()],
+            ]
 
-                    self.__writer.write(buffer)
+            for data in data_list:
+                buffer = FreeSpaceBox.write_to_buffer(free_tag + data)
 
+                self.__writer.write(buffer)
+
+            self.__writer.flush()
+            raise SystemExit(2)
         finally:
             bar.close(clear=True)
 
