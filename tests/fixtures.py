@@ -35,11 +35,22 @@ TempMp4Files = FinalizerFixture[list[Path]]
 @pytest.fixture(scope="package")
 def temp_mp4_files() -> TempMp4Files:
     # from: https://test-videos.co.uk/bigbuckbunny/mp4-h264
+    # and https://file-examples.com/index.php/sample-video-files/
     video_urls = [
+        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4",
         "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
         "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
+        "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
+        "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
+        #
+        "https://file-examples.com/wp-content/storage/2017/04/file_example_MP4_480_1_5MG.mp4",
+        "https://file-examples.com/wp-content/storage/2020/03/file_example_WEBM_480_900KB.webm",
+        "https://file-examples.com/wp-content/storage/2018/04/file_example_AVI_480_750kB.avi",
+        "https://file-examples.com/wp-content/storage/2018/04/file_example_MOV_480_700kB.mov",
+        "https://file-examples.com/wp-content/storage/2018/04/file_example_WMV_480_1_2MB.wmv",
     ]
     results: list[Path] = []
+    raise RuntimeError("TODO refactor the usage of this!")
     for url in video_urls:
         response = requests.get(url, timeout=10)
         with tempfile.NamedTemporaryFile(delete=False) as f:

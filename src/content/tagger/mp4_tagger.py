@@ -776,7 +776,7 @@ class MediaHeaderBox(MP4FullBox):
 
         f.seek(self.span.start + self.language_offset)
         verify_bytes = read_checked(f, 2)
-        verify = Unpacker.unpack_one(ISOM_BYTE_ORDER,UnsignedShort(), verify_bytes)
+        verify = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), verify_bytes)
 
         if verify != packed:
             msg = "Invalid overwrite"
@@ -928,7 +928,9 @@ class TrackBox(MP4Box):
 
         mdia_box: Optional[MediaBox] = None
 
-        for box in iter_boxes(f, start=parent.span.payload_start, end=parent.span.end):
+        for box in mp4_iter_boxes(
+            f, start=parent.span.payload_start, end=parent.span.end
+        ):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
                     msg = "Invalid MediaBox: type not dispatched to correct class"
@@ -941,7 +943,7 @@ class TrackBox(MP4Box):
             msg = "Missing mdia box in trak"
             raise RuntimeError(msg)
 
-        for box in iter_boxes(
+        for box in mp4_iter_boxes(
             f, start=mdia_box.span.payload_start, end=mdia_box.span.end
         ):
             if box.type == HDLR_ATOM_NAME:
@@ -990,7 +992,7 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             return box
 
 
-def iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
+def mp4_iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
     pos = start
 
     while pos < end:
@@ -1016,7 +1018,7 @@ def find_mdhd_boxes_with_type(
     while stack:
         start, end, path = stack.pop()
 
-        for box in iter_boxes(f, start, end):
+        for box in mp4_iter_boxes(f, start, end):
 
             if box.type == TRAK_ATOM_NAME:
                 if not isinstance(box, TrackBox):
@@ -1107,7 +1109,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
             self.__writer.seek(0)
 
-            top_boxes: list[MP4Box] = list(iter_boxes(self.__writer, 0, end=end))
+            top_boxes: list[MP4Box] = list(mp4_iter_boxes(self.__writer, 0, end=end))
 
             first_free_box: Optional[FreeSpaceBox] = None
             other_box_encountered = False
@@ -1154,6 +1156,23 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
             bar.close(clear=True)
 
 
+def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
+    f.seek(0)
+
+    first_box = read_box_from_stream(f, 0)
+
+    if not isinstance(first_box, FileTypeBox):
+        return _("Not a valid ISOM / MP4 file")
+
+    if first_box.major_brand not in [b"isom", b"mp42"]:
+        return _(
+            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+        ).format(major_brand=first_box.major_brand)
+
+    f.seek(0)
+    return None
+
+
 class VideoTaggerMp4(VideoTagger):
     __streams: int
     __types: list[ISOAtomName]
@@ -1176,20 +1195,9 @@ class VideoTaggerMp4(VideoTagger):
         try:
 
             with file.open("rb") as f:
-
-                first_box = read_box_from_stream(f, 0)
-
-                if not isinstance(first_box, FileTypeBox):
-                    return VideoTagger__HandleResult.err(
-                        _("Not a valid ISOM / MP4 file")
-                    )
-
-                if first_box.major_brand not in [b"isom", b"mp42"]:
-                    return VideoTagger__HandleResult.err(
-                        _(
-                            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
-                        ).format(major_brand=first_box.major_brand),
-                    )
+                mp4_res = is_mp4_file(f)
+                if mp4_res is not None:
+                    return VideoTagger__HandleResult.err(mp4_res)
 
                 f.seek(0)
 
