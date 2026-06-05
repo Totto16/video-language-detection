@@ -2,7 +2,7 @@ from io import BufferedIOBase
 from pathlib import Path
 from typing import Self
 
-from fixtures import mark_as_used, temp_mp4_files
+from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
 from pytest_subtests import SubTests
 
 from content.tagger.mp4_tagger import (
@@ -23,7 +23,7 @@ from content.tagger.mp4_tagger import (
 )
 from helper.result import Result
 
-mark_as_used(temp_mp4_files)
+mark_as_used(mp4_test_parse_files)
 
 
 class PseudoMp4Box(MP4Box):
@@ -88,7 +88,6 @@ class RecursiveBoxes:
     ) -> bool:
         # pseudo comparison based on pseudo boxes, alias just size and type!
         if box1.type != box2.type:
-            raise NotImplementedError((box1, box2))
             return False
 
         return box1.span.size == box2.span.size
@@ -206,73 +205,75 @@ class Mp4BoxStructure:
 
 def test_mp4_tagger_parsing(
     subtests: SubTests,
+    mp4_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    todo_files: list[tuple[Path, Mp4BoxStructure]] = [
-        (
-            Path(
-                "/home/totto/Code/video-language-detection/file_example_MP4_480_1_5MG.mp4"
-            ),
-            Mp4BoxStructure(
-                RecursiveBoxes(
-                    [
-                        PseudoMp4Box(FTYP_ATOM_NAME, 32),
-                        (
-                            PseudoMp4Box(MOOV_ATOM_NAME, 11824),
-                            [
-                                PseudoMp4Box(ISOAtomName(b"mvhd"), 108),
-                                PseudoMp4Box(ISOAtomName(b"iods"), 42),
-                                (
-                                    PseudoMp4Box(TRAK_ATOM_NAME, 5317),
-                                    [
-                                        PseudoMp4Box(
-                                            ISOAtomName(
-                                                b"tkhd",
+    test_files: list[tuple[Path, Mp4BoxStructure]] = list(
+        zip(
+            mp4_test_parse_files.data,
+            [
+                Mp4BoxStructure(
+                    RecursiveBoxes(
+                        [
+                            PseudoMp4Box(FTYP_ATOM_NAME, 32),
+                            (
+                                PseudoMp4Box(MOOV_ATOM_NAME, 11824),
+                                [
+                                    PseudoMp4Box(ISOAtomName(b"mvhd"), 108),
+                                    PseudoMp4Box(ISOAtomName(b"iods"), 42),
+                                    (
+                                        PseudoMp4Box(TRAK_ATOM_NAME, 5317),
+                                        [
+                                            PseudoMp4Box(
+                                                ISOAtomName(
+                                                    b"tkhd",
+                                                ),
+                                                92,
                                             ),
-                                            92,
-                                        ),
-                                        PseudoMp4Box(EDTS_ATOM_NAME, 36),
-                                        (
-                                            PseudoMp4Box(MDIA_ATOM_NAME, 5181),
-                                            [
-                                                PseudoMp4Box(MDHD_ATOM_NAME, 32),
-                                                PseudoMp4Box(HDLR_ATOM_NAME, 54),
-                                                PseudoMp4Box(MINF_ATOM_NAME, 5087),
-                                            ],
-                                        ),
-                                    ],
-                                ),
-                                (
-                                    PseudoMp4Box(TRAK_ATOM_NAME, 6349),
-                                    [
-                                        PseudoMp4Box(
-                                            ISOAtomName(
-                                                b"tkhd",
+                                            PseudoMp4Box(EDTS_ATOM_NAME, 36),
+                                            (
+                                                PseudoMp4Box(MDIA_ATOM_NAME, 5181),
+                                                [
+                                                    PseudoMp4Box(MDHD_ATOM_NAME, 32),
+                                                    PseudoMp4Box(HDLR_ATOM_NAME, 54),
+                                                    PseudoMp4Box(MINF_ATOM_NAME, 5087),
+                                                ],
                                             ),
-                                            92,
-                                        ),
-                                        PseudoMp4Box(EDTS_ATOM_NAME, 36),
-                                        (
-                                            PseudoMp4Box(MDIA_ATOM_NAME, 6213),
-                                            [
-                                                PseudoMp4Box(MDHD_ATOM_NAME, 32),
-                                                PseudoMp4Box(HDLR_ATOM_NAME, 54),
-                                                PseudoMp4Box(MINF_ATOM_NAME, 6119),
-                                            ],
-                                        ),
-                                    ],
-                                ),
-                            ],
-                        ),
-                        PseudoMp4Box(FREE_ATOM_NAME, 8),
-                        PseudoMp4Box(ISOAtomName(b"mdat"), 1558160),
-                    ],
-                )
-            ),
-        ),
-    ]
+                                        ],
+                                    ),
+                                    (
+                                        PseudoMp4Box(TRAK_ATOM_NAME, 6349),
+                                        [
+                                            PseudoMp4Box(
+                                                ISOAtomName(
+                                                    b"tkhd",
+                                                ),
+                                                92,
+                                            ),
+                                            PseudoMp4Box(EDTS_ATOM_NAME, 36),
+                                            (
+                                                PseudoMp4Box(MDIA_ATOM_NAME, 6213),
+                                                [
+                                                    PseudoMp4Box(MDHD_ATOM_NAME, 32),
+                                                    PseudoMp4Box(HDLR_ATOM_NAME, 54),
+                                                    PseudoMp4Box(MINF_ATOM_NAME, 6119),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            PseudoMp4Box(FREE_ATOM_NAME, 8),
+                            PseudoMp4Box(ISOAtomName(b"mdat"), 1558160),
+                        ],
+                    )
+                ),
+            ],
+            strict=True,
+        )
+    )
 
-    for file, result in todo_files:
+    for file, result in test_files:
         with subtests.test("video gets parsed correctly"):
             structure_res = Mp4BoxStructure.from_file(file)
 

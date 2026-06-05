@@ -7,10 +7,10 @@ from pytest_subtests import SubTests
 
 from helper.ffprobe import ffprobe, parse_float_safely
 
-from fixtures import dummy_files, mark_as_used, temp_mp4_files, TempMp4Files, DummyFiles
+from fixtures import ffprobe_dummy_files, mark_as_used, ffprobe_temp_mp4_files, TempVideoFiles, DummyFiles
 
-mark_as_used(dummy_files)
-mark_as_used(temp_mp4_files)
+mark_as_used(ffprobe_dummy_files)
+mark_as_used(ffprobe_temp_mp4_files)
 
 
 def test_float_parsing_correct(subtests: SubTests) -> None:
@@ -69,9 +69,9 @@ def test_raw_int_parse(subtests: SubTests) -> None:
 
 def test_ffprobe_with_intact_videos(
     subtests: SubTests,
-    temp_mp4_files: TempMp4Files,
+    ffprobe_temp_mp4_files: TempVideoFiles,
 ) -> None:
-    for video in temp_mp4_files.data:
+    for video in ffprobe_temp_mp4_files.data:
         with subtests.test("video get's parsed correctly"):
             result, err = ffprobe(video)
             assert err is None, "No error occurred"
@@ -121,10 +121,10 @@ def test_ffprobe_errors() -> None:
 
 def test_ffprobe_errors_with_files(
     subtests: SubTests,
-    dummy_files: DummyFiles,
+    ffprobe_dummy_files: DummyFiles,
 ) -> None:
     with subtests.test("dummy wrong file fails "):
-        for file, should_pass in dummy_files.data:
+        for file, should_pass in ffprobe_dummy_files.data:
             result, _err = ffprobe(file)
             assert (result is not None) == should_pass, "pass status is correct"
             if should_pass:

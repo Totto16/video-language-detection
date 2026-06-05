@@ -29,46 +29,117 @@ class FinalizerFixture[A]:
         self.__data.drop(self.__data.data)
 
 
-TempMp4Files = FinalizerFixture[list[Path]]
+TempVideoFiles = FinalizerFixture[list[Path]]
 
 
 @pytest.fixture(scope="package")
-def temp_mp4_files() -> TempMp4Files:
+def video_file_dict() -> dict[str, str]:
     # from: https://test-videos.co.uk/bigbuckbunny/mp4-h264
     # and https://file-examples.com/index.php/sample-video-files/
-    video_urls = [
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4",
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
-        "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
-        "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
+    video: dict[str, str] = {
+        "Big_Buck_Bunny_360_10s_1MB.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        "Big_Buck_Bunny_1080_10s_1MB.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
+        "Big_Buck_Bunny_1080_10s_30MB.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
+        "Big_Buck_Bunny_360_10s_1MB.webm": "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
+        "Big_Buck_Bunny_360_10s_1MB.mkv": "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
         #
-        "https://file-examples.com/wp-content/storage/2017/04/file_example_MP4_480_1_5MG.mp4",
-        "https://file-examples.com/wp-content/storage/2020/03/file_example_WEBM_480_900KB.webm",
-        "https://file-examples.com/wp-content/storage/2018/04/file_example_AVI_480_750kB.avi",
-        "https://file-examples.com/wp-content/storage/2018/04/file_example_MOV_480_700kB.mov",
-        "https://file-examples.com/wp-content/storage/2018/04/file_example_WMV_480_1_2MB.wmv",
-    ]
+        "file_example_MP4_480_1_5MG.mp4": "https://file-examples.com/storage/fe63e83a686a22f89a101a3/2017/04/file_example_MP4_480_1_5MG.mp4",
+        "file_example_WEBM_480_900KB.webm": "https://file-examples.com/wp-content/storage/2020/03/file_example_WEBM_480_900KB.webm",
+        "file_example_AVI_480_750kB.avi": "https://file-examples.com/wp-content/storage/2018/04/file_example_AVI_480_750kB.avi",
+        "file_example_MOV_480_700kB.mov": "https://file-examples.com/wp-content/storage/2018/04/file_example_MOV_480_700kB.mov",
+        "file_example_WMV_480_1_2MB.wmv": "https://file-examples.com/wp-content/storage/2018/04/file_example_WMV_480_1_2MB.wmv",
+    }
+
+    return video
+
+
+def at_video_dict(dct: dict[str, str], name: str) -> tuple[str, str]:
+    return (name, dct[name])
+
+
+class CachedFileManager:
+    __cache_folder: Path
+
+    def __init__(self: Self, cache_folder: Path) -> None:
+        self.__cache_folder = cache_folder
+        if not self.__cache_folder.exists():
+            self.__cache_folder.mkdir(parents=True, exist_ok=True)
+
+    def get(self: Self, name: str, url: str) -> bytes:
+        cached_path = self.__cache_folder / name
+        if cached_path.exists():
+            return cached_path.read_bytes()
+
+        result = requests.get(url, timeout=10)
+
+        data = result.content
+        with cached_path.open("wb") as f:
+            f.write(data)
+
+        return data
+
+
+@pytest.fixture(scope="package")
+def cached_file_manager() -> CachedFileManager:
+
+    cache_folder = Path(__file__).parent / "files" / "cache"
+
+    return CachedFileManager(cache_folder)
+
+
+def temp_video_files(
+    videos: list[tuple[str, str]],
+    cached_manager: CachedFileManager,
+) -> TempVideoFiles:
     results: list[Path] = []
-    raise RuntimeError("TODO refactor the usage of this!")
-    for url in video_urls:
-        response = requests.get(url, timeout=10)
+    for name, url in videos:
+        file_data = cached_manager.get(name, url)
         with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(response.content)
+            f.write(file_data)
             results.append(Path(f.file.name))
 
     def delete_results(files: list[Path]) -> None:
         for f in files:
             f.unlink(missing_ok=True)
 
-    return TempMp4Files(Finalizer[list[Path]](results, delete_results))
+    return TempVideoFiles(Finalizer[list[Path]](results, delete_results))
+
+
+@pytest.fixture(scope="package")
+def ffprobe_temp_mp4_files(
+    video_file_dict: dict[str, str],
+    cached_file_manager: CachedFileManager,
+) -> TempVideoFiles:
+
+    video_urls = [
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mp4"),
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_1080_10s_1MB.mp4"),
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_1080_10s_30MB.mp4"),
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.webm"),
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mkv"),
+    ]
+
+    return temp_video_files(video_urls, cached_file_manager)
+
+
+@pytest.fixture(scope="package")
+def mp4_test_parse_files(
+    video_file_dict: dict[str, str],
+    cached_file_manager: CachedFileManager,
+) -> TempVideoFiles:
+
+    video_urls = [
+        at_video_dict(video_file_dict, "file_example_MP4_480_1_5MG.mp4"),
+    ]
+
+    return temp_video_files(video_urls, cached_file_manager)
 
 
 DummyFiles = FinalizerFixture[list[tuple[Path, bool]]]
 
 
 @pytest.fixture(scope="package")
-def dummy_files() -> DummyFiles:
+def ffprobe_dummy_files() -> DummyFiles:
     content_description = [
         (
             ".srt",
