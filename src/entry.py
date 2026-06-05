@@ -164,6 +164,8 @@ def parse_args() -> AllParsedNameSpaces:
             "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
         ),
     )
+    #TODO: support more complex args 
+    # "-t no -f "c:0" -f "s~:landman" -f "e:<id>" -f "p=:media" -e "check" -e "summary" -e "validate" -e "test"
     run_parser.add_argument(
         "-f",
         "--filter",

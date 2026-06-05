@@ -197,14 +197,13 @@ class EpisodeContent(Content):
         *,
         only_update_file: bool = False,
     ) -> None:
-
         changed_file: bool = False
 
         def write_file_metadata() -> None:
             nonlocal changed_file
 
-            print(f"Try to tag file {self.scanned_file.path}")
-        
+            #print(f"Try to tag file {self.scanned_file.path}")
+
             handle_result = get_tagger_for_file(self.scanned_file.path)
             if handle_result.is_err():
                 logger.error(
@@ -361,6 +360,7 @@ class EpisodeContent(Content):
                         if Language.is_default_value(
                             self.__language,
                         ) and scanner.should_scan_language(ScanType.rescan):
+                            print("WHEY ARE WE SCNNING?")
                             language = scanner.language_scanner.get_language(
                                 self.scanned_file,
                                 language_picker,
