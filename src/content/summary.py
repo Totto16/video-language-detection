@@ -43,7 +43,7 @@ class VideoMetadataType(StrEnum):
     missing = "missing"
 
     def __str__(self: Self) -> str:
-        return f"<MetadataType: {self.name}>"
+        return f"<VideoMetadataType: {self.name}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
