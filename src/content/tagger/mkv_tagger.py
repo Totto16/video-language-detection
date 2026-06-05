@@ -8,7 +8,7 @@ from content.language import Language
 
 def set_mkv_language(language: Language) -> None:
 
-    lang = get_iso639_2(language.short)
+    lang = get_iso639_2(str(language.short))
 
     # MKVTrack setter is now lenient — any recognized form is accepted and
     # canonicalized to /B on store.
