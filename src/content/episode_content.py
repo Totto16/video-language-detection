@@ -227,6 +227,8 @@ class EpisodeContent(Content):
                 global global_counter_wip
 
                 if global_counter_wip > 0:
+                    global_counter_wip -= 1
+
                     with handle.writer(manager=manager) as writer:
                         writer.write_metadata(
                             comment=[
@@ -235,7 +237,6 @@ class EpisodeContent(Content):
                             language=self.language,
                             metadata=metadata,
                         )
-                        global_counter_wip -= 1
                         print(metadata)
                         self.scanned_file.reset_file_data()
                         changed_file = True

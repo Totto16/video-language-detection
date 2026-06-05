@@ -191,6 +191,12 @@ class BoxSpan:
             msg = f"Invalid box size {self.size} at {self.start}"
             raise RuntimeError(msg)
 
+    def __str__(self: Self) -> str:
+        return f"<BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class MP4Box:
     type: ISOAtomName
@@ -310,6 +316,14 @@ class MP4Box:
 
         return buf.getvalue()
 
+    def __str__(self: Self) -> str:
+        return (
+            f"<MP4Box type: {self.type} span: {self.span} container: {self.container}>"
+        )
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class MP4FullBox(MP4Box):
     version: int
@@ -354,6 +368,12 @@ class MP4FullBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4FullBox":
         box = MP4Box.read_from_stream(f, offset)
         return MP4FullBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<MP4FullBox parent: {MP4Box.__str__(self)} version: {self.version} flags: {self.flags.hex()}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class FileTypeBox(MP4Box):
@@ -415,6 +435,12 @@ class FileTypeBox(MP4Box):
         box = MP4Box.read_from_stream(f, offset)
         return FileTypeBox.__read_from_stream_impl(f, box)
 
+    def __str__(self: Self) -> str:
+        return f"<FileTypeBox parent: {MP4Box.__str__(self)} major_brand: {self.major_brand} minor_version: {self.minor_version} compatible_brands: {self.compatible_brands!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 def align_bytes_to_8(data: bytes) -> bytes:
     mod = len(data) % 8
@@ -470,6 +496,12 @@ class FreeSpaceBox(MP4Box):
         final_data = align_bytes_to_8(data)
 
         return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, final_data)
+
+    def __str__(self: Self) -> str:
+        return f"<FileTypeBox parent: {MP4Box.__str__(self)} data: {self.data!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class MediaHeaderBox(MP4FullBox):
@@ -612,6 +644,12 @@ class MediaHeaderBox(MP4FullBox):
             msg = "Invalid overwrite"
             raise RuntimeError(msg)
 
+    def __str__(self: Self) -> str:
+        return f"<MediaHeaderBox parent: {MP4FullBox.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
@@ -635,6 +673,12 @@ class MediaBox(MP4Box):
         box = MP4Box.read_from_stream(f, offset)
         return MediaBox.__read_from_stream_impl(f, box)
 
+    def __str__(self: Self) -> str:
+        return f"<MediaBox parent: {MP4Box.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class MovieBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
@@ -657,6 +701,12 @@ class MovieBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MovieBox":
         box = MP4Box.read_from_stream(f, offset)
         return MovieBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<MovieBox parent: {MP4Box.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class HandlerBox(MP4FullBox):
@@ -712,6 +762,12 @@ class HandlerBox(MP4FullBox):
         box = MP4FullBox.read_from_stream(f, offset)
         return HandlerBox.__read_from_stream_impl(f, box)
 
+    def __str__(self: Self) -> str:
+        return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class TrackBox(MP4Box):
     hdlr: HandlerBox
@@ -764,6 +820,12 @@ class TrackBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "TrackBox":
         box = MP4Box.read_from_stream(f, offset)
         return TrackBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<TrackBox parent: {MP4Box.__str__(self)} hdlr: {self.hdlr}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
@@ -892,6 +954,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
 
+            # TODO: remove end tags, that are assoicated with this, start them with a string, and search the global list, afterwars remove them and add new ones
             end_tag = b"video_language_detect_end_tag"
             # check if the end already has a freebox with this content
             last_box: Optional[MP4Box] = None
@@ -900,7 +963,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
 
             self.__writer.seek(0)
             for box in iter_boxes(self.__writer, 0, end=end):
-                print(box, box.type)
+                print(box)
                 last_box = box
 
             end_tag_found = False
