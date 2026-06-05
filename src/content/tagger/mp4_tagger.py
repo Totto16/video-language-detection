@@ -1,7 +1,7 @@
 import struct
 from collections.abc import Generator
 from contextlib import AbstractContextManager
-from io import BufferedIOBase
+from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal, Optional, Self, override
@@ -145,6 +145,9 @@ MDHD_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdhd")
 SOUN_ATOM_NAME: ISOAtomName = ISOAtomName(b"soun")
 HDLR_ATOM_NAME: ISOAtomName = ISOAtomName(b"hdlr")
 VIDE_ATOM_NAME: ISOAtomName = ISOAtomName(b"vide")
+FTYP_ATOM_NAME: ISOAtomName = ISOAtomName(b"ftyp")
+FREE_ATOM_NAME: ISOAtomName = ISOAtomName(b"free")
+SKIP_ATOM_NAME: ISOAtomName = ISOAtomName(b"skip")
 
 
 class BoxSpan:
@@ -266,6 +269,47 @@ class MP4Box:
         span = BoxSpan(offset, size, header_size=8)
         return MP4Box(typ, span, container=False)
 
+    @staticmethod
+    def write_to_buffer_mp4_box(typ: ISOAtomName, data: bytes) -> bytes:
+
+        if typ == UUID_ATOM_NAME:
+            msg = "'uuid' type not implemented, the box header size differs with that type"
+            raise RuntimeError(msg)
+
+        buf = BytesIO()
+
+        final_size: int = 4 + 4 + len(data)
+        additional_size: Optional[int] = None
+
+        if final_size > ((2**32) - 1):
+            additional_size = final_size + 8
+            final_size = 1
+
+        hdr = struct.pack(">I4s", (final_size, typ.value))
+        if len(hdr) != 8:
+            msg = "packed bytes are not of correct size"
+            raise RuntimeError(msg)
+
+        buf.write(hdr)
+
+        if additional_size is not None:
+            largsize = struct.pack(">Q", (additional_size))
+            if len(largsize) != 8:
+                msg = "packed bytes are not of correct size"
+                raise RuntimeError(msg)
+
+            buf.write(largsize)
+
+            if (buf.tell() % 8) != 0:
+                msg = "Error, serialization of MP4Box invalid, not aligned by 8!"
+                raise RuntimeError(msg)
+
+        final_data = align_bytes_to_8(data)
+
+        buf.write(final_data)
+
+        return buf.getvalue()
+
 
 class MP4FullBox(MP4Box):
     version: int
@@ -372,6 +416,15 @@ class FileTypeBox(MP4Box):
         return FileTypeBox.__read_from_stream_impl(f, box)
 
 
+def align_bytes_to_8(data: bytes) -> bytes:
+    mod = len(data) % 8
+    if mod == 0:
+        return data
+
+    padding = 8 - mod
+    return data + b"\x00" * padding
+
+
 class FreeSpaceBox(MP4Box):
     data: bytes
 
@@ -410,6 +463,13 @@ class FreeSpaceBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "FreeSpaceBox":
         box = MP4Box.read_from_stream(f, offset)
         return FreeSpaceBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def write_to_buffer(data: bytes) -> bytes:
+
+        final_data = align_bytes_to_8(data)
+
+        return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, final_data)
 
 
 class MediaHeaderBox(MP4FullBox):
@@ -816,7 +876,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
         new_language = language.to_alpha3()
 
         bar: CounterInterface = self.__manager.counter(
-            total=float(self.__streams),
+            total=float(self.__streams + 1),
             desc="update mp4 language",
             unit="B",
             leave=False,
@@ -830,6 +890,31 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
             for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
+
+            # write other metadata into free space box
+
+            self.__writer.seek(0, 2)
+
+            data_list: list[bytes] = [
+                *[cmt.encode() for cmt in comment],
+                *[(f"{key}:{val}").encode() for key, val in metadata.items()],
+            ]
+            for data in data_list:
+
+                pos = self.__writer.tell()
+
+                if (pos % 8) != 0:
+                    msg = "Can't write to end of the mp4 file, not aligned by 8!"
+                    raise RuntimeError(msg)
+
+                buffer = FreeSpaceBox.write_to_buffer(data)
+
+                if (len(buffer) % 8) != 0:
+                    msg = "Error, serialization of FreeSpaceBox invalid, not aligned by 8!"
+                    raise RuntimeError(msg)
+
+                self.__writer.write(buffer)
+
         finally:
             bar.close(clear=True)
 
