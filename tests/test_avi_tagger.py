@@ -53,7 +53,7 @@ class RecursiveChunks:
     def __init__(self: Self, data: RecursiveChunkData) -> None:
         self.__data = data
 
-    def append(self: Self, val: AVIChunk | tuple[AVIChunk, "RecursiveChunks"]) -> None:
+    def append(self: Self, val: AVIChunk | tuple[AVIList, "RecursiveChunks"]) -> None:
         if isinstance(val, tuple):
             self.__data.append((val[0], val[1].__data))  # noqa: SLF001
             return
@@ -182,7 +182,11 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
 
         for chunk in avi_iter_chunks(f, start, end):
             if chunk.is_list:
-                target: tuple[AVIChunk, RecursiveChunks] = (chunk, RecursiveChunks([]))
+                if not isinstance(chunk, AVIList):
+                    msg = "Invalid AVIList: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                target: tuple[AVIList, RecursiveChunks] = (chunk, RecursiveChunks([]))
                 current_target.append(target)
                 stack.append((chunk.span.payload_start, chunk.span.end, target[1]))
             else:

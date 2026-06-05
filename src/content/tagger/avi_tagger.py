@@ -154,6 +154,7 @@ class AVIChunk:
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "AVIChunk":
+        # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI Chunk structure:
         # fourcc | 4 bytes | char[4]
         # size   | 4 bytes | unsigned int
@@ -198,6 +199,7 @@ class AVIList(AVIChunk):
 
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: AVIChunk) -> "AVIList":
+        # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI List structure:
         # chunk    | <chunk size> bytes | parent chunk
         # type   | 4 bytes | char[4]
@@ -231,6 +233,78 @@ class AVIList(AVIChunk):
         return str(self)
 
 
+class AVIStreamHeader(AVIChunk):
+    type: FOURCC
+
+    def __init__(self: Self, parent: AVIChunk, typ: FOURCC) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=False)
+
+        self.type = typ
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase,
+        parent: AVIChunk,
+    ) -> "AVIStreamHeader":
+        # spec https://learn.microsoft.com/en-us/previous-versions/ms779638(v=vs.85)
+        # AVI Stream Header structure:
+        # chunk    | <chunk size> bytes | parent chunk
+        # ... data, see below
+
+        # typedef struct _avistreamheader {
+        #     FOURCC fcc; < -|
+        #     DWORD  cb; # <- both in  the parent
+        #     FOURCC fccType;
+        #     FOURCC fccHandler;
+        #     DWORD  dwFlags;
+        #     WORD   wPriority;
+        #     WORD   wLanguage;
+        #     DWORD  dwInitialFrames;
+        #     DWORD  dwScale;
+        #     DWORD  dwRate;
+        #     DWORD  dwStart;
+        #     DWORD  dwLength;
+        #     DWORD  dwSuggestedBufferSize;
+        #     DWORD  dwQuality;
+        #     DWORD  dwSampleSize;
+        #     struct {
+        #         short int left;
+        #         short int top;
+        #         short int right;
+        #         short int bottom;
+        #     }  rcFrame;
+        # } AVISTREAMHEADER;
+
+        f.seek(parent.span.payload_start)
+
+        typ_raw = read_checked(f, 4)
+
+        typ = FOURCC(typ_raw)
+
+        additional_header_size = (
+            4 + 4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + (2 + 2 + 2 + 2)
+        )
+
+        parent.span.add_header_size(additional_header_size)
+
+        if parent.span.payload_size != 0:
+            msg = f"Implementation error"
+            raise ValueError(msg)
+
+        return AVIStreamHeader(parent, typ)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AVIStreamHeader":
+        chunk = AVIChunk.read_from_stream(f, offset)
+        return AVIStreamHeader.__read_from_stream_impl(f, chunk)
+
+    def __str__(self: Self) -> str:
+        return f"<AVIStreamHeader parent: {AVIChunk.__str__(self)} type {self.type}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 def read_chunk_from_stream(f: BufferedIOBase, pos: int) -> AVIChunk:
     chunk = AVIChunk.read_from_stream(f, pos)
 
@@ -239,6 +313,8 @@ def read_chunk_from_stream(f: BufferedIOBase, pos: int) -> AVIChunk:
             return AVIList.read_from_stream(f, pos)
         case b"LIST":
             return AVIList.read_from_stream(f, pos)
+        case b"strh":
+            return AVIStreamHeader.read_from_stream(f, pos)
         case _:
             return chunk
 
