@@ -17,7 +17,7 @@ from content.tagger.mp4_tagger import (
     TRAK_ATOM_NAME,
     ISOMAtomName,
     MP4Box,
-    Mp4BoxSpan,
+    MP4BoxSpan,
     is_mp4_file,
     mp4_iter_boxes,
 )
@@ -30,10 +30,10 @@ mark_as_used(mp4_test_parse_files)
 _ = get_translator()
 
 
-class PseudoMp4Box(MP4Box):
+class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
-        super().__init__(typ, span=Mp4BoxSpan(0, size, 8), is_container=False)
+        super().__init__(typ, span=MP4BoxSpan(0, size, 8), is_container=False)
 
 
 class RecursiveBoxes:
@@ -171,31 +171,31 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
     return result
 
 
-Mp4BoxStructure__GetResult = Result["Mp4BoxStructure", str]
+MP4BoxStructure__GetResult = Result["MP4BoxStructure", str]
 
 
-class Mp4BoxStructure:
+class MP4BoxStructure:
     boxes: RecursiveBoxes
 
     def __init__(self: Self, boxes: RecursiveBoxes) -> None:
         self.boxes = boxes
 
     @staticmethod
-    def from_file(file: Path) -> Mp4BoxStructure__GetResult:
+    def from_file(file: Path) -> MP4BoxStructure__GetResult:
         try:
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f)
 
                 if mp4_res is not None:
-                    return Mp4BoxStructure__GetResult.err(mp4_res)
+                    return MP4BoxStructure__GetResult.err(mp4_res)
 
                 boxes = list_all_boxes_recursively(f)
-                return Mp4BoxStructure__GetResult.ok(Mp4BoxStructure(boxes))
+                return MP4BoxStructure__GetResult.ok(MP4BoxStructure(boxes))
         except RuntimeError as err:
-            return Mp4BoxStructure__GetResult.err(str(err))
+            return MP4BoxStructure__GetResult.err(str(err))
 
     def __str__(self: Self) -> str:
-        return f"<Mp4BoxStructure boxes: {self.boxes!s}>"
+        return f"<MP4BoxStructure boxes: {self.boxes!s}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -204,7 +204,7 @@ class Mp4BoxStructure:
         if isinstance(other, RecursiveBoxes):
             return self.boxes == other
 
-        if isinstance(other, Mp4BoxStructure):
+        if isinstance(other, MP4BoxStructure):
             return self.boxes == other.boxes
 
         return False
@@ -218,63 +218,63 @@ def test_mp4_tagger_parsing(
     mp4_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    test_files: list[tuple[Path, Mp4BoxStructure]] = list(
+    test_files: list[tuple[Path, MP4BoxStructure]] = list(
         zip(
             mp4_test_parse_files.data,
             [
-                Mp4BoxStructure(
+                MP4BoxStructure(
                     RecursiveBoxes(
                         [
-                            PseudoMp4Box(FTYP_ATOM_NAME, 32),
+                            PseudoMP4Box(FTYP_ATOM_NAME, 32),
                             (
-                                PseudoMp4Box(MOOV_ATOM_NAME, 11824),
+                                PseudoMP4Box(MOOV_ATOM_NAME, 11824),
                                 [
-                                    PseudoMp4Box(ISOMAtomName(b"mvhd"), 108),
-                                    PseudoMp4Box(ISOMAtomName(b"iods"), 42),
+                                    PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
+                                    PseudoMP4Box(ISOMAtomName(b"iods"), 42),
                                     (
-                                        PseudoMp4Box(TRAK_ATOM_NAME, 5317),
+                                        PseudoMP4Box(TRAK_ATOM_NAME, 5317),
                                         [
-                                            PseudoMp4Box(
+                                            PseudoMP4Box(
                                                 ISOMAtomName(
                                                     b"tkhd",
                                                 ),
                                                 92,
                                             ),
-                                            PseudoMp4Box(EDTS_ATOM_NAME, 36),
+                                            PseudoMP4Box(EDTS_ATOM_NAME, 36),
                                             (
-                                                PseudoMp4Box(MDIA_ATOM_NAME, 5181),
+                                                PseudoMP4Box(MDIA_ATOM_NAME, 5181),
                                                 [
-                                                    PseudoMp4Box(MDHD_ATOM_NAME, 32),
-                                                    PseudoMp4Box(HDLR_ATOM_NAME, 54),
-                                                    PseudoMp4Box(MINF_ATOM_NAME, 5087),
+                                                    PseudoMP4Box(MDHD_ATOM_NAME, 32),
+                                                    PseudoMP4Box(HDLR_ATOM_NAME, 54),
+                                                    PseudoMP4Box(MINF_ATOM_NAME, 5087),
                                                 ],
                                             ),
                                         ],
                                     ),
                                     (
-                                        PseudoMp4Box(TRAK_ATOM_NAME, 6349),
+                                        PseudoMP4Box(TRAK_ATOM_NAME, 6349),
                                         [
-                                            PseudoMp4Box(
+                                            PseudoMP4Box(
                                                 ISOMAtomName(
                                                     b"tkhd",
                                                 ),
                                                 92,
                                             ),
-                                            PseudoMp4Box(EDTS_ATOM_NAME, 36),
+                                            PseudoMP4Box(EDTS_ATOM_NAME, 36),
                                             (
-                                                PseudoMp4Box(MDIA_ATOM_NAME, 6213),
+                                                PseudoMP4Box(MDIA_ATOM_NAME, 6213),
                                                 [
-                                                    PseudoMp4Box(MDHD_ATOM_NAME, 32),
-                                                    PseudoMp4Box(HDLR_ATOM_NAME, 54),
-                                                    PseudoMp4Box(MINF_ATOM_NAME, 6119),
+                                                    PseudoMP4Box(MDHD_ATOM_NAME, 32),
+                                                    PseudoMP4Box(HDLR_ATOM_NAME, 54),
+                                                    PseudoMP4Box(MINF_ATOM_NAME, 6119),
                                                 ],
                                             ),
                                         ],
                                     ),
                                 ],
                             ),
-                            PseudoMp4Box(FREE_ATOM_NAME, 8),
-                            PseudoMp4Box(ISOMAtomName(b"mdat"), 1558160),
+                            PseudoMP4Box(FREE_ATOM_NAME, 8),
+                            PseudoMP4Box(ISOMAtomName(b"mdat"), 1558160),
                         ],
                     ),
                 ),
@@ -285,7 +285,7 @@ def test_mp4_tagger_parsing(
 
     for file, result in test_files:
         with subtests.test("video gets parsed correctly"):
-            structure_res = Mp4BoxStructure.from_file(file)
+            structure_res = MP4BoxStructure.from_file(file)
 
             if structure_res.is_err():
                 msg = f"structure not parsed correctly: {structure_res.get_err()}"

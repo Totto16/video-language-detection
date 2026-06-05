@@ -103,7 +103,7 @@ FREE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"free")
 SKIP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"skip")
 
 
-class Mp4BoxSpan:
+class MP4BoxSpan:
     start: int
     size: int
     header_size: int
@@ -145,7 +145,7 @@ class Mp4BoxSpan:
             raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
-        return f"<Mp4BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+        return f"<MP4BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -156,13 +156,13 @@ ISOM_BYTE_ORDER = ByteOrder.Big
 
 class MP4Box:
     type: ISOMAtomName
-    span: Mp4BoxSpan
+    span: MP4BoxSpan
     is_container: bool
 
     def __init__(
         self: Self,
         typ: ISOMAtomName,
-        span: Mp4BoxSpan,
+        span: MP4BoxSpan,
         *,
         is_container: bool,
     ) -> None:
@@ -233,16 +233,16 @@ class MP4Box:
                 msg = f"Invalid extended box size {largesize}"
                 raise RuntimeError(msg)
 
-            span = Mp4BoxSpan(offset, largesize, header_size=16)
+            span = MP4BoxSpan(offset, largesize, header_size=16)
             return MP4Box(typ, span, is_container=False)
 
         if size == 0:
             f.seek(0, 2)
             eof = f.tell()
-            span = Mp4BoxSpan(offset, eof - offset, header_size=8)
+            span = MP4BoxSpan(offset, eof - offset, header_size=8)
             return MP4Box(typ, span, is_container=False)
 
-        span = Mp4BoxSpan(offset, size, header_size=8)
+        span = MP4BoxSpan(offset, size, header_size=8)
         return MP4Box(typ, span, is_container=False)
 
     @staticmethod
@@ -493,7 +493,8 @@ class MediaHeaderBox(MP4FullBox):
 
     @staticmethod
     def __read_from_stream_impl(
-        f: BufferedIOBase, parent: MP4FullBox,
+        f: BufferedIOBase,
+        parent: MP4FullBox,
     ) -> "MediaHeaderBox":
         # spec: ISO/IEC 14496-12
         # ISO media header box structure:
@@ -763,7 +764,9 @@ class TrackBox(MP4Box):
         mdia_box: Optional[MediaBox] = None
 
         for box in mp4_iter_boxes(
-            f, start=parent.span.payload_start, end=parent.span.end,
+            f,
+            start=parent.span.payload_start,
+            end=parent.span.end,
         ):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
@@ -778,7 +781,9 @@ class TrackBox(MP4Box):
             raise RuntimeError(msg)
 
         for box in mp4_iter_boxes(
-            f, start=mdia_box.span.payload_start, end=mdia_box.span.end,
+            f,
+            start=mdia_box.span.payload_start,
+            end=mdia_box.span.end,
         ):
             if box.type == HDLR_ATOM_NAME:
                 if not isinstance(box, HandlerBox):
@@ -907,7 +912,7 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
     return None
 
 
-class VideoTaggerWriterMp4(VideoTaggerWriter):
+class VideoTaggerWriterMP4(VideoTaggerWriter):
     __writer: BufferedIOBase
     __streams: int
     __types: list[ISOMAtomName]
@@ -1013,7 +1018,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
             bar.close(clear=True)
 
 
-class VideoTaggerMp4(VideoTagger):
+class VideoTaggerMP4(VideoTagger):
     __streams: int
     __types: list[ISOMAtomName]
 
@@ -1058,7 +1063,7 @@ class VideoTaggerMp4(VideoTagger):
                         return VideoTagger__HandleResult.err(msg)
 
                 return VideoTagger__HandleResult.ok(
-                    VideoTaggerMp4(file, streams, types),
+                    VideoTaggerMP4(file, streams, types),
                 )
         except RuntimeError as err:
             return VideoTagger__HandleResult.err(str(err))
@@ -1086,7 +1091,7 @@ class VideoTaggerMp4(VideoTagger):
             def __enter__(self: Self) -> VideoTaggerWriter:
                 self.__writer = file.open("rb+")
 
-                return VideoTaggerWriterMp4(manager, self.__writer, streams, types)
+                return VideoTaggerWriterMP4(manager, self.__writer, streams, types)
 
             @override
             def __exit__(
