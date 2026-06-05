@@ -15,9 +15,9 @@ from content.tagger.mp4_tagger import (
     MINF_ATOM_NAME,
     MOOV_ATOM_NAME,
     TRAK_ATOM_NAME,
-    Mp4BoxSpan,
     ISOMAtomName,
     MP4Box,
+    Mp4BoxSpan,
     is_mp4_file,
     mp4_iter_boxes,
 )
@@ -45,7 +45,7 @@ class RecursiveBoxes:
 
     def append(self: Self, val: MP4Box | tuple[MP4Box, "RecursiveBoxes"]) -> None:
         if isinstance(val, tuple):
-            self.__data.append((val[0], val[1].__data))
+            self.__data.append((val[0], val[1].__data))  # noqa: SLF001
             return
 
         self.__data.append(val)
@@ -145,6 +145,9 @@ class RecursiveBoxes:
 
         return False
 
+    def __hash__(self: Self) -> int:
+        return hash(*self.__data)
+
 
 def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
     f.seek(0, 2)
@@ -205,6 +208,9 @@ class Mp4BoxStructure:
             return self.boxes == other.boxes
 
         return False
+
+    def __hash__(self: Self) -> int:
+        return hash(self.boxes)
 
 
 def test_mp4_tagger_parsing(
@@ -270,11 +276,11 @@ def test_mp4_tagger_parsing(
                             PseudoMp4Box(FREE_ATOM_NAME, 8),
                             PseudoMp4Box(ISOMAtomName(b"mdat"), 1558160),
                         ],
-                    )
+                    ),
                 ),
             ],
             strict=True,
-        )
+        ),
     )
 
     for file, result in test_files:

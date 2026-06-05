@@ -493,7 +493,7 @@ class MediaHeaderBox(MP4FullBox):
 
     @staticmethod
     def __read_from_stream_impl(
-        f: BufferedIOBase, parent: MP4FullBox
+        f: BufferedIOBase, parent: MP4FullBox,
     ) -> "MediaHeaderBox":
         # spec: ISO/IEC 14496-12
         # ISO media header box structure:
@@ -763,7 +763,7 @@ class TrackBox(MP4Box):
         mdia_box: Optional[MediaBox] = None
 
         for box in mp4_iter_boxes(
-            f, start=parent.span.payload_start, end=parent.span.end
+            f, start=parent.span.payload_start, end=parent.span.end,
         ):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
@@ -778,7 +778,7 @@ class TrackBox(MP4Box):
             raise RuntimeError(msg)
 
         for box in mp4_iter_boxes(
-            f, start=mdia_box.span.payload_start, end=mdia_box.span.end
+            f, start=mdia_box.span.payload_start, end=mdia_box.span.end,
         ):
             if box.type == HDLR_ATOM_NAME:
                 if not isinstance(box, HandlerBox):
@@ -896,7 +896,7 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
 
         if first_box.major_brand not in [b"isom", b"mp42"]:
             return _(
-                "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+                "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"  # noqa: COM812
             ).format(major_brand=first_box.major_brand)
 
         f.seek(0)
@@ -1055,10 +1055,10 @@ class VideoTaggerMp4(VideoTagger):
                         msg = _("Invalid language in mp4 detected: {lang}").format(
                             lang=lang,
                         )
-                        raise RuntimeError(msg)
+                        return VideoTagger__HandleResult.err(msg)
 
                 return VideoTagger__HandleResult.ok(
-                    VideoTaggerMp4(file, streams, types)
+                    VideoTaggerMp4(file, streams, types),
                 )
         except RuntimeError as err:
             return VideoTagger__HandleResult.err(str(err))
