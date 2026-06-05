@@ -24,7 +24,12 @@ from content.general import (
     ScannedFile,
 )
 from content.language import Language
-from content.metadata.metadata import HandlesType, MetadataHandle, SkipHandle
+from content.metadata.metadata import (
+    HandlesType,
+    MetadataHandle,
+    SkipHandle,
+    should_skip_metadata,
+)
 from content.shared import ScanType
 from content.summary import Summary
 from helper.apischema import narrow_type
@@ -111,7 +116,7 @@ class NumeratedContent(Content):
         if handles is None:
             return None
 
-        if isinstance(handles, SkipHandle):
+        if should_skip_metadata(handles):
             return SkipHandle()
 
         if len(handles) != 2:
@@ -163,7 +168,7 @@ class NumeratedContent(Content):
                         if (
                             current_handles is not None
                             and self.metadata is None
-                            and not isinstance(current_handles, SkipHandle)
+                            and not should_skip_metadata(current_handles)
                             and scanner.should_scan_metadata(
                                 ScanType.rescan,
                                 self.metadata,
@@ -213,7 +218,7 @@ class NumeratedContent(Content):
             if (
                 current_handles is not None
                 and self.metadata is None
-                and not isinstance(current_handles, SkipHandle)
+                and not should_skip_metadata(current_handles)
                 and scanner.should_scan_metadata(ScanType.first_scan, self.metadata)
             ):
                 series_handle, season_handle = current_handles

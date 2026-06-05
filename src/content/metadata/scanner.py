@@ -1,7 +1,12 @@
 from typing import Any, Optional, Self
 
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import InternalMetadataType, MetadataHandle, SkipHandle
+from content.metadata.metadata import (
+    InternalMetadataType,
+    MetadataHandle,
+    SkipHandle,
+    should_skip_metadata,
+)
 from content.shared import ScanType
 
 
@@ -32,7 +37,7 @@ class MetadataScanner:
 
         data: Optional[Any] = self.__provider.get_series_metadata(series_name)
 
-        if isinstance(data, SkipHandle):
+        if should_skip_metadata(data):
             return SkipHandle()
 
         if data is not None:
@@ -54,7 +59,7 @@ class MetadataScanner:
             season,
         )
 
-        if isinstance(data, SkipHandle):
+        if should_skip_metadata(data):
             return SkipHandle()
 
         if data is not None:
@@ -81,7 +86,7 @@ class MetadataScanner:
             episode,
         )
 
-        if isinstance(data, SkipHandle):
+        if should_skip_metadata(data):
             return SkipHandle()
 
         if data is not None:

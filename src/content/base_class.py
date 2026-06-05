@@ -22,6 +22,7 @@ from content.metadata.metadata import (
     InternalMetadataType,
     MetadataHandle,
     SkipHandle,
+    should_skip_metadata,
 )
 from content.metadata.scanner import MetadataScanner
 from content.prediction import PredictionBest
@@ -366,7 +367,7 @@ class Content(ABC):
         if self.metadata is None or old_handles is None:
             return None
 
-        if isinstance(self.metadata, SkipHandle) or isinstance(old_handles, SkipHandle):
+        if should_skip_metadata(self.metadata) or should_skip_metadata(old_handles):
             return SkipHandle()
 
         # Note: this is important, so that it's a copy

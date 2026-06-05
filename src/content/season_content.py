@@ -29,6 +29,7 @@ from content.metadata.metadata import (
     HandlesType,
     InternalMetadataType,
     SkipHandle,
+    should_skip_metadata,
 )
 from content.shared import ScanType
 from content.summary import Summary
@@ -110,7 +111,7 @@ class SeasonContent(Content):
         if handles is None:
             return None
 
-        if isinstance(handles, SkipHandle):
+        if should_skip_metadata(handles):
             return SkipHandle()
 
         if len(handles) != 1:
@@ -138,7 +139,7 @@ class SeasonContent(Content):
             if (
                 series_handle is not None
                 and self.metadata is None
-                and not isinstance(series_handle, SkipHandle)
+                and not should_skip_metadata(series_handle)
                 and scanner.should_scan_metadata(
                     ScanType.first_scan,
                     self.metadata,
@@ -170,7 +171,7 @@ class SeasonContent(Content):
         if (
             series_handle is not None
             and self.metadata is None
-            and not isinstance(series_handle, SkipHandle)
+            and not should_skip_metadata(series_handle)
             and scanner.should_scan_metadata(
                 ScanType.rescan,
                 self.metadata,

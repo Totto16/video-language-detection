@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Optional, Self, override
+from typing import Annotated, Any, Optional, Self, TypeIs, override
 
 from apischema import alias, deserializer, schema, serialize, serializer
 from apischema.objects import ObjectField
@@ -86,11 +86,10 @@ class TmdbHandleImpl(HandleImpl):
 
     @override
     def to_handle(self: Self) -> "MetadataHandle":
-        from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
-
-        #TODO: do we need this?
-        # return MetadataHandle(provider, TMDBProvider.deserialize_metadata(data))
-        return MetadataHandle(self.provider, self.data)
+        return MetadataHandle(
+            self.provider,
+            self.data,
+        )
 
 
 MetadataHandleSchema = Annotated[ImdbHandleImpl | TmdbHandleImpl, OneOf]
@@ -125,12 +124,48 @@ class MetadataHandle:
     def deserialize(data: MetadataHandleSchema) -> "MetadataHandle":
         return data.to_handle()
 
+    def __str__(self: Self) -> str:
+        return f"<MetadataHandle provider: {self.__provider} data: {self.__data}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 class SkipHandle:
     # serialize the same as None
     @serializer
     def serialize(self: Self) -> None:
         return None
+
+    def __str__(self: Self) -> str:
+        return "<SkipHandle>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass
+class SkipMetadata:
+    def __str__(self: Self) -> str:
+        return "<SkipMetadata>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+def should_skip_metadata(
+    data: tuple[MetadataHandle, MetadataHandle] | MetadataHandle | SkipHandle | Any,
+) -> TypeIs[SkipHandle | SkipMetadata]:
+    if isinstance(data, (SkipHandle, SkipMetadata)):
+        return True
+
+    if isinstance(data, MetadataHandle):
+        return should_skip_metadata(data.data)
+
+    if isinstance(data, tuple):
+        return should_skip_metadata(data[0]) or should_skip_metadata(data[1])
+
+    return False
 
 
 type HandlesType = Optional[list[MetadataHandle] | SkipHandle]

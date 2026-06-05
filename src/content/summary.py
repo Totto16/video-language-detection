@@ -7,7 +7,10 @@ from typing import (
 
 from content.general import EpisodeDescription, SeasonDescription, SeriesDescription
 from content.language import Language
-from content.metadata.metadata import InternalMetadataType, SkipHandle
+from content.metadata.metadata import (
+    InternalMetadataType,
+    should_skip_metadata,
+)
 from content.shared import MetadataKind
 from content.video_metadata import VideoMetadata
 
@@ -64,7 +67,7 @@ def metadata_handle_to_type(
     if handle is None:
         return MetadataType.missing
 
-    if isinstance(handle, SkipHandle):
+    if should_skip_metadata(handle):
         return MetadataType.skipped
 
     return MetadataType.ok
