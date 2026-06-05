@@ -1,5 +1,6 @@
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
+from sys import stderr
 from typing import Self
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
@@ -37,10 +38,10 @@ class PseudoMP4Box(MP4Box):
 
 
 class RecursiveBoxes:
-    __RecursiveBoxesData = list[MP4Box | tuple[MP4Box, "__RecursiveBoxesData"]]
-    __data: __RecursiveBoxesData
+    RecursiveBoxesData = list[MP4Box | tuple[MP4Box, "RecursiveBoxesData"]]
+    __data: RecursiveBoxesData
 
-    def __init__(self: Self, data: __RecursiveBoxesData) -> None:
+    def __init__(self: Self, data: RecursiveBoxesData) -> None:
         self.__data = data
 
     def append(self: Self, val: MP4Box | tuple[MP4Box, "RecursiveBoxes"]) -> None:
@@ -50,21 +51,13 @@ class RecursiveBoxes:
 
         self.__data.append(val)
 
-    def top_boxes(self: Self) -> list[MP4Box]:
-        result: list[MP4Box] = []
-
-        for box in self.__data:
-            if isinstance(box, tuple):
-                result.append(box[0])
-                continue
-
-            result.append(box)
-
-        return result
+    @property
+    def data(self: Self) -> RecursiveBoxesData:
+        return self.__data
 
     @staticmethod
     def __single_to_str(
-        data: MP4Box | tuple[MP4Box, "__RecursiveBoxesData"],
+        data: MP4Box | tuple[MP4Box, "RecursiveBoxesData"],
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -75,7 +68,7 @@ class RecursiveBoxes:
 
     @staticmethod
     def __to_str(
-        data: __RecursiveBoxesData,
+        data: RecursiveBoxesData,
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -98,8 +91,8 @@ class RecursiveBoxes:
 
     @staticmethod
     def __is_elem_eq(
-        data1: MP4Box | tuple[MP4Box, __RecursiveBoxesData],
-        data2: MP4Box | tuple[MP4Box, __RecursiveBoxesData],
+        data1: MP4Box | tuple[MP4Box, RecursiveBoxesData],
+        data2: MP4Box | tuple[MP4Box, RecursiveBoxesData],
         depth: int,
     ) -> bool:
         if isinstance(data1, tuple) and isinstance(data2, tuple):
@@ -117,8 +110,8 @@ class RecursiveBoxes:
 
     @staticmethod
     def __eq_impl_both(
-        data1: __RecursiveBoxesData,
-        data2: __RecursiveBoxesData,
+        data1: RecursiveBoxesData,
+        data2: RecursiveBoxesData,
         depth: int,
     ) -> bool:
         if len(data1) != len(data2):
@@ -130,7 +123,7 @@ class RecursiveBoxes:
 
         return True
 
-    def __eq_impl(self: Self, data: __RecursiveBoxesData) -> bool:
+    def __eq_impl(self: Self, data: RecursiveBoxesData) -> bool:
         return RecursiveBoxes.__eq_impl_both(self.__data, data, depth=0)
 
     def __str__(self: Self) -> str:
@@ -293,20 +286,39 @@ def test_mp4_tagger_parsing(
 
             structure = structure_res.get_ok()
 
-            top_boxes = structure.boxes.top_boxes()
+            # check box consitency
+            boxes_stack: list[tuple[int, int, RecursiveBoxes.RecursiveBoxesData]] = [
+                (0, file.stat().st_size, structure.boxes.data),
+            ]
 
-            start: int = 0
-            for top_box in top_boxes:
-                if top_box.span.start != start:
-                    msg = f"Next box start is invalid, expected {start} but got {top_box.span.start}: {top_box!s}"
+            while len(boxes_stack) != 0:
+
+                boxes_start, boxes_end, boxes = boxes_stack.pop()
+                start: int = boxes_start
+                for box_data in boxes:
+
+                    box: MP4Box
+                    if isinstance(box_data, tuple):
+                        assert box_data[
+                            0
+                        ].is_container, (
+                            "boxes resulting in children have to be a container"
+                        )
+                        box = box_data[0]
+                        boxes_stack.append(
+                            (box.span.payload_start, box.span.end, box_data[1])
+                        )
+                    else:
+                        box = box_data
+
+                    if box.span.start != start:
+                        msg = f"Next box start is invalid, expected {start} but got {box.span.start}: {box!s}"
+                        raise AssertionError(msg)
+                    start = box.span.end
+
+                if boxes_end != start:
+                    msg = f"boxes don't reach at the parent end: size is {boxes_end} but boxes reach only to {start}"
                     raise AssertionError(msg)
-                start = top_box.span.end
-
-            file_size = file.stat().st_size
-
-            if file_size != start:
-                msg = f"boxes don't reach EOF: size is {file_size} but boxes reach only to {start}"
-                raise AssertionError(msg)
 
             if structure != result:
                 msg = f"Parsing was incorrect:\n{structure!s}"
