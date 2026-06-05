@@ -2,6 +2,7 @@ from collections.abc import Generator
 from io import BufferedIOBase
 from typing import Optional, Self, override
 
+from content.tagger.mp4_tagger import HDLR_ATOM_NAME
 from content.tagger.parser import (
     ByteOrder,
     Packable,
@@ -81,6 +82,14 @@ RIFF_FOURCC: FOURCC = FOURCC(b"RIFF")
 AVI__FOURCC: FOURCC = FOURCC(b"AVI ")
 AVIX_FOURCC: FOURCC = FOURCC(b"AVIX")
 LIST_FOURCC: FOURCC = FOURCC(b"LIST")
+STRH_FOURCC: FOURCC = FOURCC(b"strh")
+STRL_FOURCC: FOURCC = FOURCC(b"strl")
+HDRL_FOURCC: FOURCC = FOURCC(b"hdrl")
+
+AUDS_FOURCC = FOURCC(b"auds")
+MIDS_FOURCC = FOURCC(b"mids")
+TXTS_FOURCC = FOURCC(b"txts")
+VIDS_FOURCC = FOURCC(b"vids")
 
 
 class AVIChunkSpan:
@@ -326,7 +335,7 @@ def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChu
         chunk = read_chunk_from_stream(f, pos)
 
         if pos + chunk.span.size > end:
-            msg = f"Box {chunk.fourcc!r} at {pos} extends past parent boundary"
+            msg = f"chunk {chunk.fourcc!r} at {pos} extends past parent boundary"
             raise RuntimeError(msg)
 
         yield chunk
@@ -341,6 +350,47 @@ def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChu
                 raise RuntimeError(msg)
 
             pos += 1
+
+
+def find_strh_chunks_with_type(
+    f: BufferedIOBase,
+    types: list[FOURCC],
+) -> Generator[AVIStreamHeader]:
+    f.seek(0, 2)
+    filesize = f.tell()
+
+    stack: list[tuple[int, int, list[FOURCC]]] = [(0, filesize, [])]
+
+    while stack:
+        start, end, path = stack.pop()
+
+        for chunk in avi_iter_chunks(f, start, end):
+
+            if chunk.fourcc == STRH_FOURCC:
+                if not isinstance(chunk, AVIStreamHeader):
+                    msg = (
+                        "Invalid AVIStreamHeader: type not dispatched to correct class"
+                    )
+                    raise ValueError(msg)
+
+                if chunk.type not in types:
+                    continue
+
+                current = path[-2:]
+                if current != [
+                    HDRL_FOURCC,
+                    STRL_FOURCC,
+                ]:
+                    msg = f"invalid strh chunk hierarchy: {current}"
+                    raise RuntimeError(msg)
+
+                yield chunk
+
+            if chunk.is_list:
+                typ = chunk.fourcc
+                if isinstance(chunk, AVIList):
+                    typ = chunk.type
+                stack.append((chunk.span.payload_start, chunk.span.end, [*path, typ]))
 
 
 def is_avi_file(f: BufferedIOBase) -> Optional[str]:

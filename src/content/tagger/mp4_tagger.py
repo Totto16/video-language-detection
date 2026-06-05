@@ -848,7 +848,7 @@ def mp4_iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]
 def find_mdhd_boxes_with_type(
     f: BufferedIOBase,
     types: list[ISOMAtomName],
-) -> Generator["MediaHeaderBox"]:
+) -> Generator[MediaHeaderBox]:
     f.seek(0, 2)
     filesize = f.tell()
 
