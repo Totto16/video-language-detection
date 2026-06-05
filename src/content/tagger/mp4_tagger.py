@@ -941,12 +941,13 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
 
-            free_tag = b"vld\x42\x42\x69"
+            free_tag = b"vld\x42\x42\x69-->"
 
             # NOTE. there are some old legacy ones, that were only used during testing and the new one (which is shorter)
             free_tags: list[bytes] = [
                 b"video_language_detect_",
                 b"see other metadata for more info by video_language_detect",
+                b"vld\x42\x42\x69",
                 free_tag,
             ]
 
@@ -998,7 +999,6 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
                 self.__writer.write(buffer)
 
             self.__writer.flush()
-            raise SystemExit(2)
         finally:
             bar.close(clear=True)
 
