@@ -17,10 +17,10 @@ _ = get_translator()
 
 
 class RecursiveChunks:
-    __RecursiveChunkData = list[AVIChunk | tuple[AVIChunk, "__RecursiveChunkData"]]
-    __data: __RecursiveChunkData
+    RecursiveChunkData = list[AVIChunk | tuple[AVIChunk, "RecursiveChunkData"]]
+    __data: RecursiveChunkData
 
-    def __init__(self: Self, data: __RecursiveChunkData) -> None:
+    def __init__(self: Self, data: RecursiveChunkData) -> None:
         self.__data = data
 
     def append(self: Self, val: AVIChunk | tuple[AVIChunk, "RecursiveChunks"]) -> None:
@@ -30,21 +30,13 @@ class RecursiveChunks:
 
         self.__data.append(val)
 
-    def top_chunks(self: Self) -> list[AVIChunk]:
-        result: list[AVIChunk] = []
-
-        for chunk in self.__data:
-            if isinstance(chunk, tuple):
-                result.append(chunk[0])
-                continue
-
-            result.append(chunk)
-
-        return result
+    @property
+    def data(self: Self) -> RecursiveChunkData:
+        return self.__data
 
     @staticmethod
     def __single_to_str(
-        data: AVIChunk | tuple[AVIChunk, "__RecursiveChunkData"],
+        data: AVIChunk | tuple[AVIChunk, "RecursiveChunkData"],
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -55,7 +47,7 @@ class RecursiveChunks:
 
     @staticmethod
     def __to_str(
-        data: __RecursiveChunkData,
+        data: RecursiveChunkData,
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -84,8 +76,8 @@ class RecursiveChunks:
 
     @staticmethod
     def __is_elem_eq(
-        data1: AVIChunk | tuple[AVIChunk, __RecursiveChunkData],
-        data2: AVIChunk | tuple[AVIChunk, __RecursiveChunkData],
+        data1: AVIChunk | tuple[AVIChunk, RecursiveChunkData],
+        data2: AVIChunk | tuple[AVIChunk, RecursiveChunkData],
         depth: int,
     ) -> bool:
         if isinstance(data1, tuple) and isinstance(data2, tuple):
@@ -103,8 +95,8 @@ class RecursiveChunks:
 
     @staticmethod
     def __eq_impl_both(
-        data1: __RecursiveChunkData,
-        data2: __RecursiveChunkData,
+        data1: RecursiveChunkData,
+        data2: RecursiveChunkData,
         depth: int,
     ) -> bool:
         if len(data1) != len(data2):
@@ -116,7 +108,7 @@ class RecursiveChunks:
 
         return True
 
-    def __eq_impl(self: Self, data: __RecursiveChunkData) -> bool:
+    def __eq_impl(self: Self, data: RecursiveChunkData) -> bool:
         return RecursiveChunks.__eq_impl_both(self.__data, data, depth=0)
 
     def __str__(self: Self) -> str:
@@ -222,19 +214,41 @@ def test_avi_tagger_parsing(
 
             structure = structure_res.get_ok()
 
-            top_chunks = structure.chunks.top_chunks()
+            # check chunk consistency
+            chunks_stack: list[tuple[int, int, RecursiveChunks.RecursiveChunkData]] = [
+                (0, file.stat().st_size, structure.chunks.data),
+            ]
 
-            start: int = 0
-            for top_chunk in top_chunks:
-                if top_chunk.span.start != start:
-                    msg = f"Next chunk start is invalid, expected {start} but got {top_chunk.span.start}: {top_chunk!s}"
-                    raise AssertionError(msg)
-                start = top_chunk.span.end
+            while len(chunks_stack) != 0:
 
-            file_size = file.stat().st_size
+                chunks_start, chunks_end, chunks = chunks_stack.pop()
+                start: int = chunks_start
+                for chunk_data in chunks:
 
-            if file_size != start:
-                msg = f"chunks don't reach EOF: size is {file_size} but chunks reach only to {start}"
+                    chunk: AVIChunk
+                    if isinstance(chunk_data, tuple):
+                        assert chunk_data[
+                            0
+                        ].is_list, "chunks resulting in children have to be a list"
+                        chunk = chunk_data[0]
+                        chunks_stack.append(
+                            (chunk.span.payload_start, chunk.span.end, chunk_data[1]),
+                        )
+                    else:
+                        chunk = chunk_data
+
+                    if chunk.span.start != start:
+                        msg = f"Next chunk start is invalid, expected {start} but got {chunk.span.start}: {chunk!s}"
+                        raise AssertionError(msg)
+
+                    start = chunk.span.end
+                    
+                    #adjust padding
+                    if (start % 2) != 0:
+                        start += 1
+
+            if chunks_end != start:
+                msg = f"chunks don't reach at the parent end: size is {chunks_end} but chunks reach only to {start}"
                 raise AssertionError(msg)
 
             if structure != result:

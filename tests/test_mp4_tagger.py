@@ -286,7 +286,7 @@ def test_mp4_tagger_parsing(
 
             structure = structure_res.get_ok()
 
-            # check box consitency
+            # check box consistency
             boxes_stack: list[tuple[int, int, RecursiveBoxes.RecursiveBoxesData]] = [
                 (0, file.stat().st_size, structure.boxes.data),
             ]
@@ -314,6 +314,7 @@ def test_mp4_tagger_parsing(
                     if box.span.start != start:
                         msg = f"Next box start is invalid, expected {start} but got {box.span.start}: {box!s}"
                         raise AssertionError(msg)
+
                     start = box.span.end
 
                 if boxes_end != start:
