@@ -1021,37 +1021,48 @@ class VideoTaggerMp4(VideoTagger):
 
     @staticmethod
     def get_handle(file: Path) -> VideoTagger__HandleResult:
-        with file.open("rb") as f:
 
-            first_box = read_box_from_stream(f, 0)
+        try:
 
-            if not isinstance(first_box, FileTypeBox):
-                return VideoTagger__HandleResult.err(_("Not a valid ISOM / MP4 file"))
+            with file.open("rb") as f:
 
-            if first_box.major_brand != b"isom":
-                return VideoTagger__HandleResult.err(
-                    _("ISOM file has valid box, but invalid major_brand"),
-                )
+                first_box = read_box_from_stream(f, 0)
 
-            f.seek(0)
-
-            streams = 0
-            types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
-
-            # read the file, so that we check if we can parse it correctly and that it is an mp4
-            for mdhd in find_mdhd_boxes_with_type(f, types):
-                streams = streams + 1
-                lang = mdhd.read_language(f)
-                # check if this lang is valid
-                validated_lang = Alpha3LanguageStr.from_str(lang)
-
-                if validated_lang is None:
-                    msg = _("Invalid language in mp4 detected: {lang}").format(
-                        lang=lang,
+                if not isinstance(first_box, FileTypeBox):
+                    return VideoTagger__HandleResult.err(
+                        _("Not a valid ISOM / MP4 file")
                     )
-                    raise RuntimeError(msg)
 
-            return VideoTagger__HandleResult.ok(VideoTaggerMp4(file, streams, types))
+                if first_box.major_brand != b"isom":
+                    return VideoTagger__HandleResult.err(
+                        _("ISOM file has valid box, but invalid major_brand"),
+                    )
+
+                f.seek(0)
+
+                streams = 0
+                types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+
+                # read the file, so that we check if we can parse it correctly and that it is an mp4
+                for mdhd in find_mdhd_boxes_with_type(f, types):
+                    streams = streams + 1
+                    lang = mdhd.read_language(f)
+                    # check if this lang is valid
+                    validated_lang = Alpha3LanguageStr.from_str(lang)
+
+                    if validated_lang is None:
+                        msg = _("Invalid language in mp4 detected: {lang}").format(
+                            lang=lang,
+                        )
+                        raise RuntimeError(msg)
+
+                return VideoTagger__HandleResult.ok(
+                    VideoTaggerMp4(file, streams, types)
+                )
+        except RuntimeError as err:
+            return VideoTagger__HandleResult.err(str(err))
+        except ValueError as err:
+            return VideoTagger__HandleResult.err(str(err))
 
     @override
     def writer(

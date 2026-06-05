@@ -14,25 +14,32 @@ _ = get_translator()
 
 def get_tagger_for_mp4_file(file: Path) -> VideoTagger__HandleResult:
 
-    tagger: list[VideoTagger] = []
+    try:
 
-    mutagen_handle = VideoTaggerMutagen.get_handle(file)
+        tagger: list[VideoTagger] = []
 
-    if mutagen_handle.is_err():
-        return VideoTagger__HandleResult.err(mutagen_handle.get_err())
+        mutagen_handle = VideoTaggerMutagen.get_handle(file)
 
-    tagger.append(mutagen_handle.get_ok())
+        if mutagen_handle.is_err():
+            return VideoTagger__HandleResult.err(mutagen_handle.get_err())
 
-    mp4_handle = VideoTaggerMp4.get_handle(file)
+        tagger.append(mutagen_handle.get_ok())
 
-    if mp4_handle.is_err():
-        return VideoTagger__HandleResult.err(mp4_handle.get_err())
+        mp4_handle = VideoTaggerMp4.get_handle(file)
 
-    tagger.append(mp4_handle.get_ok())
+        if mp4_handle.is_err():
+            return VideoTagger__HandleResult.err(mp4_handle.get_err())
 
-    result = VideoTaggerMultiple(file, tagger)
+        tagger.append(mp4_handle.get_ok())
 
-    return VideoTagger__HandleResult.ok(result)
+        result = VideoTaggerMultiple(file, tagger)
+
+        return VideoTagger__HandleResult.ok(result)
+
+    except RuntimeError as err:
+        return VideoTagger__HandleResult.err(
+            _("get tagger {err}").format(err=err),
+        )
 
 
 def get_tagger_for_file(file: Path) -> VideoTagger__HandleResult:
