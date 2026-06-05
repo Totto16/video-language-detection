@@ -19,6 +19,7 @@ from content.tagger.video_tagger import (
     VideoTaggerWriter,
 )
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
+from helper.result import Result
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -180,11 +181,13 @@ class MutagenFileWrapper(IOInterface):
         self: Self,
         file: Path,
         chunk_size: int,
+        *,
+        read_only: bool = False,
     ) -> None:
         super().__init__()
 
         self.__file = file
-        self.__impl = self.__file.open(mode="rb+")
+        self.__impl = self.__file.open(mode="rb" if read_only else "rb+")
         self.__callbacks = []
         self.__chunk_size = chunk_size
 
@@ -422,47 +425,64 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
         self.__save_impl()
 
 
+VideoTaggerMutagen__HandleResult = Result[
+    tuple[MutagenFileWrapper, mutagen.FileType],
+    str,
+]
+
+
 class VideoTaggerMutagen(VideoTagger):
-    __filething: MutagenFileWrapper
-    __instance: mutagen.FileType
+    __file: Path
 
     def __init__(
         self: Self,
-        filething: MutagenFileWrapper,
-        instance: mutagen.FileType,
+        file: Path,
     ) -> None:
-        self.__instance = instance
-        self.__filething = filething
+        self.__file = file
 
     @staticmethod
-    def get_handle(file: Path) -> VideoTagger__HandleResult:
-
-        filething = MutagenFileWrapper(file=file, chunk_size=PROGRESS_CHUNK_SIZE)
-
-        # TODO:
-        # import taglib, https://pypi.org/project/pytaglib/
-
-        # import libgpac as gpac
-
-        # taglib.File("/path/to/my/file.mp3")
-        # from pymp4.parser import Box
+    def __get_handle_impl(
+        file: Path,
+        *,
+        read_only: bool,
+    ) -> VideoTaggerMutagen__HandleResult:
+        filething = MutagenFileWrapper(
+            file=file,
+            chunk_size=PROGRESS_CHUNK_SIZE,
+            read_only=read_only,
+        )
 
         try:
 
             instance = mutagen.File(filething, easy=False)
 
             if instance is None:
-                return VideoTagger__HandleResult.err(_("Not supported file type"))
+                return VideoTaggerMutagen__HandleResult.err(
+                    _("Not supported file type"),
+                )
 
-            return VideoTagger__HandleResult.ok(VideoTaggerMutagen(filething, instance))
+            return VideoTaggerMutagen__HandleResult.ok((filething, instance))
         except RuntimeError as err:
-            return VideoTagger__HandleResult.err(
+            return VideoTaggerMutagen__HandleResult.err(
                 _("get tag handle {err}").format(err=err),
             )
         except MutagenError as err:
-            return VideoTagger__HandleResult.err(
+            return VideoTaggerMutagen__HandleResult.err(
                 _("get tag handle (mutagen impl error): {err}").format(err=err),
             )
+
+    @staticmethod
+    def get_handle(file: Path) -> VideoTagger__HandleResult:
+        result = VideoTaggerMutagen.__get_handle_impl(file, read_only=True)
+
+        if result.is_err():
+            return VideoTagger__HandleResult.err(result.get_err())
+
+        filething, _instance = result.get_ok()
+
+        filething.close()
+
+        return VideoTagger__HandleResult.ok(VideoTaggerMutagen(file))
 
     @override
     def writer(
@@ -470,16 +490,28 @@ class VideoTaggerMutagen(VideoTagger):
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerWriter]:
 
-        filething = self.__filething
-        instance = self.__instance
+        def get_things() -> tuple[MutagenFileWrapper, mutagen.FileType]:
+            result = VideoTaggerMutagen.__get_handle_impl(self.__file, read_only=False)
+
+            if result.is_err():
+                msg = _(
+                    "Mutagen failed, after we checked, that it would work: {err}"  # noqa: COM812
+                ).format(err=result.get_err())
+                raise RuntimeError(msg)
+
+            return result.get_ok()
 
         class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
+            __filething: Optional[MutagenFileWrapper]
 
             def __init__(self: Self) -> None:
-                pass
+                self.__filething = None
 
             @override
             def __enter__(self: Self) -> VideoTaggerWriter:
+                filething, instance = get_things()
+                self.__filething = filething
+
                 return VideoTaggerWriterMutagen(
                     filething=filething,
                     instance=instance,
@@ -493,7 +525,8 @@ class VideoTaggerMutagen(VideoTagger):
                 _exc_val: Optional[BaseException],
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
-                filething.close()
+                if self.__filething is not None:
+                    self.__filething.close()
                 return False
 
         return VideoTaggerWriterCtx()

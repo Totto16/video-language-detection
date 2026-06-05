@@ -904,7 +904,7 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
                 pos = self.__writer.tell()
 
                 if (pos % 8) != 0:
-                    msg = "Can't write to end of the mp4 file, not aligned by 8!"
+                    msg = f"Can't write to end of the mp4 file, not aligned by 8: {pos}"
                     raise RuntimeError(msg)
 
                 buffer = FreeSpaceBox.write_to_buffer(data)
