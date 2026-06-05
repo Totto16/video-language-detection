@@ -377,6 +377,7 @@ class EpisodeContent(Content):
                     def scan_metadata_outdated() -> None:
                         if (
                             current_handles is not None
+                            and self.metadata is None
                             and not isinstance(current_handles, SkipHandle)
                             and scanner.should_scan_metadata(
                                 ScanType.rescan,

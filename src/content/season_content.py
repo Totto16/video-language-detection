@@ -169,6 +169,7 @@ class SeasonContent(Content):
 
         if (
             series_handle is not None
+            and self.metadata is None
             and not isinstance(series_handle, SkipHandle)
             and scanner.should_scan_metadata(
                 ScanType.rescan,
