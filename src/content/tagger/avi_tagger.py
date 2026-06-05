@@ -1,28 +1,14 @@
 from collections.abc import Generator
-from contextlib import AbstractContextManager
-from io import BufferedIOBase, BytesIO
-from pathlib import Path
-from types import TracebackType
-from typing import Literal, Optional, Self, override
+from io import BufferedIOBase
+from typing import Optional, Self, override
 
-from content.language import Alpha3LanguageStr, Language
 from content.tagger.parser import (
     ByteOrder,
     Packable,
-    Packer,
     Unpacker,
     UnsignedInt,
-    UnsignedLongLong,
-    UnsignedShort,
     read_checked,
 )
-from content.tagger.video_tagger import (
-    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
-    VideoTagger,
-    VideoTagger__HandleResult,
-    VideoTaggerWriter,
-)
-from helper.manager import CounterInterface, ManagerInterface
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -269,6 +255,16 @@ def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChu
 
         yield chunk
         pos += chunk.span.size
+
+        # align by WORD (2 bytes)
+        if (pos % 2) != 0:
+            f.seek(pos)
+            val = read_checked(f, 1)
+            if val != b"\x00":
+                msg = f"Invalid padding byte: {val}, it has to be 0x00"
+                raise RuntimeError(msg)
+
+            pos += 1
 
 
 def is_avi_file(f: BufferedIOBase) -> Optional[str]:
