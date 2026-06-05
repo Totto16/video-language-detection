@@ -51,7 +51,7 @@ def get_tagger_for_file(file: Path) -> VideoTagger__HandleResult:
             return get_tagger_for_mp4_file(file)
         case ".mkv":
             return VideoTagger__HandleResult.err("TODO")
-        case "avi":
+        case ".avi":
             return VideoTagger__HandleResult.err("TODO")
         case _:
             return VideoTagger__HandleResult.err(
