@@ -83,7 +83,7 @@ AVIX_FOURCC: FOURCC = FOURCC(b"AVIX")
 LIST_FOURCC: FOURCC = FOURCC(b"LIST")
 
 
-class AVIBoxSpan:
+class AVIChunkSpan:
     start: int
     size: int
     header_size: int
@@ -109,8 +109,8 @@ class AVIBoxSpan:
     @staticmethod
     def from_avi_specified_size(
         start: int, size: int, header_size: int
-    ) -> "AVIBoxSpan":
-        return AVIBoxSpan(start, size + 8, header_size)
+    ) -> "AVIChunkSpan":
+        return AVIChunkSpan(start, size + 8, header_size)
 
     @property
     def end(self: Self) -> int:
@@ -131,7 +131,7 @@ class AVIBoxSpan:
             raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
-        return f"<AVIBoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+        return f"<AVIChunkSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -142,11 +142,11 @@ AVI_BYTE_ORDER = ByteOrder.Little
 
 class AVIChunk:
     fourcc: FOURCC
-    span: AVIBoxSpan
+    span: AVIChunkSpan
     is_list: bool
 
     def __init__(
-        self: Self, fourcc: FOURCC, span: AVIBoxSpan, *, is_list: bool
+        self: Self, fourcc: FOURCC, span: AVIChunkSpan, *, is_list: bool
     ) -> None:
         self.fourcc = fourcc
         self.span = span
@@ -178,7 +178,7 @@ class AVIChunk:
         )
 
         fourcc = FOURCC(fourcc_raw)
-        span = AVIBoxSpan.from_avi_specified_size(offset, size, header_size=8)
+        span = AVIChunkSpan.from_avi_specified_size(offset, size, header_size=8)
         return AVIChunk(fourcc, span, is_list=False)
 
     def __str__(self: Self) -> str:
@@ -261,7 +261,7 @@ def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChu
             f.seek(pos)
             val = read_checked(f, 1)
             if val != b"\x00":
-                msg = f"Invalid padding byte: {val}, it has to be 0x00"
+                msg = f"Invalid padding byte: {val!r}, it has to be 0x00"
                 raise RuntimeError(msg)
 
             pos += 1

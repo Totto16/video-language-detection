@@ -5,7 +5,17 @@ from typing import Self
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
 
-from content.tagger.avi_tagger import AVIChunk, AVIList, avi_iter_chunks, is_avi_file
+from content.tagger.avi_tagger import (
+    AVI__FOURCC,
+    FOURCC,
+    LIST_FOURCC,
+    RIFF_FOURCC,
+    AVIChunk,
+    AVIChunkSpan,
+    AVIList,
+    avi_iter_chunks,
+    is_avi_file,
+)
 from helper.result import Result
 from helper.translation import get_translator
 
@@ -16,8 +26,28 @@ mark_as_used(avi_test_parse_files)
 _ = get_translator()
 
 
+class PseudoAVIChunk(AVIChunk):
+
+    def __init__(self: Self, fourcc: FOURCC, size: int) -> None:
+        super().__init__(fourcc, span=AVIChunkSpan(0, size, 8), is_list=False)
+
+
+class PseudoAVIList(AVIList):
+
+    def __init__(self: Self, fourcc: FOURCC, size: int, typ: FOURCC) -> None:
+        super().__init__(PseudoAVIChunk(fourcc, size), typ)
+
+
+class PseudoMOVIChunk(PseudoAVIList):
+    children: int
+
+    def __init__(self: Self, children: int, size: int) -> None:
+        super().__init__(LIST_FOURCC, size, FOURCC(b"movi"))
+        self.children = children
+
+
 class RecursiveChunks:
-    RecursiveChunkData = list[AVIChunk | tuple[AVIChunk, "RecursiveChunkData"]]
+    RecursiveChunkData = list[AVIChunk | tuple[AVIList, "RecursiveChunkData"]]
     __data: RecursiveChunkData
 
     def __init__(self: Self, data: RecursiveChunkData) -> None:
@@ -41,9 +71,13 @@ class RecursiveChunks:
         indent_str: str = " ",
     ) -> str:
         if isinstance(data, tuple):
-            return f"{(indent_str * depth)}<NestedBoxes\n{data[0]!s}\n{RecursiveChunks.__to_str(data[1], depth=depth+1)}>"
+            if isinstance(data[0], AVIList):
+                if data[0].type == FOURCC(b"movi"):
+                    return f"{(indent_str * depth)}<MoviChunk children: {len(data[1])} span: {data[0].span}>"
 
-        return f"{(indent_str * depth)}<SimpleBox {data!s}>"
+            return f"{(indent_str * depth)}<NestedChunks\n{data[0]!s}\n{RecursiveChunks.__to_str(data[1], depth=depth+1)}>"
+
+        return f"{(indent_str * depth)}<SimpleChunk {data!s}>"
 
     @staticmethod
     def __to_str(
@@ -86,6 +120,14 @@ class RecursiveChunks:
 
             if not RecursiveChunks.__is_chunk_eq(c1, c2):
                 return False
+
+            if isinstance(c1, AVIList):
+                if c1.type == FOURCC(b"movi"):
+                    if not isinstance(c2, PseudoMOVIChunk):
+                        msg = f"Found MOVI Chunk without matching PseudoMOVIChunk"
+                        raise RuntimeError(msg)
+
+                    return c2.children == len(d1)
 
             return RecursiveChunks.__eq_impl_both(d1, d2, depth=depth + 1)
         if isinstance(data1, AVIChunk) and isinstance(data2, AVIChunk):
@@ -199,7 +241,77 @@ def test_avi_tagger_parsing(
     test_files: list[tuple[Path, AVIChunkStructure]] = list(
         zip(
             avi_test_parse_files.data,
-            [AVIChunkStructure(RecursiveChunks([]))],
+            [
+                AVIChunkStructure(
+                    RecursiveChunks(
+                        [
+                            (
+                                PseudoAVIList(RIFF_FOURCC, 742478, AVI__FOURCC),
+                                [
+                                    (
+                                        PseudoAVIList(
+                                            LIST_FOURCC, 8902, FOURCC(b"hdrl")
+                                        ),
+                                        [
+                                            PseudoAVIChunk(FOURCC(b"avih"), 64),
+                                            (
+                                                PseudoAVIList(
+                                                    LIST_FOURCC,
+                                                    4328,
+                                                    FOURCC(b"strl"),
+                                                ),
+                                                [
+                                                    PseudoAVIChunk(FOURCC(b"strh"), 64),
+                                                    PseudoAVIChunk(FOURCC(b"strf"), 48),
+                                                    PseudoAVIChunk(
+                                                        FOURCC(
+                                                            b"JUNK",
+                                                        ),
+                                                        4128,
+                                                    ),
+                                                    PseudoAVIChunk(FOURCC(b"vprp"), 76),
+                                                ],
+                                            ),
+                                            (
+                                                PseudoAVIList(
+                                                    LIST_FOURCC,
+                                                    4230,
+                                                    FOURCC(b"strl"),
+                                                ),
+                                                [
+                                                    PseudoAVIChunk(FOURCC(b"strh"), 64),
+                                                    PseudoAVIChunk(FOURCC(b"strf"), 26),
+                                                    PseudoAVIChunk(
+                                                        FOURCC(
+                                                            b"JUNK",
+                                                        ),
+                                                        4128,
+                                                    ),
+                                                ],
+                                            ),
+                                            PseudoAVIChunk(
+                                                FOURCC(
+                                                    b"JUNK",
+                                                ),
+                                                268,
+                                            ),
+                                        ],
+                                    ),
+                                    (
+                                        PseudoAVIList(LIST_FOURCC, 34, FOURCC(b"INFO")),
+                                        [
+                                            PseudoAVIChunk(FOURCC(b"ISFT"), 22),
+                                        ],
+                                    ),
+                                    PseudoAVIChunk(FOURCC(b"JUNK"), 1024),
+                                    (PseudoMOVIChunk(2336, 695122), []),
+                                    PseudoAVIChunk(FOURCC(b"idx1"), 37384),
+                                ],
+                            ),
+                        ],
+                    ),
+                ),
+            ],
             strict=True,
         ),
     )
@@ -242,8 +354,8 @@ def test_avi_tagger_parsing(
                         raise AssertionError(msg)
 
                     start = chunk.span.end
-                    
-                    #adjust padding
+
+                    # adjust padding
                     if (start % 2) != 0:
                         start += 1
 

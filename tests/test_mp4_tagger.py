@@ -1,6 +1,5 @@
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
-from sys import stderr
 from typing import Self
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
