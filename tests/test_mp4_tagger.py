@@ -2,6 +2,7 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
 
+from content.language import Language
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
 from pytest_subtests import SubTests
 
@@ -14,10 +15,13 @@ from content.tagger.mp4_tagger import (
     MDIA_ATOM_NAME,
     MINF_ATOM_NAME,
     MOOV_ATOM_NAME,
+    SOUN_ATOM_NAME,
     TRAK_ATOM_NAME,
+    VIDE_ATOM_NAME,
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
+    find_mdhd_boxes_with_type,
     is_mp4_file,
     mp4_iter_boxes,
 )
@@ -352,3 +356,47 @@ def test_mp4_invalid_bytes(
             assert res is not None, "valid mp4 is incorrect here"
 
             assert res == err, "incorrect error"
+
+
+def test_mp4_tagger_language_patching(
+    subtests: SubTests,
+    mp4_test_parse_files: TempVideoFiles,
+) -> None:
+
+    test_files: list[tuple[Path, Language, Language]] = list(
+        zip(
+            mp4_test_parse_files.data,
+            [Language.get_default()],
+            [Language.from_values("de", "German")],
+            strict=True,
+        ),
+    )
+
+    types: list[ISOMAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+
+    for file, old_lang, new_language in test_files:
+        with subtests.test("video gets parsed correctly"):
+            structure_res = MP4BoxStructure.from_file(file)
+
+            if structure_res.is_err():
+                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+                raise AssertionError(msg)
+
+            with file.open("rb+") as f:
+                for mdhd in find_mdhd_boxes_with_type(f, types):
+                    old_file_lang = mdhd.read_language(f)
+
+                    assert old_file_lang == str(
+                        old_lang.to_alpha3()
+                    ), "Old language should match"
+
+                    mdhd.patch_language(f, str(new_language.to_alpha3()))
+
+            # validate language
+            with file.open("rb") as f:
+                for mdhd in find_mdhd_boxes_with_type(f, types):
+                    old_file_lang = mdhd.read_language(f)
+
+                    assert old_file_lang == str(
+                        new_language.to_alpha3()
+                    ), "New language should be written"

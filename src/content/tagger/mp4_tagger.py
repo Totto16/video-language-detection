@@ -951,7 +951,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
         try:
             self.__writer.seek(0)
-            # NOTE: we always path the language, no matter what
+            # NOTE: we always patch the language, no matter what
             for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
                 mdhd.patch_language(self.__writer, str(new_language))
                 bar.update(1, force=True)
