@@ -1,3 +1,4 @@
+from enum import StrEnum
 import struct
 from abc import ABC, abstractmethod
 from collections.abc import Generator
@@ -33,78 +34,78 @@ def read_checked(f: BufferedIOBase, amount: int) -> bytes:
     return value
 
 
-BytesOrder = Literal[
-    "@",
-    "=",
-    "<",
-    ">",
-    "!",
-]
+class ByteOrder(StrEnum):
+    NativeNative = "@"
+    Native = "="
+    Little = "<"
+    Big = ">"
+    Network = "!"
 
 
-class Packable(ABC):
-
-    @abstractmethod
+class Packable[T](ABC):
     @property
+    @abstractmethod
     def pack_str(self: Self) -> str: ...
 
-    @abstractmethod
     @property
+    @abstractmethod
     def pack_size(self: Self) -> int: ...
 
 
-class UnsignedInt(Packable):
-    @override
+class UnsignedInt(Packable[int]):
     @property
+    @override
     def pack_str(self: Self) -> str:
         return "I"
 
-    @override
     @property
+    @override
     def pack_size(self: Self) -> int:
         return 4
 
-    pack_type = int
 
-
-class PackableISOAtomName(Packable):
-    @override
+class PackableISOAtomName(Packable[bytes]):
     @property
+    @override
     def pack_str(self: Self) -> str:
         return "4s"
 
-    @override
     @property
+    @override
     def pack_size(self: Self) -> int:
         return 4
 
-    pack_type = bytes
 
-
-class UnsignedLongLong(Packable):
-    @override
+class UnsignedLongLong(Packable[int]):
     @property
+    @override
     def pack_str(self: Self) -> str:
         return "Q"
 
-    @override
     @property
+    @override
     def pack_size(self: Self) -> int:
         return 8
 
-    pack_type = int
 
+class UnsignedShort(Packable[int]):
+    @property
+    @override
+    def pack_str(self: Self) -> str:
+        return "H"
 
-class TODOH:
-    i = "H"
+    @property
+    @override
+    def pack_size(self: Self) -> int:
+        return 2
 
 
 class Unpacker:
 
     @staticmethod
     def __unpack_impl(
-        byte_order: BytesOrder,
-        packer: list[Packable],
+        byte_order: ByteOrder,
+        packer: list[Packable[Any]],
         value: bytes,
     ) -> tuple[Any, ...]:
 
@@ -127,22 +128,18 @@ class Unpacker:
         return struct.unpack(fmt, value)
 
     @staticmethod
-    def unpack_default(
-        packer: list[Packable],
+    def unpack_sized(
+        byte_order: ByteOrder,
+        packer: list[Packable[Any]],
         value: bytes,
-    ) -> tuple[Any, ...]:
-        return Unpacker.__unpack_impl(">", packer, value)
-
-    @staticmethod
-    def unpack_default_sized(
-        packer: list[Packable], value: bytes, size: int
+        size: int,
     ) -> tuple[Any, ...]:
 
         if len(packer) != size:
             msg = f"Expected unpack to produce {size} values, but got {len(packer)}"
             raise RuntimeError(msg)
 
-        result = Unpacker.unpack_default(packer, value)
+        result = Unpacker.__unpack_impl(byte_order, packer, value)
 
         if len(result) != size:
             msg = f"Expected unpack to produce {size} values, but got {len(result)}"
@@ -151,17 +148,75 @@ class Unpacker:
         return result
 
     @staticmethod
-    def unpack_default_one[A](
-        packer: Packable,
+    def unpack_one[A](
+        byte_order: ByteOrder,
+        packer: Packable[A],
         value: bytes,
-    ) -> A.pack_type:
-        result = Unpacker.unpack_default_sized[A]([packer], value, size=1)
+    ) -> A:
+        result = Unpacker.unpack_sized(byte_order, [packer], value, size=1)
 
         return result[0]
 
+    @staticmethod
+    def unpack_two[A, B](
+        byte_order: ByteOrder,
+        packer: tuple[Packable[A], Packable[B]],
+        value: bytes,
+    ) -> tuple[A, B]:
+        return Unpacker.unpack_sized(byte_order, [*packer], value, size=2)
+
 
 class Packer:
-    pass
+
+    @staticmethod
+    def __pack_impl(
+        byte_order: ByteOrder,
+        packer: list[Packable[Any]],
+        values: list[Any],
+        size: int,
+    ) -> bytes:
+
+        if len(packer) != len(values):
+            msg = f"Expected pack to use {len(packer)} values, but got {len(values)}"
+            raise RuntimeError(msg)
+
+        fmts = "".join([pack.pack_str for pack in packer])
+
+        pack_size = sum(pack.pack_size for pack in packer)
+
+        fmt: str = f"{byte_order}{fmts}"
+
+        size = struct.calcsize(fmt)
+
+        if pack_size != size:
+            msg = f"Packing implementation error: expected bytes with size {size} but got PACK {pack_size}"
+            raise RuntimeError(msg)
+
+        value = struct.pack(fmt, *values)
+
+        if len(value) != size:
+            msg = f"Packing has wrong input: expected bytes with size {size} but got {len(value)}"
+            raise RuntimeError(msg)
+
+        return value
+
+    @staticmethod
+    def pack_one[A](
+        byte_order: ByteOrder,
+        packer: Packable[A],
+        value: A,
+        size: int,
+    ) -> bytes:
+        return Packer.__pack_impl(byte_order, [packer], [value], size=size)
+
+    @staticmethod
+    def pack_two[A, B](
+        byte_order: ByteOrder,
+        packer: tuple[Packable[A], Packable[B]],
+        values: tuple[A, B],
+        size: int,
+    ) -> bytes:
+        return Packer.__pack_impl(byte_order, [*packer], [*values], size=size)
 
 
 class ISOAtomName:
@@ -275,6 +330,9 @@ class BoxSpan:
         return str(self)
 
 
+ISOM_BYTE_ORDER = ByteOrder.Big
+
+
 class MP4Box:
     type: ISOAtomName
     span: BoxSpan
@@ -315,7 +373,8 @@ class MP4Box:
 
         hdr = read_checked(f, 8)
 
-        size, typ_raw = Unpacker.unpack_default_tuple(
+        size, typ_raw = Unpacker.unpack_two(
+            ISOM_BYTE_ORDER,
             (UnsignedInt(), PackableISOAtomName()),
             hdr,
         )
@@ -337,8 +396,10 @@ class MP4Box:
         if size == 1:
             ext = read_checked(f, 8)
 
-            largesize = Unpacker.unpack_default_one[UnsignedLongLong](
-                UnsignedLongLong(), ext
+            largesize = Unpacker.unpack_one(
+                ISOM_BYTE_ORDER,
+                UnsignedLongLong(),
+                ext,
             )
 
             if largesize < 16:
@@ -373,20 +434,25 @@ class MP4Box:
             additional_size = final_size + 8
             final_size = 1
 
-        hdr = struct.pack_default(
-            (UnsignedInt, PackableISOAtomName), final_size, typ.value
+        hdr = Packer.pack_two(
+            ISOM_BYTE_ORDER,
+            (UnsignedInt(), PackableISOAtomName()),
+            (
+                final_size,
+                typ.value,
+            ),
+            8,
         )
-        if len(hdr) != 8:
-            msg = "packed bytes are not of correct size"
-            raise RuntimeError(msg)
 
         buf.write(hdr)
 
         if additional_size is not None:
-            largsize = struct.pack_Default(UnsignedLongLong, additional_size)
-            if len(largsize) != 8:
-                msg = "packed bytes are not of correct size"
-                raise RuntimeError(msg)
+            largsize = Packer.pack_one(
+                ISOM_BYTE_ORDER,
+                UnsignedLongLong(),
+                additional_size,
+                8,
+            )
 
             buf.write(largsize)
 
@@ -500,8 +566,10 @@ class FileTypeBox(MP4Box):
 
         minor_version_bytes = read_checked(f, 4)
 
-        minor_version = Unpacker.unpack_default_one[UnsignedInt](
-            UnsignedInt(), minor_version_bytes
+        minor_version = Unpacker.unpack_one(
+            ISOM_BYTE_ORDER,
+            UnsignedInt(),
+            minor_version_bytes,
         )
 
         compatible_brands_size = parent.span.payload_size - (4 + 4)
@@ -692,7 +760,7 @@ class MediaHeaderBox(MP4FullBox):
         f.seek(self.span.start + self.language_offset)
 
         lang_bytes = read_checked(f, 2)
-        packed = Unpacker.unpack_default_one(TODOH, lang_bytes)
+        packed = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), lang_bytes)
 
         return MediaHeaderBox.decode_language(packed)
 
@@ -701,17 +769,14 @@ class MediaHeaderBox(MP4FullBox):
 
         f.seek(self.span.start + self.language_offset)
 
-        packed_bytes = struct.pack_default(TODOH, packed)
-        if len(packed_bytes) != 2:
-            msg = "packed bytes are not of correct size"
-            raise RuntimeError(msg)
+        packed_bytes = Packer.pack_one(ISOM_BYTE_ORDER, UnsignedShort(), packed, 2)
 
         f.write(packed_bytes)
         f.flush()
 
         f.seek(self.span.start + self.language_offset)
         verify_bytes = read_checked(f, 2)
-        verify = Unpacker.unpack_default_one[TODOH](TODOH, verify_bytes)
+        verify = Unpacker.unpack_one(ISOM_BYTE_ORDER,UnsignedShort(), verify_bytes)
 
         if verify != packed:
             msg = "Invalid overwrite"
