@@ -113,11 +113,11 @@ class AVIBoxSpan:
         self.header_size = header_size
 
         if self.size < 8:
-            msg = f"Invalid box: sitze too small: {self.size}"
+            msg = f"Invalid chunk: sitze too small: {self.size}"
             raise RuntimeError(msg)
 
         if self.size < self.header_size:
-            msg = f"Invalid box size {self.size} at {self.start}"
+            msg = f"Invalid chunk size {self.size} at {self.start}"
             raise RuntimeError(msg)
 
     @staticmethod
@@ -141,7 +141,7 @@ class AVIBoxSpan:
     def add_header_size(self: Self, header_size: int) -> None:
         self.header_size = self.header_size + header_size
         if self.size < self.header_size:
-            msg = f"Invalid box size {self.size} at {self.start}"
+            msg = f"Invalid chunk size {self.size} at {self.start}"
             raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
@@ -213,7 +213,7 @@ class AVIList(AVIChunk):
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: AVIChunk) -> "AVIList":
         # AVI List structure:
-        # box    | <chunk size> bytes | parent chunk
+        # chunk    | <chunk size> bytes | parent chunk
         # type   | 4 bytes | char[4]
 
         # typedef struct {
@@ -271,67 +271,29 @@ def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChu
         pos += chunk.span.size
 
 
-def find_mdhd_boxes_with_type(
-    f: BufferedIOBase,
-    types: list[ISOAtomName],
-) -> Generator["MediaHeaderBox"]:
-    f.seek(0, 2)
-    filesize = f.tell()
-
-    stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
-
-    while stack:
-        start, end, path = stack.pop()
-
-        for box in mp4_iter_boxes(f, start, end):
-
-            if box.type == TRAK_ATOM_NAME:
-                if not isinstance(box, TrackBox):
-                    msg = "Invalid TrackBox: type not dispatched to correct class"
-                    raise ValueError(msg)
-
-                hdlr = box.hdlr.handler_type
-
-                if hdlr not in types:
-                    continue
-
-            if box.type == MDHD_ATOM_NAME:
-                if not isinstance(box, MediaHeaderBox):
-                    msg = "Invalid MediaHeaderBox: type not dispatched to correct class"
-                    raise ValueError(msg)
-
-                current = path
-                if current != [
-                    MOOV_ATOM_NAME,
-                    TRAK_ATOM_NAME,
-                    MDIA_ATOM_NAME,
-                ]:
-                    msg = f"invalid mdhd box hierarchy: {current}"
-                    raise RuntimeError(msg)
-
-                yield box
-
-            if box.container:
-                stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
-
-
 def is_avi_file(f: BufferedIOBase) -> Optional[str]:
     f.seek(0)
 
-    first_chunk = read_chunk_from_stream(f, 0)
+    try:
 
-    if not isinstance(first_chunk, AVIList):
-        return _("Not a valid RIFF / AVI file")
+        first_chunk = read_chunk_from_stream(f, 0)
 
-    if first_chunk.fourcc != RIFF_FOURCC:
-        return _(
-            "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}"
-        ).format(first_chunk=first_chunk.fourcc)
+        if not isinstance(first_chunk, AVIList):
+            return _("Not a valid RIFF / AVI file")
 
-    if first_chunk.type not in [AVI__FOURCC, AVIX_FOURCC]:
-        return _(
-            "RIFF/AVI file has valid chunk, but it sis not the correct starting chunk, list type invalid: {list_type!r}"
-        ).format(list_type=first_chunk.type)
+        if first_chunk.fourcc != RIFF_FOURCC:
+            return _(
+                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}"
+            ).format(first_chunk=first_chunk.fourcc)
 
-    f.seek(0)
+        if first_chunk.type not in [AVI__FOURCC, AVIX_FOURCC]:
+            return _(
+                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}"
+            ).format(list_type=first_chunk.type)
+
+        f.seek(0)
+    except RuntimeError as err:
+        return str(err)
+    except ValueError as err:
+        return str(err)
     return None
