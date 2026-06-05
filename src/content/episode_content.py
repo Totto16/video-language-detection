@@ -198,6 +198,8 @@ class EpisodeContent(Content):
         def write_file_metadata() -> None:
             nonlocal changed_file
 
+            print(f"Try to tag file {self.scanned_file.path}")
+        
             handle_result = get_tagger_for_file(self.scanned_file.path)
             if handle_result.is_err():
                 logger.error(
@@ -228,6 +230,7 @@ class EpisodeContent(Content):
 
                 if global_counter_wip > 0:
                     global_counter_wip -= 1
+                    print(f"Tagging file {self.scanned_file.path}")
 
                     with handle.writer(manager=manager) as writer:
                         writer.write_metadata(

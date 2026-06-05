@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from functools import reduce
 from logging import Logger
 from typing import Any, NewType, Optional, Self, assert_never, cast, override
@@ -103,6 +104,18 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> None:
         self.__reporter.emit_error(self.__name, where, message)
 
+    def __validate_episodes_impl(
+        self: Self,
+        series: SeriesDescription,
+        season: SeasonDescription,
+        contents: list[EpisodeContent],
+    ) -> list[ED]:
+        state: list[ED] = [
+            self.validate_episode(content, series=series, season=season)
+            for content in contents
+        ]
+        return state
+
     def __validate_seasons_impl(
         self: Self,
         series: SeriesDescription,
@@ -111,10 +124,11 @@ class Validator[ED, SD, S2D, CD](ABC):
         state: list[SD] = []
 
         for content in contents:
-            local_state = [
-                self.validate_episode(episode, series, content.description)
-                for episode in content.episodes
-            ]
+            local_state = self.__validate_episodes_impl(
+                series=series,
+                season=content.description,
+                contents=content.episodes,
+            )
             state.append(
                 self.validate_season(content, series=series, result=local_state),
             )
@@ -141,6 +155,9 @@ class Validator[ED, SD, S2D, CD](ABC):
                 state.append(self.validate_collection(content, local_state))
             elif isinstance(content, SeriesContent):
                 local_state = self.__validate_series_impl([content])
+                if len(local_state) != 1:
+                    msg = "UNREACHABLE"
+                    raise RuntimeError(msg)
                 state.extend(local_state)
             elif isinstance(content, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
@@ -165,6 +182,39 @@ class Validator[ED, SD, S2D, CD](ABC):
     __Any4 = NewType("__Any4", __AnyClass)
 
     @staticmethod
+    def __validate_multiple_episodes_impl(
+        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        series: SeriesDescription,
+        season: SeasonDescription,
+        contents: list[EpisodeContent],
+    ) -> list[list["Validator.__Any1"]]:
+        state: list[list[Validator.__Any1]] = []
+
+        for content in contents:
+            local_states: list[Validator.__Any1] = [
+                validator.validate_episode(content, series=series, season=season)
+                for validator in validators
+            ]
+
+            state.append(local_states)
+
+        return state
+
+    @staticmethod
+    def __list_transpose[A](ls: list[list[A]]) -> list[list[A]]:
+        return [list(row) for row in zip(*ls, strict=True)]
+
+    @staticmethod
+    def __zip_validators[A, B](
+        a: list[A],
+        b: list[list[B]],
+    ) -> Iterable[tuple[A, list[B]]]:
+        if len(b) == 0:
+            return zip(a, [cast(list[B], []) for _ in a], strict=True)
+
+        return zip(a, b, strict=True)
+
+    @staticmethod
     def __validate_multiple_seasons_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         series: SeriesDescription,
@@ -172,19 +222,19 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> list[list["Validator.__Any2"]]:
         state: list[list[Validator.__Any2]] = []
 
-        for validator in validators:
-            local_states: list[list[Validator.__Any1]] = []
-            for content in contents:
-                local_states.append(
-                    [
-                        validator.validate_episode(
-                            episode,
-                            series=series,
-                            season=content.description,
-                        )
-                        for episode in content.episodes
-                    ],
+        for content in contents:
+            local_states: list[list[Validator.__Any1]] = (
+                Validator.__validate_multiple_episodes_impl(
+                    validators,
+                    series=series,
+                    season=content.description,
+                    contents=content.episodes,
                 )
+            )
+
+            validator_index_states: list[list[Validator.__Any1]] = (
+                Validator.__list_transpose(local_states)
+            )
 
             state.append(
                 [
@@ -193,13 +243,13 @@ class Validator[ED, SD, S2D, CD](ABC):
                         series=series,
                         result=local_state,
                     )
-                    for validator, local_state in zip(
+                    for validator, local_state in Validator.__zip_validators(
                         validators,
-                        local_states,
-                        strict=True,
+                        validator_index_states,
                     )
                 ],
             )
+
         return state
 
     @staticmethod
@@ -210,18 +260,24 @@ class Validator[ED, SD, S2D, CD](ABC):
         state: list[list[Validator.__Any3]] = []
 
         for content in contents:
-            local_states: list[list[Any]] = Validator.__validate_multiple_seasons_impl(
-                validators,
-                series=content.description,
-                contents=content.seasons,
+            local_states: list[list[Validator.__Any2]] = (
+                Validator.__validate_multiple_seasons_impl(
+                    validators,
+                    series=content.description,
+                    contents=content.seasons,
+                )
             )
+
+            validator_index_states: list[list[Validator.__Any2]] = (
+                Validator.__list_transpose(local_states)
+            )
+
             state.append(
                 [
                     validator.validate_series(content, local_state)
-                    for validator, local_state in zip(
+                    for validator, local_state in Validator.__zip_validators(
                         validators,
-                        local_states,
-                        strict=True,
+                        validator_index_states,
                     )
                 ],
             )
@@ -241,13 +297,17 @@ class Validator[ED, SD, S2D, CD](ABC):
                     validators,
                     content.series,
                 )
+
+                validator_index_states: list[list[Validator.__Any3]] = (
+                    Validator.__list_transpose(local_states)
+                )
+
                 state.append(
                     [
                         validator.validate_collection(content, local_state)
-                        for validator, local_state in zip(
+                        for validator, local_state in Validator.__zip_validators(
                             validators,
-                            local_states,
-                            strict=True,
+                            validator_index_states,
                         )
                     ],
                 )
@@ -256,6 +316,10 @@ class Validator[ED, SD, S2D, CD](ABC):
                     validators,
                     [content],
                 )
+
+                if len(local_states) != 1:
+                    msg = "UNREACHABLE"
+                    raise RuntimeError(msg)
                 state.extend(local_states)
             elif isinstance(content, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
