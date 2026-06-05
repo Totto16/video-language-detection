@@ -15,8 +15,8 @@ from content.tagger.mp4_tagger import (
     MINF_ATOM_NAME,
     MOOV_ATOM_NAME,
     TRAK_ATOM_NAME,
-    BoxSpan,
-    ISOAtomName,
+    Mp4BoxSpan,
+    ISOMAtomName,
     MP4Box,
     is_mp4_file,
     mp4_iter_boxes,
@@ -28,8 +28,8 @@ mark_as_used(mp4_test_parse_files)
 
 class PseudoMp4Box(MP4Box):
 
-    def __init__(self: Self, typ: ISOAtomName, size: int) -> None:
-        super().__init__(typ, span=BoxSpan(0, size, 8), container=False)
+    def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
+        super().__init__(typ, span=Mp4BoxSpan(0, size, 8), is_container=False)
 
 
 class RecursiveBoxes:
@@ -154,7 +154,7 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
         start, end, current_target = stack.pop()
 
         for box in mp4_iter_boxes(f, start, end):
-            if box.container:
+            if box.is_container:
                 target: tuple[MP4Box, RecursiveBoxes] = (box, RecursiveBoxes([]))
                 current_target.append(target)
                 stack.append((box.span.payload_start, box.span.end, target[1]))
@@ -219,13 +219,13 @@ def test_mp4_tagger_parsing(
                             (
                                 PseudoMp4Box(MOOV_ATOM_NAME, 11824),
                                 [
-                                    PseudoMp4Box(ISOAtomName(b"mvhd"), 108),
-                                    PseudoMp4Box(ISOAtomName(b"iods"), 42),
+                                    PseudoMp4Box(ISOMAtomName(b"mvhd"), 108),
+                                    PseudoMp4Box(ISOMAtomName(b"iods"), 42),
                                     (
                                         PseudoMp4Box(TRAK_ATOM_NAME, 5317),
                                         [
                                             PseudoMp4Box(
-                                                ISOAtomName(
+                                                ISOMAtomName(
                                                     b"tkhd",
                                                 ),
                                                 92,
@@ -245,7 +245,7 @@ def test_mp4_tagger_parsing(
                                         PseudoMp4Box(TRAK_ATOM_NAME, 6349),
                                         [
                                             PseudoMp4Box(
-                                                ISOAtomName(
+                                                ISOMAtomName(
                                                     b"tkhd",
                                                 ),
                                                 92,
@@ -264,7 +264,7 @@ def test_mp4_tagger_parsing(
                                 ],
                             ),
                             PseudoMp4Box(FREE_ATOM_NAME, 8),
-                            PseudoMp4Box(ISOAtomName(b"mdat"), 1558160),
+                            PseudoMp4Box(ISOMAtomName(b"mdat"), 1558160),
                         ],
                     )
                 ),

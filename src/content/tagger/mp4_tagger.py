@@ -6,7 +6,16 @@ from types import TracebackType
 from typing import Literal, Optional, Self, override
 
 from content.language import Alpha3LanguageStr, Language
-from content.tagger.parser import ByteOrder, Packable, Packer, Unpacker, UnsignedInt, UnsignedLongLong, UnsignedShort, read_checked
+from content.tagger.parser import (
+    ByteOrder,
+    Packable,
+    Packer,
+    Unpacker,
+    UnsignedInt,
+    UnsignedLongLong,
+    UnsignedShort,
+    read_checked,
+)
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     VideoTagger,
@@ -19,19 +28,7 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-class PackableISOAtomName(Packable[bytes]):
-    @property
-    @override
-    def pack_str(self: Self) -> str:
-        return "4s"
-
-    @property
-    @override
-    def pack_size(self: Self) -> int:
-        return 4
-
-
-class ISOAtomName:
+class ISOMAtomName:
     __value: bytes
 
     def __init__(self: Self, value: bytes) -> None:
@@ -59,7 +56,7 @@ class ISOAtomName:
         return hash(self.__value)
 
     def __eq__(self: Self, other: object) -> bool:
-        if isinstance(other, ISOAtomName):
+        if isinstance(other, ISOMAtomName):
             return self.__value == other.__value
 
         if isinstance(other, str):
@@ -71,30 +68,42 @@ class ISOAtomName:
         return False
 
 
-CMOV_ATOM_NAME: ISOAtomName = ISOAtomName(b"cmov")
-MOOF_ATOM_NAME: ISOAtomName = ISOAtomName(b"moof")
-MOOV_ATOM_NAME: ISOAtomName = ISOAtomName(b"moov")
-UUID_ATOM_NAME: ISOAtomName = ISOAtomName(b"uuid")
-TRAK_ATOM_NAME: ISOAtomName = ISOAtomName(b"trak")
-MDIA_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdia")
-MINF_ATOM_NAME: ISOAtomName = ISOAtomName(b"minf")
-STBL_ATOM_NAME: ISOAtomName = ISOAtomName(b"stbl")
-EDTS_ATOM_NAME: ISOAtomName = ISOAtomName(b"edts")
-DINF_ATOM_NAME: ISOAtomName = ISOAtomName(b"dinf")
-UDTA_ATOM_NAME: ISOAtomName = ISOAtomName(b"udta")
-META_ATOM_NAME: ISOAtomName = ISOAtomName(b"meta")
-TRAF_ATOM_NAME: ISOAtomName = ISOAtomName(b"traf")
-MFRA_ATOM_NAME: ISOAtomName = ISOAtomName(b"mfra")
-MDHD_ATOM_NAME: ISOAtomName = ISOAtomName(b"mdhd")
-SOUN_ATOM_NAME: ISOAtomName = ISOAtomName(b"soun")
-HDLR_ATOM_NAME: ISOAtomName = ISOAtomName(b"hdlr")
-VIDE_ATOM_NAME: ISOAtomName = ISOAtomName(b"vide")
-FTYP_ATOM_NAME: ISOAtomName = ISOAtomName(b"ftyp")
-FREE_ATOM_NAME: ISOAtomName = ISOAtomName(b"free")
-SKIP_ATOM_NAME: ISOAtomName = ISOAtomName(b"skip")
+class PackableISOMAtomName(Packable[bytes]):
+    @property
+    @override
+    def pack_str(self: Self) -> str:
+        return "4s"
+
+    @property
+    @override
+    def pack_size(self: Self) -> int:
+        return 4
 
 
-class BoxSpan:
+CMOV_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"cmov")
+MOOF_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"moof")
+MOOV_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"moov")
+UUID_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"uuid")
+TRAK_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"trak")
+MDIA_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mdia")
+MINF_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"minf")
+STBL_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"stbl")
+EDTS_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"edts")
+DINF_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"dinf")
+UDTA_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"udta")
+META_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"meta")
+TRAF_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"traf")
+MFRA_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mfra")
+MDHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mdhd")
+SOUN_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"soun")
+HDLR_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"hdlr")
+VIDE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"vide")
+FTYP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"ftyp")
+FREE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"free")
+SKIP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"skip")
+
+
+class Mp4BoxSpan:
     start: int
     size: int
     header_size: int
@@ -136,7 +145,7 @@ class BoxSpan:
             raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
-        return f"<BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+        return f"<Mp4BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -146,14 +155,20 @@ ISOM_BYTE_ORDER = ByteOrder.Big
 
 
 class MP4Box:
-    type: ISOAtomName
-    span: BoxSpan
-    container: bool
+    type: ISOMAtomName
+    span: Mp4BoxSpan
+    is_container: bool
 
-    def __init__(self: Self, typ: ISOAtomName, span: BoxSpan, container: bool) -> None:
+    def __init__(
+        self: Self,
+        typ: ISOMAtomName,
+        span: Mp4BoxSpan,
+        *,
+        is_container: bool,
+    ) -> None:
         self.type = typ
         self.span = span
-        self.container = container
+        self.is_container = is_container
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4Box":
@@ -187,11 +202,11 @@ class MP4Box:
 
         size, typ_raw = Unpacker.unpack_two(
             ISOM_BYTE_ORDER,
-            (UnsignedInt(), PackableISOAtomName()),
+            (UnsignedInt(), PackableISOMAtomName()),
             hdr,
         )
 
-        typ = ISOAtomName(typ_raw)
+        typ = ISOMAtomName(typ_raw)
 
         if typ == UUID_ATOM_NAME:
             msg = "'uuid' type not implemented, the box header size differs with that type"
@@ -218,20 +233,20 @@ class MP4Box:
                 msg = f"Invalid extended box size {largesize}"
                 raise RuntimeError(msg)
 
-            span = BoxSpan(offset, largesize, header_size=16)
-            return MP4Box(typ, span, container=False)
+            span = Mp4BoxSpan(offset, largesize, header_size=16)
+            return MP4Box(typ, span, is_container=False)
 
         if size == 0:
             f.seek(0, 2)
             eof = f.tell()
-            span = BoxSpan(offset, eof - offset, header_size=8)
-            return MP4Box(typ, span, container=False)
+            span = Mp4BoxSpan(offset, eof - offset, header_size=8)
+            return MP4Box(typ, span, is_container=False)
 
-        span = BoxSpan(offset, size, header_size=8)
-        return MP4Box(typ, span, container=False)
+        span = Mp4BoxSpan(offset, size, header_size=8)
+        return MP4Box(typ, span, is_container=False)
 
     @staticmethod
-    def write_to_buffer_mp4_box(typ: ISOAtomName, data: bytes) -> bytes:
+    def write_to_buffer_mp4_box(typ: ISOMAtomName, data: bytes) -> bytes:
 
         if typ == UUID_ATOM_NAME:
             msg = "'uuid' type not implemented, the box header size differs with that type"
@@ -248,7 +263,7 @@ class MP4Box:
 
         hdr = Packer.pack_two(
             ISOM_BYTE_ORDER,
-            (UnsignedInt(), PackableISOAtomName()),
+            (UnsignedInt(), PackableISOMAtomName()),
             (
                 final_size,
                 typ.value,
@@ -277,9 +292,7 @@ class MP4Box:
         return buf.getvalue()
 
     def __str__(self: Self) -> str:
-        return (
-            f"<MP4Box type: {self.type} span: {self.span} container: {self.container}>"
-        )
+        return f"<MP4Box type: {self.type} span: {self.span} is_container: {self.is_container}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -290,9 +303,14 @@ class MP4FullBox(MP4Box):
     flags: bytes
 
     def __init__(
-        self: Self, parent: MP4Box, container: bool, version: int, flags: bytes
+        self: Self,
+        parent: MP4Box,
+        version: int,
+        flags: bytes,
+        *,
+        is_container: bool,
     ) -> None:
-        super().__init__(parent.type, parent.span, container=container)
+        super().__init__(parent.type, parent.span, is_container=is_container)
 
         self.version = version
         self.flags = flags
@@ -322,7 +340,7 @@ class MP4FullBox(MP4Box):
 
         parent.span.add_header_size(4)
 
-        return MP4FullBox(parent, container=False, version=version, flags=flags)
+        return MP4FullBox(parent, version, flags, is_container=False)
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MP4FullBox":
@@ -337,18 +355,18 @@ class MP4FullBox(MP4Box):
 
 
 class FileTypeBox(MP4Box):
-    major_brand: ISOAtomName
+    major_brand: ISOMAtomName
     minor_version: int
     compatible_brands: bytes
 
     def __init__(
         self: Self,
         parent: MP4Box,
-        major_brand: ISOAtomName,
+        major_brand: ISOMAtomName,
         minor_version: int,
         compatible_brands: bytes,
     ) -> None:
-        super().__init__(parent.type, parent.span, container=False)
+        super().__init__(parent.type, parent.span, is_container=False)
 
         self.major_brand = major_brand
         self.minor_version = minor_version
@@ -374,7 +392,7 @@ class FileTypeBox(MP4Box):
         f.seek(parent.span.payload_start)
 
         major_brand_raw = read_checked(f, 4)
-        major_brand = ISOAtomName(major_brand_raw)
+        major_brand = ISOMAtomName(major_brand_raw)
 
         minor_version_bytes = read_checked(f, 4)
 
@@ -414,7 +432,7 @@ class FreeSpaceBox(MP4Box):
         parent: MP4Box,
         data: bytes,
     ) -> None:
-        super().__init__(parent.type, parent.span, container=False)
+        super().__init__(parent.type, parent.span, is_container=False)
 
         self.data = data
 
@@ -463,9 +481,9 @@ class MediaHeaderBox(MP4FullBox):
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
         super().__init__(
             parent,
-            container=False,
-            version=parent.version,
-            flags=parent.flags,
+            parent.version,
+            parent.flags,
+            is_container=False,
         )
         self.language_offset = language_offset
 
@@ -603,7 +621,7 @@ class MediaHeaderBox(MP4FullBox):
 
 class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
-        super().__init__(parent.type, parent.span, container=True)
+        super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
@@ -632,7 +650,7 @@ class MediaBox(MP4Box):
 
 class MovieBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
-        super().__init__(parent.type, parent.span, container=True)
+        super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MovieBox":
@@ -660,14 +678,14 @@ class MovieBox(MP4Box):
 
 
 class HandlerBox(MP4FullBox):
-    handler_type: ISOAtomName
+    handler_type: ISOMAtomName
 
-    def __init__(self: Self, parent: MP4FullBox, handler_type: ISOAtomName) -> None:
+    def __init__(self: Self, parent: MP4FullBox, handler_type: ISOMAtomName) -> None:
         super().__init__(
             parent,
-            container=False,
-            version=parent.version,
-            flags=parent.flags,
+            parent.version,
+            parent.flags,
+            is_container=False,
         )
         self.handler_type = handler_type
 
@@ -698,7 +716,7 @@ class HandlerBox(MP4FullBox):
         f.seek(parent.span.payload_start + 4)
 
         handler_type_raw = read_checked(f, 4)
-        handler_type = ISOAtomName(handler_type_raw)
+        handler_type = ISOMAtomName(handler_type_raw)
 
         # omitting dynamic sized string "name"
         additional_header_size = 4 + 4 + (4 * 3)
@@ -723,7 +741,7 @@ class TrackBox(MP4Box):
     hdlr: HandlerBox
 
     def __init__(self: Self, parent: MP4Box, hdlr: HandlerBox) -> None:
-        super().__init__(parent.type, parent.span, container=True)
+        super().__init__(parent.type, parent.span, is_container=True)
 
         self.hdlr = hdlr
 
@@ -783,7 +801,7 @@ class TrackBox(MP4Box):
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
     box = MP4Box.read_from_stream(f, pos)
 
-    match box.type:
+    match box.type.value:
         case b"mdhd":
             return MediaHeaderBox.read_from_stream(f, pos)
         case b"mdia":
@@ -820,12 +838,12 @@ def mp4_iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]
 
 def find_mdhd_boxes_with_type(
     f: BufferedIOBase,
-    types: list[ISOAtomName],
+    types: list[ISOMAtomName],
 ) -> Generator["MediaHeaderBox"]:
     f.seek(0, 2)
     filesize = f.tell()
 
-    stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
+    stack: list[tuple[int, int, list[ISOMAtomName]]] = [(0, filesize, [])]
 
     while stack:
         start, end, path = stack.pop()
@@ -858,21 +876,38 @@ def find_mdhd_boxes_with_type(
 
                 yield box
 
-            if box.container:
+            if box.is_container:
                 stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
+
+
+def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
+    f.seek(0)
+
+    first_box = read_box_from_stream(f, 0)
+
+    if not isinstance(first_box, FileTypeBox):
+        return _("Not a valid ISOM / MP4 file")
+
+    if first_box.major_brand not in [b"isom", b"mp42"]:
+        return _(
+            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+        ).format(major_brand=first_box.major_brand)
+
+    f.seek(0)
+    return None
 
 
 class VideoTaggerWriterMp4(VideoTaggerWriter):
     __writer: BufferedIOBase
     __streams: int
-    __types: list[ISOAtomName]
+    __types: list[ISOMAtomName]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
         writer: BufferedIOBase,
         streams: int,
-        types: list[ISOAtomName],
+        types: list[ISOMAtomName],
     ) -> None:
         super().__init__(manager)
         self.__writer = writer
@@ -968,32 +1003,15 @@ class VideoTaggerWriterMp4(VideoTaggerWriter):
             bar.close(clear=True)
 
 
-def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
-    f.seek(0)
-
-    first_box = read_box_from_stream(f, 0)
-
-    if not isinstance(first_box, FileTypeBox):
-        return _("Not a valid ISOM / MP4 file")
-
-    if first_box.major_brand not in [b"isom", b"mp42"]:
-        return _(
-            "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
-        ).format(major_brand=first_box.major_brand)
-
-    f.seek(0)
-    return None
-
-
 class VideoTaggerMp4(VideoTagger):
     __streams: int
-    __types: list[ISOAtomName]
+    __types: list[ISOMAtomName]
 
     def __init__(
         self: Self,
         file: Path,
         streams: int,
-        types: list[ISOAtomName],
+        types: list[ISOMAtomName],
     ) -> None:
         super().__init__(file)
         self.__streams = streams
@@ -1014,7 +1032,7 @@ class VideoTaggerMp4(VideoTagger):
                 f.seek(0)
 
                 streams = 0
-                types: list[ISOAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
+                types: list[ISOMAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
 
                 # read the file, so that we check if we can parse it correctly and that it is an mp4
                 for mdhd in find_mdhd_boxes_with_type(f, types):
