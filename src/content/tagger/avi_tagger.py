@@ -1,149 +1,337 @@
-# inside strh
-# see https://learn.microsoft.com/de-de/previous-versions/windows/desktop/api/avifmt/ns-avifmt-avistreamheader#syntax
-
-import struct
+from collections.abc import Generator
+from contextlib import AbstractContextManager
+from io import BufferedIOBase, BytesIO
 from pathlib import Path
+from types import TracebackType
+from typing import Literal, Optional, Self, override
+
+from content.language import Alpha3LanguageStr, Language
+from content.tagger.parser import (
+    ByteOrder,
+    Packable,
+    Packer,
+    Unpacker,
+    UnsignedInt,
+    UnsignedLongLong,
+    UnsignedShort,
+    read_checked,
+)
+from content.tagger.video_tagger import (
+    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    VideoTagger,
+    VideoTagger__HandleResult,
+    VideoTaggerWriter,
+)
+from helper.manager import CounterInterface, ManagerInterface
+from helper.translation import get_translator
+
+_ = get_translator()
 
 
-RIFF_HEADER = b"RIFF"
-LIST = b"LIST"
-STRH = b"strh"
-STRL = b"strl"
+class FOURCC:
+    __value: bytes
+
+    def __init__(self: Self, value: bytes) -> None:
+        self.__value = value
+
+        if len(value) != 4:
+            msg = f"Invalid FOURCC name length {len(value)}"
+            raise ValueError(msg)
+
+        def is_valid_byte(byte: int) -> bool:
+            val = bytes([byte])
+
+            if val.lower():
+                return True
+
+            if val.upper():
+                return True
+
+            return val == b" "
+
+        if not all(is_valid_byte(val) for val in value):
+            msg = f"FOURCC not valid {value!s}"
+            raise ValueError(msg)
+
+    @property
+    def value(self: Self) -> bytes:
+        return self.__value
+
+    def __str__(self: Self) -> str:
+        return str(self.__value)
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__value)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.__value)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, FOURCC):
+            return self.__value == other.__value
+
+        if isinstance(other, str):
+            return self.__value == other.encode()
+
+        if isinstance(other, bytes):
+            return self.__value == other
+
+        return False
 
 
-def read_chunk_header(f, offset):
-    f.seek(offset)
-    header = f.read(8)
-    if len(header) < 8:
-        return None
+class PackableFOURCC(Packable[bytes]):
+    @property
+    @override
+    def pack_str(self: Self) -> str:
+        return "4s"
 
-    chunk_id, size = struct.unpack("<4sI", header)
-    return chunk_id, size, offset + 8
+    @property
+    @override
+    def pack_size(self: Self) -> int:
+        return 4
 
 
-def iter_riff_chunks(f, start, end):
+RIFF_FOURCC: FOURCC = FOURCC(b"RIFF")
+AVI__FOURCC: FOURCC = FOURCC(b"AVI ")
+AVIX_FOURCC: FOURCC = FOURCC(b"AVIX")
+LIST_FOURCC: FOURCC = FOURCC(b"LIST")
+
+
+class AVIBoxSpan:
+    start: int
+    size: int
+    header_size: int
+
+    def __init__(
+        self: Self,
+        start: int,
+        size: int,
+        header_size: int,
+    ) -> None:
+        self.start = start
+        self.size = size
+        self.header_size = header_size
+
+        if self.size < 8:
+            msg = f"Invalid box: sitze too small: {self.size}"
+            raise RuntimeError(msg)
+
+        if self.size < self.header_size:
+            msg = f"Invalid box size {self.size} at {self.start}"
+            raise RuntimeError(msg)
+
+    @staticmethod
+    def from_avi_specified_size(
+        start: int, size: int, header_size: int
+    ) -> "AVIBoxSpan":
+        return AVIBoxSpan(start, size + 8, header_size)
+
+    @property
+    def end(self: Self) -> int:
+        return self.start + self.size
+
+    @property
+    def payload_start(self: Self) -> int:
+        return self.start + self.header_size
+
+    @property
+    def payload_size(self: Self) -> int:
+        return self.size - self.header_size
+
+    def add_header_size(self: Self, header_size: int) -> None:
+        self.header_size = self.header_size + header_size
+        if self.size < self.header_size:
+            msg = f"Invalid box size {self.size} at {self.start}"
+            raise RuntimeError(msg)
+
+    def __str__(self: Self) -> str:
+        return f"<AVIBoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+AVI_BYTE_ORDER = ByteOrder.Little
+
+
+class AVIChunk:
+    fourcc: FOURCC
+    span: AVIBoxSpan
+    is_list: bool
+
+    def __init__(
+        self: Self, fourcc: FOURCC, span: AVIBoxSpan, *, is_list: bool
+    ) -> None:
+        self.fourcc = fourcc
+        self.span = span
+        self.is_list = is_list
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AVIChunk":
+        # AVI Chunk structure:
+        # fourcc | 4 bytes | char[4]
+        # size   | 4 bytes | unsigned int
+        # ... data
+
+        # Note: size is the size after it, so 8 bytes less then the whole size
+
+        # typedef struct {
+        #     DWORD dwFourCC
+        #     DWORD dwSize
+        #     BYTE data[dwSize]
+        # } CHUNK;
+
+        f.seek(offset)
+
+        hdr = read_checked(f, 8)
+
+        fourcc_raw, size = Unpacker.unpack_two(
+            AVI_BYTE_ORDER,
+            (PackableFOURCC(), UnsignedInt()),
+            hdr,
+        )
+
+        fourcc = FOURCC(fourcc_raw)
+        span = AVIBoxSpan.from_avi_specified_size(offset, size, header_size=8)
+        return AVIChunk(fourcc, span, is_list=False)
+
+    def __str__(self: Self) -> str:
+        return f"<AVIChunk fourcc: {self.fourcc} span: {self.span} is_list: {self.is_list}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+class AVIList(AVIChunk):
+    type: FOURCC
+
+    def __init__(self: Self, parent: AVIChunk, typ: FOURCC) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=True)
+
+        self.type = typ
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: AVIChunk) -> "AVIList":
+        # AVI List structure:
+        # box    | <chunk size> bytes | parent chunk
+        # type   | 4 bytes | char[4]
+
+        # typedef struct {
+        #     DWORD dwList
+        #     DWORD dwSize
+        #     DWORD dwFourCC
+        #     BYTE data[dwSize-4]
+        # } LIST;
+
+        f.seek(parent.span.payload_start)
+
+        typ_raw = read_checked(f, 4)
+
+        typ = FOURCC(typ_raw)
+
+        parent.span.add_header_size(4)
+
+        return AVIList(parent, typ)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AVIList":
+        chunk = AVIChunk.read_from_stream(f, offset)
+        return AVIList.__read_from_stream_impl(f, chunk)
+
+    def __str__(self: Self) -> str:
+        return f"<AVIList parent: {AVIChunk.__str__(self)} type {self.type}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+def read_chunk_from_stream(f: BufferedIOBase, pos: int) -> AVIChunk:
+    chunk = AVIChunk.read_from_stream(f, pos)
+
+    match chunk.fourcc.value:
+        case b"RIFF":
+            return AVIList.read_from_stream(f, pos)
+        case b"LIST":
+            return AVIList.read_from_stream(f, pos)
+        case _:
+            return chunk
+
+
+def avi_iter_chunks(f: BufferedIOBase, start: int, end: int) -> Generator[AVIChunk]:
     pos = start
 
-    while pos + 8 <= end:
-        hdr = read_chunk_header(f, pos)
-        if not hdr:
-            return
+    while pos < end:
+        chunk = read_chunk_from_stream(f, pos)
 
-        chunk_id, size, data_start = hdr
+        if pos + chunk.span.size > end:
+            msg = f"Box {chunk.fourcc!r} at {pos} extends past parent boundary"
+            raise RuntimeError(msg)
 
-        # RIFF chunks are word-aligned
-        padded_size = size + (size & 1)
-        next_pos = data_start + padded_size
-
-        if next_pos > end:
-            raise ValueError(f"Corrupt chunk {chunk_id} exceeds bounds")
-
-        yield chunk_id, pos, data_start, size, next_pos
-        pos = next_pos
+        yield chunk
+        pos += chunk.span.size
 
 
-def find_riff_root(f):
+def find_mdhd_boxes_with_type(
+    f: BufferedIOBase,
+    types: list[ISOAtomName],
+) -> Generator["MediaHeaderBox"]:
     f.seek(0, 2)
-    size = f.tell()
+    filesize = f.tell()
+
+    stack: list[tuple[int, int, list[ISOAtomName]]] = [(0, filesize, [])]
+
+    while stack:
+        start, end, path = stack.pop()
+
+        for box in mp4_iter_boxes(f, start, end):
+
+            if box.type == TRAK_ATOM_NAME:
+                if not isinstance(box, TrackBox):
+                    msg = "Invalid TrackBox: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                hdlr = box.hdlr.handler_type
+
+                if hdlr not in types:
+                    continue
+
+            if box.type == MDHD_ATOM_NAME:
+                if not isinstance(box, MediaHeaderBox):
+                    msg = "Invalid MediaHeaderBox: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                current = path
+                if current != [
+                    MOOV_ATOM_NAME,
+                    TRAK_ATOM_NAME,
+                    MDIA_ATOM_NAME,
+                ]:
+                    msg = f"invalid mdhd box hierarchy: {current}"
+                    raise RuntimeError(msg)
+
+                yield box
+
+            if box.container:
+                stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
+
+
+def is_avi_file(f: BufferedIOBase) -> Optional[str]:
     f.seek(0)
 
-    header = f.read(12)
-    if len(header) < 12:
-        raise ValueError("Not a valid RIFF file")
+    first_chunk = read_chunk_from_stream(f, 0)
 
-    riff, file_size, riff_type = struct.unpack("<4sI4s", header)
+    if not isinstance(first_chunk, AVIList):
+        return _("Not a valid RIFF / AVI file")
 
-    if riff != RIFF_HEADER or riff_type != b"AVI ":
-        raise ValueError("Not an AVI RIFF file")
+    if first_chunk.fourcc != RIFF_FOURCC:
+        return _(
+            "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}"
+        ).format(first_chunk=first_chunk.fourcc)
 
-    return 12, size
+    if first_chunk.type not in [AVI__FOURCC, AVIX_FOURCC]:
+        return _(
+            "RIFF/AVI file has valid chunk, but it sis not the correct starting chunk, list type invalid: {list_type!r}"
+        ).format(list_type=first_chunk.type)
 
-
-def decode_language(val):
-    # 16-bit packed: 5-bit chars (a=1)
-    chars = []
-    for shift in (10, 5, 0):
-        v = (val >> shift) & 0x1F
-        if v == 0:
-            chars.append(" ")
-        else:
-            chars.append(chr(v + 0x60))
-    return "".join(chars).strip()
-
-
-def encode_language(code):
-    if len(code) != 3:
-        raise ValueError("AVI language must be 3 letters")
-
-    code = code.lower()
-    val = 0
-
-    for ch in code:
-        n = ord(ch) - 0x60
-        if not (1 <= n <= 26):
-            raise ValueError(f"Invalid language char: {ch}")
-        val = (val << 5) | n
-
-    return val
-
-
-def find_strh_offsets(f):
-    start, end = find_riff_root(f)
-
-    for chunk_id, offset, data_start, size, next_pos in iter_riff_chunks(f, start, end):
-
-        # We only care about LIST 'strl'
-        if chunk_id == LIST:
-            f.seek(data_start)
-            list_type = f.read(4)
-
-            if list_type != STRL:
-                continue
-
-            list_end = offset + 8 + size
-
-            # search inside strl
-            for cid, off, data_start2, size2, next2 in iter_riff_chunks(
-                f, data_start + 4, list_end
-            ):
-                if cid == STRH:
-                    yield off, data_start2, size2
-
-
-def read_strh_language(f, strh_data_start):
-    # STRH layout is fixed for AVI:
-    # 0..?
-    # language is at offset 24 (common AVI VFW layout)
-    LANG_OFFSET = 24
-
-    f.seek(strh_data_start + LANG_OFFSET)
-    raw = f.read(2)
-
-    if len(raw) != 2:
-        raise ValueError("Truncated strh")
-
-    return struct.unpack("<H", raw)[0], strh_data_start + LANG_OFFSET
-
-
-def patch_avi_language(path, new_lang="eng"):
-    new_val = encode_language(new_lang)
-
-    with open(path, "r+b") as f:
-        for strh_off, data_start, size in find_strh_offsets(f):
-
-            old_val, lang_pos = read_strh_language(f, data_start)
-
-            old_lang = decode_language(old_val)
-
-            # sanity: ensure we don't overwrite outside box
-            assert lang_pos + 2 <= data_start + size, "Language field out of bounds"
-
-            f.seek(lang_pos)
-            f.write(struct.pack("<H", new_val))
-
-            print(f"{old_lang} -> {new_lang}")
-
-            # verify
-            f.seek(lang_pos)
-            check = struct.unpack("<H", f.read(2))[0]
-            assert check == new_val, "Write verification failed"
+    f.seek(0)
+    return None
