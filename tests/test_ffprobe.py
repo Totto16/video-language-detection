@@ -1,62 +1,16 @@
 import os
-import tempfile
 from math import isnan
 from pathlib import Path
 
 import pytest
-import requests
 from pytest_subtests import SubTests
 
 from helper.ffprobe import ffprobe, parse_float_safely
 
+from fixtures import dummy_files, mark_as_used, temp_mp4_files, TempMp4Files, DummyFiles
 
-@pytest.fixture(scope="module")
-def temp_mp4_files() -> list[Path]:
-    ## from: https://test-videos.co.uk/bigbuckbunny/mp4-h264
-    video_urls = [
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_1MB.mp4",
-        "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
-    ]
-    results: list[Path] = []
-    for url in video_urls:
-        response = requests.get(url, timeout=10)
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            f.write(response.content)
-            results.append(Path(f.file.name))
-
-    return results
-
-
-@pytest.fixture(scope="module")
-def dummy_files() -> list[tuple[Path, bool]]:
-    content_description = [
-        (
-            ".srt",
-            """1
-00:00:00,498 --> 00:00:02,827
-- Here's what I love most
-about food and diet.
-
-2
-00:00:02,827 --> 00:00:06,383
-We all eat several times a day,
-and we're totally in charge
-
-3
-00:00:06,383 --> 00:00:09,427
-of what goes on our plate
-and what stays off.""",
-            True,
-        ),
-        (".txt", "", False),
-    ]
-    results: list[tuple[Path, bool]] = []
-    for suffix, content, res in content_description:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-            f.write(bytes(content, encoding="utf-8"))
-            results.append((Path(f.file.name), res))
-
-    return results
+mark_as_used(dummy_files)
+mark_as_used(temp_mp4_files)
 
 
 def test_float_parsing_correct(subtests: SubTests) -> None:
@@ -115,9 +69,9 @@ def test_raw_int_parse(subtests: SubTests) -> None:
 
 def test_ffprobe_with_intact_videos(
     subtests: SubTests,
-    temp_mp4_files: list[Path],
+    temp_mp4_files: TempMp4Files,
 ) -> None:
-    for video in temp_mp4_files:
+    for video in temp_mp4_files.data:
         with subtests.test("video get's parsed correctly"):
             result, err = ffprobe(video)
             assert err is None, "No error occurred"
@@ -146,8 +100,6 @@ def test_ffprobe_with_intact_videos(
             assert len(result.audio_streams()) == 0, "correct amount of audio streams"
             assert result.is_audio() is False, "result is no audio"
 
-        video.unlink(missing_ok=True)
-
 
 def test_ffprobe_errors() -> None:
     assert ffprobe(Path("/zt/e.mp4")) == (
@@ -169,10 +121,10 @@ def test_ffprobe_errors() -> None:
 
 def test_ffprobe_errors_with_files(
     subtests: SubTests,
-    dummy_files: list[tuple[Path, bool]],
+    dummy_files: DummyFiles,
 ) -> None:
     with subtests.test("dummy wrong file fails "):
-        for file, should_pass in dummy_files:
+        for file, should_pass in dummy_files.data:
             result, _err = ffprobe(file)
             assert (result is not None) == should_pass, "pass status is correct"
             if should_pass:
