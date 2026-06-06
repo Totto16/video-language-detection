@@ -560,7 +560,7 @@ class MediaHeaderBox(MP4FullBox):
         return MediaHeaderBox.__read_from_stream_impl(f, box)
 
     @staticmethod
-    def decode_language(value: int) -> ShortLanguageStr | str:
+    def __decode_language_impl(value: int) -> ShortLanguageStr | str:
         chars = []
 
         for shift in (10, 5, 0):
@@ -580,7 +580,7 @@ class MediaHeaderBox(MP4FullBox):
         return val
 
     @staticmethod
-    def encode_language(lang: ShortLanguageStr) -> int:
+    def __encode_language_impl(lang: ShortLanguageStr) -> int:
         code = str(lang.to_alpha3())
 
         if len(code) != 3:
@@ -605,14 +605,14 @@ class MediaHeaderBox(MP4FullBox):
         lang_bytes = read_checked(f, 2)
         packed = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), lang_bytes)
 
-        return MediaHeaderBox.decode_language(packed)
+        return MediaHeaderBox.__decode_language_impl(packed)
 
     def patch_language(
         self: Self,
         f: BufferedIOBase,
         new_language: ShortLanguageStr,
     ) -> None:
-        packed = MediaHeaderBox.encode_language(new_language)
+        packed = MediaHeaderBox.__encode_language_impl(new_language)
 
         f.seek(self.span.start + self.language_offset)
 
@@ -964,9 +964,17 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
         try:
             self.__writer.seek(0)
-            # NOTE: we always patch the language, no matter what
             for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
-                mdhd.patch_language(self.__writer, new_language)
+
+                should_write_language = True
+
+                lang = mdhd.read_language(self.__writer)
+                if isinstance(lang, ShortLanguageStr) and new_language == lang:
+                    should_write_language = False
+
+                if should_write_language:
+                    mdhd.patch_language(self.__writer, new_language)
+
                 bar.update(1, force=True)
 
             free_tag = b"vld\x42\x42\x69-->"
@@ -978,6 +986,8 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
                 b"vld\x42\x42\x69",
                 free_tag,
             ]
+
+            # TODO: write uuid once
 
             self.__writer.seek(0, 2)
             end = self.__writer.tell()
