@@ -819,6 +819,35 @@ class TrackBox(MP4Box):
         return str(self)
 
 
+class UserDataBox(MP4Box):
+    def __init__(self: Self, parent: MP4Box) -> None:
+        super().__init__(parent.type, parent.span, is_container=True)
+
+    @staticmethod
+    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "UserDataBox":
+        # spec: ISO/IEC 14496-12
+        # ISO user data box structure:
+        # box     | <box size> bytes | parent box
+
+        # aligned(8) class UserDataBox extends Box(
+        #     ‘udta’
+        #     ) {
+        # }
+
+        return UserDataBox(parent)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "UserDataBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return UserDataBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<UserDataBox parent: {MP4Box.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
     box = MP4Box.read_from_stream(f, pos)
 
@@ -839,6 +868,8 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             return FreeSpaceBox.read_from_stream(f, pos)
         case b"skip":
             return FreeSpaceBox.read_from_stream(f, pos)
+        case b"udta":
+            return UserDataBox.read_from_stream(f, pos)
         case _:
             return box
 

@@ -214,67 +214,69 @@ def test_mp4_tagger_parsing(
     mp4_test_parse_files: TempVideoFiles,
 ) -> None:
 
+    structure1 = MP4BoxStructure(
+        RecursiveBoxes(
+            [
+                PseudoMP4Box(FTYP_ATOM_NAME, 32),
+                (
+                    PseudoMP4Box(MOOV_ATOM_NAME, 11824),
+                    [
+                        PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
+                        PseudoMP4Box(ISOMAtomName(b"iods"), 42),
+                        (
+                            PseudoMP4Box(TRAK_ATOM_NAME, 5317),
+                            [
+                                PseudoMP4Box(
+                                    ISOMAtomName(
+                                        b"tkhd",
+                                    ),
+                                    92,
+                                ),
+                                PseudoMP4Box(EDTS_ATOM_NAME, 36),
+                                (
+                                    PseudoMP4Box(MDIA_ATOM_NAME, 5181),
+                                    [
+                                        PseudoMP4Box(MDHD_ATOM_NAME, 32),
+                                        PseudoMP4Box(HDLR_ATOM_NAME, 54),
+                                        PseudoMP4Box(MINF_ATOM_NAME, 5087),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        (
+                            PseudoMP4Box(TRAK_ATOM_NAME, 6349),
+                            [
+                                PseudoMP4Box(
+                                    ISOMAtomName(
+                                        b"tkhd",
+                                    ),
+                                    92,
+                                ),
+                                PseudoMP4Box(EDTS_ATOM_NAME, 36),
+                                (
+                                    PseudoMP4Box(MDIA_ATOM_NAME, 6213),
+                                    [
+                                        PseudoMP4Box(MDHD_ATOM_NAME, 32),
+                                        PseudoMP4Box(HDLR_ATOM_NAME, 54),
+                                        PseudoMP4Box(MINF_ATOM_NAME, 6119),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                PseudoMP4Box(FREE_ATOM_NAME, 8),
+                PseudoMP4Box(ISOMAtomName(b"mdat"), 1558160),
+            ],
+        ),
+    )
+
+    structure2 = MP4BoxStructure(RecursiveBoxes([]))
+
     test_files: list[tuple[Path, MP4BoxStructure]] = list(
         zip(
             mp4_test_parse_files.data,
-            [
-                MP4BoxStructure(
-                    RecursiveBoxes(
-                        [
-                            PseudoMP4Box(FTYP_ATOM_NAME, 32),
-                            (
-                                PseudoMP4Box(MOOV_ATOM_NAME, 11824),
-                                [
-                                    PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
-                                    PseudoMP4Box(ISOMAtomName(b"iods"), 42),
-                                    (
-                                        PseudoMP4Box(TRAK_ATOM_NAME, 5317),
-                                        [
-                                            PseudoMP4Box(
-                                                ISOMAtomName(
-                                                    b"tkhd",
-                                                ),
-                                                92,
-                                            ),
-                                            PseudoMP4Box(EDTS_ATOM_NAME, 36),
-                                            (
-                                                PseudoMP4Box(MDIA_ATOM_NAME, 5181),
-                                                [
-                                                    PseudoMP4Box(MDHD_ATOM_NAME, 32),
-                                                    PseudoMP4Box(HDLR_ATOM_NAME, 54),
-                                                    PseudoMP4Box(MINF_ATOM_NAME, 5087),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                    (
-                                        PseudoMP4Box(TRAK_ATOM_NAME, 6349),
-                                        [
-                                            PseudoMP4Box(
-                                                ISOMAtomName(
-                                                    b"tkhd",
-                                                ),
-                                                92,
-                                            ),
-                                            PseudoMP4Box(EDTS_ATOM_NAME, 36),
-                                            (
-                                                PseudoMP4Box(MDIA_ATOM_NAME, 6213),
-                                                [
-                                                    PseudoMP4Box(MDHD_ATOM_NAME, 32),
-                                                    PseudoMP4Box(HDLR_ATOM_NAME, 54),
-                                                    PseudoMP4Box(MINF_ATOM_NAME, 6119),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            PseudoMP4Box(FREE_ATOM_NAME, 8),
-                            PseudoMP4Box(ISOMAtomName(b"mdat"), 1558160),
-                        ],
-                    ),
-                ),
-            ],
+            [structure1, structure2],
             strict=True,
         ),
     )
@@ -366,8 +368,11 @@ def test_mp4_tagger_language_patching(
     test_files: list[tuple[Path, Language, Language]] = list(
         zip(
             mp4_test_parse_files.data,
-            [Language.get_default()],
-            [Language.from_values_unsafe("de", "German")],
+            [Language.get_default(), Language.get_default()],
+            [
+                Language.from_values_unsafe("de", "German"),
+                Language.from_values_unsafe("en", "English"),
+            ],
             strict=True,
         ),
     )

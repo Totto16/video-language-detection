@@ -164,6 +164,7 @@ def mp4_test_parse_files(
 
     video_urls = [
         at_video_dict(video_file_dict, "file_example_MP4_480_1_5MG.mp4"),
+        at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mp4"),
     ]
 
     return TempVideoFiles(temp_video_files(video_urls, cached_file_manager))
