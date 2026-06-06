@@ -4,6 +4,7 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, override
+from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
 from content.tagger.parser import (
@@ -944,6 +945,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
     def write_metadata(
         self: Self,
         comment: list[str],
+        uuid: UUID,
         language: Language,
         metadata: dict[str, str],
     ) -> None:

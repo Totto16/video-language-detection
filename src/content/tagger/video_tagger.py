@@ -4,6 +4,7 @@ from logging import Logger
 from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, override
+from uuid import UUID
 
 from content.language import Language
 from helper.log import get_logger
@@ -35,6 +36,7 @@ class VideoTaggerWriter(ABC):
     def write_metadata(
         self: Self,
         comment: list[str],
+        uuid: UUID,
         language: Language,
         metadata: dict[str, str],
     ) -> None: ...
@@ -80,12 +82,13 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
     def write_metadata(
         self: Self,
         comment: list[str],
+        uuid: UUID,
         language: Language,
         metadata: dict[str, str],
     ) -> None:
         for writer in self.__writer:
             with writer as w:
-                w.write_metadata(comment, language, metadata)
+                w.write_metadata(comment, uuid, language, metadata)
 
 
 class VideoTaggerMultiple(VideoTagger):

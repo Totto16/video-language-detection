@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import BinaryIO, Literal, Optional, Self, assert_never, override
+from uuid import UUID
 
 import mutagen._file as mutagen
 from mutagen import mp4
@@ -402,6 +403,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
     def write_metadata(
         self: Self,
         comment: list[str],
+        uuid: UUID,
         language: Language,
         metadata: dict[str, str],
     ) -> None:

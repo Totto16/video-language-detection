@@ -11,6 +11,7 @@ from typing import (
     Self,
     override,
 )
+from uuid import uuid4
 
 from apischema import alias, schema
 from apischema.metadata import none_as_undefined
@@ -202,7 +203,7 @@ class EpisodeContent(Content):
         def write_file_metadata() -> None:
             nonlocal changed_file
 
-            #print(f"Try to tag file {self.scanned_file.path}")
+            # print(f"Try to tag file {self.scanned_file.path}")
 
             handle_result = get_tagger_for_file(self.scanned_file.path)
             if handle_result.is_err():
@@ -229,6 +230,13 @@ class EpisodeContent(Content):
                     metadata_prefix("iso_time"): now.isoformat(),
                 }
 
+                comment: list[str] = [
+                    "see other metadata for more info by video_language_detect",
+                ]
+
+                # NOTE: this should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
+                uuid = uuid4()
+
                 # TODO: remove
                 global global_counter_wip
 
@@ -238,9 +246,8 @@ class EpisodeContent(Content):
 
                     with handle.writer(manager=manager) as writer:
                         writer.write_metadata(
-                            comment=[
-                                "see other metadata for more info by video_language_detect",
-                            ],
+                            comment,
+                            uuid,
                             language=self.language,
                             metadata=metadata,
                         )
