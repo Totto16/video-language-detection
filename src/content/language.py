@@ -310,7 +310,10 @@ class Alpha3LanguageStr:
             return self.__data == other.__data
 
         if isinstance(other, str):
-            return self.__data == Alpha3LanguageStr.from_str(other)
+            other_str = Alpha3LanguageStr.from_str(other)
+            if other_str is None:
+                return False
+            return self.__data == other_str.__data
 
         return False
 
@@ -643,6 +646,165 @@ class NoLangDeprecatedType(StrEnum):
     no_lang = "no_lang"
 
 
+class ShortLanguageStr:
+    __data: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
+
+    def __init__(
+        self: Self,
+        data: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+    ) -> None:
+        self.__data = data
+
+    @property
+    def data(
+        self: Self,
+    ) -> Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional:
+        return self.__data
+
+    @staticmethod
+    def __from_str_impl(
+        val: str,
+    ) -> Optional["ShortLanguageStr"]:
+        def optional_short(
+            val: Optional[
+                Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
+            ],
+        ) -> Optional[ShortLanguageStr]:
+            if val is None:
+                return None
+
+            return ShortLanguageStr(val)
+
+        if len(val) == 2:
+            return optional_short(Alpha2LanguageStr.from_str(val))
+
+        if len(val) == 3:
+            return optional_short(Alpha3LanguageStr.from_str(val))
+
+        if "-" in val:
+            return optional_short(Alpha2LanguageStrRegional.from_str(val))
+
+        return None
+
+    @staticmethod
+    def from_str(
+        val: str,
+    ) -> Optional["ShortLanguageStr"]:
+        return ShortLanguageStr.__from_str_impl(val)
+
+    @staticmethod
+    def __alpha2_to_3_impl(alpha_2: Alpha2LanguageStr) -> Optional[Alpha3LanguageStr]:
+        val = lang_code_validation_list_impl.map_alpha_2_to_alpha3.get(
+            str(alpha_2),
+            None,
+        )
+        if val is None:
+            return None
+
+        return Alpha3LanguageStr.from_str(val)
+
+    def to_alpha3(self: Self) -> Alpha3LanguageStr:
+        if isinstance(self.__data, Alpha3LanguageStr):
+            return self.__data
+
+        def alpha2_to_3(alpha_2: Alpha2LanguageStr) -> Alpha3LanguageStr:
+            value = ShortLanguageStr.__alpha2_to_3_impl(alpha_2)
+            if value is None:
+                msg = _(
+                    "Can't convert alpha 2 language string {lang} to alpha 3 language string"  # noqa: COM812
+                ).format(lang=alpha_2)
+                raise RuntimeError(msg)
+
+            return value
+
+        if isinstance(self.__data, Alpha2LanguageStr):
+            return alpha2_to_3(self.__data)
+
+        if isinstance(self.__data, Alpha2LanguageStrRegional):
+            return alpha2_to_3(self.__data.alpha2)
+
+        assert_never(self.__data)
+
+    def __str__(self: Self) -> str:
+        return str(self.__data)
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.__data)
+
+    @staticmethod
+    def __eq_short_variants_impl(
+        data1: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+        data2: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+    ) -> bool:
+        if isinstance(data1, Alpha2LanguageStr):
+            if isinstance(data2, Alpha2LanguageStr):
+                return data1 == data2
+
+            if isinstance(data2, Alpha3LanguageStr):
+                alpha3 = ShortLanguageStr.__alpha2_to_3_impl(data1)
+                if alpha3 is None:
+                    return False
+
+                return alpha3 == data2
+
+            if isinstance(data2, Alpha2LanguageStrRegional):
+                return False
+
+            assert_never(data2)
+
+        if isinstance(data1, Alpha3LanguageStr):
+            if isinstance(data2, Alpha3LanguageStr):
+                return data1 == data2
+
+            if isinstance(data2, Alpha2LanguageStr):
+                alpha3 = ShortLanguageStr.__alpha2_to_3_impl(data2)
+                if alpha3 is None:
+                    return False
+
+                return data1 == alpha3
+
+            if isinstance(data2, Alpha2LanguageStrRegional):
+                return False
+
+            assert_never(data2)
+
+        if isinstance(data1, Alpha2LanguageStrRegional):
+            if isinstance(data2, Alpha2LanguageStrRegional):
+                return data1 == data2
+
+            return False
+
+        assert_never(data1)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, str):
+            other_str = ShortLanguageStr.from_str(other)
+            if other_str is None:
+                return False
+
+            return ShortLanguageStr.__eq_short_variants_impl(
+                self.__data,
+                other_str.data,
+            )
+
+        if isinstance(other, ShortLanguageStr):
+            return ShortLanguageStr.__eq_short_variants_impl(self.__data, other.data)
+
+        if isinstance(other, Alpha2LanguageStr):
+            return ShortLanguageStr.__eq_short_variants_impl(self.__data, other)
+
+        if isinstance(other, Alpha3LanguageStr):
+            return ShortLanguageStr.__eq_short_variants_impl(self.__data, other)
+
+        if isinstance(other, Alpha2LanguageStrRegional):
+            return ShortLanguageStr.__eq_short_variants_impl(self.__data, other)
+
+        return False
+
+
 @schema()
 @type_name("LanguageImpl")
 @dataclass
@@ -659,7 +821,7 @@ class LanguageSchema:
 
 @use_schema_from(LanguageSchema)
 class Language:
-    __short: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
+    __short: ShortLanguageStr
     __long: LongLanguageStr
 
     # this is used, so that init is only callable from the internal class, so that it only gets checked values!
@@ -667,14 +829,14 @@ class Language:
 
     def __init__(
         self: Self,
-        short: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+        short: ShortLanguageStr,
         long: LongLanguageStr,
         *,
         sentinel: Optional[__PrivateSentinel] = None,
     ) -> None:
         if sentinel is None:
             # NOTE: this is for apischema deserialization checks!
-            myself = self.deserialize(LanguageSchema(short, long))
+            myself = self.deserialize(LanguageSchema(short.data, long))
             self.__short = myself.__short  # noqa: SLF001
             self.__long = myself.__long  # noqa: SLF001
             return
@@ -685,7 +847,7 @@ class Language:
     @property
     def short(
         self: Self,
-    ) -> Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional:
+    ) -> ShortLanguageStr:
         return self.__short
 
     @property
@@ -701,30 +863,13 @@ class Language:
         return Language.from_values(short=arr[0], long=arr[1])
 
     @staticmethod
-    def __short_from_str(
-        val: str,
-    ) -> Optional[Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional]:
-        if len(val) == 2:
-            return Alpha2LanguageStr.from_str(val)
-
-        if len(val) == 3:
-            return Alpha3LanguageStr.from_str(val)
-
-        if "-" in val:
-            return Alpha2LanguageStrRegional.from_str(val)
-
-        return None
-
-    @staticmethod
     def __from_values_impl(
         short: str,
         long: str,
         *,
         valid_check: bool,
     ) -> Optional["Language"]:
-        short_val: Optional[
-            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
-        ] = Language.__short_from_str(short)
+        short_val: Optional[ShortLanguageStr] = ShortLanguageStr.from_str(short)
 
         if short_val is None:
             return None
@@ -772,7 +917,7 @@ class Language:
     @staticmethod
     def no_language() -> "Language":
         return Language(
-            Alpha2LanguageStr.no_lang(),
+            ShortLanguageStr(Alpha2LanguageStr.no_lang()),
             LongLanguageStr("No Language"),
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
@@ -781,7 +926,7 @@ class Language:
     @staticmethod
     def __unknown() -> "Language":
         return Language(
-            Alpha2LanguageStr.unknown_lang(),
+            ShortLanguageStr(Alpha2LanguageStr.unknown_lang()),
             LongLanguageStr("Unknown"),
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
@@ -813,7 +958,7 @@ class Language:
     def serialize(self: Self) -> dict[str, Any]:
         serialized_dict: dict[str, Any] = serialize(
             LanguageSchema,
-            LanguageSchema(short=self.__short, long=self.__long),
+            LanguageSchema(short=self.__short.data, long=self.__long),
         )
         return serialized_dict
 
@@ -827,32 +972,10 @@ class Language:
             return Language.no_language()
 
         return Language(
-            language.short,
+            ShortLanguageStr(language.short),
             language.long,
             sentinel=Language.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     def to_alpha3(self: Self) -> Alpha3LanguageStr:
-        if isinstance(self.__short, Alpha3LanguageStr):
-            return self.__short
-
-        def alpha2_to_3(alpha_2: Alpha2LanguageStr) -> Alpha3LanguageStr:
-            val = lang_code_validation_list_impl.map_alpha_2_to_alpha3.get(
-                str(alpha_2),
-                None,
-            )
-            if val is None:
-                msg = _(
-                    "Can't convert alpha 2 language string {lang} to alpha 3 language string"  # noqa: COM812
-                ).format(lang=alpha_2)
-                raise RuntimeError(msg)
-
-            return Alpha3LanguageStr.from_str_unsafe(val)
-
-        if isinstance(self.__short, Alpha2LanguageStr):
-            return alpha2_to_3(self.__short)
-
-        if isinstance(self.__short, Alpha2LanguageStrRegional):
-            return alpha2_to_3(self.__short.alpha2)
-
-        assert_never(self.__short)
+        return self.__short.to_alpha3()

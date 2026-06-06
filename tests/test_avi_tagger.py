@@ -2,10 +2,10 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
 
-from content.language import Language
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
 
+from content.language import Language
 from content.tagger.avi_tagger import (
     AUDS_FOURCC,
     AVI__FOURCC,
