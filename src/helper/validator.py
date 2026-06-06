@@ -189,6 +189,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         contents: list[EpisodeContent],
     ) -> list[list["Validator.__Any1"]]:
         state: list[list[Validator.__Any1]] = []
+        # TODO: refactor validator multiple parsing with other approach, initialize lists and than append to each one, instead dof transposing, also solves the special case in transposing!
 
         for content in contents:
             local_states: list[Validator.__Any1] = [
