@@ -367,7 +367,7 @@ def test_mp4_tagger_language_patching(
         zip(
             mp4_test_parse_files.data,
             [Language.get_default()],
-            [Language.from_values("de", "German")],
+            [Language.from_values_unsafe("de", "German")],
             strict=True,
         ),
     )

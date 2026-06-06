@@ -2,18 +2,22 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
 
+from content.language import Language
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
 
 from content.tagger.avi_tagger import (
+    AUDS_FOURCC,
     AVI__FOURCC,
     FOURCC,
     LIST_FOURCC,
     RIFF_FOURCC,
+    VIDS_FOURCC,
     AVIChunk,
     AVIChunkSpan,
     AVIList,
     avi_iter_chunks,
+    find_strh_chunks_with_type,
     is_avi_file,
 )
 from helper.result import Result
@@ -398,3 +402,45 @@ def test_avi_invalid_bytes(
             assert res is not None, "valid avi is incorrect here"
 
             assert res == err, "incorrect error"
+
+
+def test_avi_tagger_language_patching(
+    subtests: SubTests,
+    avi_test_parse_files: TempVideoFiles,
+) -> None:
+
+    test_files: list[tuple[Path, Language, Language]] = list(
+        zip(
+            avi_test_parse_files.data,
+            [Language.get_default()],
+            [Language.from_values_unsafe("de", "German")],
+            strict=True,
+        ),
+    )
+
+    types: list[FOURCC] = [AUDS_FOURCC, VIDS_FOURCC]
+
+    for file, old_lang, new_language in test_files:
+        with subtests.test("video gets parsed correctly"):
+            structure_res = AVIChunkStructure.from_file(file)
+
+            if structure_res.is_err():
+                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+                raise AssertionError(msg)
+
+            with file.open("rb+") as f:
+                for strh in find_strh_chunks_with_type(f, types):
+                    old_file_lang = strh.read_language(f)
+
+                    assert old_lang.short == old_file_lang, "Old language should match"
+
+                    strh.patch_language(f, str(new_language.to_alpha3()))
+
+            # validate language
+            with file.open("rb") as f:
+                for strh in find_strh_chunks_with_type(f, types):
+                    old_file_lang = strh.read_language(f)
+
+                    assert (
+                        new_language.short == old_file_lang
+                    ), "New language should be written"
