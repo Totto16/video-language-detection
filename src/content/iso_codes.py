@@ -1026,7 +1026,7 @@ valid_iso_639_2_languages_list: list[IsoLanguage] = [
 
 validate_iso_languages(valid_iso_639_2_languages_list)
 
-#  a partial list of valid languages from the newer spec, with much more languages, seletec so that some models pass the language check
+#  a partial list of valid languages from the newer spec, with much more languages, seleted so that some models pass the language check
 valid_iso_639_3_languages_list_partial: list[IsoLanguage] = [
     # see https://en.wikipedia.org/wiki/ISO_639:c
     ("cnh", None, ["Haka Chin", "Hakha Chin"], "", ""),

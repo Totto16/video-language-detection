@@ -74,10 +74,9 @@ class RecursiveChunks:
         depth: int,
         indent_str: str = " ",
     ) -> str:
-        if isinstance(data, tuple):
-            if isinstance(data[0], AVIList):
-                if data[0].type == FOURCC(b"movi"):
-                    return f"{(indent_str * depth)}<MoviChunk children: {len(data[1])} span: {data[0].span}>"
+        if isinstance(data, tuple) and isinstance(data[0], AVIList):
+            if data[0].type == FOURCC(b"movi"):
+                return f"{(indent_str * depth)}<MoviChunk children: {len(data[1])} span: {data[0].span}>"
 
             return f"{(indent_str * depth)}<NestedChunks\n{data[0]!s}\n{RecursiveChunks.__to_str(data[1], depth=depth+1)}>"
 
@@ -125,13 +124,12 @@ class RecursiveChunks:
             if not RecursiveChunks.__is_chunk_eq(c1, c2):
                 return False
 
-            if isinstance(c1, AVIList):
-                if c1.type == FOURCC(b"movi"):
-                    if not isinstance(c2, PseudoMOVIChunk):
-                        msg = "Found MOVI Chunk without matching PseudoMOVIChunk"
-                        raise RuntimeError(msg)
+            if isinstance(c1, AVIList) and c1.type == FOURCC(b"movi"):
+                if not isinstance(c2, PseudoMOVIChunk):
+                    msg = "Found MOVI Chunk without matching PseudoMOVIChunk"
+                    raise RuntimeError(msg)
 
-                    return c2.children == len(d1)
+                return c2.children == len(d1)
 
             return RecursiveChunks.__eq_impl_both(d1, d2, depth=depth + 1)
         if isinstance(data1, AVIChunk) and isinstance(data2, AVIChunk):
@@ -258,7 +256,9 @@ def test_avi_tagger_parsing(
                                 [
                                     (
                                         PseudoAVIList(
-                                            LIST_FOURCC, 8902, FOURCC(b"hdrl"),
+                                            LIST_FOURCC,
+                                            8902,
+                                            FOURCC(b"hdrl"),
                                         ),
                                         [
                                             PseudoAVIChunk(FOURCC(b"avih"), 64),

@@ -1,12 +1,562 @@
+from dataclasses import dataclass
 from typing import Optional
 
 from content.language import ShortLanguageStr
+
+
+@dataclass
+class TODOAlpha3:
+    value: str
+
+
+# valid according to extended ISo 639-3, but not all codes of that are recognized yet, only those needed by my models
+# see https://en.wikipedia.org/wiki/ISO_639
+def valid_iso_alpha3_language_todo(a: str) -> TODOAlpha3:
+    return TODOAlpha3(a)
+
+
+@dataclass
+class TODOAlpha2Regional:
+    value: str
+
+
+def valid_iso_alpha2_region_language_todo(a: str) -> TODOAlpha2Regional:
+    return TODOAlpha2Regional(a)
+
+
+@dataclass
+class TODOAlpha3Regional:
+    value: str
+
+
+def valid_iso_alpha3_region_language_todo(a: str) -> TODOAlpha3Regional:
+    return TODOAlpha3Regional(a)
+
+
+@dataclass
+class InvalidISOstring:
+    value: str
+
+
+def invalid_iso_string(a: str) -> InvalidISOstring:
+    return InvalidISOstring(a)
+
+
+# TODO: use this:
+# Local $aLanguageID_TAG[493][4] = [["Num", "Language ID HEX", "Language ID DEC", "Language tag"] _
+#         , [1, "0x0001", 1, "ar"] _
+#         , [2, "0x0002", 2, "bg"] _
+#         , [3, "0x0003", 3, "ca"] _
+#         , [4, "0x0004", 4, "zh-Hans"] _
+#         , [5, "0x0005", 5, "cs"] _
+#         , [6, "0x0006", 6, "da"] _
+#         , [7, "0x0007", 7, "de"] _
+#         , [8, "0x0008", 8, "el"] _
+#         , [9, "0x0009", 9, "en"] _
+#         , [10, "0x000A", 10, "es"] _
+#         , [11, "0x000B", 11, "fi"] _
+#         , [12, "0x000C", 12, "fr"] _
+#         , [13, "0x000D", 13, "he"] _
+#         , [14, "0x000E", 14, "hu"] _
+#         , [15, "0x000F", 15, "is"] _
+#         , [16, "0x0010", 16, "it"] _
+#         , [17, "0x0011", 17, "ja"] _
+#         , [18, "0x0012", 18, "ko"] _
+#         , [19, "0x0013", 19, "nl"] _
+#         , [20, "0x0014", 20, "no"] _
+#         , [21, "0x0015", 21, "pl"] _
+#         , [22, "0x0016", 22, "pt"] _
+#         , [23, "0x0017", 23, "rm"] _
+#         , [24, "0x0018", 24, "ro"] _
+#         , [25, "0x0019", 25, "ru"] _
+#         , [26, "0x001A", 26, "hr"] _
+#         , [27, "0x001B", 27, "sk"] _
+#         , [28, "0x001C", 28, "sq"] _
+#         , [29, "0x001D", 29, "sv"] _
+#         , [30, "0x001E", 30, "th"] _
+#         , [31, "0x001F", 31, "tr"] _
+#         , [32, "0x0020", 32, "ur"] _
+#         , [33, "0x0021", 33, "id"] _
+#         , [34, "0x0022", 34, "uk"] _
+#         , [35, "0x0023", 35, "be"] _
+#         , [36, "0x0024", 36, "sl"] _
+#         , [37, "0x0025", 37, "et"] _
+#         , [38, "0x0026", 38, "lv"] _
+#         , [39, "0x0027", 39, "lt"] _
+#         , [40, "0x0028", 40, "tg"] _
+#         , [41, "0x0029", 41, "fa"] _
+#         , [42, "0x002A", 42, "vi"] _
+#         , [43, "0x002B", 43, "hy"] _
+#         , [44, "0x002C", 44, "az"] _
+#         , [45, "0x002D", 45, "eu"] _
+#         , [46, "0x002E", 46, "hsb"] _
+#         , [47, "0x002F", 47, "mk"] _
+#         , [48, "0x0030", 48, "st"] _
+#         , [49, "0x0031", 49, "ts"] _
+#         , [50, "0x0032", 50, "tn"] _
+#         , [51, "0x0033", 51, "ve"] _
+#         , [52, "0x0034", 52, "xh"] _
+#         , [53, "0x0035", 53, "zu"] _
+#         , [54, "0x0036", 54, "af"] _
+#         , [55, "0x0037", 55, "ka"] _
+#         , [56, "0x0038", 56, "fo"] _
+#         , [57, "0x0039", 57, "hi"] _
+#         , [58, "0x003A", 58, "mt"] _
+#         , [59, "0x003B", 59, "se"] _
+#         , [60, "0x003C", 60, "ga"] _
+#         , [61, "0x003D", 61, "yi"] _
+#         , [62, "0x003E", 62, "ms"] _
+#         , [63, "0x003F", 63, "kk"] _
+#         , [64, "0x0040", 64, "ky"] _
+#         , [65, "0x0041", 65, "sw"] _
+#         , [66, "0x0042", 66, "tk"] _
+#         , [67, "0x0043", 67, "uz"] _
+#         , [68, "0x0044", 68, "tt"] _
+#         , [69, "0x0045", 69, "bn"] _
+#         , [70, "0x0046", 70, "pa"] _
+#         , [71, "0x0047", 71, "gu"] _
+#         , [72, "0x0048", 72, "or"] _
+#         , [73, "0x0049", 73, "ta"] _
+#         , [74, "0x004A", 74, "te"] _
+#         , [75, "0x004B", 75, "kn"] _
+#         , [76, "0x004C", 76, "ml"] _
+#         , [77, "0x004D", 77, "as"] _
+#         , [78, "0x004E", 78, "mr"] _
+#         , [79, "0x004F", 79, "sa"] _
+#         , [80, "0x0050", 80, "mn"] _
+#         , [81, "0x0051", 81, "bo"] _
+#         , [82, "0x0052", 82, "cy"] _
+#         , [83, "0x0053", 83, "km"] _
+#         , [84, "0x0054", 84, "lo"] _
+#         , [85, "0x0055", 85, "my"] _
+#         , [86, "0x0056", 86, "gl"] _
+#         , [87, "0x0057", 87, "kok"] _
+#         , [88, "0x0058", 88, "mni"] _
+#         , [89, "0x0059", 89, "sd"] _
+#         , [90, "0x005A", 90, "syr"] _
+#         , [91, "0x005B", 91, "si"] _
+#         , [92, "0x005C", 92, "chr"] _
+#         , [93, "0x005D", 93, "iu"] _
+#         , [94, "0x005E", 94, "am"] _
+#         , [95, "0x005F", 95, "tzm"] _
+#         , [96, "0x0060", 96, "ks"] _
+#         , [97, "0x0061", 97, "ne"] _
+#         , [98, "0x0062", 98, "fy"] _
+#         , [99, "0x0063", 99, "ps"] _
+#         , [100, "0x0064", 100, "fil"] _
+#         , [101, "0x0065", 101, "dv"] _
+#         , [102, "0x0066", 102, "bin"] _
+#         , [103, "0x0067", 103, "ff"] _
+#         , [104, "0x0068", 104, "ha"] _
+#         , [105, "0x0069", 105, "ibb"] _
+#         , [106, "0x006A", 106, "yo"] _
+#         , [107, "0x006B", 107, "quz"] _
+#         , [108, "0x006C", 108, "nso"] _
+#         , [109, "0x006D", 109, "ba"] _
+#         , [110, "0x006E", 110, "lb"] _
+#         , [111, "0x006F", 111, "kl"] _
+#         , [112, "0x0070", 112, "ig"] _
+#         , [113, "0x0071", 113, "kr"] _
+#         , [114, "0x0072", 114, "om"] _
+#         , [115, "0x0073", 115, "ti"] _
+#         , [116, "0x0074", 116, "gn"] _
+#         , [117, "0x0075", 117, "haw"] _
+#         , [118, "0x0076", 118, "la"] _
+#         , [119, "0x0077", 119, "so"] _
+#         , [120, "0x0078", 120, "ii"] _
+#         , [121, "0x0079", 121, "pap"] _
+#         , [122, "0x007A", 122, "arn"] _
+#         , [123, "0x007B", 123, "Unassigned"] _
+#         , [124, "0x007C", 124, "moh"] _
+#         , [125, "0x007D", 125, "Unassigned"] _
+#         , [126, "0x007E", 126, "br"] _
+#         , [127, "0x007F", 127, "Reserved for invariant locale behavior"] _
+#         , [128, "0x0080", 128, "ug"] _
+#         , [129, "0x0081", 129, "mi"] _
+#         , [130, "0x0082", 130, "oc"] _
+#         , [131, "0x0083", 131, "co"] _
+#         , [132, "0x0084", 132, "gsw"] _
+#         , [133, "0x0085", 133, "sah"] _
+#         , [134, "0x0086", 134, "qut"] _
+#         , [135, "0x0087", 135, "rw"] _
+#         , [136, "0x0088", 136, "wo"] _
+#         , [137, "0x0089", 137, "Unassigned"] _
+#         , [138, "0x008A", 138, "Unassigned"] _
+#         , [139, "0x008B", 139, "Unassigned"] _
+#         , [140, "0x008C", 140, "prs"] _
+#         , [141, "0x008D", 141, "Unassigned"] _
+#         , [142, "0x008E", 142, "Unassigned"] _
+#         , [143, "0x008F", 143, "Unassigned"] _
+#         , [144, "0x0090", 144, "Unassigned"] _
+#         , [145, "0x0091", 145, "gd"] _
+#         , [146, "0x0092", 146, "ku"] _
+#         , [147, "0x0093", 147, "quc"] _
+#         , [148, "0x0401", 1025, "ar-SA"] _
+#         , [149, "0x0402", 1026, "bg-BG"] _
+#         , [150, "0x0403", 1027, "ca-ES"] _
+#         , [151, "0x0404", 1028, "zh-TW"] _
+#         , [152, "0x0405", 1029, "cs-CZ"] _
+#         , [153, "0x0406", 1030, "da-DK"] _
+#         , [154, "0x0407", 1031, "de-DE"] _
+#         , [155, "0x0408", 1032, "el-GR"] _
+#         , [156, "0x0409", 1033, "en-US"] _
+#         , [157, "0x040A", 1034, "es-ES_tradnl"] _
+#         , [158, "0x040B", 1035, "fi-FI"] _
+#         , [159, "0x040C", 1036, "fr-FR"] _
+#         , [160, "0x040D", 1037, "he-IL"] _
+#         , [161, "0x040E", 1038, "hu-HU"] _
+#         , [162, "0x040F", 1039, "is-IS"] _
+#         , [163, "0x0410", 1040, "it-IT"] _
+#         , [164, "0x0411", 1041, "ja-JP"] _
+#         , [165, "0x0412", 1042, "ko-KR"] _
+#         , [166, "0x0413", 1043, "nl-NL"] _
+#         , [167, "0x0414", 1044, "nb-NO"] _
+#         , [168, "0x0415", 1045, "pl-PL"] _
+#         , [169, "0x0416", 1046, "pt-BR"] _
+#         , [170, "0x0417", 1047, "rm-CH"] _
+#         , [171, "0x0418", 1048, "ro-RO"] _
+#         , [172, "0x0419", 1049, "ru-RU"] _
+#         , [173, "0x041A", 1050, "hr-HR"] _
+#         , [174, "0x041B", 1051, "sk-SK"] _
+#         , [175, "0x041C", 1052, "sq-AL"] _
+#         , [176, "0x041D", 1053, "sv-SE"] _
+#         , [177, "0x041E", 1054, "th-TH"] _
+#         , [178, "0x041F", 1055, "tr-TR"] _
+#         , [179, "0x0420", 1056, "ur-PK"] _
+#         , [180, "0x0421", 1057, "id-ID"] _
+#         , [181, "0x0422", 1058, "uk-UA"] _
+#         , [182, "0x0423", 1059, "be-BY"] _
+#         , [183, "0x0424", 1060, "sl-SI"] _
+#         , [184, "0x0425", 1061, "et-EE"] _
+#         , [185, "0x0426", 1062, "lv-LV"] _
+#         , [186, "0x0427", 1063, "lt-LT"] _
+#         , [187, "0x0428", 1064, "tg-Cyrl-TJ"] _
+#         , [188, "0x0429", 1065, "fa-IR"] _
+#         , [189, "0x042A", 1066, "vi-VN"] _
+#         , [190, "0x042B", 1067, "hy-AM"] _
+#         , [191, "0x042C", 1068, "az-Latn-AZ"] _
+#         , [192, "0x042D", 1069, "eu-ES"] _
+#         , [193, "0x042E", 1070, "hsb-DE"] _
+#         , [194, "0x042F", 1071, "mk-MK"] _
+#         , [195, "0x0430", 1072, "st-ZA"] _
+#         , [196, "0x0431", 1073, "ts-ZA"] _
+#         , [197, "0x0432", 1074, "tn-ZA"] _
+#         , [198, "0x0433", 1075, "ve-ZA"] _
+#         , [199, "0x0434", 1076, "xh-ZA"] _
+#         , [200, "0x0435", 1077, "zu-ZA"] _
+#         , [201, "0x0436", 1078, "af-ZA"] _
+#         , [202, "0x0437", 1079, "ka-GE"] _
+#         , [203, "0x0438", 1080, "fo-FO"] _
+#         , [204, "0x0439", 1081, "hi-IN"] _
+#         , [205, "0x043A", 1082, "mt-MT"] _
+#         , [206, "0x043B", 1083, "se-NO"] _
+#         , [207, "0x043D", 1085, "yi-001"] _
+#         , [208, "0x043E", 1086, "ms-MY"] _
+#         , [209, "0x043F", 1087, "kk-KZ"] _
+#         , [210, "0x0440", 1088, "ky-KG"] _
+#         , [211, "0x0441", 1089, "sw-KE"] _
+#         , [212, "0x0442", 1090, "tk-TM"] _
+#         , [213, "0x0443", 1091, "uz-Latn-UZ"] _
+#         , [214, "0x0444", 1092, "tt-RU"] _
+#         , [215, "0x0445", 1093, "bn-IN"] _
+#         , [216, "0x0446", 1094, "pa-IN"] _
+#         , [217, "0x0447", 1095, "gu-IN"] _
+#         , [218, "0x0448", 1096, "or-IN"] _
+#         , [219, "0x0449", 1097, "ta-IN"] _
+#         , [220, "0x044A", 1098, "te-IN"] _
+#         , [221, "0x044B", 1099, "kn-IN"] _
+#         , [222, "0x044C", 1100, "ml-IN"] _
+#         , [223, "0x044D", 1101, "as-IN"] _
+#         , [224, "0x044E", 1102, "mr-IN"] _
+#         , [225, "0x044F", 1103, "sa-IN"] _
+#         , [226, "0x0450", 1104, "mn-MN"] _
+#         , [227, "0x0451", 1105, "bo-CN"] _
+#         , [228, "0x0452", 1106, "cy-GB"] _
+#         , [229, "0x0453", 1107, "km-KH"] _
+#         , [230, "0x0454", 1108, "lo-LA"] _
+#         , [231, "0x0455", 1109, "my-MM"] _
+#         , [232, "0x0456", 1110, "gl-ES"] _
+#         , [233, "0x0457", 1111, "kok-IN"] _
+#         , [234, "0x0458", 1112, "mni-IN"] _
+#         , [235, "0x0459", 1113, "sd-Deva-IN"] _
+#         , [236, "0x045A", 1114, "syr-SY"] _
+#         , [237, "0x045B", 1115, "si-LK"] _
+#         , [238, "0x045C", 1116, "chr-Cher-US"] _
+#         , [239, "0x045D", 1117, "iu-Cans-CA"] _
+#         , [240, "0x045E", 1118, "am-ET"] _
+#         , [241, "0x045F", 1119, "tzm-Arab-MA"] _
+#         , [242, "0x0460", 1120, "ks-Arab"] _
+#         , [243, "0x0461", 1121, "ne-NP"] _
+#         , [244, "0x0462", 1122, "fy-NL"] _
+#         , [245, "0x0463", 1123, "ps-AF"] _
+#         , [246, "0x0464", 1124, "fil-PH"] _
+#         , [247, "0x0465", 1125, "dv-MV"] _
+#         , [248, "0x0466", 1126, "bin-NG"] _
+#         , [249, "0x0467", 1127, "ff-NG, ff-Latn-NG"] _
+#         , [250, "0x0468", 1128, "ha-Latn-NG"] _
+#         , [251, "0x0469", 1129, "ibb-NG"] _
+#         , [252, "0x046A", 1130, "yo-NG"] _
+#         , [253, "0x046B", 1131, "quz-BO"] _
+#         , [254, "0x046C", 1132, "nso-ZA"] _
+#         , [255, "0x046D", 1133, "ba-RU"] _
+#         , [256, "0x046E", 1134, "lb-LU"] _
+#         , [257, "0x046F", 1135, "kl-GL"] _
+#         , [258, "0x0470", 1136, "ig-NG"] _
+#         , [259, "0x0471", 1137, "kr-Latn-NG"] _
+#         , [260, "0x0472", 1138, "om-ET"] _
+#         , [261, "0x0473", 1139, "ti-ET"] _
+#         , [262, "0x0474", 1140, "gn-PY"] _
+#         , [263, "0x0475", 1141, "haw-US"] _
+#         , [264, "0x0476", 1142, "la-VA"] _
+#         , [265, "0x0477", 1143, "so-SO"] _
+#         , [266, "0x0478", 1144, "ii-CN"] _
+#         , [267, "0x0479", 1145, "pap-029"] _
+#         , [268, "0x047A", 1146, "arn-CL"] _
+#         , [269, "0x047C", 1148, "moh-CA"] _
+#         , [270, "0x047E", 1150, "br-FR"] _
+#         , [271, "0x0480", 1152, "ug-CN"] _
+#         , [272, "0x0481", 1153, "mi-NZ"] _
+#         , [273, "0x0482", 1154, "oc-FR"] _
+#         , [274, "0x0483", 1155, "co-FR"] _
+#         , [275, "0x0484", 1156, "gsw-FR"] _
+#         , [276, "0x0485", 1157, "sah-RU"] _
+#         , [277, "0x0486", 1158, "qut-GT"] _
+#         , [278, "0x0487", 1159, "rw-RW"] _
+#         , [279, "0x0488", 1160, "wo-SN"] _
+#         , [280, "0x048C", 1164, "prs-AF"] _
+#         , [281, "0x048D", 1165, "plt-MG"] _
+#         , [282, "0x048E", 1166, "zh-yue-HK"] _
+#         , [283, "0x048F", 1167, "tdd-Tale-CN"] _
+#         , [284, "0x0490", 1168, "khb-Talu-CN"] _
+#         , [285, "0x0491", 1169, "gd-GB"] _
+#         , [286, "0x0492", 1170, "ku-Arab-IQ"] _
+#         , [287, "0x0493", 1171, "quc-CO"] _
+#         , [288, "0x0501", 1281, "qps-ploc"] _
+#         , [289, "0x05FE", 1534, "qps-ploca"] _
+#         , [290, "0x0801", 2049, "ar-IQ"] _
+#         , [291, "0x0803", 2051, "ca-ES-vale ncia"] _
+#         , [292, "0x0804", 2052, "zh-CN"] _
+#         , [293, "0x0807", 2055, "de-CH"] _
+#         , [294, "0x0809", 2057, "en-GB"] _
+#         , [295, "0x080A", 2058, "es-MX"] _
+#         , [296, "0x080C", 2060, "fr-BE"] _
+#         , [297, "0x0810", 2064, "it-CH"] _
+#         , [298, "0x0811", 2065, "ja-Ploc-JP"] _
+#         , [299, "0x0813", 2067, "nl-BE"] _
+#         , [300, "0x0814", 2068, "nn-NO"] _
+#         , [301, "0x0816", 2070, "pt-PT"] _
+#         , [302, "0x0818", 2072, "ro-MD"] _
+#         , [303, "0x0819", 2073, "ru-MD"] _
+#         , [304, "0x081A", 2074, "sr-Latn-CS"] _
+#         , [305, "0x081D", 2077, "sv-FI"] _
+#         , [306, "0x0820", 2080, "ur-IN"] _
+#         , [307, "0x0827", 2087, "Unassigned"] _
+#         , [308, "0x082C", 2092, "az-Cyrl-AZ"] _
+#         , [309, "0x082E", 2094, "dsb-DE"] _
+#         , [310, "0x0832", 2098, "tn-BW"] _
+#         , [311, "0x083B", 2107, "se-SE"] _
+#         , [312, "0x083C", 2108, "ga-IE"] _
+#         , [313, "0x083E", 2110, "ms-BN"] _
+#         , [314, "0x083F", 2111, "kk-Latn-KZ"] _
+#         , [315, "0x0843", 2115, "uz-Cyrl-UZ"] _
+#         , [316, "0x0845", 2117, "bn-BD"] _
+#         , [317, "0x0846", 2118, "pa-Arab-PK"] _
+#         , [318, "0x0849", 2121, "ta-LK"] _
+#         , [319, "0x0850", 2128, "mn-Mong-CN"] _
+#         , [320, "0x0851", 2129, "bo-BT"] _
+#         , [321, "0x0859", 2137, "sd-Arab-PK"] _
+#         , [322, "0x085D", 2141, "iu-Latn-CA"] _
+#         , [323, "0x085F", 2143, "tzm-Latn-DZ"] _
+#         , [324, "0x0860", 2144, "ks-Deva-IN"] _
+#         , [325, "0x0861", 2145, "ne-IN"] _
+#         , [326, "0x0867", 2151, "ff-Latn-SN"] _
+#         , [327, "0x086B", 2155, "quz-EC"] _
+#         , [328, "0x0873", 2163, "ti-ER"] _
+#         , [329, "0x09FF", 2559, "qps-plocm"] _
+#         , [330, "0x0C00", 3072, "Locale without assigned LCID if the curre nt user default locale. "] _
+#         , [331, "0x0C01", 3073, "ar-EG"] _
+#         , [332, "0x0C04", 3076, "zh-HK"] _
+#         , [333, "0x0C07", 3079, "de-AT"] _
+#         , [334, "0x0C09", 3081, "en-AU"] _
+#         , [335, "0x0C0A", 3082, "es-ES"] _
+#         , [336, "0x0C0C", 3084, "fr-CA"] _
+#         , [337, "0x0C1A", 3098, "sr-Cyrl-CS"] _
+#         , [338, "0x0C3B", 3131, "se-FI"] _
+#         , [339, "0x0C50", 3152, "mn-Mong-MN"] _
+#         , [340, "0x0C51", 3153, "dz-BT"] _
+#         , [341, "0x0C5F", 3167, "tmz-MA"] _
+#         , [342, "0x0C6b", 3179, "quz-PE"] _
+#         , [343, "0x1000", 4096, "Locale without assigned LCID if the curre nt user default locale. "] _
+#         , [344, "0x1001", 4097, "ar-LY"] _
+#         , [345, "0x1004", 4100, "zh-SG"] _
+#         , [346, "0x1007", 4103, "de-LU"] _
+#         , [347, "0x1009", 4105, "en-CA"] _
+#         , [348, "0x100A", 4106, "es-GT"] _
+#         , [349, "0x100C", 4108, "fr-CH"] _
+#         , [350, "0x101A", 4122, "hr-BA"] _
+#         , [351, "0x103B", 4155, "smj-NO"] _
+#         , [352, "0x105F", 4191, "tzm-Tfng-MA"] _
+#         , [353, "0x1401", 5121, "ar-DZ"] _
+#         , [354, "0x1404", 5124, "zh-MO"] _
+#         , [355, "0x1407", 5127, "de-LI"] _
+#         , [356, "0x1409", 5129, "en-NZ"] _
+#         , [357, "0x140A", 5130, "es-CR"] _
+#         , [358, "0x140C", 5132, "fr-LU"] _
+#         , [359, "0x141A", 5146, "bs-Latn-BA"] _
+#         , [360, "0x143B", 5179, "smj-SE"] _
+#         , [361, "0x1801", 6145, "ar-MA"] _
+#         , [362, "0x1809", 6153, "en-IE"] _
+#         , [363, "0x180A", 6154, "es-PA"] _
+#         , [364, "0x180C", 6156, "fr-MC"] _
+#         , [365, "0x181A", 6170, "sr-Latn-BA"] _
+#         , [366, "0x183B", 6203, "sma-NO"] _
+#         , [367, "0x1C01", 7169, "ar-TN"] _
+#         , [368, "0x1C09", 7177, "en-ZA"] _
+#         , [369, "0x1C0A", 7178, "es-DO"] _
+#         , [370, "0x1C0C", 7180, "fr-029"] _
+#         , [371, "0x1C1A", 7194, "sr-Cyrl-BA"] _
+#         , [372, "0x1C3B", 7227, "sma-SE"] _
+#         , [373, "0x2001", 8193, "ar-OM"] _
+#         , [374, "0x2008", 8200, "Unassigned"] _
+#         , [375, "0x2009", 8201, "en-JM"] _
+#         , [376, "0x200A", 8202, "es-VE"] _
+#         , [377, "0x200C", 8204, "fr-RE"] _
+#         , [378, "0x201A", 8218, "bs-Cyrl-BA"] _
+#         , [379, "0x203B", 8251, "sms-FI"] _
+#         , [380, "0x2401", 9217, "ar-YE"] _
+#         , [381, "0x2409", 9225, "en-029"] _
+#         , [382, "0x240A", 9226, "es-CO"] _
+#         , [383, "0x240C", 9228, "fr-CD"] _
+#         , [384, "0x241A", 9242, "sr-Latn-RS"] _
+#         , [385, "0x243B", 9275, "smn-FI"] _
+#         , [386, "0x2801", 10241, "ar-SY"] _
+#         , [387, "0x2809", 10249, "en-BZ"] _
+#         , [388, "0x280A", 10250, "es-PE"] _
+#         , [389, "0x280C", 10252, "fr-SN"] _
+#         , [390, "0x281A", 10266, "sr-Cyrl-RS"] _
+#         , [391, "0x2C01", 11265, "ar-JO"] _
+#         , [392, "0x2C09", 11273, "en-TT"] _
+#         , [393, "0x2C0A", 11274, "es-AR"] _
+#         , [394, "0x2C0C", 11276, "fr-CM"] _
+#         , [395, "0x2C1A", 11290, "sr-Latn-ME"] _
+#         , [396, "0x3000", 12288, "Unassigned"] _
+#         , [397, "0x3001", 12289, "ar-LB"] _
+#         , [398, "0x3009", 12297, "en-ZW"] _
+#         , [399, "0x300A", 12298, "es-EC"] _
+#         , [400, "0x300C", 12300, "fr-CI"] _
+#         , [401, "0x301A", 12314, "sr-Cyrl-ME"] _
+#         , [402, "0x3400", 13312, "Unassigned"] _
+#         , [403, "0x3401", 13313, "ar-KW"] _
+#         , [404, "0x3409", 13321, "en-PH"] _
+#         , [405, "0x340A", 13322, "es-CL"] _
+#         , [406, "0x340C", 13324, "fr-ML"] _
+#         , [407, "0x3800", 14336, "Unassigned"] _
+#         , [408, "0x3801", 14337, "ar-AE"] _
+#         , [409, "0x3809", 14345, "en-ID"] _
+#         , [410, "0x380A", 14346, "es-UY"] _
+#         , [411, "0x380C", 14348, "fr-MA"] _
+#         , [412, "0x3C00", 15360, "Unassigned"] _
+#         , [413, "0x3C01", 15361, "ar-BH"] _
+#         , [414, "0x3C09", 15369, "en-HK"] _
+#         , [415, "0x3C0A", 15370, "es-PY"] _
+#         , [416, "0x3C0C", 15372, "fr-HT"] _
+#         , [417, "0x4000", 16384, "Unassigned"] _
+#         , [418, "0x4001", 16385, "ar-QA"] _
+#         , [419, "0x4009", 16393, "en-IN"] _
+#         , [420, "0x400A", 16394, "es-BO"] _
+#         , [421, "0x4400", 17408, "Unassigned"] _
+#         , [422, "0x4401", 17409, "ar-Ploc-SA"] _
+#         , [423, "0x4409", 17417, "en-MY"] _
+#         , [424, "0x440A", 17418, "es-SV"] _
+#         , [425, "0x4800", 18432, "Unassigned"] _
+#         , [426, "0x4801", 18433, "ar-145"] _
+#         , [427, "0x4809", 18441, "en-SG"] _
+#         , [428, "0x480A", 18442, "es-HN"] _
+#         , [429, "0x4C00", 19456, "Unassigned"] _
+#         , [430, "0x4C09", 19465, "en-AE"] _
+#         , [431, "0x4C0A", 19466, "es-NI"] _
+#         , [432, "0x5009", 20489, "en-BH"] _
+#         , [433, "0x500A", 20490, "es-PR"] _
+#         , [434, "0x5409", 21513, "en-EG"] _
+#         , [435, "0x540A", 21514, "es-US"] _
+#         , [436, "0x5809", 22537, "en-JO"] _
+#         , [437, "0x580A", 22538, "es-419"] _
+#         , [438, "0x5C09", 23561, "en-KW"] _
+#         , [439, "0x5C0A", 23562, "es-CU"] _
+#         , [440, "0x6009", 24585, "en-TR"] _
+#         , [441, "0x6409", 25609, "en-YE"] _
+#         , [442, "0x641A", 25626, "bs-Cyrl"] _
+#         , [443, "0x681A", 26650, "bs-Latn"] _
+#         , [444, "0x6C1A", 27674, "sr-Cyrl"] _
+#         , [445, "0x701A", 28698, "sr-Latn"] _
+#         , [446, "0x703B", 28731, "smn"] _
+#         , [447, "0x742C", 29740, "az-Cyrl"] _
+#         , [448, "0x743B", 29755, "sms"] _
+#         , [449, "0x7804", 30724, "zh"] _
+#         , [450, "0x7814", 30740, "nn"] _
+#         , [451, "0x781A", 30746, "bs"] _
+#         , [452, "0x782C", 30764, "az-Latn"] _
+#         , [453, "0x783B", 30779, "sma"] _
+#         , [454, "0x783F", 30783, "kk-Cyrl"] _
+#         , [455, "0x7843", 30787, "uz-Cyrl"] _
+#         , [456, "0x7850", 30800, "mn-Cyrl"] _
+#         , [457, "0x785D", 30813, "iu-Cans"] _
+#         , [458, "0x785F", 30815, "tzm-Tfng"] _
+#         , [459, "0x7C04", 31748, "zh-Hant"] _
+#         , [460, "0x7C14", 31764, "nb"] _
+#         , [461, "0x7C1A", 31770, "sr"] _
+#         , [462, "0x7C28", 31784, "tg-Cyrl"] _
+#         , [463, "0x7C2E", 31790, "dsb"] _
+#         , [464, "0x7C3B", 31803, "smj"] _
+#         , [465, "0x7C3F", 31807, "kk-Latn"] _
+#         , [466, "0x7C43", 31811, "uz-Latn"] _
+#         , [467, "0x7C46", 31814, "pa-Arab"] _
+#         , [468, "0x7C50", 31824, "mn-Mong"] _
+#         , [469, "0x7C59", 31833, "sd-Arab"] _
+#         , [470, "0x7C5C", 31836, "chr-Cher"] _
+#         , [471, "0x7C5D", 31837, "iu-Latn"] _
+#         , [472, "0x7C5F", 31839, "tzm-Latn"] _
+#         , [473, "0x7C67", 31847, "ff-Latn"] _
+#         , [474, "0x7C68", 31848, "ha-Latn"] _
+#         , [475, "0x7C92", 31890, "ku-Arab"] _
+#         , [476, "0xF2EE", 62190, "reserved"] _
+#         , [477, "0xE40C", 58380, "fr-015"] _
+#         , [478, "0xEEEE", 61166, "reserved"] _
+#         , [479, "0x0001007F", 65663, "x-IV-mathan (math alphanumeric sorting)"] _
+#         , [480, "0x00010407", 66567, "de-DE_phoneb"] _
+#         , [481, "0x0001040E", 66574, "hu-HU_tchncl"] _
+#         , [482, "0x00010437", 66615, "ka-GE_modern"] _
+#         , [483, "0x00020804", 133124, "zh-CN_stroke"] _
+#         , [484, "0x00021004", 135172, "zh-SG_stroke"] _
+#         , [485, "0x00021404", 136196, "zh-MO_stroke"] _
+#         , [486, "0x00030404", 197636, "zh-TW_pronun"] _
+#         , [487, "0x00040404", 263172, "zh-TW_radstr"] _
+#         , [488, "0x00040411", 263185, "ja-JP_radstr"] _
+#         , [489, "0x00040C04", 265220, "zh-HK_radstr"] _
+#         , [490, "0x00041404", 267268, "zh-MO_radstr"] _
+#         , [491, "0x00050804", 329732, "zh-CN_phoneb"] _
+#         , [492, "0x00051004", 331780, "zh-SG_phoneb"]] ; :)
+# #include <Array.au3>
+# _ArrayDisplay($aLanguageID_TAG)
+
 
 # from https://www.autoitscript.com/forum/topic/209486-microsoft-windows-lcid-list-decimal-and-hex-all-locale-codes-ids/
 # some values where verified
 ##[["Num", "Language", "Location_(or type)", "Language_ID_HEX", "Language_ID_DEC", "Language_tag", "Supported_version"),
 raw_lcid_languages: list[
-    tuple[int, str, Optional[str], int, int, ShortLanguageStr | str, str]
+    tuple[
+        int,
+        str,
+        Optional[str],
+        int,
+        int,
+        ShortLanguageStr
+        | TODOAlpha3
+        | TODOAlpha2Regional
+        | TODOAlpha3Regional
+        | InvalidISOstring,
+        str,
+    ]
 ] = [
     (
         1,
@@ -23,7 +573,7 @@ raw_lcid_languages: list[
         "Djibouti",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("aa-DJ"),
+        valid_iso_alpha2_region_language_todo("aa-DJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -32,7 +582,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("aa-ER"),
+        valid_iso_alpha2_region_language_todo("aa-ER"),
         "Win_10,Win_2016",
     ),
     (
@@ -41,7 +591,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("aa-ET"),
+        valid_iso_alpha2_region_language_todo("aa-ET"),
         "Win_10,Win_2016",
     ),
     (
@@ -59,7 +609,7 @@ raw_lcid_languages: list[
         "Namibia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("af-NA"),
+        valid_iso_alpha2_region_language_todo("af-NA"),
         "Win_10,Win_2016",
     ),
     (
@@ -68,7 +618,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0436,
         1078,
-        ShortLanguageStr.from_str_unsafe("af-ZA"),
+        valid_iso_alpha2_region_language_todo("af-ZA"),
         "Win_NT_4",
     ),
     (
@@ -77,7 +627,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("agq"),
+        valid_iso_alpha3_language_todo("agq"),
         "Win_10,Win_2016",
     ),
     (
@@ -86,7 +636,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("agq-CM"),
+        valid_iso_alpha3_region_language_todo("agq-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -104,7 +654,7 @@ raw_lcid_languages: list[
         "Ghana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ak-GH"),
+        valid_iso_alpha2_region_language_todo("ak-GH"),
         "Win_10,Win_2016",
     ),
     (
@@ -122,7 +672,7 @@ raw_lcid_languages: list[
         "Albania",
         0x041C,
         1052,
-        ShortLanguageStr.from_str_unsafe("sq-AL"),
+        valid_iso_alpha2_region_language_todo("sq-AL"),
         "Win_NT_4",
     ),
     (
@@ -131,7 +681,7 @@ raw_lcid_languages: list[
         "North Macedonia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sq-MK"),
+        valid_iso_alpha2_region_language_todo("sq-MK"),
         "Win_10,Win_2016",
     ),
     (
@@ -149,7 +699,7 @@ raw_lcid_languages: list[
         "France",
         0x0484,
         1156,
-        ShortLanguageStr.from_str_unsafe("gsw-FR"),
+        valid_iso_alpha3_region_language_todo("gsw-FR"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -158,7 +708,7 @@ raw_lcid_languages: list[
         "Liechtenstein",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("gsw-LI"),
+        valid_iso_alpha3_region_language_todo("gsw-LI"),
         "Win_10,Win_2016",
     ),
     (
@@ -167,7 +717,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("gsw-CH"),
+        valid_iso_alpha3_region_language_todo("gsw-CH"),
         "Win_10,Win_2016",
     ),
     (
@@ -185,7 +735,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x045E,
         1118,
-        ShortLanguageStr.from_str_unsafe("am-ET"),
+        valid_iso_alpha2_region_language_todo("am-ET"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -203,7 +753,7 @@ raw_lcid_languages: list[
         "Algeria",
         0x1401,
         5121,
-        ShortLanguageStr.from_str_unsafe("ar-DZ"),
+        valid_iso_alpha2_region_language_todo("ar-DZ"),
         "Win_NT_4",
     ),
     (
@@ -212,7 +762,7 @@ raw_lcid_languages: list[
         "Bahrain",
         0x3C01,
         15361,
-        ShortLanguageStr.from_str_unsafe("ar-BH"),
+        valid_iso_alpha2_region_language_todo("ar-BH"),
         "Win_NT_4",
     ),
     (
@@ -221,7 +771,7 @@ raw_lcid_languages: list[
         "Chad",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-TD"),
+        valid_iso_alpha2_region_language_todo("ar-TD"),
         "Win_10,Win_2016",
     ),
     (
@@ -230,7 +780,7 @@ raw_lcid_languages: list[
         "Comoros",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-KM"),
+        valid_iso_alpha2_region_language_todo("ar-KM"),
         "Win_10,Win_2016",
     ),
     (
@@ -239,7 +789,7 @@ raw_lcid_languages: list[
         "Djibouti",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-DJ"),
+        valid_iso_alpha2_region_language_todo("ar-DJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -248,7 +798,7 @@ raw_lcid_languages: list[
         "Egypt",
         0x0C01,
         3073,
-        ShortLanguageStr.from_str_unsafe("ar-EG"),
+        valid_iso_alpha2_region_language_todo("ar-EG"),
         "Win_NT_4",
     ),
     (
@@ -257,7 +807,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-ER"),
+        valid_iso_alpha2_region_language_todo("ar-ER"),
         "Win_10,Win_2016",
     ),
     (
@@ -266,7 +816,7 @@ raw_lcid_languages: list[
         "Iraq",
         0x0801,
         2049,
-        ShortLanguageStr.from_str_unsafe("ar-IQ"),
+        valid_iso_alpha2_region_language_todo("ar-IQ"),
         "Win_NT_4",
     ),
     (
@@ -275,7 +825,7 @@ raw_lcid_languages: list[
         "Israel",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-IL"),
+        valid_iso_alpha2_region_language_todo("ar-IL"),
         "Win_10,Win_2016",
     ),
     (
@@ -284,7 +834,7 @@ raw_lcid_languages: list[
         "Jordan",
         0x2C01,
         11265,
-        ShortLanguageStr.from_str_unsafe("ar-JO"),
+        valid_iso_alpha2_region_language_todo("ar-JO"),
         "Win_NT_4",
     ),
     (
@@ -293,7 +843,7 @@ raw_lcid_languages: list[
         "Kuwait",
         0x3401,
         13313,
-        ShortLanguageStr.from_str_unsafe("ar-KW"),
+        valid_iso_alpha2_region_language_todo("ar-KW"),
         "Win_NT_4",
     ),
     (
@@ -302,7 +852,7 @@ raw_lcid_languages: list[
         "Lebanon",
         0x3001,
         12289,
-        ShortLanguageStr.from_str_unsafe("ar-LB"),
+        valid_iso_alpha2_region_language_todo("ar-LB"),
         "Win_NT_4",
     ),
     (
@@ -311,7 +861,7 @@ raw_lcid_languages: list[
         "Libya",
         0x1001,
         4097,
-        ShortLanguageStr.from_str_unsafe("ar-LY"),
+        valid_iso_alpha2_region_language_todo("ar-LY"),
         "Win_NT_4",
     ),
     (
@@ -320,7 +870,7 @@ raw_lcid_languages: list[
         "Mauritania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-MR"),
+        valid_iso_alpha2_region_language_todo("ar-MR"),
         "Win_10,Win_2016",
     ),
     (
@@ -329,7 +879,7 @@ raw_lcid_languages: list[
         "Morocco",
         0x1801,
         6145,
-        ShortLanguageStr.from_str_unsafe("ar-MA"),
+        valid_iso_alpha2_region_language_todo("ar-MA"),
         "Win_NT_4",
     ),
     (
@@ -338,7 +888,7 @@ raw_lcid_languages: list[
         "Oman",
         0x2001,
         8193,
-        ShortLanguageStr.from_str_unsafe("ar-OM"),
+        valid_iso_alpha2_region_language_todo("ar-OM"),
         "Win_NT_4",
     ),
     (
@@ -347,7 +897,7 @@ raw_lcid_languages: list[
         "Palestinian Authority",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-PS"),
+        valid_iso_alpha2_region_language_todo("ar-PS"),
         "Win_10,Win_2016",
     ),
     (
@@ -356,7 +906,7 @@ raw_lcid_languages: list[
         "Qatar",
         0x4001,
         16385,
-        ShortLanguageStr.from_str_unsafe("ar-QA"),
+        valid_iso_alpha2_region_language_todo("ar-QA"),
         "Win_NT_4",
     ),
     (
@@ -365,7 +915,7 @@ raw_lcid_languages: list[
         "Saudi Arabia",
         0x0401,
         1025,
-        ShortLanguageStr.from_str_unsafe("ar-SA"),
+        valid_iso_alpha2_region_language_todo("ar-SA"),
         "Win_NT_4",
     ),
     (
@@ -374,7 +924,7 @@ raw_lcid_languages: list[
         "Somalia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-SO"),
+        valid_iso_alpha2_region_language_todo("ar-SO"),
         "Win_10,Win_2016",
     ),
     (
@@ -383,7 +933,7 @@ raw_lcid_languages: list[
         "South Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-SS"),
+        valid_iso_alpha2_region_language_todo("ar-SS"),
         "Win_10,Win_2016",
     ),
     (
@@ -392,7 +942,7 @@ raw_lcid_languages: list[
         "Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ar-SD"),
+        valid_iso_alpha2_region_language_todo("ar-SD"),
         "Win_10,Win_2016",
     ),
     (
@@ -401,7 +951,7 @@ raw_lcid_languages: list[
         "Syria",
         0x2801,
         10241,
-        ShortLanguageStr.from_str_unsafe("ar-SY"),
+        valid_iso_alpha2_region_language_todo("ar-SY"),
         "Win_NT_4",
     ),
     (
@@ -410,7 +960,7 @@ raw_lcid_languages: list[
         "Tunisia",
         0x1C01,
         7169,
-        ShortLanguageStr.from_str_unsafe("ar-TN"),
+        valid_iso_alpha2_region_language_todo("ar-TN"),
         "Win_NT_4",
     ),
     (
@@ -419,17 +969,25 @@ raw_lcid_languages: list[
         "U.A.E.",
         0x3801,
         14337,
-        ShortLanguageStr.from_str_unsafe("ar-AE"),
+        valid_iso_alpha2_region_language_todo("ar-AE"),
         "Win_NT_4",
     ),
-    (47, "Arabic", "World", 0x1000, 4096, "ar-001", "Win_10,Win_2016"),
+    (
+        47,
+        "Arabic",
+        "World",
+        0x1000,
+        4096,
+        invalid_iso_string("ar-001"),
+        "Win_10,Win_2016",
+    ),
     (
         48,
         "Arabic",
         "Yemen",
         0x2401,
         9217,
-        ShortLanguageStr.from_str_unsafe("ar-YE"),
+        valid_iso_alpha2_region_language_todo("ar-YE"),
         "Win_NT_4",
     ),
     (
@@ -447,7 +1005,7 @@ raw_lcid_languages: list[
         "Armenia",
         0x042B,
         1067,
-        ShortLanguageStr.from_str_unsafe("hy-AM"),
+        valid_iso_alpha2_region_language_todo("hy-AM"),
         "Win_2000",
     ),
     (
@@ -465,7 +1023,7 @@ raw_lcid_languages: list[
         "India",
         0x044D,
         1101,
-        ShortLanguageStr.from_str_unsafe("as-IN"),
+        valid_iso_alpha2_region_language_todo("as-IN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -483,7 +1041,7 @@ raw_lcid_languages: list[
         "Spain",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ast-ES"),
+        valid_iso_alpha3_region_language_todo("ast-ES"),
         "Win_10,Win_2016",
     ),
     (
@@ -492,7 +1050,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("asa"),
+        valid_iso_alpha3_language_todo("asa"),
         "Win_10,Win_2016",
     ),
     (
@@ -501,17 +1059,25 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("asa-TZ"),
+        valid_iso_alpha3_region_language_todo("asa-TZ"),
         "Win_10,Win_2016",
     ),
-    (57, "Azerbaijani (Cyrillic)", None, 0x742C, 29740, "az-Cyrl", "Windows 7"),
+    (
+        57,
+        "Azerbaijani (Cyrillic)",
+        None,
+        0x742C,
+        29740,
+        invalid_iso_string("az-Cyrl"),
+        "Windows 7",
+    ),
     (
         58,
         "Azerbaijani (Cyrillic)",
         "Azerbaijan",
         0x082C,
         2092,
-        "az-Cyrl-AZ",
+        invalid_iso_string("az-Cyrl-AZ"),
         "Win_2000",
     ),
     (
@@ -523,15 +1089,31 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("az"),
         "Win_7,Win_2008_R2",
     ),
-    (60, "Azerbaijani (Latin)", None, 0x782C, 30764, "az-Latn", "Windows 7"),
-    (61, "Azerbaijani (Latin)", "Azerbaijan", 0x042C, 1068, "az-Latn-AZ", "Win_2000"),
+    (
+        60,
+        "Azerbaijani (Latin)",
+        None,
+        0x782C,
+        30764,
+        invalid_iso_string("az-Latn"),
+        "Windows 7",
+    ),
+    (
+        61,
+        "Azerbaijani (Latin)",
+        "Azerbaijan",
+        0x042C,
+        1068,
+        invalid_iso_string("az-Latn-AZ"),
+        "Win_2000",
+    ),
     (
         62,
         "Bafia",
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksf"),
+        valid_iso_alpha3_language_todo("ksf"),
         "Win_10,Win_2016",
     ),
     (
@@ -540,7 +1122,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksf-CM"),
+        valid_iso_alpha3_region_language_todo("ksf-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -552,7 +1134,15 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("bm"),
         "Win_10,Win_2016",
     ),
-    (65, "Bamanankan (Latin)", "Mali", 0x1000, 4096, "bm-Latn-ML", "Win_10,Win_2016"),
+    (
+        65,
+        "Bamanankan (Latin)",
+        "Mali",
+        0x1000,
+        4096,
+        invalid_iso_string("bm-Latn-ML"),
+        "Win_10,Win_2016",
+    ),
     (
         66,
         "Bangla",
@@ -568,7 +1158,7 @@ raw_lcid_languages: list[
         "Bangladesh",
         0x0845,
         2117,
-        ShortLanguageStr.from_str_unsafe("bn-BD"),
+        valid_iso_alpha2_region_language_todo("bn-BD"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -577,7 +1167,7 @@ raw_lcid_languages: list[
         "India",
         0x0445,
         1093,
-        ShortLanguageStr.from_str_unsafe("bn-IN"),
+        valid_iso_alpha2_region_language_todo("bn-IN"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -595,7 +1185,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("bas-CM"),
+        valid_iso_alpha3_region_language_todo("bas-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -613,7 +1203,7 @@ raw_lcid_languages: list[
         "Russia",
         0x046D,
         1133,
-        ShortLanguageStr.from_str_unsafe("ba-RU"),
+        valid_iso_alpha2_region_language_todo("ba-RU"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -631,7 +1221,7 @@ raw_lcid_languages: list[
         "Spain",
         0x042D,
         1069,
-        ShortLanguageStr.from_str_unsafe("eu-ES"),
+        valid_iso_alpha2_region_language_todo("eu-ES"),
         "Win_NT_4",
     ),
     (
@@ -649,7 +1239,7 @@ raw_lcid_languages: list[
         "Belarus",
         0x0423,
         1059,
-        ShortLanguageStr.from_str_unsafe("be-BY"),
+        valid_iso_alpha2_region_language_todo("be-BY"),
         "Win_NT_4",
     ),
     (
@@ -667,7 +1257,7 @@ raw_lcid_languages: list[
         "Zambia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("bem-ZM"),
+        valid_iso_alpha3_region_language_todo("bem-ZM"),
         "Win_10,Win_2016",
     ),
     (
@@ -676,7 +1266,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("bez"),
+        valid_iso_alpha3_language_todo("bez"),
         "Win_10,Win_2016",
     ),
     (
@@ -685,7 +1275,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("bez-TZ"),
+        valid_iso_alpha3_region_language_todo("bez-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -703,7 +1293,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("byn-ER"),
+        valid_iso_alpha3_region_language_todo("byn-ER"),
         "Win_10,Win_2016",
     ),
     (
@@ -712,7 +1302,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("brx"),
+        valid_iso_alpha3_language_todo("brx"),
         "Win_10,Win_2016",
     ),
     (
@@ -721,20 +1311,36 @@ raw_lcid_languages: list[
         "India",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("brx-IN"),
+        valid_iso_alpha3_region_language_todo("brx-IN"),
         "Win_10,Win_2016",
     ),
-    (85, "Bosnian (Cyrillic)", None, 0x641A, 25626, "bs-Cyrl", "Windows 7"),
+    (
+        85,
+        "Bosnian (Cyrillic)",
+        None,
+        0x641A,
+        25626,
+        invalid_iso_string("bs-Cyrl"),
+        "Windows 7",
+    ),
     (
         86,
         "Bosnian (Cyrillic)",
         "Bosnia and Herzegovina",
         0x201A,
         8218,
-        "bs-Cyrl-BA",
+        invalid_iso_string("bs-Cyrl-BA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
-    (87, "Bosnian (Latin)", None, 0x681A, 26650, "bs-Latn", "Windows 7"),
+    (
+        87,
+        "Bosnian (Latin)",
+        None,
+        0x681A,
+        26650,
+        invalid_iso_string("bs-Latn"),
+        "Windows 7",
+    ),
     (
         88,
         "Bosnian (Latin)",
@@ -750,7 +1356,7 @@ raw_lcid_languages: list[
         "Bosnia and Herzegovina",
         0x141A,
         5146,
-        "bs-Latn-BA",
+        invalid_iso_string("bs-Latn-BA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -768,7 +1374,7 @@ raw_lcid_languages: list[
         "France",
         0x047E,
         1150,
-        ShortLanguageStr.from_str_unsafe("br-FR"),
+        valid_iso_alpha2_region_language_todo("br-FR"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -786,7 +1392,7 @@ raw_lcid_languages: list[
         "Bulgaria",
         0x0402,
         1026,
-        ShortLanguageStr.from_str_unsafe("bg-BG"),
+        valid_iso_alpha2_region_language_todo("bg-BG"),
         "Win_NT_4",
     ),
     (
@@ -804,7 +1410,7 @@ raw_lcid_languages: list[
         "Myanmar",
         0x0455,
         1109,
-        ShortLanguageStr.from_str_unsafe("my-MM"),
+        valid_iso_alpha2_region_language_todo("my-MM"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -822,7 +1428,7 @@ raw_lcid_languages: list[
         "Andorra",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ca-AD"),
+        valid_iso_alpha2_region_language_todo("ca-AD"),
         "Win_10,Win_2016",
     ),
     (
@@ -831,7 +1437,7 @@ raw_lcid_languages: list[
         "France",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ca-FR"),
+        valid_iso_alpha2_region_language_todo("ca-FR"),
         "Win_10,Win_2016",
     ),
     (
@@ -840,7 +1446,7 @@ raw_lcid_languages: list[
         "Italy",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ca-IT"),
+        valid_iso_alpha2_region_language_todo("ca-IT"),
         "Win_10,Win_2016",
     ),
     (
@@ -849,7 +1455,7 @@ raw_lcid_languages: list[
         "Spain",
         0x0403,
         1027,
-        ShortLanguageStr.from_str_unsafe("ca-ES"),
+        valid_iso_alpha2_region_language_todo("ca-ES"),
         "Win_NT_4",
     ),
     (
@@ -861,14 +1467,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("ceb"),
         "Win_10_v2004,Win_2004",
     ),
-    (102, "Cebuan (Latin)", None, 0x1000, 4096, "ceb-Latn", "Win_10_v2004,Win_2004"),
+    (
+        102,
+        "Cebuan (Latin)",
+        None,
+        0x1000,
+        4096,
+        invalid_iso_string("ceb-Latn"),
+        "Win_10_v2004,Win_2004",
+    ),
     (
         103,
         "Cebuan (Latin)",
         "Philippines",
         0x1000,
         4096,
-        "ceb-Latn-PH",
+        invalid_iso_string("ceb-Latn-PH"),
         "Win_10_v2004,Win_2004",
     ),
     (
@@ -877,7 +1491,7 @@ raw_lcid_languages: list[
         "Morocco",
         0x045F,
         1119,
-        "tzm-Arab- MA",
+        invalid_iso_string("tzm-Arab- MA"),
         "Win_10,Win_2016",
     ),
     (
@@ -886,7 +1500,7 @@ raw_lcid_languages: list[
         "Morocco",
         0x1000,
         4096,
-        "tzm-Latn- MA",
+        invalid_iso_string("tzm-Latn- MA"),
         "Win_10,Win_2016",
     ),
     (
@@ -898,35 +1512,67 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("ku"),
         "Win_8,Win_2012",
     ),
-    (107, "Central Kurdish", None, 0x7C92, 31890, "ku-Arab", "Win_8,Win_2012"),
-    (108, "Central Kurdish", "Iraq", 0x0492, 1170, "ku-Arab-IQ", "Win_8,Win_2012"),
+    (
+        107,
+        "Central Kurdish",
+        None,
+        0x7C92,
+        31890,
+        invalid_iso_string("ku-Arab"),
+        "Win_8,Win_2012",
+    ),
+    (
+        108,
+        "Central Kurdish",
+        "Iraq",
+        0x0492,
+        1170,
+        invalid_iso_string("ku-Arab-IQ"),
+        "Win_8,Win_2012",
+    ),
     (
         109,
         "Chakma",
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ccp"),
+        valid_iso_alpha3_language_todo("ccp"),
         "Win_10_v2004,Win_2004",
     ),
-    (110, "Chakma", "Chakma", 0x1000, 4096, "ccp-Cakm", "Win_10_v2004,Win_2004"),
+    (
+        110,
+        "Chakma",
+        "Chakma",
+        0x1000,
+        4096,
+        invalid_iso_string("ccp-Cakm"),
+        "Win_10_v2004,Win_2004",
+    ),
     (
         111,
         "Chakma",
         "Bangladesh",
         0x1000,
         4096,
-        "ccp-Cakm- BD",
+        invalid_iso_string("ccp-Cakm- BD"),
         "Win_10_v2004,Win_2004",
     ),
-    (112, "Chakma", "India", 0x1000, 4096, "ccp-Cakm- IN", "Win_10_v2004,Win_2004"),
+    (
+        112,
+        "Chakma",
+        "India",
+        0x1000,
+        4096,
+        invalid_iso_string("ccp-Cakm- IN"),
+        "Win_10_v2004,Win_2004",
+    ),
     (
         113,
         "Chechen",
         "Russia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ce-RU"),
+        valid_iso_alpha2_region_language_todo("ce-RU"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -938,15 +1584,31 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("chr"),
         "Win_8,Win_2012",
     ),
-    (115, "Cherokee", None, 0x7C5C, 31836, "chr-Cher", "Win_8,Win_2012"),
-    (116, "Cherokee", "United States", 0x045C, 1116, "chr-Cher-US", "Win_8,Win_2012"),
+    (
+        115,
+        "Cherokee",
+        None,
+        0x7C5C,
+        31836,
+        invalid_iso_string("chr-Cher"),
+        "Win_8,Win_2012",
+    ),
+    (
+        116,
+        "Cherokee",
+        "United States",
+        0x045C,
+        1116,
+        invalid_iso_string("chr-Cher-US"),
+        "Win_8,Win_2012",
+    ),
     (
         117,
         "Chiga",
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("cgg"),
+        valid_iso_alpha3_language_todo("cgg"),
         "Win_10,Win_2016",
     ),
     (
@@ -955,10 +1617,18 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("cgg-UG"),
+        valid_iso_alpha3_region_language_todo("cgg-UG"),
         "Win_10,Win_2016",
     ),
-    (119, "Chinese (Simplified)", None, 0x0004, 4, "zh-Hans", "Win_NT_3"),
+    (
+        119,
+        "Chinese (Simplified)",
+        None,
+        0x0004,
+        4,
+        invalid_iso_string("zh-Hans"),
+        "Win_NT_3",
+    ),
     (
         120,
         "Chinese (Simplified)",
@@ -974,7 +1644,7 @@ raw_lcid_languages: list[
         "People's Republic of China",
         0x0804,
         2052,
-        ShortLanguageStr.from_str_unsafe("zh-CN"),
+        valid_iso_alpha2_region_language_todo("zh-CN"),
         "Win_NT_3",
     ),
     (
@@ -983,17 +1653,25 @@ raw_lcid_languages: list[
         "Singapore",
         0x1004,
         4100,
-        ShortLanguageStr.from_str_unsafe("zh-SG"),
+        valid_iso_alpha2_region_language_todo("zh-SG"),
         "Win_NT_3",
     ),
-    (123, "Chinese (Traditional)", None, 0x7C04, 31748, "zh-Hant", "Win_NT_3"),
+    (
+        123,
+        "Chinese (Traditional)",
+        None,
+        0x7C04,
+        31748,
+        invalid_iso_string("zh-Hant"),
+        "Win_NT_3",
+    ),
     (
         124,
         "Chinese (Traditional)",
         "Hong Kong S.A.R.",
         0x0C04,
         3076,
-        ShortLanguageStr.from_str_unsafe("zh-HK"),
+        valid_iso_alpha2_region_language_todo("zh-HK"),
         "Win_NT_3",
     ),
     (
@@ -1002,7 +1680,7 @@ raw_lcid_languages: list[
         "Macao S.A.R.",
         0x1404,
         5124,
-        ShortLanguageStr.from_str_unsafe("zh-MO"),
+        valid_iso_alpha2_region_language_todo("zh-MO"),
         "Win_XP,Win_2003",
     ),
     (
@@ -1011,7 +1689,7 @@ raw_lcid_languages: list[
         "Taiwan",
         0x0404,
         1028,
-        ShortLanguageStr.from_str_unsafe("zh-TW"),
+        valid_iso_alpha2_region_language_todo("zh-TW"),
         "Win_NT_3",
     ),
     (
@@ -1020,7 +1698,7 @@ raw_lcid_languages: list[
         "Russia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("cu-RU"),
+        valid_iso_alpha2_region_language_todo("cu-RU"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1029,7 +1707,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("swc"),
+        valid_iso_alpha3_language_todo("swc"),
         "Win_10,Win_2016",
     ),
     (
@@ -1038,7 +1716,7 @@ raw_lcid_languages: list[
         "Congo DRC",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("swc-CD"),
+        valid_iso_alpha3_region_language_todo("swc-CD"),
         "Win_10,Win_2016",
     ),
     (
@@ -1056,7 +1734,7 @@ raw_lcid_languages: list[
         "United Kingdom",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kw-GB"),
+        valid_iso_alpha2_region_language_todo("kw-GB"),
         "Win_10,Win_2016",
     ),
     (
@@ -1074,7 +1752,7 @@ raw_lcid_languages: list[
         "France",
         0x0483,
         1155,
-        ShortLanguageStr.from_str_unsafe("co-FR"),
+        valid_iso_alpha2_region_language_todo("co-FR"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -1092,7 +1770,7 @@ raw_lcid_languages: list[
         "Croatia",
         0x041A,
         1050,
-        ShortLanguageStr.from_str_unsafe("hr-HR"),
+        valid_iso_alpha2_region_language_todo("hr-HR"),
         "Win_NT_3",
     ),
     (
@@ -1101,7 +1779,7 @@ raw_lcid_languages: list[
         "Bosnia and Herzegovina",
         0x101A,
         4122,
-        ShortLanguageStr.from_str_unsafe("hr-BA"),
+        valid_iso_alpha2_region_language_todo("hr-BA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -1119,7 +1797,7 @@ raw_lcid_languages: list[
         "Czech Republic",
         0x0405,
         1029,
-        ShortLanguageStr.from_str_unsafe("cs-CZ"),
+        valid_iso_alpha2_region_language_todo("cs-CZ"),
         "Win_NT_3",
     ),
     (
@@ -1137,7 +1815,7 @@ raw_lcid_languages: list[
         "Denmark",
         0x0406,
         1030,
-        ShortLanguageStr.from_str_unsafe("da-DK"),
+        valid_iso_alpha2_region_language_todo("da-DK"),
         "Win_NT_3",
     ),
     (
@@ -1146,7 +1824,7 @@ raw_lcid_languages: list[
         "Greenland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("da-GL"),
+        valid_iso_alpha2_region_language_todo("da-GL"),
         "Win_10,Win_2016",
     ),
     (
@@ -1155,7 +1833,7 @@ raw_lcid_languages: list[
         None,
         0x008C,
         140,
-        ShortLanguageStr.from_str_unsafe("prs"),
+        valid_iso_alpha3_language_todo("prs"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -1164,7 +1842,7 @@ raw_lcid_languages: list[
         "Afghanistan",
         0x048C,
         1164,
-        ShortLanguageStr.from_str_unsafe("prs-AF"),
+        valid_iso_alpha3_region_language_todo("prs-AF"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -1182,7 +1860,7 @@ raw_lcid_languages: list[
         "Maldives",
         0x0465,
         1125,
-        ShortLanguageStr.from_str_unsafe("dv-MV"),
+        valid_iso_alpha2_region_language_todo("dv-MV"),
         "Win_XP,Win_2003",
     ),
     (
@@ -1200,7 +1878,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dua-CM"),
+        valid_iso_alpha3_region_language_todo("dua-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1218,7 +1896,7 @@ raw_lcid_languages: list[
         "Aruba",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nl-AW"),
+        valid_iso_alpha2_region_language_todo("nl-AW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1227,7 +1905,7 @@ raw_lcid_languages: list[
         "Belgium",
         0x0813,
         2067,
-        ShortLanguageStr.from_str_unsafe("nl-BE"),
+        valid_iso_alpha2_region_language_todo("nl-BE"),
         "Win_NT_3",
     ),
     (
@@ -1236,7 +1914,7 @@ raw_lcid_languages: list[
         "Bonaire, Sint Eustatius and Saba",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nl-BQ"),
+        valid_iso_alpha2_region_language_todo("nl-BQ"),
         "Win_10,Win_2016",
     ),
     (
@@ -1245,7 +1923,7 @@ raw_lcid_languages: list[
         "Curaçao",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nl-CW"),
+        valid_iso_alpha2_region_language_todo("nl-CW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1254,7 +1932,7 @@ raw_lcid_languages: list[
         "Netherlands",
         0x0413,
         1043,
-        ShortLanguageStr.from_str_unsafe("nl-NL"),
+        valid_iso_alpha2_region_language_todo("nl-NL"),
         "Win_NT_3",
     ),
     (
@@ -1263,7 +1941,7 @@ raw_lcid_languages: list[
         "Sint Maarten",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nl-SX"),
+        valid_iso_alpha2_region_language_todo("nl-SX"),
         "Win_10,Win_2016",
     ),
     (
@@ -1272,7 +1950,7 @@ raw_lcid_languages: list[
         "Suriname",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nl-SR"),
+        valid_iso_alpha2_region_language_todo("nl-SR"),
         "Win_10,Win_2016",
     ),
     (
@@ -1290,7 +1968,7 @@ raw_lcid_languages: list[
         "Bhutan",
         0x0C51,
         3153,
-        ShortLanguageStr.from_str_unsafe("dz-BT"),
+        valid_iso_alpha2_region_language_todo("dz-BT"),
         "Win_10,Win_2016",
     ),
     (
@@ -1299,7 +1977,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ebu"),
+        valid_iso_alpha3_language_todo("ebu"),
         "Win_10,Win_2016",
     ),
     (
@@ -1308,7 +1986,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ebu-KE"),
+        valid_iso_alpha3_region_language_todo("ebu-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -1326,7 +2004,7 @@ raw_lcid_languages: list[
         "American Samoa",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-AS"),
+        valid_iso_alpha2_region_language_todo("en-AS"),
         "Win_10,Win_2016",
     ),
     (
@@ -1335,7 +2013,7 @@ raw_lcid_languages: list[
         "Anguilla",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-AI"),
+        valid_iso_alpha2_region_language_todo("en-AI"),
         "Win_10,Win_2016",
     ),
     (
@@ -1344,7 +2022,7 @@ raw_lcid_languages: list[
         "Antigua and Barbuda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-AG"),
+        valid_iso_alpha2_region_language_todo("en-AG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1353,7 +2031,7 @@ raw_lcid_languages: list[
         "Australia",
         0x0C09,
         3081,
-        ShortLanguageStr.from_str_unsafe("en-AU"),
+        valid_iso_alpha2_region_language_todo("en-AU"),
         "Win_NT_3",
     ),
     (
@@ -1362,7 +2040,7 @@ raw_lcid_languages: list[
         "Austria",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-AT"),
+        valid_iso_alpha2_region_language_todo("en-AT"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1371,7 +2049,7 @@ raw_lcid_languages: list[
         "Bahamas",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BS"),
+        valid_iso_alpha2_region_language_todo("en-BS"),
         "Win_10,Win_2016",
     ),
     (
@@ -1380,7 +2058,7 @@ raw_lcid_languages: list[
         "Barbados",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BB"),
+        valid_iso_alpha2_region_language_todo("en-BB"),
         "Win_10,Win_2016",
     ),
     (
@@ -1389,7 +2067,7 @@ raw_lcid_languages: list[
         "Belgium",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BE"),
+        valid_iso_alpha2_region_language_todo("en-BE"),
         "Win_10,Win_2016",
     ),
     (
@@ -1398,7 +2076,7 @@ raw_lcid_languages: list[
         "Belize",
         0x2809,
         10249,
-        ShortLanguageStr.from_str_unsafe("en-BZ"),
+        valid_iso_alpha2_region_language_todo("en-BZ"),
         "Win_NT_4",
     ),
     (
@@ -1407,7 +2085,7 @@ raw_lcid_languages: list[
         "Bermuda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BM"),
+        valid_iso_alpha2_region_language_todo("en-BM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1416,7 +2094,7 @@ raw_lcid_languages: list[
         "Botswana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BW"),
+        valid_iso_alpha2_region_language_todo("en-BW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1425,7 +2103,7 @@ raw_lcid_languages: list[
         "British Indian Ocean Territory",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-IO"),
+        valid_iso_alpha2_region_language_todo("en-IO"),
         "Win_10,Win_2016",
     ),
     (
@@ -1434,7 +2112,7 @@ raw_lcid_languages: list[
         "British Virgin Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-VG"),
+        valid_iso_alpha2_region_language_todo("en-VG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1443,7 +2121,7 @@ raw_lcid_languages: list[
         "Burundi",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-BI"),
+        valid_iso_alpha2_region_language_todo("en-BI"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1452,7 +2130,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CM"),
+        valid_iso_alpha2_region_language_todo("en-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1461,17 +2139,25 @@ raw_lcid_languages: list[
         "Canada",
         0x1009,
         4105,
-        ShortLanguageStr.from_str_unsafe("en-CA"),
+        valid_iso_alpha2_region_language_todo("en-CA"),
         "Win_NT_3",
     ),
-    (177, "English", "Caribbean", 0x2409, 9225, "en-029", "Win_NT_4"),
+    (
+        177,
+        "English",
+        "Caribbean",
+        0x2409,
+        9225,
+        invalid_iso_string("en-029"),
+        "Win_NT_4",
+    ),
     (
         178,
         "English",
         "Cayman Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-KY"),
+        valid_iso_alpha2_region_language_todo("en-KY"),
         "Win_10,Win_2016",
     ),
     (
@@ -1480,7 +2166,7 @@ raw_lcid_languages: list[
         "Christmas Island",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CX"),
+        valid_iso_alpha2_region_language_todo("en-CX"),
         "Win_10,Win_2016",
     ),
     (
@@ -1489,7 +2175,7 @@ raw_lcid_languages: list[
         "Cocos [Keeling] Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CC"),
+        valid_iso_alpha2_region_language_todo("en-CC"),
         "Win_10,Win_2016",
     ),
     (
@@ -1498,7 +2184,7 @@ raw_lcid_languages: list[
         "Cook Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CK"),
+        valid_iso_alpha2_region_language_todo("en-CK"),
         "Win_10,Win_2016",
     ),
     (
@@ -1507,7 +2193,7 @@ raw_lcid_languages: list[
         "Cyprus",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CY"),
+        valid_iso_alpha2_region_language_todo("en-CY"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1516,7 +2202,7 @@ raw_lcid_languages: list[
         "Denmark",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-DK"),
+        valid_iso_alpha2_region_language_todo("en-DK"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1525,7 +2211,7 @@ raw_lcid_languages: list[
         "Dominica",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-DM"),
+        valid_iso_alpha2_region_language_todo("en-DM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1534,17 +2220,25 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-ER"),
+        valid_iso_alpha2_region_language_todo("en-ER"),
         "Win_10,Win_2016",
     ),
-    (186, "English", "Europe", 0x1000, 4096, "en-150", "Win_10,Win_2016"),
+    (
+        186,
+        "English",
+        "Europe",
+        0x1000,
+        4096,
+        invalid_iso_string("en-150"),
+        "Win_10,Win_2016",
+    ),
     (
         187,
         "English",
         "Falkland Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-FK"),
+        valid_iso_alpha2_region_language_todo("en-FK"),
         "Win_10,Win_2016",
     ),
     (
@@ -1553,7 +2247,7 @@ raw_lcid_languages: list[
         "Finland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-FI"),
+        valid_iso_alpha2_region_language_todo("en-FI"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1562,7 +2256,7 @@ raw_lcid_languages: list[
         "Fiji",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-FJ"),
+        valid_iso_alpha2_region_language_todo("en-FJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -1571,7 +2265,7 @@ raw_lcid_languages: list[
         "Gambia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GM"),
+        valid_iso_alpha2_region_language_todo("en-GM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1580,7 +2274,7 @@ raw_lcid_languages: list[
         "Germany",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-DE"),
+        valid_iso_alpha2_region_language_todo("en-DE"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1589,7 +2283,7 @@ raw_lcid_languages: list[
         "Ghana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GH"),
+        valid_iso_alpha2_region_language_todo("en-GH"),
         "Win_10,Win_2016",
     ),
     (
@@ -1598,7 +2292,7 @@ raw_lcid_languages: list[
         "Gibraltar",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GI"),
+        valid_iso_alpha2_region_language_todo("en-GI"),
         "Win_10,Win_2016",
     ),
     (
@@ -1607,7 +2301,7 @@ raw_lcid_languages: list[
         "Grenada",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GD"),
+        valid_iso_alpha2_region_language_todo("en-GD"),
         "Win_10,Win_2016",
     ),
     (
@@ -1616,7 +2310,7 @@ raw_lcid_languages: list[
         "Guam",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GU"),
+        valid_iso_alpha2_region_language_todo("en-GU"),
         "Win_10,Win_2016",
     ),
     (
@@ -1625,7 +2319,7 @@ raw_lcid_languages: list[
         "Guernsey",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GG"),
+        valid_iso_alpha2_region_language_todo("en-GG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1634,7 +2328,7 @@ raw_lcid_languages: list[
         "Guyana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-GY"),
+        valid_iso_alpha2_region_language_todo("en-GY"),
         "Win_10,Win_2016",
     ),
     (
@@ -1643,7 +2337,7 @@ raw_lcid_languages: list[
         "Hong Kong",
         0x3C09,
         15369,
-        ShortLanguageStr.from_str_unsafe("en-HK"),
+        valid_iso_alpha2_region_language_todo("en-HK"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -1652,7 +2346,7 @@ raw_lcid_languages: list[
         "India",
         0x4009,
         16393,
-        ShortLanguageStr.from_str_unsafe("en-IN"),
+        valid_iso_alpha2_region_language_todo("en-IN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -1661,7 +2355,7 @@ raw_lcid_languages: list[
         "Ireland",
         0x1809,
         6153,
-        ShortLanguageStr.from_str_unsafe("en-IE"),
+        valid_iso_alpha2_region_language_todo("en-IE"),
         "Win_NT_3",
     ),
     (
@@ -1670,7 +2364,7 @@ raw_lcid_languages: list[
         "Isle of Man",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-IM"),
+        valid_iso_alpha2_region_language_todo("en-IM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1679,7 +2373,7 @@ raw_lcid_languages: list[
         "Israel",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-IL"),
+        valid_iso_alpha2_region_language_todo("en-IL"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1688,7 +2382,7 @@ raw_lcid_languages: list[
         "Jamaica",
         0x2009,
         8201,
-        ShortLanguageStr.from_str_unsafe("en-JM"),
+        valid_iso_alpha2_region_language_todo("en-JM"),
         "Win_NT_4",
     ),
     (
@@ -1697,7 +2391,7 @@ raw_lcid_languages: list[
         "Jersey",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-JE"),
+        valid_iso_alpha2_region_language_todo("en-JE"),
         "Win_10,Win_2016",
     ),
     (
@@ -1706,7 +2400,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-KE"),
+        valid_iso_alpha2_region_language_todo("en-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -1715,7 +2409,7 @@ raw_lcid_languages: list[
         "Kiribati",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-KI"),
+        valid_iso_alpha2_region_language_todo("en-KI"),
         "Win_10,Win_2016",
     ),
     (
@@ -1724,7 +2418,7 @@ raw_lcid_languages: list[
         "Lesotho",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-LS"),
+        valid_iso_alpha2_region_language_todo("en-LS"),
         "Win_10,Win_2016",
     ),
     (
@@ -1733,7 +2427,7 @@ raw_lcid_languages: list[
         "Liberia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-LR"),
+        valid_iso_alpha2_region_language_todo("en-LR"),
         "Win_10,Win_2016",
     ),
     (
@@ -1742,7 +2436,7 @@ raw_lcid_languages: list[
         "Macao SAR",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MO"),
+        valid_iso_alpha2_region_language_todo("en-MO"),
         "Win_10,Win_2016",
     ),
     (
@@ -1751,7 +2445,7 @@ raw_lcid_languages: list[
         "Madagascar",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MG"),
+        valid_iso_alpha2_region_language_todo("en-MG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1760,7 +2454,7 @@ raw_lcid_languages: list[
         "Malawi",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MW"),
+        valid_iso_alpha2_region_language_todo("en-MW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1769,7 +2463,7 @@ raw_lcid_languages: list[
         "Malaysia",
         0x4409,
         17417,
-        ShortLanguageStr.from_str_unsafe("en-MY"),
+        valid_iso_alpha2_region_language_todo("en-MY"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -1778,7 +2472,7 @@ raw_lcid_languages: list[
         "Malta",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MT"),
+        valid_iso_alpha2_region_language_todo("en-MT"),
         "Win_10,Win_2016",
     ),
     (
@@ -1787,7 +2481,7 @@ raw_lcid_languages: list[
         "Marshall Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MH"),
+        valid_iso_alpha2_region_language_todo("en-MH"),
         "Win_10,Win_2016",
     ),
     (
@@ -1796,7 +2490,7 @@ raw_lcid_languages: list[
         "Mauritius",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MU"),
+        valid_iso_alpha2_region_language_todo("en-MU"),
         "Win_10,Win_2016",
     ),
     (
@@ -1805,7 +2499,7 @@ raw_lcid_languages: list[
         "Micronesia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-FM"),
+        valid_iso_alpha2_region_language_todo("en-FM"),
         "Win_10,Win_2016",
     ),
     (
@@ -1814,7 +2508,7 @@ raw_lcid_languages: list[
         "Montserrat",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MS"),
+        valid_iso_alpha2_region_language_todo("en-MS"),
         "Win_10,Win_2016",
     ),
     (
@@ -1823,7 +2517,7 @@ raw_lcid_languages: list[
         "Namibia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NA"),
+        valid_iso_alpha2_region_language_todo("en-NA"),
         "Win_10,Win_2016",
     ),
     (
@@ -1832,7 +2526,7 @@ raw_lcid_languages: list[
         "Nauru",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NR"),
+        valid_iso_alpha2_region_language_todo("en-NR"),
         "Win_10,Win_2016",
     ),
     (
@@ -1841,7 +2535,7 @@ raw_lcid_languages: list[
         "Netherlands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NL"),
+        valid_iso_alpha2_region_language_todo("en-NL"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -1850,7 +2544,7 @@ raw_lcid_languages: list[
         "New Zealand",
         0x1409,
         5129,
-        ShortLanguageStr.from_str_unsafe("en-NZ"),
+        valid_iso_alpha2_region_language_todo("en-NZ"),
         "Win_NT_3",
     ),
     (
@@ -1859,7 +2553,7 @@ raw_lcid_languages: list[
         "Nigeria",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NG"),
+        valid_iso_alpha2_region_language_todo("en-NG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1868,7 +2562,7 @@ raw_lcid_languages: list[
         "Niue",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NU"),
+        valid_iso_alpha2_region_language_todo("en-NU"),
         "Win_10,Win_2016",
     ),
     (
@@ -1877,7 +2571,7 @@ raw_lcid_languages: list[
         "Norfolk Island",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-NF"),
+        valid_iso_alpha2_region_language_todo("en-NF"),
         "Win_10,Win_2016",
     ),
     (
@@ -1886,7 +2580,7 @@ raw_lcid_languages: list[
         "Northern Mariana Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-MP"),
+        valid_iso_alpha2_region_language_todo("en-MP"),
         "Win_10,Win_2016",
     ),
     (
@@ -1895,7 +2589,7 @@ raw_lcid_languages: list[
         "Pakistan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-PK"),
+        valid_iso_alpha2_region_language_todo("en-PK"),
         "Win_10,Win_2016",
     ),
     (
@@ -1904,7 +2598,7 @@ raw_lcid_languages: list[
         "Palau",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-PW"),
+        valid_iso_alpha2_region_language_todo("en-PW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1913,7 +2607,7 @@ raw_lcid_languages: list[
         "Papua New Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-PG"),
+        valid_iso_alpha2_region_language_todo("en-PG"),
         "Win_10,Win_2016",
     ),
     (
@@ -1922,7 +2616,7 @@ raw_lcid_languages: list[
         "Pitcairn Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-PN"),
+        valid_iso_alpha2_region_language_todo("en-PN"),
         "Win_10,Win_2016",
     ),
     (
@@ -1931,7 +2625,7 @@ raw_lcid_languages: list[
         "Puerto Rico",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-PR"),
+        valid_iso_alpha2_region_language_todo("en-PR"),
         "Win_10,Win_2016",
     ),
     (
@@ -1940,7 +2634,7 @@ raw_lcid_languages: list[
         "Republic of the Philippines",
         0x3409,
         13321,
-        ShortLanguageStr.from_str_unsafe("en-PH"),
+        valid_iso_alpha2_region_language_todo("en-PH"),
         "Win_2000",
     ),
     (
@@ -1949,7 +2643,7 @@ raw_lcid_languages: list[
         "Rwanda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-RW"),
+        valid_iso_alpha2_region_language_todo("en-RW"),
         "Win_10,Win_2016",
     ),
     (
@@ -1958,7 +2652,7 @@ raw_lcid_languages: list[
         "Saint Kitts and Nevis",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-KN"),
+        valid_iso_alpha2_region_language_todo("en-KN"),
         "Win_10,Win_2016",
     ),
     (
@@ -1967,7 +2661,7 @@ raw_lcid_languages: list[
         "Saint Lucia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-LC"),
+        valid_iso_alpha2_region_language_todo("en-LC"),
         "Win_10,Win_2016",
     ),
     (
@@ -1976,7 +2670,7 @@ raw_lcid_languages: list[
         "Saint Vincent and the Grenadines",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-VC"),
+        valid_iso_alpha2_region_language_todo("en-VC"),
         "Win_10,Win_2016",
     ),
     (
@@ -1985,7 +2679,7 @@ raw_lcid_languages: list[
         "Samoa",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-WS"),
+        valid_iso_alpha2_region_language_todo("en-WS"),
         "Win_10,Win_2016",
     ),
     (
@@ -1994,7 +2688,7 @@ raw_lcid_languages: list[
         "Seychelles",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SC"),
+        valid_iso_alpha2_region_language_todo("en-SC"),
         "Win_10,Win_2016",
     ),
     (
@@ -2003,7 +2697,7 @@ raw_lcid_languages: list[
         "Sierra Leone",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SL"),
+        valid_iso_alpha2_region_language_todo("en-SL"),
         "Win_10,Win_2016",
     ),
     (
@@ -2012,7 +2706,7 @@ raw_lcid_languages: list[
         "Singapore",
         0x4809,
         18441,
-        ShortLanguageStr.from_str_unsafe("en-SG"),
+        valid_iso_alpha2_region_language_todo("en-SG"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -2021,7 +2715,7 @@ raw_lcid_languages: list[
         "Sint Maarten",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SX"),
+        valid_iso_alpha2_region_language_todo("en-SX"),
         "Win_10,Win_2016",
     ),
     (
@@ -2030,7 +2724,7 @@ raw_lcid_languages: list[
         "Slovenia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SI"),
+        valid_iso_alpha2_region_language_todo("en-SI"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -2039,7 +2733,7 @@ raw_lcid_languages: list[
         "Solomon Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SB"),
+        valid_iso_alpha2_region_language_todo("en-SB"),
         "Win_10,Win_2016",
     ),
     (
@@ -2048,7 +2742,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x1C09,
         7177,
-        ShortLanguageStr.from_str_unsafe("en-ZA"),
+        valid_iso_alpha2_region_language_todo("en-ZA"),
         "Win_NT_4",
     ),
     (
@@ -2057,7 +2751,7 @@ raw_lcid_languages: list[
         "South Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SS"),
+        valid_iso_alpha2_region_language_todo("en-SS"),
         "Win_10,Win_2016",
     ),
     (
@@ -2066,7 +2760,7 @@ raw_lcid_languages: list[
         "St Helena, Ascension, Tristan da Cunha",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SH"),
+        valid_iso_alpha2_region_language_todo("en-SH"),
         "Win_10,Win_2016",
     ),
     (
@@ -2075,7 +2769,7 @@ raw_lcid_languages: list[
         "Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SD"),
+        valid_iso_alpha2_region_language_todo("en-SD"),
         "Win_10,Win_2016",
     ),
     (
@@ -2084,7 +2778,7 @@ raw_lcid_languages: list[
         "Swaziland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SZ"),
+        valid_iso_alpha2_region_language_todo("en-SZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2093,7 +2787,7 @@ raw_lcid_languages: list[
         "Sweden",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-SE"),
+        valid_iso_alpha2_region_language_todo("en-SE"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -2102,7 +2796,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-CH"),
+        valid_iso_alpha2_region_language_todo("en-CH"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -2111,7 +2805,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-TZ"),
+        valid_iso_alpha2_region_language_todo("en-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2120,7 +2814,7 @@ raw_lcid_languages: list[
         "Tokelau",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-TK"),
+        valid_iso_alpha2_region_language_todo("en-TK"),
         "Win_10,Win_2016",
     ),
     (
@@ -2129,7 +2823,7 @@ raw_lcid_languages: list[
         "Tonga",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-TO"),
+        valid_iso_alpha2_region_language_todo("en-TO"),
         "Win_10,Win_2016",
     ),
     (
@@ -2138,7 +2832,7 @@ raw_lcid_languages: list[
         "Trinidad and Tobago",
         0x2C09,
         11273,
-        ShortLanguageStr.from_str_unsafe("en-TT"),
+        valid_iso_alpha2_region_language_todo("en-TT"),
         "Win_NT_4",
     ),
     (
@@ -2147,7 +2841,7 @@ raw_lcid_languages: list[
         "Turks and Caicos Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-TC"),
+        valid_iso_alpha2_region_language_todo("en-TC"),
         "Win_10,Win_2016",
     ),
     (
@@ -2156,7 +2850,7 @@ raw_lcid_languages: list[
         "Tuvalu",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-TV"),
+        valid_iso_alpha2_region_language_todo("en-TV"),
         "Win_10,Win_2016",
     ),
     (
@@ -2165,7 +2859,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-UG"),
+        valid_iso_alpha2_region_language_todo("en-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2174,7 +2868,7 @@ raw_lcid_languages: list[
         "United Arab Emirates",
         0x4C09,
         19465,
-        ShortLanguageStr.from_str_unsafe("en-AE"),
+        valid_iso_alpha2_region_language_todo("en-AE"),
         "Win_10_v2004,Win_2004",
     ),
     (
@@ -2183,7 +2877,7 @@ raw_lcid_languages: list[
         "United Kingdom",
         0x0809,
         2057,
-        ShortLanguageStr.from_str_unsafe("en-GB"),
+        valid_iso_alpha2_region_language_todo("en-GB"),
         "Win_NT_3",
     ),
     (
@@ -2192,7 +2886,7 @@ raw_lcid_languages: list[
         "United States",
         0x0409,
         1033,
-        ShortLanguageStr.from_str_unsafe("en-US"),
+        valid_iso_alpha2_region_language_todo("en-US"),
         "Win_NT_3",
     ),
     (
@@ -2201,7 +2895,7 @@ raw_lcid_languages: list[
         "US Minor Outlying Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-UM"),
+        valid_iso_alpha2_region_language_todo("en-UM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2210,7 +2904,7 @@ raw_lcid_languages: list[
         "US Virgin Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-VI"),
+        valid_iso_alpha2_region_language_todo("en-VI"),
         "Win_10,Win_2016",
     ),
     (
@@ -2219,17 +2913,25 @@ raw_lcid_languages: list[
         "Vanuatu",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-VU"),
+        valid_iso_alpha2_region_language_todo("en-VU"),
         "Win_10,Win_2016",
     ),
-    (263, "English", "World", 0x1000, 4096, "en-001", "Win_10,Win_2016"),
+    (
+        263,
+        "English",
+        "World",
+        0x1000,
+        4096,
+        invalid_iso_string("en-001"),
+        "Win_10,Win_2016",
+    ),
     (
         264,
         "English",
         "Zambia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("en-ZM"),
+        valid_iso_alpha2_region_language_todo("en-ZM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2238,7 +2940,7 @@ raw_lcid_languages: list[
         "Zimbabwe",
         0x3009,
         12297,
-        ShortLanguageStr.from_str_unsafe("en-ZW"),
+        valid_iso_alpha2_region_language_todo("en-ZW"),
         "Win_2000",
     ),
     (
@@ -2250,7 +2952,15 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("eo"),
         "Win_10,Win_2016",
     ),
-    (267, "Esperanto", "World", 0x1000, 4096, "eo-001", "Win_10,Win_2016"),
+    (
+        267,
+        "Esperanto",
+        "World",
+        0x1000,
+        4096,
+        invalid_iso_string("eo-001"),
+        "Win_10,Win_2016",
+    ),
     (
         268,
         "Estonian",
@@ -2266,7 +2976,7 @@ raw_lcid_languages: list[
         "Estonia",
         0x0425,
         1061,
-        ShortLanguageStr.from_str_unsafe("et-EE"),
+        valid_iso_alpha2_region_language_todo("et-EE"),
         "Win_NT_4",
     ),
     (
@@ -2284,7 +2994,7 @@ raw_lcid_languages: list[
         "Ghana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ee-GH"),
+        valid_iso_alpha2_region_language_todo("ee-GH"),
         "Win_10,Win_2016",
     ),
     (
@@ -2293,7 +3003,7 @@ raw_lcid_languages: list[
         "Togo",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ee-TG"),
+        valid_iso_alpha2_region_language_todo("ee-TG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2311,7 +3021,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ewo-CM"),
+        valid_iso_alpha3_region_language_todo("ewo-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2329,7 +3039,7 @@ raw_lcid_languages: list[
         "Denmark",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fo-DK"),
+        valid_iso_alpha2_region_language_todo("fo-DK"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -2338,7 +3048,7 @@ raw_lcid_languages: list[
         "Faroe Islands",
         0x0438,
         1080,
-        ShortLanguageStr.from_str_unsafe("fo-FO"),
+        valid_iso_alpha2_region_language_todo("fo-FO"),
         "Win_NT_4",
     ),
     (
@@ -2356,7 +3066,7 @@ raw_lcid_languages: list[
         "Philippines",
         0x0464,
         1124,
-        ShortLanguageStr.from_str_unsafe("fil-PH"),
+        valid_iso_alpha3_region_language_todo("fil-PH"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -2374,7 +3084,7 @@ raw_lcid_languages: list[
         "Finland",
         0x040B,
         1035,
-        ShortLanguageStr.from_str_unsafe("fi-FI"),
+        valid_iso_alpha2_region_language_todo("fi-FI"),
         "Win_NT_3",
     ),
     (
@@ -2392,7 +3102,7 @@ raw_lcid_languages: list[
         "Algeria",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-DZ"),
+        valid_iso_alpha2_region_language_todo("fr-DZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2401,7 +3111,7 @@ raw_lcid_languages: list[
         "Belgium",
         0x080C,
         2060,
-        ShortLanguageStr.from_str_unsafe("fr-BE"),
+        valid_iso_alpha2_region_language_todo("fr-BE"),
         "Win_NT_3",
     ),
     (
@@ -2410,7 +3120,7 @@ raw_lcid_languages: list[
         "Benin",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-BJ"),
+        valid_iso_alpha2_region_language_todo("fr-BJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2419,7 +3129,7 @@ raw_lcid_languages: list[
         "Burkina Faso",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-BF"),
+        valid_iso_alpha2_region_language_todo("fr-BF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2428,7 +3138,7 @@ raw_lcid_languages: list[
         "Burundi",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-BI"),
+        valid_iso_alpha2_region_language_todo("fr-BI"),
         "Win_10,Win_2016",
     ),
     (
@@ -2437,7 +3147,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x2C0C,
         11276,
-        ShortLanguageStr.from_str_unsafe("fr-CM"),
+        valid_iso_alpha2_region_language_todo("fr-CM"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2446,17 +3156,25 @@ raw_lcid_languages: list[
         "Canada",
         0x0C0C,
         3084,
-        ShortLanguageStr.from_str_unsafe("fr-CA"),
+        valid_iso_alpha2_region_language_todo("fr-CA"),
         "Win_NT_3",
     ),
-    (290, "French", "Caribbean", 0x1C0C, 7180, "fr-029", "Win_10,Win_2016"),
+    (
+        290,
+        "French",
+        "Caribbean",
+        0x1C0C,
+        7180,
+        invalid_iso_string("fr-029"),
+        "Win_10,Win_2016",
+    ),
     (
         291,
         "French",
         "Central African Republic",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-CF"),
+        valid_iso_alpha2_region_language_todo("fr-CF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2465,7 +3183,7 @@ raw_lcid_languages: list[
         "Chad",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-TD"),
+        valid_iso_alpha2_region_language_todo("fr-TD"),
         "Win_10,Win_2016",
     ),
     (
@@ -2474,7 +3192,7 @@ raw_lcid_languages: list[
         "Comoros",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-KM"),
+        valid_iso_alpha2_region_language_todo("fr-KM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2483,7 +3201,7 @@ raw_lcid_languages: list[
         "Congo",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-CG"),
+        valid_iso_alpha2_region_language_todo("fr-CG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2492,7 +3210,7 @@ raw_lcid_languages: list[
         "Congo, DRC",
         0x240C,
         9228,
-        ShortLanguageStr.from_str_unsafe("fr-CD"),
+        valid_iso_alpha2_region_language_todo("fr-CD"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2501,7 +3219,7 @@ raw_lcid_languages: list[
         "Côte d'Ivoire",
         0x300C,
         12300,
-        ShortLanguageStr.from_str_unsafe("fr-CI"),
+        valid_iso_alpha2_region_language_todo("fr-CI"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2510,7 +3228,7 @@ raw_lcid_languages: list[
         "Djibouti",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-DJ"),
+        valid_iso_alpha2_region_language_todo("fr-DJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2519,7 +3237,7 @@ raw_lcid_languages: list[
         "Equatorial Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-GQ"),
+        valid_iso_alpha2_region_language_todo("fr-GQ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2528,7 +3246,7 @@ raw_lcid_languages: list[
         "France",
         0x040C,
         1036,
-        ShortLanguageStr.from_str_unsafe("fr-FR"),
+        valid_iso_alpha2_region_language_todo("fr-FR"),
         "Win_NT_3",
     ),
     (
@@ -2537,7 +3255,7 @@ raw_lcid_languages: list[
         "French Guiana",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-GF"),
+        valid_iso_alpha2_region_language_todo("fr-GF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2546,7 +3264,7 @@ raw_lcid_languages: list[
         "French Polynesia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-PF"),
+        valid_iso_alpha2_region_language_todo("fr-PF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2555,7 +3273,7 @@ raw_lcid_languages: list[
         "Gabon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-GA"),
+        valid_iso_alpha2_region_language_todo("fr-GA"),
         "Win_10,Win_2016",
     ),
     (
@@ -2564,7 +3282,7 @@ raw_lcid_languages: list[
         "Guadeloupe",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-GP"),
+        valid_iso_alpha2_region_language_todo("fr-GP"),
         "Win_10,Win_2016",
     ),
     (
@@ -2573,7 +3291,7 @@ raw_lcid_languages: list[
         "Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-GN"),
+        valid_iso_alpha2_region_language_todo("fr-GN"),
         "Win_10,Win_2016",
     ),
     (
@@ -2582,7 +3300,7 @@ raw_lcid_languages: list[
         "Haiti",
         0x3C0C,
         15372,
-        ShortLanguageStr.from_str_unsafe("fr-HT"),
+        valid_iso_alpha2_region_language_todo("fr-HT"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2591,7 +3309,7 @@ raw_lcid_languages: list[
         "Luxembourg",
         0x140C,
         5132,
-        ShortLanguageStr.from_str_unsafe("fr-LU"),
+        valid_iso_alpha2_region_language_todo("fr-LU"),
         "Win_NT_3",
     ),
     (
@@ -2600,7 +3318,7 @@ raw_lcid_languages: list[
         "Madagascar",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-MG"),
+        valid_iso_alpha2_region_language_todo("fr-MG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2609,7 +3327,7 @@ raw_lcid_languages: list[
         "Mali",
         0x340C,
         13324,
-        ShortLanguageStr.from_str_unsafe("fr-ML"),
+        valid_iso_alpha2_region_language_todo("fr-ML"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2618,7 +3336,7 @@ raw_lcid_languages: list[
         "Martinique",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-MQ"),
+        valid_iso_alpha2_region_language_todo("fr-MQ"),
         "Win_10,Win_2016",
     ),
     (
@@ -2627,7 +3345,7 @@ raw_lcid_languages: list[
         "Mauritania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-MR"),
+        valid_iso_alpha2_region_language_todo("fr-MR"),
         "Win_10,Win_2016",
     ),
     (
@@ -2636,7 +3354,7 @@ raw_lcid_languages: list[
         "Mauritius",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-MU"),
+        valid_iso_alpha2_region_language_todo("fr-MU"),
         "Win_10,Win_2016",
     ),
     (
@@ -2645,7 +3363,7 @@ raw_lcid_languages: list[
         "Mayotte",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-YT"),
+        valid_iso_alpha2_region_language_todo("fr-YT"),
         "Win_10,Win_2016",
     ),
     (
@@ -2654,7 +3372,7 @@ raw_lcid_languages: list[
         "Morocco",
         0x380C,
         14348,
-        ShortLanguageStr.from_str_unsafe("fr-MA"),
+        valid_iso_alpha2_region_language_todo("fr-MA"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2663,7 +3381,7 @@ raw_lcid_languages: list[
         "New Caledonia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-NC"),
+        valid_iso_alpha2_region_language_todo("fr-NC"),
         "Win_10,Win_2016",
     ),
     (
@@ -2672,7 +3390,7 @@ raw_lcid_languages: list[
         "Niger",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-NE"),
+        valid_iso_alpha2_region_language_todo("fr-NE"),
         "Win_10,Win_2016",
     ),
     (
@@ -2681,7 +3399,7 @@ raw_lcid_languages: list[
         "Principality of Monaco",
         0x180C,
         6156,
-        ShortLanguageStr.from_str_unsafe("fr-MC"),
+        valid_iso_alpha2_region_language_todo("fr-MC"),
         "Win_NT_3",
     ),
     (
@@ -2690,7 +3408,7 @@ raw_lcid_languages: list[
         "Reunion",
         0x200C,
         8204,
-        ShortLanguageStr.from_str_unsafe("fr-RE"),
+        valid_iso_alpha2_region_language_todo("fr-RE"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2699,7 +3417,7 @@ raw_lcid_languages: list[
         "Rwanda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-RW"),
+        valid_iso_alpha2_region_language_todo("fr-RW"),
         "Win_10,Win_2016",
     ),
     (
@@ -2708,7 +3426,7 @@ raw_lcid_languages: list[
         "Saint Barthélemy",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-BL"),
+        valid_iso_alpha2_region_language_todo("fr-BL"),
         "Win_10,Win_2016",
     ),
     (
@@ -2717,7 +3435,7 @@ raw_lcid_languages: list[
         "Saint Martin",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-MF"),
+        valid_iso_alpha2_region_language_todo("fr-MF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2726,7 +3444,7 @@ raw_lcid_languages: list[
         "Saint Pierre and Miquelon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-PM"),
+        valid_iso_alpha2_region_language_todo("fr-PM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2735,7 +3453,7 @@ raw_lcid_languages: list[
         "Senegal",
         0x280C,
         10252,
-        ShortLanguageStr.from_str_unsafe("fr-SN"),
+        valid_iso_alpha2_region_language_todo("fr-SN"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -2744,7 +3462,7 @@ raw_lcid_languages: list[
         "Seychelles",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-SC"),
+        valid_iso_alpha2_region_language_todo("fr-SC"),
         "Win_10,Win_2016",
     ),
     (
@@ -2753,7 +3471,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x100C,
         4108,
-        ShortLanguageStr.from_str_unsafe("fr-CH"),
+        valid_iso_alpha2_region_language_todo("fr-CH"),
         "Win_NT_3",
     ),
     (
@@ -2762,7 +3480,7 @@ raw_lcid_languages: list[
         "Syria",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-SY"),
+        valid_iso_alpha2_region_language_todo("fr-SY"),
         "Win_10,Win_2016",
     ),
     (
@@ -2771,7 +3489,7 @@ raw_lcid_languages: list[
         "Togo",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-TG"),
+        valid_iso_alpha2_region_language_todo("fr-TG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2780,7 +3498,7 @@ raw_lcid_languages: list[
         "Tunisia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-TN"),
+        valid_iso_alpha2_region_language_todo("fr-TN"),
         "Win_10,Win_2016",
     ),
     (
@@ -2789,7 +3507,7 @@ raw_lcid_languages: list[
         "Vanuatu",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-VU"),
+        valid_iso_alpha2_region_language_todo("fr-VU"),
         "Win_10,Win_2016",
     ),
     (
@@ -2798,7 +3516,7 @@ raw_lcid_languages: list[
         "Wallis and Futuna",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fr-WF"),
+        valid_iso_alpha2_region_language_todo("fr-WF"),
         "Win_10,Win_2016",
     ),
     (
@@ -2816,7 +3534,7 @@ raw_lcid_languages: list[
         "Netherlands",
         0x0462,
         1122,
-        ShortLanguageStr.from_str_unsafe("fy-NL"),
+        valid_iso_alpha2_region_language_todo("fy-NL"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -2834,7 +3552,7 @@ raw_lcid_languages: list[
         "Italy",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fur-IT"),
+        valid_iso_alpha3_region_language_todo("fur-IT"),
         "Win_10,Win_2016",
     ),
     (
@@ -2846,14 +3564,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("ff"),
         "Win_8,Win_2012",
     ),
-    (335, "Fulah (Latin)", None, 0x7C67, 31847, "ff-Latn", "Win_8,Win_2012"),
+    (
+        335,
+        "Fulah (Latin)",
+        None,
+        0x7C67,
+        31847,
+        invalid_iso_string("ff-Latn"),
+        "Win_8,Win_2012",
+    ),
     (
         336,
         "Fulah (Latin)",
         "Burkina Faso",
         0x1000,
         4096,
-        "ff-Latn-BF",
+        invalid_iso_string("ff-Latn-BF"),
         "Win_10,Win_2016.4",
     ),
     (
@@ -2862,7 +3588,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ff-CM"),
+        valid_iso_alpha2_region_language_todo("ff-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -2871,28 +3597,52 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        "ff-Latn-CM",
+        invalid_iso_string("ff-Latn-CM"),
         "Win_10,Win_2016.4",
     ),
-    (339, "Fulah (Latin)", "Gambia", 0x1000, 4096, "ff-Latn-GM", "Win_10,Win_2016.4"),
-    (340, "Fulah (Latin)", "Ghana", 0x1000, 4096, "ff-Latn-GH", "Win_10,Win_2016.4"),
+    (
+        339,
+        "Fulah (Latin)",
+        "Gambia",
+        0x1000,
+        4096,
+        invalid_iso_string("ff-Latn-GM"),
+        "Win_10,Win_2016.4",
+    ),
+    (
+        340,
+        "Fulah (Latin)",
+        "Ghana",
+        0x1000,
+        4096,
+        invalid_iso_string("ff-Latn-GH"),
+        "Win_10,Win_2016.4",
+    ),
     (
         341,
         "Fulah",
         "Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ff-GN"),
+        valid_iso_alpha2_region_language_todo("ff-GN"),
         "Win_10,Win_2016",
     ),
-    (342, "Fulah (Latin)", "Guinea", 0x1000, 4096, "ff-Latn-GN", "Win_10,Win_2016.4"),
+    (
+        342,
+        "Fulah (Latin)",
+        "Guinea",
+        0x1000,
+        4096,
+        invalid_iso_string("ff-Latn-GN"),
+        "Win_10,Win_2016.4",
+    ),
     (
         343,
         "Fulah (Latin)",
         "Guinea-Bissau",
         0x1000,
         4096,
-        "ff-Latn-GW",
+        invalid_iso_string("ff-Latn-GW"),
         "Win_10,Win_2016.4",
     ),
     (
@@ -2901,7 +3651,7 @@ raw_lcid_languages: list[
         "Liberia",
         0x1000,
         4096,
-        "ff-Latn-LR",
+        invalid_iso_string("ff-Latn-LR"),
         "Win_10,Win_2016.4",
     ),
     (
@@ -2910,7 +3660,7 @@ raw_lcid_languages: list[
         "Mauritania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ff-MR"),
+        valid_iso_alpha2_region_language_todo("ff-MR"),
         "Win_10,Win_2016",
     ),
     (
@@ -2919,17 +3669,25 @@ raw_lcid_languages: list[
         "Mauritania",
         0x1000,
         4096,
-        "ff-Latn-MR",
+        invalid_iso_string("ff-Latn-MR"),
         "Win_10,Win_2016.4",
     ),
-    (347, "Fulah (Latin)", "Niger", 0x1000, 4096, "ff-Latn-NE", "Win_10,Win_2016.4"),
+    (
+        347,
+        "Fulah (Latin)",
+        "Niger",
+        0x1000,
+        4096,
+        invalid_iso_string("ff-Latn-NE"),
+        "Win_10,Win_2016.4",
+    ),
     (
         348,
         "Fulah",
         "Nigeria",
         0x0467,
         1127,
-        ShortLanguageStr.from_str_unsafe("ff-NG"),
+        valid_iso_alpha2_region_language_todo("ff-NG"),
         "Win_10,Win_2016",
     ),
     (
@@ -2938,17 +3696,25 @@ raw_lcid_languages: list[
         "Nigeria",
         0x0467,
         1127,
-        "ff-Latn-NG",
+        invalid_iso_string("ff-Latn-NG"),
         "Win_10,Win_2016.4",
     ),
-    (350, "Fulah", "Senegal", 0x0867, 2151, "ff-Latn-SN", "Win_8,Win_2012"),
+    (
+        350,
+        "Fulah",
+        "Senegal",
+        0x0867,
+        2151,
+        invalid_iso_string("ff-Latn-SN"),
+        "Win_8,Win_2012",
+    ),
     (
         351,
         "Fulah (Latin)",
         "Sierra Leone",
         0x1000,
         4096,
-        "ff-Latn-SL",
+        invalid_iso_string("ff-Latn-SL"),
         "Win_10,Win_2016.4",
     ),
     (
@@ -2966,7 +3732,7 @@ raw_lcid_languages: list[
         "Spain",
         0x0456,
         1110,
-        ShortLanguageStr.from_str_unsafe("gl-ES"),
+        valid_iso_alpha2_region_language_todo("gl-ES"),
         "Win_XP,Win_2003",
     ),
     (
@@ -2984,7 +3750,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lg-UG"),
+        valid_iso_alpha2_region_language_todo("lg-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -3002,7 +3768,7 @@ raw_lcid_languages: list[
         "Georgia",
         0x0437,
         1079,
-        ShortLanguageStr.from_str_unsafe("ka-GE"),
+        valid_iso_alpha2_region_language_todo("ka-GE"),
         "Win_2000",
     ),
     (
@@ -3020,7 +3786,7 @@ raw_lcid_languages: list[
         "Austria",
         0x0C07,
         3079,
-        ShortLanguageStr.from_str_unsafe("de-AT"),
+        valid_iso_alpha2_region_language_todo("de-AT"),
         "Win_NT_3",
     ),
     (
@@ -3029,7 +3795,7 @@ raw_lcid_languages: list[
         "Belgium",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("de-BE"),
+        valid_iso_alpha2_region_language_todo("de-BE"),
         "Win_10,Win_2016",
     ),
     (
@@ -3038,7 +3804,7 @@ raw_lcid_languages: list[
         "Germany",
         0x0407,
         1031,
-        ShortLanguageStr.from_str_unsafe("de-DE"),
+        valid_iso_alpha2_region_language_todo("de-DE"),
         "Win_NT_3",
     ),
     (
@@ -3047,7 +3813,7 @@ raw_lcid_languages: list[
         "Italy",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("de-IT"),
+        valid_iso_alpha2_region_language_todo("de-IT"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -3056,7 +3822,7 @@ raw_lcid_languages: list[
         "Liechtenstein",
         0x1407,
         5127,
-        ShortLanguageStr.from_str_unsafe("de-LI"),
+        valid_iso_alpha2_region_language_todo("de-LI"),
         "Win_NT_4",
     ),
     (
@@ -3065,7 +3831,7 @@ raw_lcid_languages: list[
         "Luxembourg",
         0x1007,
         4103,
-        ShortLanguageStr.from_str_unsafe("de-LU"),
+        valid_iso_alpha2_region_language_todo("de-LU"),
         "Win_NT_4",
     ),
     (
@@ -3074,7 +3840,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x0807,
         2055,
-        ShortLanguageStr.from_str_unsafe("de-CH"),
+        valid_iso_alpha2_region_language_todo("de-CH"),
         "Win_NT_3",
     ),
     (
@@ -3092,7 +3858,7 @@ raw_lcid_languages: list[
         "Cyprus",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("el-CY"),
+        valid_iso_alpha2_region_language_todo("el-CY"),
         "Win_10,Win_2016",
     ),
     (
@@ -3101,7 +3867,7 @@ raw_lcid_languages: list[
         "Greece",
         0x0408,
         1032,
-        ShortLanguageStr.from_str_unsafe("el-GR"),
+        valid_iso_alpha2_region_language_todo("el-GR"),
         "Win_NT_3",
     ),
     (
@@ -3119,7 +3885,7 @@ raw_lcid_languages: list[
         "Greenland",
         0x046F,
         1135,
-        ShortLanguageStr.from_str_unsafe("kl-GL"),
+        valid_iso_alpha2_region_language_todo("kl-GL"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3137,7 +3903,7 @@ raw_lcid_languages: list[
         "Paraguay",
         0x0474,
         1140,
-        ShortLanguageStr.from_str_unsafe("gn-PY"),
+        valid_iso_alpha2_region_language_todo("gn-PY"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -3155,7 +3921,7 @@ raw_lcid_languages: list[
         "India",
         0x0447,
         1095,
-        ShortLanguageStr.from_str_unsafe("gu-IN"),
+        valid_iso_alpha2_region_language_todo("gu-IN"),
         "Win_XP,Win_2003",
     ),
     (
@@ -3164,7 +3930,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("guz"),
+        valid_iso_alpha3_language_todo("guz"),
         "Win_10,Win_2016",
     ),
     (
@@ -3173,7 +3939,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("guz-KE"),
+        valid_iso_alpha3_region_language_todo("guz-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -3185,16 +3951,40 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("ha"),
         "Win_7,Win_2008_R2",
     ),
-    (378, "Hausa (Latin)", None, 0x7C68, 31848, "ha-Latn", "Windows 7"),
-    (379, "Hausa (Latin)", "Ghana", 0x1000, 4096, "ha-Latn-GH", "Win_10,Win_2016"),
-    (380, "Hausa (Latin)", "Niger", 0x1000, 4096, "ha-Latn-NE", "Win_10,Win_2016"),
+    (
+        378,
+        "Hausa (Latin)",
+        None,
+        0x7C68,
+        31848,
+        invalid_iso_string("ha-Latn"),
+        "Windows 7",
+    ),
+    (
+        379,
+        "Hausa (Latin)",
+        "Ghana",
+        0x1000,
+        4096,
+        invalid_iso_string("ha-Latn-GH"),
+        "Win_10,Win_2016",
+    ),
+    (
+        380,
+        "Hausa (Latin)",
+        "Niger",
+        0x1000,
+        4096,
+        invalid_iso_string("ha-Latn-NE"),
+        "Win_10,Win_2016",
+    ),
     (
         381,
         "Hausa (Latin)",
         "Nigeria",
         0x0468,
         1128,
-        "ha-Latn-NG",
+        invalid_iso_string("ha-Latn-NG"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3212,7 +4002,7 @@ raw_lcid_languages: list[
         "United States",
         0x0475,
         1141,
-        ShortLanguageStr.from_str_unsafe("haw-US"),
+        valid_iso_alpha3_region_language_todo("haw-US"),
         "Win_8,Win_2012",
     ),
     (
@@ -3230,7 +4020,7 @@ raw_lcid_languages: list[
         "Israel",
         0x040D,
         1037,
-        ShortLanguageStr.from_str_unsafe("he-IL"),
+        valid_iso_alpha2_region_language_todo("he-IL"),
         "Win_NT_4",
     ),
     (
@@ -3248,7 +4038,7 @@ raw_lcid_languages: list[
         "India",
         0x0439,
         1081,
-        ShortLanguageStr.from_str_unsafe("hi-IN"),
+        valid_iso_alpha2_region_language_todo("hi-IN"),
         "Win_2000",
     ),
     (
@@ -3266,7 +4056,7 @@ raw_lcid_languages: list[
         "Hungary",
         0x040E,
         1038,
-        ShortLanguageStr.from_str_unsafe("hu-HU"),
+        valid_iso_alpha2_region_language_todo("hu-HU"),
         "Win_NT_3",
     ),
     (
@@ -3284,7 +4074,7 @@ raw_lcid_languages: list[
         "Iceland",
         0x040F,
         1039,
-        ShortLanguageStr.from_str_unsafe("is-IS"),
+        valid_iso_alpha2_region_language_todo("is-IS"),
         "Win_NT_3",
     ),
     (
@@ -3302,7 +4092,7 @@ raw_lcid_languages: list[
         "Nigeria",
         0x0470,
         1136,
-        ShortLanguageStr.from_str_unsafe("ig-NG"),
+        valid_iso_alpha2_region_language_todo("ig-NG"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3320,7 +4110,7 @@ raw_lcid_languages: list[
         "Indonesia",
         0x0421,
         1057,
-        ShortLanguageStr.from_str_unsafe("id-ID"),
+        valid_iso_alpha2_region_language_todo("id-ID"),
         "Win_NT_4",
     ),
     (
@@ -3338,10 +4128,18 @@ raw_lcid_languages: list[
         "France",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ia-FR"),
+        valid_iso_alpha2_region_language_todo("ia-FR"),
         "Win_10,Win_2016",
     ),
-    (398, "Interlingua", "World", 0x1000, 4096, "ia-001", "Win_10,Win_2016"),
+    (
+        398,
+        "Interlingua",
+        "World",
+        0x1000,
+        4096,
+        invalid_iso_string("ia-001"),
+        "Win_10,Win_2016",
+    ),
     (
         399,
         "Inuktitut (Latin)",
@@ -3351,24 +4149,40 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("iu"),
         "Win_7,Win_2008_R2",
     ),
-    (400, "Inuktitut (Latin)", None, 0x7C5D, 31837, "iu-Latn", "Windows 7"),
+    (
+        400,
+        "Inuktitut (Latin)",
+        None,
+        0x7C5D,
+        31837,
+        invalid_iso_string("iu-Latn"),
+        "Windows 7",
+    ),
     (
         401,
         "Inuktitut (Latin)",
         "Canada",
         0x085D,
         2141,
-        "iu-Latn-CA",
+        invalid_iso_string("iu-Latn-CA"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
-    (402, "Inuktitut (Syllabics)", None, 0x785D, 30813, "iu-Cans", "Windows 7"),
+    (
+        402,
+        "Inuktitut (Syllabics)",
+        None,
+        0x785D,
+        30813,
+        invalid_iso_string("iu-Cans"),
+        "Windows 7",
+    ),
     (
         403,
         "Inuktitut (Syllabics)",
         "Canada",
         0x045D,
         1117,
-        "iu-Cans-CA",
+        invalid_iso_string("iu-Cans-CA"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3386,7 +4200,7 @@ raw_lcid_languages: list[
         "Ireland",
         0x083C,
         2108,
-        ShortLanguageStr.from_str_unsafe("ga-IE"),
+        valid_iso_alpha2_region_language_todo("ga-IE"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -3404,7 +4218,7 @@ raw_lcid_languages: list[
         "Italy",
         0x0410,
         1040,
-        ShortLanguageStr.from_str_unsafe("it-IT"),
+        valid_iso_alpha2_region_language_todo("it-IT"),
         "Win_NT_3",
     ),
     (
@@ -3413,7 +4227,7 @@ raw_lcid_languages: list[
         "San Marino",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("it-SM"),
+        valid_iso_alpha2_region_language_todo("it-SM"),
         "Win_10,Win_2016",
     ),
     (
@@ -3422,7 +4236,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x0810,
         2064,
-        ShortLanguageStr.from_str_unsafe("it-CH"),
+        valid_iso_alpha2_region_language_todo("it-CH"),
         "Win_NT_3",
     ),
     (
@@ -3431,7 +4245,7 @@ raw_lcid_languages: list[
         "Vatican City",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("it-VA"),
+        valid_iso_alpha2_region_language_todo("it-VA"),
         "Win_10,Win_2016.3",
     ),
     (
@@ -3449,7 +4263,7 @@ raw_lcid_languages: list[
         "Japan",
         0x0411,
         1041,
-        ShortLanguageStr.from_str_unsafe("ja-JP"),
+        valid_iso_alpha2_region_language_todo("ja-JP"),
         "Win_NT_3",
     ),
     (
@@ -3461,14 +4275,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("jv"),
         "Win_81,Win_2012_R2",
     ),
-    (414, "Javanese", "Latin", 0x1000, 4096, "jv-Latn", "Win_81,Win_2012_R2"),
+    (
+        414,
+        "Javanese",
+        "Latin",
+        0x1000,
+        4096,
+        invalid_iso_string("jv-Latn"),
+        "Win_81,Win_2012_R2",
+    ),
     (
         415,
         "Javanese",
         "Latin, Indonesia",
         0x1000,
         4096,
-        "jv-Latn-ID",
+        invalid_iso_string("jv-Latn-ID"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -3477,7 +4299,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dyo"),
+        valid_iso_alpha3_language_todo("dyo"),
         "Win_10,Win_2016",
     ),
     (
@@ -3486,7 +4308,7 @@ raw_lcid_languages: list[
         "Senegal",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dyo-SN"),
+        valid_iso_alpha3_region_language_todo("dyo-SN"),
         "Win_10,Win_2016",
     ),
     (
@@ -3495,7 +4317,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kea"),
+        valid_iso_alpha3_language_todo("kea"),
         "Win_10,Win_2016",
     ),
     (
@@ -3504,7 +4326,7 @@ raw_lcid_languages: list[
         "Cabo Verde",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kea-CV"),
+        valid_iso_alpha3_region_language_todo("kea-CV"),
         "Win_10,Win_2016",
     ),
     (
@@ -3522,7 +4344,7 @@ raw_lcid_languages: list[
         "Algeria",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kab-DZ"),
+        valid_iso_alpha3_region_language_todo("kab-DZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -3531,7 +4353,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kkj"),
+        valid_iso_alpha3_language_todo("kkj"),
         "Win_10,Win_2016",
     ),
     (
@@ -3540,7 +4362,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kkj-CM"),
+        valid_iso_alpha3_region_language_todo("kkj-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -3549,7 +4371,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kln"),
+        valid_iso_alpha3_language_todo("kln"),
         "Win_10,Win_2016",
     ),
     (
@@ -3558,7 +4380,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kln-KE"),
+        valid_iso_alpha3_region_language_todo("kln-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -3576,7 +4398,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kam-KE"),
+        valid_iso_alpha3_region_language_todo("kam-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -3594,10 +4416,18 @@ raw_lcid_languages: list[
         "India",
         0x044B,
         1099,
-        ShortLanguageStr.from_str_unsafe("kn-IN"),
+        valid_iso_alpha2_region_language_todo("kn-IN"),
         "Win_XP,Win_2003",
     ),
-    (430, "Kanuri (Latin)", "Nigeria", 0x0471, 1137, "kr-Latn-NG", "Win_10,Win_2016"),
+    (
+        430,
+        "Kanuri (Latin)",
+        "Nigeria",
+        0x0471,
+        1137,
+        invalid_iso_string("kr-Latn-NG"),
+        "Win_10,Win_2016",
+    ),
     (
         431,
         "Kashmiri",
@@ -3607,15 +4437,31 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("ks"),
         "Win_10,Win_2016",
     ),
-    (432, "Kashmiri", "Perso-Arabic", 0x0460, 1120, "ks-Arab", "Win_10,Win_2016"),
-    (433, "Kashmiri", "Perso-Arabic", 0x1000, 4096, "ks-Arab-IN", "Win_10,Win_2016"),
+    (
+        432,
+        "Kashmiri",
+        "Perso-Arabic",
+        0x0460,
+        1120,
+        invalid_iso_string("ks-Arab"),
+        "Win_10,Win_2016",
+    ),
+    (
+        433,
+        "Kashmiri",
+        "Perso-Arabic",
+        0x1000,
+        4096,
+        invalid_iso_string("ks-Arab-IN"),
+        "Win_10,Win_2016",
+    ),
     (
         434,
         "Kashmiri (Devanagari)",
         "India",
         0x0860,
         2144,
-        "ks-Deva-IN",
+        invalid_iso_string("ks-Deva-IN"),
         "Win_10,Win_2016",
     ),
     (
@@ -3633,7 +4479,7 @@ raw_lcid_languages: list[
         "Kazakhstan",
         0x043F,
         1087,
-        ShortLanguageStr.from_str_unsafe("kk-KZ"),
+        valid_iso_alpha2_region_language_todo("kk-KZ"),
         "Win_2000",
     ),
     (
@@ -3651,7 +4497,7 @@ raw_lcid_languages: list[
         "Cambodia",
         0x0453,
         1107,
-        ShortLanguageStr.from_str_unsafe("km-KH"),
+        valid_iso_alpha2_region_language_todo("km-KH"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3660,10 +4506,18 @@ raw_lcid_languages: list[
         None,
         0x0086,
         134,
-        ShortLanguageStr.from_str_unsafe("quc"),
+        valid_iso_alpha3_language_todo("quc"),
         "Win_10,Win_2016",
     ),
-    (440, "K'iche", "Guatemala", 0x0486, 1158, "quc-Latn-GT", "Win_10,Win_2016"),
+    (
+        440,
+        "K'iche",
+        "Guatemala",
+        0x0486,
+        1158,
+        invalid_iso_string("quc-Latn-GT"),
+        "Win_10,Win_2016",
+    ),
     (
         441,
         "Kikuyu",
@@ -3679,7 +4533,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ki-KE"),
+        valid_iso_alpha2_region_language_todo("ki-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -3697,7 +4551,7 @@ raw_lcid_languages: list[
         "Rwanda",
         0x0487,
         1159,
-        ShortLanguageStr.from_str_unsafe("rw-RW"),
+        valid_iso_alpha2_region_language_todo("rw-RW"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3715,7 +4569,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x0441,
         1089,
-        ShortLanguageStr.from_str_unsafe("sw-KE"),
+        valid_iso_alpha2_region_language_todo("sw-KE"),
         "Win_2000",
     ),
     (
@@ -3724,7 +4578,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sw-TZ"),
+        valid_iso_alpha2_region_language_todo("sw-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -3733,7 +4587,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sw-UG"),
+        valid_iso_alpha2_region_language_todo("sw-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -3751,7 +4605,7 @@ raw_lcid_languages: list[
         "India",
         0x0457,
         1111,
-        ShortLanguageStr.from_str_unsafe("kok-IN"),
+        valid_iso_alpha3_region_language_todo("kok-IN"),
         "Win_2000",
     ),
     (
@@ -3769,7 +4623,7 @@ raw_lcid_languages: list[
         "Korea",
         0x0412,
         1042,
-        ShortLanguageStr.from_str_unsafe("ko-KR"),
+        valid_iso_alpha2_region_language_todo("ko-KR"),
         "Win_NT_3",
     ),
     (
@@ -3778,7 +4632,7 @@ raw_lcid_languages: list[
         "North Korea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ko-KP"),
+        valid_iso_alpha2_region_language_todo("ko-KP"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -3787,7 +4641,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("khq"),
+        valid_iso_alpha3_language_todo("khq"),
         "Win_10,Win_2016",
     ),
     (
@@ -3796,7 +4650,7 @@ raw_lcid_languages: list[
         "Mali",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("khq-ML"),
+        valid_iso_alpha3_region_language_todo("khq-ML"),
         "Win_10,Win_2016",
     ),
     (
@@ -3805,7 +4659,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ses"),
+        valid_iso_alpha3_language_todo("ses"),
         "Win_10,Win_2016",
     ),
     (
@@ -3814,7 +4668,7 @@ raw_lcid_languages: list[
         "Mali",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ses-ML"),
+        valid_iso_alpha3_region_language_todo("ses-ML"),
         "Win_10,Win_2016",
     ),
     (
@@ -3823,7 +4677,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nmg"),
+        valid_iso_alpha3_language_todo("nmg"),
         "Win_10,Win_2016",
     ),
     (
@@ -3832,7 +4686,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nmg-CM"),
+        valid_iso_alpha3_region_language_todo("nmg-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -3850,7 +4704,7 @@ raw_lcid_languages: list[
         "Kyrgyzstan",
         0x0440,
         1088,
-        ShortLanguageStr.from_str_unsafe("ky-KG"),
+        valid_iso_alpha2_region_language_todo("ky-KG"),
         "Win_XP,Win_2003",
     ),
     (
@@ -3859,7 +4713,7 @@ raw_lcid_languages: list[
         "Perso-Arabic, Iran",
         0x1000,
         4096,
-        "ku-Arab-IR",
+        invalid_iso_string("ku-Arab-IR"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -3868,7 +4722,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lkt"),
+        valid_iso_alpha3_language_todo("lkt"),
         "Win_10,Win_2016",
     ),
     (
@@ -3877,7 +4731,7 @@ raw_lcid_languages: list[
         "United States",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lkt-US"),
+        valid_iso_alpha3_region_language_todo("lkt-US"),
         "Win_10,Win_2016",
     ),
     (
@@ -3886,7 +4740,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lag"),
+        valid_iso_alpha3_language_todo("lag"),
         "Win_10,Win_2016",
     ),
     (
@@ -3895,7 +4749,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lag-TZ"),
+        valid_iso_alpha3_region_language_todo("lag-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -3913,7 +4767,7 @@ raw_lcid_languages: list[
         "Lao P.D.R.",
         0x0454,
         1108,
-        ShortLanguageStr.from_str_unsafe("lo-LA"),
+        valid_iso_alpha2_region_language_todo("lo-LA"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -3922,7 +4776,7 @@ raw_lcid_languages: list[
         "Vatican City",
         0x0476,
         1142,
-        ShortLanguageStr.from_str_unsafe("la-VA"),
+        valid_iso_alpha2_region_language_todo("la-VA"),
         "Win_10_v2004,Win_2004",
     ),
     (
@@ -3940,7 +4794,7 @@ raw_lcid_languages: list[
         "Latvia",
         0x0426,
         1062,
-        ShortLanguageStr.from_str_unsafe("lv-LV"),
+        valid_iso_alpha2_region_language_todo("lv-LV"),
         "Win_NT_4",
     ),
     (
@@ -3958,7 +4812,7 @@ raw_lcid_languages: list[
         "Angola",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ln-AO"),
+        valid_iso_alpha2_region_language_todo("ln-AO"),
         "Win_10,Win_2016",
     ),
     (
@@ -3967,7 +4821,7 @@ raw_lcid_languages: list[
         "Central African Republic",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ln-CF"),
+        valid_iso_alpha2_region_language_todo("ln-CF"),
         "Win_10,Win_2016",
     ),
     (
@@ -3976,7 +4830,7 @@ raw_lcid_languages: list[
         "Congo",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ln-CG"),
+        valid_iso_alpha2_region_language_todo("ln-CG"),
         "Win_10,Win_2016",
     ),
     (
@@ -3985,7 +4839,7 @@ raw_lcid_languages: list[
         "Congo DRC",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ln-CD"),
+        valid_iso_alpha2_region_language_todo("ln-CD"),
         "Win_10,Win_2016",
     ),
     (
@@ -4003,7 +4857,7 @@ raw_lcid_languages: list[
         "Lithuania",
         0x0427,
         1063,
-        ShortLanguageStr.from_str_unsafe("lt-LT"),
+        valid_iso_alpha2_region_language_todo("lt-LT"),
         "Win_NT_4",
     ),
     (
@@ -4021,7 +4875,7 @@ raw_lcid_languages: list[
         "Germany",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nds-DE"),
+        valid_iso_alpha3_region_language_todo("nds-DE"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -4030,7 +4884,7 @@ raw_lcid_languages: list[
         "Netherlands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nds-NL"),
+        valid_iso_alpha3_region_language_todo("nds-NL"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -4048,7 +4902,7 @@ raw_lcid_languages: list[
         "Germany",
         0x082E,
         2094,
-        ShortLanguageStr.from_str_unsafe("dsb-DE"),
+        valid_iso_alpha3_region_language_todo("dsb-DE"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -4066,7 +4920,7 @@ raw_lcid_languages: list[
         "Congo DRC",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lu-CD"),
+        valid_iso_alpha2_region_language_todo("lu-CD"),
         "Win_10,Win_2016",
     ),
     (
@@ -4084,7 +4938,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("luo-KE"),
+        valid_iso_alpha3_region_language_todo("luo-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4102,7 +4956,7 @@ raw_lcid_languages: list[
         "Luxembourg",
         0x046E,
         1134,
-        ShortLanguageStr.from_str_unsafe("lb-LU"),
+        valid_iso_alpha2_region_language_todo("lb-LU"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4111,7 +4965,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("luy"),
+        valid_iso_alpha3_language_todo("luy"),
         "Win_10,Win_2016",
     ),
     (
@@ -4120,7 +4974,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("luy-KE"),
+        valid_iso_alpha3_region_language_todo("luy-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4138,7 +4992,7 @@ raw_lcid_languages: list[
         "North Macedonia",
         0x042F,
         1071,
-        ShortLanguageStr.from_str_unsafe("mk-MK"),
+        valid_iso_alpha2_region_language_todo("mk-MK"),
         "Win_2000",
     ),
     (
@@ -4147,7 +5001,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("jmc"),
+        valid_iso_alpha3_language_todo("jmc"),
         "Win_10,Win_2016",
     ),
     (
@@ -4156,7 +5010,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("jmc-TZ"),
+        valid_iso_alpha3_region_language_todo("jmc-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -4165,7 +5019,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mgh"),
+        valid_iso_alpha3_language_todo("mgh"),
         "Win_10,Win_2016",
     ),
     (
@@ -4174,7 +5028,7 @@ raw_lcid_languages: list[
         "Mozambique",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mgh-MZ"),
+        valid_iso_alpha3_region_language_todo("mgh-MZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -4183,7 +5037,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kde"),
+        valid_iso_alpha3_language_todo("kde"),
         "Win_10,Win_2016",
     ),
     (
@@ -4192,7 +5046,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("kde-TZ"),
+        valid_iso_alpha3_region_language_todo("kde-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -4210,7 +5064,7 @@ raw_lcid_languages: list[
         "Madagascar",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mg-MG"),
+        valid_iso_alpha2_region_language_todo("mg-MG"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -4228,7 +5082,7 @@ raw_lcid_languages: list[
         "Brunei Darussalam",
         0x083E,
         2110,
-        ShortLanguageStr.from_str_unsafe("ms-BN"),
+        valid_iso_alpha2_region_language_todo("ms-BN"),
         "Win_2000",
     ),
     (
@@ -4237,7 +5091,7 @@ raw_lcid_languages: list[
         "Malaysia",
         0x043E,
         1086,
-        ShortLanguageStr.from_str_unsafe("ms-MY"),
+        valid_iso_alpha2_region_language_todo("ms-MY"),
         "Win_2000",
     ),
     (
@@ -4255,7 +5109,7 @@ raw_lcid_languages: list[
         "India",
         0x044C,
         1100,
-        ShortLanguageStr.from_str_unsafe("ml-IN"),
+        valid_iso_alpha2_region_language_todo("ml-IN"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4273,7 +5127,7 @@ raw_lcid_languages: list[
         "Malta",
         0x043A,
         1082,
-        ShortLanguageStr.from_str_unsafe("mt-MT"),
+        valid_iso_alpha2_region_language_todo("mt-MT"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4291,7 +5145,7 @@ raw_lcid_languages: list[
         "Isle of Man",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("gv-IM"),
+        valid_iso_alpha2_region_language_todo("gv-IM"),
         "Win_10,Win_2016",
     ),
     (
@@ -4309,7 +5163,7 @@ raw_lcid_languages: list[
         "New Zealand",
         0x0481,
         1153,
-        ShortLanguageStr.from_str_unsafe("mi-NZ"),
+        valid_iso_alpha2_region_language_todo("mi-NZ"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4327,7 +5181,7 @@ raw_lcid_languages: list[
         "Chile",
         0x047A,
         1146,
-        ShortLanguageStr.from_str_unsafe("arn-CL"),
+        valid_iso_alpha3_region_language_todo("arn-CL"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4345,7 +5199,7 @@ raw_lcid_languages: list[
         "India",
         0x044E,
         1102,
-        ShortLanguageStr.from_str_unsafe("mr-IN"),
+        valid_iso_alpha2_region_language_todo("mr-IN"),
         "Win_2000",
     ),
     (
@@ -4363,7 +5217,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mas-KE"),
+        valid_iso_alpha3_region_language_todo("mas-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4372,7 +5226,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mas-TZ"),
+        valid_iso_alpha3_region_language_todo("mas-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -4381,7 +5235,7 @@ raw_lcid_languages: list[
         "Iran",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mzn-IR"),
+        valid_iso_alpha3_region_language_todo("mzn-IR"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -4390,7 +5244,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mer"),
+        valid_iso_alpha3_language_todo("mer"),
         "Win_10,Win_2016",
     ),
     (
@@ -4399,7 +5253,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mer-KE"),
+        valid_iso_alpha3_region_language_todo("mer-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4408,7 +5262,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mgo"),
+        valid_iso_alpha3_language_todo("mgo"),
         "Win_10,Win_2016",
     ),
     (
@@ -4417,7 +5271,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mgo-CM"),
+        valid_iso_alpha3_region_language_todo("mgo-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -4435,7 +5289,7 @@ raw_lcid_languages: list[
         "Canada",
         0x047C,
         1148,
-        ShortLanguageStr.from_str_unsafe("moh-CA"),
+        valid_iso_alpha3_region_language_todo("moh-CA"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4447,14 +5301,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("mn"),
         "Win_7,Win_2008_R2",
     ),
-    (528, "Mongolian (Cyrillic)", None, 0x7850, 30800, "mn-Cyrl", "Windows 7"),
+    (
+        528,
+        "Mongolian (Cyrillic)",
+        None,
+        0x7850,
+        30800,
+        invalid_iso_string("mn-Cyrl"),
+        "Windows 7",
+    ),
     (
         529,
         "Mongolian (Cyrillic)",
         "Mongolia",
         0x0450,
         1104,
-        ShortLanguageStr.from_str_unsafe("mn-MN"),
+        valid_iso_alpha2_region_language_todo("mn-MN"),
         "Win_XP,Win_2003",
     ),
     (
@@ -4463,7 +5325,7 @@ raw_lcid_languages: list[
         None,
         0x7C50,
         31824,
-        "mn-Mong",
+        invalid_iso_string("mn-Mong"),
         "Windows 7",
     ),
     (
@@ -4472,7 +5334,7 @@ raw_lcid_languages: list[
         "People's Republic of China",
         0x0850,
         2128,
-        "mn-Mong- CN",
+        invalid_iso_string("mn-Mong- CN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -4481,7 +5343,7 @@ raw_lcid_languages: list[
         "Mongolia",
         0x0C50,
         3152,
-        "mn-Mong- MN",
+        invalid_iso_string("mn-Mong- MN"),
         "Windows 7",
     ),
     (
@@ -4490,7 +5352,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mfe"),
+        valid_iso_alpha3_language_todo("mfe"),
         "Win_10,Win_2016",
     ),
     (
@@ -4499,7 +5361,7 @@ raw_lcid_languages: list[
         "Mauritius",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mfe-MU"),
+        valid_iso_alpha3_region_language_todo("mfe-MU"),
         "Win_10,Win_2016",
     ),
     (
@@ -4508,7 +5370,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mua"),
+        valid_iso_alpha3_language_todo("mua"),
         "Win_10,Win_2016",
     ),
     (
@@ -4517,7 +5379,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("mua-CM"),
+        valid_iso_alpha3_region_language_todo("mua-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -4535,7 +5397,7 @@ raw_lcid_languages: list[
         "Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nqo-GN"),
+        valid_iso_alpha3_region_language_todo("nqo-GN"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -4544,7 +5406,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("naq"),
+        valid_iso_alpha3_language_todo("naq"),
         "Win_10,Win_2016",
     ),
     (
@@ -4553,7 +5415,7 @@ raw_lcid_languages: list[
         "Namibia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("naq-NA"),
+        valid_iso_alpha3_region_language_todo("naq-NA"),
         "Win_10,Win_2016",
     ),
     (
@@ -4571,7 +5433,7 @@ raw_lcid_languages: list[
         "India",
         0x0861,
         2145,
-        ShortLanguageStr.from_str_unsafe("ne-IN"),
+        valid_iso_alpha2_region_language_todo("ne-IN"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -4580,7 +5442,7 @@ raw_lcid_languages: list[
         "Nepal",
         0x0461,
         1121,
-        ShortLanguageStr.from_str_unsafe("ne-NP"),
+        valid_iso_alpha2_region_language_todo("ne-NP"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4589,7 +5451,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nnh"),
+        valid_iso_alpha3_language_todo("nnh"),
         "Win_10,Win_2016",
     ),
     (
@@ -4598,7 +5460,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nnh-CM"),
+        valid_iso_alpha3_region_language_todo("nnh-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -4607,7 +5469,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("jgo"),
+        valid_iso_alpha3_language_todo("jgo"),
         "Win_10,Win_2016",
     ),
     (
@@ -4616,7 +5478,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("jgo-CM"),
+        valid_iso_alpha3_region_language_todo("jgo-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -4625,7 +5487,7 @@ raw_lcid_languages: list[
         "Iraq",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lrc-IQ"),
+        valid_iso_alpha3_region_language_todo("lrc-IQ"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -4634,7 +5496,7 @@ raw_lcid_languages: list[
         "Iran",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("lrc-IR"),
+        valid_iso_alpha3_region_language_todo("lrc-IR"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -4652,7 +5514,7 @@ raw_lcid_languages: list[
         "Zimbabwe",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nd-ZW"),
+        valid_iso_alpha2_region_language_todo("nd-ZW"),
         "Win_10,Win_2016",
     ),
     (
@@ -4679,7 +5541,7 @@ raw_lcid_languages: list[
         "Norway",
         0x0414,
         1044,
-        ShortLanguageStr.from_str_unsafe("nb-NO"),
+        valid_iso_alpha2_region_language_todo("nb-NO"),
         "Win_NT_3",
     ),
     (
@@ -4697,7 +5559,7 @@ raw_lcid_languages: list[
         "Norway",
         0x0814,
         2068,
-        ShortLanguageStr.from_str_unsafe("nn-NO"),
+        valid_iso_alpha2_region_language_todo("nn-NO"),
         "Win_NT_3",
     ),
     (
@@ -4706,7 +5568,7 @@ raw_lcid_languages: list[
         "Svalbard and Jan Mayen",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nb-SJ"),
+        valid_iso_alpha2_region_language_todo("nb-SJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -4715,7 +5577,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nus"),
+        valid_iso_alpha3_language_todo("nus"),
         "Win_10,Win_2016",
     ),
     (
@@ -4724,7 +5586,7 @@ raw_lcid_languages: list[
         "Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nus-SD"),
+        valid_iso_alpha3_region_language_todo("nus-SD"),
         "Win_10,Win_2016",
     ),
     (
@@ -4733,7 +5595,7 @@ raw_lcid_languages: list[
         "South Sudan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nus-SS"),
+        valid_iso_alpha3_region_language_todo("nus-SS"),
         "Win_10,Win_2016.1",
     ),
     (
@@ -4751,7 +5613,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nyn-UG"),
+        valid_iso_alpha3_region_language_todo("nyn-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -4769,7 +5631,7 @@ raw_lcid_languages: list[
         "France",
         0x0482,
         1154,
-        ShortLanguageStr.from_str_unsafe("oc-FR"),
+        valid_iso_alpha2_region_language_todo("oc-FR"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -4787,7 +5649,7 @@ raw_lcid_languages: list[
         "India",
         0x0448,
         1096,
-        ShortLanguageStr.from_str_unsafe("or-IN"),
+        valid_iso_alpha2_region_language_todo("or-IN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -4805,7 +5667,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x0472,
         1138,
-        ShortLanguageStr.from_str_unsafe("om-ET"),
+        valid_iso_alpha2_region_language_todo("om-ET"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -4814,7 +5676,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("om-KE"),
+        valid_iso_alpha2_region_language_todo("om-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4832,7 +5694,7 @@ raw_lcid_languages: list[
         "Cyrillic, Georgia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("os-GE"),
+        valid_iso_alpha2_region_language_todo("os-GE"),
         "Win_10,Win_2016",
     ),
     (
@@ -4841,7 +5703,7 @@ raw_lcid_languages: list[
         "Cyrillic, Russia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("os-RU"),
+        valid_iso_alpha2_region_language_todo("os-RU"),
         "Win_10,Win_2016",
     ),
     (
@@ -4859,7 +5721,7 @@ raw_lcid_languages: list[
         "Afghanistan",
         0x0463,
         1123,
-        ShortLanguageStr.from_str_unsafe("ps-AF"),
+        valid_iso_alpha2_region_language_todo("ps-AF"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -4868,7 +5730,7 @@ raw_lcid_languages: list[
         "Pakistan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ps-PK"),
+        valid_iso_alpha2_region_language_todo("ps-PK"),
         "Win_10_v2004,Win_2004",
     ),
     (
@@ -4886,7 +5748,7 @@ raw_lcid_languages: list[
         "Afghanistan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("fa-AF"),
+        valid_iso_alpha2_region_language_todo("fa-AF"),
         "Win_10,Win_2016",
     ),
     (
@@ -4895,7 +5757,7 @@ raw_lcid_languages: list[
         "Iran",
         0x0429,
         1065,
-        ShortLanguageStr.from_str_unsafe("fa-IR"),
+        valid_iso_alpha2_region_language_todo("fa-IR"),
         "Win_NT_4",
     ),
     (
@@ -4913,7 +5775,7 @@ raw_lcid_languages: list[
         "Poland",
         0x0415,
         1045,
-        ShortLanguageStr.from_str_unsafe("pl-PL"),
+        valid_iso_alpha2_region_language_todo("pl-PL"),
         "Win_NT_3",
     ),
     (
@@ -4931,7 +5793,7 @@ raw_lcid_languages: list[
         "Angola",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-AO"),
+        valid_iso_alpha2_region_language_todo("pt-AO"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -4940,7 +5802,7 @@ raw_lcid_languages: list[
         "Brazil",
         0x0416,
         1046,
-        ShortLanguageStr.from_str_unsafe("pt-BR"),
+        valid_iso_alpha2_region_language_todo("pt-BR"),
         "Win_NT_3",
     ),
     (
@@ -4949,7 +5811,7 @@ raw_lcid_languages: list[
         "Cabo Verde",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-CV"),
+        valid_iso_alpha2_region_language_todo("pt-CV"),
         "Win_10,Win_2016",
     ),
     (
@@ -4958,7 +5820,7 @@ raw_lcid_languages: list[
         "Equatorial Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-GQ"),
+        valid_iso_alpha2_region_language_todo("pt-GQ"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -4967,7 +5829,7 @@ raw_lcid_languages: list[
         "Guinea-Bissau",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-GW"),
+        valid_iso_alpha2_region_language_todo("pt-GW"),
         "Win_10,Win_2016",
     ),
     (
@@ -4976,7 +5838,7 @@ raw_lcid_languages: list[
         "Luxembourg",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-LU"),
+        valid_iso_alpha2_region_language_todo("pt-LU"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -4985,7 +5847,7 @@ raw_lcid_languages: list[
         "Macao SAR",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-MO"),
+        valid_iso_alpha2_region_language_todo("pt-MO"),
         "Win_10,Win_2016",
     ),
     (
@@ -4994,7 +5856,7 @@ raw_lcid_languages: list[
         "Mozambique",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-MZ"),
+        valid_iso_alpha2_region_language_todo("pt-MZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5003,7 +5865,7 @@ raw_lcid_languages: list[
         "Portugal",
         0x0816,
         2070,
-        ShortLanguageStr.from_str_unsafe("pt-PT"),
+        valid_iso_alpha2_region_language_todo("pt-PT"),
         "Win_NT_3",
     ),
     (
@@ -5012,7 +5874,7 @@ raw_lcid_languages: list[
         "São Tomé and Príncipe",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-ST"),
+        valid_iso_alpha2_region_language_todo("pt-ST"),
         "Win_10,Win_2016",
     ),
     (
@@ -5021,7 +5883,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-CH"),
+        valid_iso_alpha2_region_language_todo("pt-CH"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -5030,17 +5892,25 @@ raw_lcid_languages: list[
         "Timor-Leste",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("pt-TL"),
+        valid_iso_alpha2_region_language_todo("pt-TL"),
         "Win_10,Win_2016",
     ),
-    (594, "Prussian", None, 0x1000, 4096, "prg-001", "Win_10,Win_2016.1"),
+    (
+        594,
+        "Prussian",
+        None,
+        0x1000,
+        4096,
+        invalid_iso_string("prg-001"),
+        "Win_10,Win_2016.1",
+    ),
     (
         595,
         "Pseudo Language",
         "Pseudo locale for east Asian/complex script localization testing",
         0x05FE,
         1534,
-        "qps-ploca",
+        invalid_iso_string("qps-ploca"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5049,7 +5919,7 @@ raw_lcid_languages: list[
         "Pseudo locale used for localization testing",
         0x0501,
         1281,
-        "qps-ploc",
+        invalid_iso_string("qps-ploc"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5058,7 +5928,7 @@ raw_lcid_languages: list[
         "Pseudo locale used for localization testing of mirrored locales",
         0x09FF,
         2559,
-        "qps-plocm",
+        invalid_iso_string("qps-plocm"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5070,14 +5940,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("pa"),
         "Win_7,Win_2008_R2",
     ),
-    (599, "Punjabi", None, 0x7C46, 31814, "pa-Arab", "Win_8,Win_2012"),
+    (
+        599,
+        "Punjabi",
+        None,
+        0x7C46,
+        31814,
+        invalid_iso_string("pa-Arab"),
+        "Win_8,Win_2012",
+    ),
     (
         600,
         "Punjabi",
         "India",
         0x0446,
         1094,
-        ShortLanguageStr.from_str_unsafe("pa-IN"),
+        valid_iso_alpha2_region_language_todo("pa-IN"),
         "Win_XP,Win_2003",
     ),
     (
@@ -5086,7 +5964,7 @@ raw_lcid_languages: list[
         "Islamic Republic of Pakistan",
         0x0846,
         2118,
-        "pa-Arab-PK",
+        invalid_iso_string("pa-Arab-PK"),
         "Win_8,Win_2012",
     ),
     (
@@ -5095,7 +5973,7 @@ raw_lcid_languages: list[
         None,
         0x006B,
         107,
-        ShortLanguageStr.from_str_unsafe("quz"),
+        valid_iso_alpha3_language_todo("quz"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5104,7 +5982,7 @@ raw_lcid_languages: list[
         "Bolivia",
         0x046B,
         1131,
-        ShortLanguageStr.from_str_unsafe("quz-BO"),
+        valid_iso_alpha3_region_language_todo("quz-BO"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5113,7 +5991,7 @@ raw_lcid_languages: list[
         "Ecuador",
         0x086B,
         2155,
-        ShortLanguageStr.from_str_unsafe("quz-EC"),
+        valid_iso_alpha3_region_language_todo("quz-EC"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5122,7 +6000,7 @@ raw_lcid_languages: list[
         "Peru",
         0x0C6B,
         3179,
-        ShortLanguageStr.from_str_unsafe("quz-PE"),
+        valid_iso_alpha3_region_language_todo("quz-PE"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5131,7 +6009,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksh"),
+        valid_iso_alpha3_language_todo("ksh"),
         "Win_10,Win_2016",
     ),
     (
@@ -5140,7 +6018,7 @@ raw_lcid_languages: list[
         "Germany",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksh-DE"),
+        valid_iso_alpha3_region_language_todo("ksh-DE"),
         "Win_10,Win_2016",
     ),
     (
@@ -5158,7 +6036,7 @@ raw_lcid_languages: list[
         "Moldova",
         0x0818,
         2072,
-        ShortLanguageStr.from_str_unsafe("ro-MD"),
+        valid_iso_alpha2_region_language_todo("ro-MD"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -5167,7 +6045,7 @@ raw_lcid_languages: list[
         "Romania",
         0x0418,
         1048,
-        ShortLanguageStr.from_str_unsafe("ro-RO"),
+        valid_iso_alpha2_region_language_todo("ro-RO"),
         "Win_NT_3",
     ),
     (
@@ -5185,7 +6063,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x0417,
         1047,
-        ShortLanguageStr.from_str_unsafe("rm-CH"),
+        valid_iso_alpha2_region_language_todo("rm-CH"),
         "Win_XP_ELK_v2,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5194,7 +6072,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("rof"),
+        valid_iso_alpha3_language_todo("rof"),
         "Win_10,Win_2016",
     ),
     (
@@ -5203,7 +6081,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("rof-TZ"),
+        valid_iso_alpha3_region_language_todo("rof-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5221,7 +6099,7 @@ raw_lcid_languages: list[
         "Burundi",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("rn-BI"),
+        valid_iso_alpha2_region_language_todo("rn-BI"),
         "Win_10,Win_2016",
     ),
     (
@@ -5239,7 +6117,7 @@ raw_lcid_languages: list[
         "Belarus",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ru-BY"),
+        valid_iso_alpha2_region_language_todo("ru-BY"),
         "Win_10,Win_2016",
     ),
     (
@@ -5248,7 +6126,7 @@ raw_lcid_languages: list[
         "Kazakhstan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ru-KZ"),
+        valid_iso_alpha2_region_language_todo("ru-KZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5257,7 +6135,7 @@ raw_lcid_languages: list[
         "Kyrgyzstan",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ru-KG"),
+        valid_iso_alpha2_region_language_todo("ru-KG"),
         "Win_10,Win_2016",
     ),
     (
@@ -5266,7 +6144,7 @@ raw_lcid_languages: list[
         "Moldova",
         0x0819,
         2073,
-        ShortLanguageStr.from_str_unsafe("ru-MD"),
+        valid_iso_alpha2_region_language_todo("ru-MD"),
         "Win_10,Win_2016",
     ),
     (
@@ -5275,7 +6153,7 @@ raw_lcid_languages: list[
         "Russia",
         0x0419,
         1049,
-        ShortLanguageStr.from_str_unsafe("ru-RU"),
+        valid_iso_alpha2_region_language_todo("ru-RU"),
         "Win_NT_3",
     ),
     (
@@ -5284,7 +6162,7 @@ raw_lcid_languages: list[
         "Ukraine",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ru-UA"),
+        valid_iso_alpha2_region_language_todo("ru-UA"),
         "Win_10,Win_2016",
     ),
     (
@@ -5293,7 +6171,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("rwk"),
+        valid_iso_alpha3_language_todo("rwk"),
         "Win_10,Win_2016",
     ),
     (
@@ -5302,7 +6180,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("rwk-TZ"),
+        valid_iso_alpha3_region_language_todo("rwk-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5311,7 +6189,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ssy"),
+        valid_iso_alpha3_language_todo("ssy"),
         "Win_10,Win_2016",
     ),
     (
@@ -5320,7 +6198,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ssy-ER"),
+        valid_iso_alpha3_region_language_todo("ssy-ER"),
         "Win_10,Win_2016",
     ),
     (
@@ -5338,7 +6216,7 @@ raw_lcid_languages: list[
         "Russia",
         0x0485,
         1157,
-        ShortLanguageStr.from_str_unsafe("sah-RU"),
+        valid_iso_alpha3_region_language_todo("sah-RU"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -5347,7 +6225,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("saq"),
+        valid_iso_alpha3_language_todo("saq"),
         "Win_10,Win_2016",
     ),
     (
@@ -5356,7 +6234,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("saq-KE"),
+        valid_iso_alpha3_region_language_todo("saq-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -5374,7 +6252,7 @@ raw_lcid_languages: list[
         "Finland",
         0x243B,
         9275,
-        ShortLanguageStr.from_str_unsafe("smn-FI"),
+        valid_iso_alpha3_region_language_todo("smn-FI"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5392,7 +6270,7 @@ raw_lcid_languages: list[
         "Norway",
         0x103B,
         4155,
-        ShortLanguageStr.from_str_unsafe("smj-NO"),
+        valid_iso_alpha3_region_language_todo("smj-NO"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5401,7 +6279,7 @@ raw_lcid_languages: list[
         "Sweden",
         0x143B,
         5179,
-        ShortLanguageStr.from_str_unsafe("smj-SE"),
+        valid_iso_alpha3_region_language_todo("smj-SE"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5419,7 +6297,7 @@ raw_lcid_languages: list[
         "Finland",
         0x0C3B,
         3131,
-        ShortLanguageStr.from_str_unsafe("se-FI"),
+        valid_iso_alpha2_region_language_todo("se-FI"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5428,7 +6306,7 @@ raw_lcid_languages: list[
         "Norway",
         0x043B,
         1083,
-        ShortLanguageStr.from_str_unsafe("se-NO"),
+        valid_iso_alpha2_region_language_todo("se-NO"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5437,7 +6315,7 @@ raw_lcid_languages: list[
         "Sweden",
         0x083B,
         2107,
-        ShortLanguageStr.from_str_unsafe("se-SE"),
+        valid_iso_alpha2_region_language_todo("se-SE"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5455,7 +6333,7 @@ raw_lcid_languages: list[
         "Finland",
         0x203B,
         8251,
-        ShortLanguageStr.from_str_unsafe("sms-FI"),
+        valid_iso_alpha3_region_language_todo("sms-FI"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5473,7 +6351,7 @@ raw_lcid_languages: list[
         "Norway",
         0x183B,
         6203,
-        ShortLanguageStr.from_str_unsafe("sma-NO"),
+        valid_iso_alpha3_region_language_todo("sma-NO"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5482,7 +6360,7 @@ raw_lcid_languages: list[
         "Sweden",
         0x1C3B,
         7227,
-        ShortLanguageStr.from_str_unsafe("sma-SE"),
+        valid_iso_alpha3_region_language_todo("sma-SE"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5500,7 +6378,7 @@ raw_lcid_languages: list[
         "Central African Republic",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sg-CF"),
+        valid_iso_alpha2_region_language_todo("sg-CF"),
         "Win_10,Win_2016",
     ),
     (
@@ -5509,7 +6387,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sbp"),
+        valid_iso_alpha3_language_todo("sbp"),
         "Win_10,Win_2016",
     ),
     (
@@ -5518,7 +6396,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sbp-TZ"),
+        valid_iso_alpha3_region_language_todo("sbp-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5536,7 +6414,7 @@ raw_lcid_languages: list[
         "India",
         0x044F,
         1103,
-        ShortLanguageStr.from_str_unsafe("sa-IN"),
+        valid_iso_alpha2_region_language_todo("sa-IN"),
         "Win_2000",
     ),
     (
@@ -5554,7 +6432,7 @@ raw_lcid_languages: list[
         "United Kingdom",
         0x0491,
         1169,
-        ShortLanguageStr.from_str_unsafe("gd-GB"),
+        valid_iso_alpha2_region_language_todo("gd-GB"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5563,7 +6441,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("seh"),
+        valid_iso_alpha3_language_todo("seh"),
         "Win_10,Win_2016",
     ),
     (
@@ -5572,17 +6450,25 @@ raw_lcid_languages: list[
         "Mozambique",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("seh-MZ"),
+        valid_iso_alpha3_region_language_todo("seh-MZ"),
         "Win_10,Win_2016",
     ),
-    (656, "Serbian (Cyrillic)", None, 0x6C1A, 27674, "sr-Cyrl", "Windows 7"),
+    (
+        656,
+        "Serbian (Cyrillic)",
+        None,
+        0x6C1A,
+        27674,
+        invalid_iso_string("sr-Cyrl"),
+        "Windows 7",
+    ),
     (
         657,
         "Serbian (Cyrillic)",
         "Bosnia and Herzegovina",
         0x1C1A,
         7194,
-        "sr-Cyrl-BA",
+        invalid_iso_string("sr-Cyrl-BA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5591,7 +6477,7 @@ raw_lcid_languages: list[
         "Montenegro",
         0x301A,
         12314,
-        "sr-Cyrl-ME",
+        invalid_iso_string("sr-Cyrl-ME"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5600,7 +6486,7 @@ raw_lcid_languages: list[
         "Serbia",
         0x281A,
         10266,
-        "sr-Cyrl-RS",
+        invalid_iso_string("sr-Cyrl-RS"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5609,10 +6495,18 @@ raw_lcid_languages: list[
         "Serbia and Montenegro (Former)",
         0x0C1A,
         3098,
-        "sr-Cyrl-CS",
+        invalid_iso_string("sr-Cyrl-CS"),
         "Win_NT_4",
     ),
-    (661, "Serbian (Latin)", None, 0x701A, 28698, "sr-Latn", "Windows 7"),
+    (
+        661,
+        "Serbian (Latin)",
+        None,
+        0x701A,
+        28698,
+        invalid_iso_string("sr-Latn"),
+        "Windows 7",
+    ),
     (
         662,
         "Serbian (Latin)",
@@ -5628,7 +6522,7 @@ raw_lcid_languages: list[
         "Bosnia and Herzegovina",
         0x181A,
         6170,
-        "sr-Latn-BA",
+        invalid_iso_string("sr-Latn-BA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5637,7 +6531,7 @@ raw_lcid_languages: list[
         "Montenegro",
         0x2C1A,
         11290,
-        "sr-Latn-ME",
+        invalid_iso_string("sr-Latn-ME"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5646,7 +6540,7 @@ raw_lcid_languages: list[
         "Serbia",
         0x241A,
         9242,
-        "sr-Latn-RS",
+        invalid_iso_string("sr-Latn-RS"),
         "Win_7,Win_2008_R2",
     ),
     (
@@ -5655,7 +6549,7 @@ raw_lcid_languages: list[
         "Serbia and Montenegro (Former)",
         0x081A,
         2074,
-        "sr-Latn-CS",
+        invalid_iso_string("sr-Latn-CS"),
         "Win_NT_4",
     ),
     (
@@ -5673,7 +6567,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x046C,
         1132,
-        ShortLanguageStr.from_str_unsafe("nso-ZA"),
+        valid_iso_alpha3_region_language_todo("nso-ZA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5691,7 +6585,7 @@ raw_lcid_languages: list[
         "Botswana",
         0x0832,
         2098,
-        ShortLanguageStr.from_str_unsafe("tn-BW"),
+        valid_iso_alpha2_region_language_todo("tn-BW"),
         "Win_8,Win_2012",
     ),
     (
@@ -5700,7 +6594,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0432,
         1074,
-        ShortLanguageStr.from_str_unsafe("tn-ZA"),
+        valid_iso_alpha2_region_language_todo("tn-ZA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -5709,7 +6603,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksb"),
+        valid_iso_alpha3_language_todo("ksb"),
         "Win_10,Win_2016",
     ),
     (
@@ -5718,7 +6612,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ksb-TZ"),
+        valid_iso_alpha3_region_language_todo("ksb-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5730,8 +6624,24 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("sn"),
         "Win_81,Win_2012_R2",
     ),
-    (675, "Shona", "Latin", 0x1000, 4096, "sn-Latn", "Win_81,Win_2012_R2"),
-    (676, "Shona", "Zimbabwe", 0x1000, 4096, "sn-Latn-ZW", "Win_81,Win_2012_R2"),
+    (
+        675,
+        "Shona",
+        "Latin",
+        0x1000,
+        4096,
+        invalid_iso_string("sn-Latn"),
+        "Win_81,Win_2012_R2",
+    ),
+    (
+        676,
+        "Shona",
+        "Zimbabwe",
+        0x1000,
+        4096,
+        invalid_iso_string("sn-Latn-ZW"),
+        "Win_81,Win_2012_R2",
+    ),
     (
         677,
         "Sindhi",
@@ -5741,14 +6651,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("sd"),
         "Win_8,Win_2012",
     ),
-    (678, "Sindhi", None, 0x7C59, 31833, "sd-Arab", "Win_8,Win_2012"),
+    (
+        678,
+        "Sindhi",
+        None,
+        0x7C59,
+        31833,
+        invalid_iso_string("sd-Arab"),
+        "Win_8,Win_2012",
+    ),
     (
         679,
         "Sindhi",
         "Islamic Republic of Pakistan",
         0x0859,
         2137,
-        "sd-Arab-PK",
+        invalid_iso_string("sd-Arab-PK"),
         "Win_8,Win_2012",
     ),
     (
@@ -5766,7 +6684,7 @@ raw_lcid_languages: list[
         "Sri Lanka",
         0x045B,
         1115,
-        ShortLanguageStr.from_str_unsafe("si-LK"),
+        valid_iso_alpha2_region_language_todo("si-LK"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -5784,7 +6702,7 @@ raw_lcid_languages: list[
         "Slovakia",
         0x041B,
         1051,
-        ShortLanguageStr.from_str_unsafe("sk-SK"),
+        valid_iso_alpha2_region_language_todo("sk-SK"),
         "Win_NT_3",
     ),
     (
@@ -5802,7 +6720,7 @@ raw_lcid_languages: list[
         "Slovenia",
         0x0424,
         1060,
-        ShortLanguageStr.from_str_unsafe("sl-SI"),
+        valid_iso_alpha2_region_language_todo("sl-SI"),
         "Win_NT_3",
     ),
     (
@@ -5811,7 +6729,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("xog"),
+        valid_iso_alpha3_language_todo("xog"),
         "Win_10,Win_2016",
     ),
     (
@@ -5820,7 +6738,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("xog-UG"),
+        valid_iso_alpha3_region_language_todo("xog-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -5838,7 +6756,7 @@ raw_lcid_languages: list[
         "Djibouti",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("so-DJ"),
+        valid_iso_alpha2_region_language_todo("so-DJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -5847,7 +6765,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("so-ET"),
+        valid_iso_alpha2_region_language_todo("so-ET"),
         "Win_10,Win_2016",
     ),
     (
@@ -5856,7 +6774,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("so-KE"),
+        valid_iso_alpha2_region_language_todo("so-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -5865,7 +6783,7 @@ raw_lcid_languages: list[
         "Somalia",
         0x0477,
         1143,
-        ShortLanguageStr.from_str_unsafe("so-SO"),
+        valid_iso_alpha2_region_language_todo("so-SO"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -5883,7 +6801,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0430,
         1072,
-        ShortLanguageStr.from_str_unsafe("st-ZA"),
+        valid_iso_alpha2_region_language_todo("st-ZA"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -5901,7 +6819,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("nr-ZA"),
+        valid_iso_alpha2_region_language_todo("nr-ZA"),
         "Win_10,Win_2016",
     ),
     (
@@ -5910,7 +6828,7 @@ raw_lcid_languages: list[
         "Lesotho",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("st-LS"),
+        valid_iso_alpha2_region_language_todo("st-LS"),
         "Win_10,Win_2016",
     ),
     (
@@ -5928,7 +6846,7 @@ raw_lcid_languages: list[
         "Argentina",
         0x2C0A,
         11274,
-        ShortLanguageStr.from_str_unsafe("es-AR"),
+        valid_iso_alpha2_region_language_todo("es-AR"),
         "Win_NT_4",
     ),
     (
@@ -5937,7 +6855,7 @@ raw_lcid_languages: list[
         "Belize",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("es-BZ"),
+        valid_iso_alpha2_region_language_todo("es-BZ"),
         "Win_10,Win_2016.3",
     ),
     (
@@ -5946,7 +6864,7 @@ raw_lcid_languages: list[
         "Bolivarian Republic of Venezuela",
         0x200A,
         8202,
-        ShortLanguageStr.from_str_unsafe("es-VE"),
+        valid_iso_alpha2_region_language_todo("es-VE"),
         "Win_NT_4",
     ),
     (
@@ -5955,7 +6873,7 @@ raw_lcid_languages: list[
         "Bolivia",
         0x400A,
         16394,
-        ShortLanguageStr.from_str_unsafe("es-BO"),
+        valid_iso_alpha2_region_language_todo("es-BO"),
         "Win_NT_4",
     ),
     (
@@ -5964,7 +6882,7 @@ raw_lcid_languages: list[
         "Brazil",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("es-BR"),
+        valid_iso_alpha2_region_language_todo("es-BR"),
         "Win_10,Win_2016.2",
     ),
     (
@@ -5973,7 +6891,7 @@ raw_lcid_languages: list[
         "Chile",
         0x340A,
         13322,
-        ShortLanguageStr.from_str_unsafe("es-CL"),
+        valid_iso_alpha2_region_language_todo("es-CL"),
         "Win_NT_4",
     ),
     (
@@ -5982,7 +6900,7 @@ raw_lcid_languages: list[
         "Colombia",
         0x240A,
         9226,
-        ShortLanguageStr.from_str_unsafe("es-CO"),
+        valid_iso_alpha2_region_language_todo("es-CO"),
         "Win_NT_4",
     ),
     (
@@ -5991,7 +6909,7 @@ raw_lcid_languages: list[
         "Costa Rica",
         0x140A,
         5130,
-        ShortLanguageStr.from_str_unsafe("es-CR"),
+        valid_iso_alpha2_region_language_todo("es-CR"),
         "Win_NT_4",
     ),
     (
@@ -6000,7 +6918,7 @@ raw_lcid_languages: list[
         "Cuba",
         0x5C0A,
         23562,
-        ShortLanguageStr.from_str_unsafe("es-CU"),
+        valid_iso_alpha2_region_language_todo("es-CU"),
         "Win_10,Win_2016",
     ),
     (
@@ -6009,7 +6927,7 @@ raw_lcid_languages: list[
         "Dominican Republic",
         0x1C0A,
         7178,
-        ShortLanguageStr.from_str_unsafe("es-DO"),
+        valid_iso_alpha2_region_language_todo("es-DO"),
         "Win_NT_4",
     ),
     (
@@ -6018,7 +6936,7 @@ raw_lcid_languages: list[
         "Ecuador",
         0x300A,
         12298,
-        ShortLanguageStr.from_str_unsafe("es-EC"),
+        valid_iso_alpha2_region_language_todo("es-EC"),
         "Win_NT_4",
     ),
     (
@@ -6027,7 +6945,7 @@ raw_lcid_languages: list[
         "El Salvador",
         0x440A,
         17418,
-        ShortLanguageStr.from_str_unsafe("es-SV"),
+        valid_iso_alpha2_region_language_todo("es-SV"),
         "Win_NT_4",
     ),
     (
@@ -6036,7 +6954,7 @@ raw_lcid_languages: list[
         "Equatorial Guinea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("es-GQ"),
+        valid_iso_alpha2_region_language_todo("es-GQ"),
         "Win_10,Win_2016",
     ),
     (
@@ -6045,7 +6963,7 @@ raw_lcid_languages: list[
         "Guatemala",
         0x100A,
         4106,
-        ShortLanguageStr.from_str_unsafe("es-GT"),
+        valid_iso_alpha2_region_language_todo("es-GT"),
         "Win_NT_4",
     ),
     (
@@ -6054,17 +6972,25 @@ raw_lcid_languages: list[
         "Honduras",
         0x480A,
         18442,
-        ShortLanguageStr.from_str_unsafe("es-HN"),
+        valid_iso_alpha2_region_language_todo("es-HN"),
         "Win_NT_4",
     ),
-    (714, "Spanish", "Latin America", 0x580A, 22538, "es-419", "Win_81,Win_2012_R2"),
+    (
+        714,
+        "Spanish",
+        "Latin America",
+        0x580A,
+        22538,
+        invalid_iso_string("es-419"),
+        "Win_81,Win_2012_R2",
+    ),
     (
         715,
         "Spanish",
         "Mexico",
         0x080A,
         2058,
-        ShortLanguageStr.from_str_unsafe("es-MX"),
+        valid_iso_alpha2_region_language_todo("es-MX"),
         "Win_NT_3",
     ),
     (
@@ -6073,7 +6999,7 @@ raw_lcid_languages: list[
         "Nicaragua",
         0x4C0A,
         19466,
-        ShortLanguageStr.from_str_unsafe("es-NI"),
+        valid_iso_alpha2_region_language_todo("es-NI"),
         "Win_NT_4",
     ),
     (
@@ -6082,7 +7008,7 @@ raw_lcid_languages: list[
         "Panama",
         0x180A,
         6154,
-        ShortLanguageStr.from_str_unsafe("es-PA"),
+        valid_iso_alpha2_region_language_todo("es-PA"),
         "Win_NT_4",
     ),
     (
@@ -6091,7 +7017,7 @@ raw_lcid_languages: list[
         "Paraguay",
         0x3C0A,
         15370,
-        ShortLanguageStr.from_str_unsafe("es-PY"),
+        valid_iso_alpha2_region_language_todo("es-PY"),
         "Win_NT_4",
     ),
     (
@@ -6100,7 +7026,7 @@ raw_lcid_languages: list[
         "Peru",
         0x280A,
         10250,
-        ShortLanguageStr.from_str_unsafe("es-PE"),
+        valid_iso_alpha2_region_language_todo("es-PE"),
         "Win_NT_4",
     ),
     (
@@ -6109,7 +7035,7 @@ raw_lcid_languages: list[
         "Philippines",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("es-PH"),
+        valid_iso_alpha2_region_language_todo("es-PH"),
         "Win_10,Win_2016",
     ),
     (
@@ -6118,17 +7044,25 @@ raw_lcid_languages: list[
         "Puerto Rico",
         0x500A,
         20490,
-        ShortLanguageStr.from_str_unsafe("es-PR"),
+        valid_iso_alpha2_region_language_todo("es-PR"),
         "Win_NT_4",
     ),
-    (722, "Spanish", "Spain", 0x040A, 1034, "es-ES_tradnl", "Win_NT_3"),
+    (
+        722,
+        "Spanish",
+        "Spain",
+        0x040A,
+        1034,
+        invalid_iso_string("es-ES_tradnl"),
+        "Win_NT_3",
+    ),
     (
         723,
         "Spanish",
         "Spain",
         0x0C0A,
         3082,
-        ShortLanguageStr.from_str_unsafe("es-ES"),
+        valid_iso_alpha2_region_language_todo("es-ES"),
         "Win_NT_3",
     ),
     (
@@ -6137,7 +7071,7 @@ raw_lcid_languages: list[
         "United States",
         0x540A,
         21514,
-        ShortLanguageStr.from_str_unsafe("es-US"),
+        valid_iso_alpha2_region_language_todo("es-US"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6146,7 +7080,7 @@ raw_lcid_languages: list[
         "Uruguay",
         0x380A,
         14346,
-        ShortLanguageStr.from_str_unsafe("es-UY"),
+        valid_iso_alpha2_region_language_todo("es-UY"),
         "Win_NT_4",
     ),
     (
@@ -6164,7 +7098,7 @@ raw_lcid_languages: list[
         "Morocco",
         0x1000,
         4096,
-        "zgh-Tfng-MA",
+        invalid_iso_string("zgh-Tfng-MA"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -6173,7 +7107,7 @@ raw_lcid_languages: list[
         "Tifinagh",
         0x1000,
         4096,
-        "zgh-Tfng",
+        invalid_iso_string("zgh-Tfng"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -6191,7 +7125,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ss-ZA"),
+        valid_iso_alpha2_region_language_todo("ss-ZA"),
         "Win_10,Win_2016",
     ),
     (
@@ -6200,7 +7134,7 @@ raw_lcid_languages: list[
         "Swaziland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ss-SZ"),
+        valid_iso_alpha2_region_language_todo("ss-SZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -6218,7 +7152,7 @@ raw_lcid_languages: list[
         "Åland Islands",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("sv-AX"),
+        valid_iso_alpha2_region_language_todo("sv-AX"),
         "Win_10,Win_2016",
     ),
     (
@@ -6227,7 +7161,7 @@ raw_lcid_languages: list[
         "Finland",
         0x081D,
         2077,
-        ShortLanguageStr.from_str_unsafe("sv-FI"),
+        valid_iso_alpha2_region_language_todo("sv-FI"),
         "Win_NT_4",
     ),
     (
@@ -6236,7 +7170,7 @@ raw_lcid_languages: list[
         "Sweden",
         0x041D,
         1053,
-        ShortLanguageStr.from_str_unsafe("sv-SE"),
+        valid_iso_alpha2_region_language_todo("sv-SE"),
         "Win_NT_3",
     ),
     (
@@ -6254,7 +7188,7 @@ raw_lcid_languages: list[
         "Syria",
         0x045A,
         1114,
-        ShortLanguageStr.from_str_unsafe("syr-SY"),
+        valid_iso_alpha3_region_language_todo("syr-SY"),
         "Win_XP,Win_2003",
     ),
     (
@@ -6263,27 +7197,43 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("shi"),
+        valid_iso_alpha3_language_todo("shi"),
         "Win_10,Win_2016",
     ),
-    (739, "Tachelhit", "Tifinagh", 0x1000, 4096, "shi-Tfng", "Win_10,Win_2016"),
+    (
+        739,
+        "Tachelhit",
+        "Tifinagh",
+        0x1000,
+        4096,
+        invalid_iso_string("shi-Tfng"),
+        "Win_10,Win_2016",
+    ),
     (
         740,
         "Tachelhit",
         "Tifinagh, Morocco",
         0x1000,
         4096,
-        "shi-Tfng-MA",
+        invalid_iso_string("shi-Tfng-MA"),
         "Win_10,Win_2016",
     ),
-    (741, "Tachelhit (Latin)", None, 0x1000, 4096, "shi-Latn", "Win_10,Win_2016"),
+    (
+        741,
+        "Tachelhit (Latin)",
+        None,
+        0x1000,
+        4096,
+        invalid_iso_string("shi-Latn"),
+        "Win_10,Win_2016",
+    ),
     (
         742,
         "Tachelhit (Latin)",
         "Morocco",
         0x1000,
         4096,
-        "shi-Latn-MA",
+        invalid_iso_string("shi-Latn-MA"),
         "Win_10,Win_2016",
     ),
     (
@@ -6292,7 +7242,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dav"),
+        valid_iso_alpha3_language_todo("dav"),
         "Win_10,Win_2016",
     ),
     (
@@ -6301,7 +7251,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dav-KE"),
+        valid_iso_alpha3_region_language_todo("dav-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -6313,14 +7263,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("tg"),
         "Win_7,Win_2008_R2",
     ),
-    (746, "Tajik (Cyrillic)", None, 0x7C28, 31784, "tg-Cyrl", "Windows 7"),
+    (
+        746,
+        "Tajik (Cyrillic)",
+        None,
+        0x7C28,
+        31784,
+        invalid_iso_string("tg-Cyrl"),
+        "Windows 7",
+    ),
     (
         747,
         "Tajik (Cyrillic)",
         "Tajikistan",
         0x0428,
         1064,
-        "tg-Cyrl-TJ",
+        invalid_iso_string("tg-Cyrl-TJ"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6329,17 +7287,25 @@ raw_lcid_languages: list[
         None,
         0x005F,
         95,
-        ShortLanguageStr.from_str_unsafe("tzm"),
+        valid_iso_alpha3_language_todo("tzm"),
         "Win_7,Win_2008_R2",
     ),
-    (749, "Tamazight (Latin)", None, 0x7C5F, 31839, "tzm-Latn", "Windows 7"),
+    (
+        749,
+        "Tamazight (Latin)",
+        None,
+        0x7C5F,
+        31839,
+        invalid_iso_string("tzm-Latn"),
+        "Windows 7",
+    ),
     (
         750,
         "Tamazight (Latin)",
         "Algeria",
         0x085F,
         2143,
-        "tzm-Latn-DZ",
+        invalid_iso_string("tzm-Latn-DZ"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6357,7 +7323,7 @@ raw_lcid_languages: list[
         "India",
         0x0449,
         1097,
-        ShortLanguageStr.from_str_unsafe("ta-IN"),
+        valid_iso_alpha2_region_language_todo("ta-IN"),
         "Win_2000",
     ),
     (
@@ -6366,7 +7332,7 @@ raw_lcid_languages: list[
         "Malaysia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ta-MY"),
+        valid_iso_alpha2_region_language_todo("ta-MY"),
         "Win_10,Win_2016",
     ),
     (
@@ -6375,7 +7341,7 @@ raw_lcid_languages: list[
         "Singapore",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("ta-SG"),
+        valid_iso_alpha2_region_language_todo("ta-SG"),
         "Win_10,Win_2016",
     ),
     (
@@ -6384,7 +7350,7 @@ raw_lcid_languages: list[
         "Sri Lanka",
         0x0849,
         2121,
-        ShortLanguageStr.from_str_unsafe("ta-LK"),
+        valid_iso_alpha2_region_language_todo("ta-LK"),
         "Win_8,Win_2012",
     ),
     (
@@ -6393,7 +7359,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("twq"),
+        valid_iso_alpha3_language_todo("twq"),
         "Win_10,Win_2016",
     ),
     (
@@ -6402,7 +7368,7 @@ raw_lcid_languages: list[
         "Niger",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("twq-NE"),
+        valid_iso_alpha3_region_language_todo("twq-NE"),
         "Win_10,Win_2016",
     ),
     (
@@ -6420,7 +7386,7 @@ raw_lcid_languages: list[
         "Russia",
         0x0444,
         1092,
-        ShortLanguageStr.from_str_unsafe("tt-RU"),
+        valid_iso_alpha2_region_language_todo("tt-RU"),
         "Win_XP,Win_2003",
     ),
     (
@@ -6438,7 +7404,7 @@ raw_lcid_languages: list[
         "India",
         0x044A,
         1098,
-        ShortLanguageStr.from_str_unsafe("te-IN"),
+        valid_iso_alpha2_region_language_todo("te-IN"),
         "Win_XP,Win_2003",
     ),
     (
@@ -6447,7 +7413,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("teo"),
+        valid_iso_alpha3_language_todo("teo"),
         "Win_10,Win_2016",
     ),
     (
@@ -6456,7 +7422,7 @@ raw_lcid_languages: list[
         "Kenya",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("teo-KE"),
+        valid_iso_alpha3_region_language_todo("teo-KE"),
         "Win_10,Win_2016",
     ),
     (
@@ -6465,7 +7431,7 @@ raw_lcid_languages: list[
         "Uganda",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("teo-UG"),
+        valid_iso_alpha3_region_language_todo("teo-UG"),
         "Win_10,Win_2016",
     ),
     (
@@ -6483,7 +7449,7 @@ raw_lcid_languages: list[
         "Thailand",
         0x041E,
         1054,
-        ShortLanguageStr.from_str_unsafe("th-TH"),
+        valid_iso_alpha2_region_language_todo("th-TH"),
         "Win_NT_4",
     ),
     (
@@ -6501,7 +7467,7 @@ raw_lcid_languages: list[
         "India",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("bo-IN"),
+        valid_iso_alpha2_region_language_todo("bo-IN"),
         "Win_10,Win_2016",
     ),
     (
@@ -6510,7 +7476,7 @@ raw_lcid_languages: list[
         "People's Republic of China",
         0x0451,
         1105,
-        ShortLanguageStr.from_str_unsafe("bo-CN"),
+        valid_iso_alpha2_region_language_todo("bo-CN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6528,7 +7494,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("tig-ER"),
+        valid_iso_alpha3_region_language_todo("tig-ER"),
         "Win_10,Win_2016",
     ),
     (
@@ -6546,7 +7512,7 @@ raw_lcid_languages: list[
         "Eritrea",
         0x0873,
         2163,
-        ShortLanguageStr.from_str_unsafe("ti-ER"),
+        valid_iso_alpha2_region_language_todo("ti-ER"),
         "Win_8,Win_2012",
     ),
     (
@@ -6555,7 +7521,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x0473,
         1139,
-        ShortLanguageStr.from_str_unsafe("ti-ET"),
+        valid_iso_alpha2_region_language_todo("ti-ET"),
         "Win_8,Win_2012",
     ),
     (
@@ -6573,7 +7539,7 @@ raw_lcid_languages: list[
         "Tonga",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("to-TO"),
+        valid_iso_alpha2_region_language_todo("to-TO"),
         "Win_10,Win_2016",
     ),
     (
@@ -6591,7 +7557,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0431,
         1073,
-        ShortLanguageStr.from_str_unsafe("ts-ZA"),
+        valid_iso_alpha2_region_language_todo("ts-ZA"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -6609,7 +7575,7 @@ raw_lcid_languages: list[
         "Cyprus",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("tr-CY"),
+        valid_iso_alpha2_region_language_todo("tr-CY"),
         "Win_10,Win_2016",
     ),
     (
@@ -6618,7 +7584,7 @@ raw_lcid_languages: list[
         "Turkey",
         0x041F,
         1055,
-        ShortLanguageStr.from_str_unsafe("tr-TR"),
+        valid_iso_alpha2_region_language_todo("tr-TR"),
         "Win_NT_3",
     ),
     (
@@ -6636,7 +7602,7 @@ raw_lcid_languages: list[
         "Turkmenistan",
         0x0442,
         1090,
-        ShortLanguageStr.from_str_unsafe("tk-TM"),
+        valid_iso_alpha2_region_language_todo("tk-TM"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6654,7 +7620,7 @@ raw_lcid_languages: list[
         "Ukraine",
         0x0422,
         1058,
-        ShortLanguageStr.from_str_unsafe("uk-UA"),
+        valid_iso_alpha2_region_language_todo("uk-UA"),
         "Win_NT_4",
     ),
     (
@@ -6672,7 +7638,7 @@ raw_lcid_languages: list[
         "Germany",
         0x042E,
         1070,
-        ShortLanguageStr.from_str_unsafe("hsb-DE"),
+        valid_iso_alpha3_region_language_todo("hsb-DE"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6690,7 +7656,7 @@ raw_lcid_languages: list[
         "India",
         0x0820,
         2080,
-        ShortLanguageStr.from_str_unsafe("ur-IN"),
+        valid_iso_alpha2_region_language_todo("ur-IN"),
         "Win_81,Win_2012_R2",
     ),
     (
@@ -6699,7 +7665,7 @@ raw_lcid_languages: list[
         "Islamic Republic of Pakistan",
         0x0420,
         1056,
-        ShortLanguageStr.from_str_unsafe("ur-PK"),
+        valid_iso_alpha2_region_language_todo("ur-PK"),
         "Win_2000",
     ),
     (
@@ -6717,21 +7683,45 @@ raw_lcid_languages: list[
         "People's Republic of China",
         0x0480,
         1152,
-        ShortLanguageStr.from_str_unsafe("ug-CN"),
+        valid_iso_alpha2_region_language_todo("ug-CN"),
         "Win_Vista,Win_2008",
     ),
-    (793, "Uzbek", "Perso-Arabic", 0x1000, 4096, "uz-Arab", "Win_10,Win_2016"),
+    (
+        793,
+        "Uzbek",
+        "Perso-Arabic",
+        0x1000,
+        4096,
+        invalid_iso_string("uz-Arab"),
+        "Win_10,Win_2016",
+    ),
     (
         794,
         "Uzbek",
         "Perso-Arabic, Afghanistan",
         0x1000,
         4096,
-        "uz-Arab-AF",
+        invalid_iso_string("uz-Arab-AF"),
         "Win_10,Win_2016",
     ),
-    (795, "Uzbek (Cyrillic)", None, 0x7843, 30787, "uz-Cyrl", "Windows 7"),
-    (796, "Uzbek (Cyrillic)", "Uzbekistan", 0x0843, 2115, "uz-Cyrl-UZ", "Win_2000"),
+    (
+        795,
+        "Uzbek (Cyrillic)",
+        None,
+        0x7843,
+        30787,
+        invalid_iso_string("uz-Cyrl"),
+        "Windows 7",
+    ),
+    (
+        796,
+        "Uzbek (Cyrillic)",
+        "Uzbekistan",
+        0x0843,
+        2115,
+        invalid_iso_string("uz-Cyrl-UZ"),
+        "Win_2000",
+    ),
     (
         797,
         "Uzbek (Latin)",
@@ -6741,8 +7731,24 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("uz"),
         "Win_7,Win_2008_R2",
     ),
-    (798, "Uzbek (Latin)", None, 0x7C43, 31811, "uz-Latn", "Windows 7"),
-    (799, "Uzbek (Latin)", "Uzbekistan", 0x0443, 1091, "uz-Latn-UZ", "Win_2000"),
+    (
+        798,
+        "Uzbek (Latin)",
+        None,
+        0x7C43,
+        31811,
+        invalid_iso_string("uz-Latn"),
+        "Windows 7",
+    ),
+    (
+        799,
+        "Uzbek (Latin)",
+        "Uzbekistan",
+        0x0443,
+        1091,
+        invalid_iso_string("uz-Latn-UZ"),
+        "Win_2000",
+    ),
     (
         800,
         "Vai",
@@ -6752,11 +7758,43 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("vai"),
         "Win_10,Win_2016",
     ),
-    (801, "Vai", None, 0x1000, 4096, "vai-Vaii", "Win_10,Win_2016"),
-    (802, "Vai", "Liberia", 0x1000, 4096, "vai-Vaii-LR", "Win_10,Win_2016"),
-    (803, "Vai (Latin)", "Liberia", 0x1000, 4096, "vai-Latn-LR", "Win_10,Win_2016"),
-    (804, "Vai (Latin)", None, 0x1000, 4096, "vai-Latn", "Win_10,Win_2016"),
-    (805, "Valencian", "Spain", 0x0803, 2051, "ca-ES- valencia", "Win_8,Win_2012"),
+    (801, "Vai", None, 0x1000, 4096, invalid_iso_string("vai-Vaii"), "Win_10,Win_2016"),
+    (
+        802,
+        "Vai",
+        "Liberia",
+        0x1000,
+        4096,
+        invalid_iso_string("vai-Vaii-LR"),
+        "Win_10,Win_2016",
+    ),
+    (
+        803,
+        "Vai (Latin)",
+        "Liberia",
+        0x1000,
+        4096,
+        invalid_iso_string("vai-Latn-LR"),
+        "Win_10,Win_2016",
+    ),
+    (
+        804,
+        "Vai (Latin)",
+        None,
+        0x1000,
+        4096,
+        invalid_iso_string("vai-Latn"),
+        "Win_10,Win_2016",
+    ),
+    (
+        805,
+        "Valencian",
+        "Spain",
+        0x0803,
+        2051,
+        invalid_iso_string("ca-ES- valencia"),
+        "Win_8,Win_2012",
+    ),
     (
         806,
         "Venda",
@@ -6772,7 +7810,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0433,
         1075,
-        ShortLanguageStr.from_str_unsafe("ve-ZA"),
+        valid_iso_alpha2_region_language_todo("ve-ZA"),
         "Win_10,Win_2016",
     ),
     (
@@ -6790,7 +7828,7 @@ raw_lcid_languages: list[
         "Vietnam",
         0x042A,
         1066,
-        ShortLanguageStr.from_str_unsafe("vi-VN"),
+        valid_iso_alpha2_region_language_todo("vi-VN"),
         "Win_NT_4",
     ),
     (
@@ -6802,14 +7840,22 @@ raw_lcid_languages: list[
         ShortLanguageStr.from_str_unsafe("vo"),
         "Win_10,Win_2016",
     ),
-    (811, "Volapük", "World", 0x1000, 4096, "vo-001", "Win_10,Win_2016"),
+    (
+        811,
+        "Volapük",
+        "World",
+        0x1000,
+        4096,
+        invalid_iso_string("vo-001"),
+        "Win_10,Win_2016",
+    ),
     (
         812,
         "Vunjo",
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("vun"),
+        valid_iso_alpha3_language_todo("vun"),
         "Win_10,Win_2016",
     ),
     (
@@ -6818,7 +7864,7 @@ raw_lcid_languages: list[
         "Tanzania",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("vun-TZ"),
+        valid_iso_alpha3_region_language_todo("vun-TZ"),
         "Win_10,Win_2016",
     ),
     (
@@ -6827,7 +7873,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("wae"),
+        valid_iso_alpha3_language_todo("wae"),
         "Win_10,Win_2016",
     ),
     (
@@ -6836,7 +7882,7 @@ raw_lcid_languages: list[
         "Switzerland",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("wae-CH"),
+        valid_iso_alpha3_region_language_todo("wae-CH"),
         "Win_10,Win_2016",
     ),
     (
@@ -6854,7 +7900,7 @@ raw_lcid_languages: list[
         "United Kingdom",
         0x0452,
         1106,
-        ShortLanguageStr.from_str_unsafe("cy-GB"),
+        valid_iso_alpha2_region_language_todo("cy-GB"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -6872,7 +7918,7 @@ raw_lcid_languages: list[
         "Ethiopia",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("wal-ET"),
+        valid_iso_alpha3_region_language_todo("wal-ET"),
         "Win_10,Win_2016",
     ),
     (
@@ -6890,7 +7936,7 @@ raw_lcid_languages: list[
         "Senegal",
         0x0488,
         1160,
-        ShortLanguageStr.from_str_unsafe("wo-SN"),
+        valid_iso_alpha2_region_language_todo("wo-SN"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6908,7 +7954,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0434,
         1076,
-        ShortLanguageStr.from_str_unsafe("xh-ZA"),
+        valid_iso_alpha2_region_language_todo("xh-ZA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
     (
@@ -6917,7 +7963,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("yav"),
+        valid_iso_alpha3_language_todo("yav"),
         "Win_10,Win_2016",
     ),
     (
@@ -6926,7 +7972,7 @@ raw_lcid_languages: list[
         "Cameroon",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("yav-CM"),
+        valid_iso_alpha3_region_language_todo("yav-CM"),
         "Win_10,Win_2016",
     ),
     (
@@ -6944,10 +7990,18 @@ raw_lcid_languages: list[
         "People's Republic of China",
         0x0478,
         1144,
-        ShortLanguageStr.from_str_unsafe("ii-CN"),
+        valid_iso_alpha2_region_language_todo("ii-CN"),
         "Win_Vista,Win_2008",
     ),
-    (828, "Yiddish", "World", 0x043D, 1085, "yi-001", "Win_10,Win_2016"),
+    (
+        828,
+        "Yiddish",
+        "World",
+        0x043D,
+        1085,
+        invalid_iso_string("yi-001"),
+        "Win_10,Win_2016",
+    ),
     (
         829,
         "Yoruba",
@@ -6963,7 +8017,7 @@ raw_lcid_languages: list[
         "Benin",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("yo-BJ"),
+        valid_iso_alpha2_region_language_todo("yo-BJ"),
         "Win_10,Win_2016",
     ),
     (
@@ -6972,7 +8026,7 @@ raw_lcid_languages: list[
         "Nigeria",
         0x046A,
         1130,
-        ShortLanguageStr.from_str_unsafe("yo-NG"),
+        valid_iso_alpha2_region_language_todo("yo-NG"),
         "Win_Vista,Win_2008",
     ),
     (
@@ -6981,7 +8035,7 @@ raw_lcid_languages: list[
         None,
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dje"),
+        valid_iso_alpha3_language_todo("dje"),
         "Win_10,Win_2016",
     ),
     (
@@ -6990,7 +8044,7 @@ raw_lcid_languages: list[
         "Niger",
         0x1000,
         4096,
-        ShortLanguageStr.from_str_unsafe("dje-NE"),
+        valid_iso_alpha3_region_language_todo("dje-NE"),
         "Win_10,Win_2016",
     ),
     (
@@ -7008,7 +8062,7 @@ raw_lcid_languages: list[
         "South Africa",
         0x0435,
         1077,
-        ShortLanguageStr.from_str_unsafe("zu-ZA"),
+        valid_iso_alpha2_region_language_todo("zu-ZA"),
         "Win_XP_ELK_v1,Win_XP_SP2,Win_2003,Win_Vista,Win_2008",
     ),
 ]
@@ -7030,7 +8084,7 @@ def get_lcid_lookup_tables() -> (
         _version,
     ) in raw_lcid_languages:
         # NOTE: ignore invalid languages for now, if we can't partse it as part of the ShortLanguageStr class, it is not that important
-        if isinstance(lang, str):
+        if not isinstance(lang, ShortLanguageStr):
             continue
 
         dict1[lang] = hex_id
@@ -7040,7 +8094,8 @@ def get_lcid_lookup_tables() -> (
 
 
 lcid_language_lookups: tuple[
-    dict[ShortLanguageStr, int], dict[int, ShortLanguageStr]
+    dict[ShortLanguageStr, int],
+    dict[int, ShortLanguageStr],
 ] = get_lcid_lookup_tables()
 
 
