@@ -1,3 +1,4 @@
+import stat
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -67,6 +68,10 @@ class CachedFileManager:
     def get(self: Self, name: str, url: str) -> bytes:
         cached_path = self.__cache_folder / name
         if cached_path.exists():
+            st = cached_path.stat()
+            if st.st_mode != stat.S_IMODE(st.st_mode):
+                cached_path.chmod(0o444)
+
             return cached_path.read_bytes()
 
         result = requests.get(url, timeout=10)
@@ -74,6 +79,8 @@ class CachedFileManager:
         data = result.content
         with cached_path.open("wb") as f:
             f.write(data)
+
+        cached_path.chmod(0o444)
 
         return data
 
