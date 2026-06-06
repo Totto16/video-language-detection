@@ -20,6 +20,12 @@ def get_tagger_for_mp4_file(file: Path) -> VideoTagger__HandleResult:
 
         mutagen_handle = VideoTaggerMutagen.get_handle(file)
 
+        # NOTE: we use mutagen instead of our custom tagger, as writing metadata is quite complicated
+        # it lives inside "moov" -> "udta" -> "meta" -> "ilst" boxes
+        # so to add new things, some complicated logic is needed,
+        # wee need to create a udta box under moov, if it is not present, in both cases some complicated size logic need to be made, as all parent need to be updated, that means all sizes, sometimes some "free" padding is present, but just implementing using that is complicated, and mutagen already does that
+        # additionally, when we resize the "moov" box, we need to also relocate global offset in the boxes "stco" and "co64", which is rather complicated, mutagen already does all that, so no need to complicate things
+
         if mutagen_handle.is_err():
             return VideoTagger__HandleResult.err(mutagen_handle.get_err())
 

@@ -258,6 +258,10 @@ class EpisodeContent(Content):
                 logger.error(  # noqa: TRY400
                     _("Write Video Metadata: {err}").format(err=err),
                 )
+            except ValueError as err:
+                logger.error(  # noqa: TRY400
+                    _("Write Video Metadata: {err}").format(err=err),
+                )
 
         def update_checksum() -> None:
             if changed_file:
