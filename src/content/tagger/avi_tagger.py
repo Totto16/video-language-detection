@@ -2,12 +2,14 @@ from collections.abc import Generator
 from io import BufferedIOBase
 from typing import Optional, Self, override
 
-from content.tagger.mp4_tagger import HDLR_ATOM_NAME
+from content.tagger.lcid_languages import LCID
 from content.tagger.parser import (
     ByteOrder,
     Packable,
+    Packer,
     Unpacker,
     UnsignedInt,
+    UnsignedShort,
     read_checked,
 )
 from helper.translation import get_translator
@@ -306,6 +308,36 @@ class AVIStreamHeader(AVIChunk):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "AVIStreamHeader":
         chunk = AVIChunk.read_from_stream(f, offset)
         return AVIStreamHeader.__read_from_stream_impl(f, chunk)
+
+    @property
+    def __language_offset(self: Self) -> int:
+        return 4 + 4 + 4 + 4 + 4 + 2
+
+    def read_language(self: Self, f: BufferedIOBase) -> str:
+        f.seek(self.span.start + self.__language_offset)
+
+        lang_bytes = read_checked(f, 2)
+        packed = Unpacker.unpack_one(AVI_BYTE_ORDER, UnsignedShort(), lang_bytes)
+
+        return LCID.decode_language(packed)
+
+    def patch_language(self: Self, f: BufferedIOBase, new_language: str) -> None:
+        packed = LCID.encode_language(new_language)
+
+        f.seek(self.span.start + self.__language_offset)
+
+        packed_bytes = Packer.pack_one(AVI_BYTE_ORDER, UnsignedShort(), packed, 2)
+
+        f.write(packed_bytes)
+        f.flush()
+
+        f.seek(self.span.start + self.__language_offset)
+        verify_bytes = read_checked(f, 2)
+        verify = Unpacker.unpack_one(AVI_BYTE_ORDER, UnsignedShort(), verify_bytes)
+
+        if verify != packed:
+            msg = "Invalid overwrite"
+            raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
         return f"<AVIStreamHeader parent: {AVIChunk.__str__(self)} type {self.type}>"
