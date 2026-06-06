@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Annotated, Optional, Self, override
 
 from content.language import (

@@ -41,7 +41,7 @@ def video_file_dict() -> dict[str, str]:
         "Big_Buck_Bunny_1080_10s_30MB.mp4": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4",
         "Big_Buck_Bunny_360_10s_1MB.webm": "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
         "Big_Buck_Bunny_360_10s_1MB.mkv": "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
-        #
+        # separator
         "file_example_MP4_480_1_5MG.mp4": "https://file-examples.com/storage/fe63e83a686a22f89a101a3/2017/04/file_example_MP4_480_1_5MG.mp4",
         "file_example_WEBM_480_900KB.webm": "https://file-examples.com/wp-content/storage/2020/03/file_example_WEBM_480_900KB.webm",
         "file_example_AVI_480_750kB.avi": "https://file-examples.com/storage/fe2c4db53a6a2330da0d375/2018/04/file_example_AVI_480_750kB.avi",
