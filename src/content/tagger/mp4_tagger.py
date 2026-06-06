@@ -209,10 +209,6 @@ class MP4Box:
 
         typ = ISOMAtomName(typ_raw)
 
-        if typ == UUID_ATOM_NAME:
-            msg = "'uuid' type not implemented, the box header size differs with that type"
-            raise RuntimeError(msg)
-
         if typ == CMOV_ATOM_NAME:
             msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
             raise RuntimeError(msg)
@@ -220,6 +216,9 @@ class MP4Box:
         if typ == MOOF_ATOM_NAME:
             msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
             raise RuntimeError(msg)
+
+        final_size: int = size
+        header_size: int = 8
 
         if size == 1:
             ext = read_checked(f, 8)
@@ -234,16 +233,25 @@ class MP4Box:
                 msg = f"Invalid extended box size {largesize}"
                 raise RuntimeError(msg)
 
-            span = MP4BoxSpan(offset, largesize, header_size=16)
-            return MP4Box(typ, span, is_container=False)
-
-        if size == 0:
+            final_size = largesize
+            header_size = 16
+        elif size == 0:
             f.seek(0, 2)
             eof = f.tell()
-            span = MP4BoxSpan(offset, eof - offset, header_size=8)
-            return MP4Box(typ, span, is_container=False)
+            final_size = eof - offset
+            header_size = 8
 
-        span = MP4BoxSpan(offset, size, header_size=8)
+        if typ == UUID_ATOM_NAME:
+            usertype = read_checked(f, 16)
+
+            header_size = header_size + 16
+
+            span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
+            box = MP4Box(typ, span, is_container=False)
+            user_box = UserExtensionBox(box, usertype, is_container=False)
+            return user_extension_box_determine_correct_extension(user_box)
+
+        span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
         return MP4Box(typ, span, is_container=False)
 
     @staticmethod
@@ -297,6 +305,36 @@ class MP4Box:
 
     def __repr__(self: Self) -> str:
         return str(self)
+
+
+class UserExtensionBox(MP4Box):
+    usertype: bytes
+
+    def __init__(
+        self: Self,
+        parent: MP4Box,
+        usertype: bytes,
+        *,
+        is_container: bool,
+    ) -> None:
+        super().__init__(parent.type, parent.span, is_container=is_container)
+
+        self.usertype = usertype
+
+    def __str__(self: Self) -> str:
+        return f"<UserExtensionBox parent: {MP4Box.__str__(self)} usertype: {self.usertype!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+def user_extension_box_determine_correct_extension(
+    box: UserExtensionBox,
+) -> UserExtensionBox:
+    match box.usertype:
+        # TODO: dispatch to custom boxes
+        case _:
+            return box
 
 
 class MP4FullBox(MP4Box):
@@ -1063,6 +1101,16 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             ]
 
             for data in data_list:
+                # NOTE: use another scheme to do this:
+                # use either top level "meta", "meco" or "uuid" boxes
+
+                # meta:
+                # location, file (0 or 1), inside meco (1 or more, per handler, one meta box!)
+
+                # meco:
+                # location, file (0 or 1)
+
+                # note: can write 0 or more free space boxes, and its allowed everywhere
                 buffer = FreeSpaceBox.write_to_buffer(free_tag + data)
 
                 self.__writer.write(buffer)
