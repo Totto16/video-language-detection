@@ -512,7 +512,7 @@ class FreeSpaceBox(MP4Box):
         return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, data)
 
     def __str__(self: Self) -> str:
-        return f"<FileTypeBox parent: {MP4Box.__str__(self)} data: {self.data!s}>"
+        return f"<FreeSpaceBox parent: {MP4Box.__str__(self)} data: {self.data!s}>"
 
     def __repr__(self: Self) -> str:
         return str(self)

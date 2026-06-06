@@ -13,10 +13,12 @@ from content.tagger.mp4_tagger import (
     HDLR_ATOM_NAME,
     MDHD_ATOM_NAME,
     MDIA_ATOM_NAME,
+    META_ATOM_NAME,
     MINF_ATOM_NAME,
     MOOV_ATOM_NAME,
     SOUN_ATOM_NAME,
     TRAK_ATOM_NAME,
+    UDTA_ATOM_NAME,
     VIDE_ATOM_NAME,
     ISOMAtomName,
     MP4Box,
@@ -65,7 +67,7 @@ class RecursiveBoxes:
         indent_str: str = " ",
     ) -> str:
         if isinstance(data, tuple):
-            return f"{(indent_str * depth)}<NestedBoxes\n{data[0]!s}\n{RecursiveBoxes.__to_str(data[1], depth=depth+1)}>"
+            return f"{(indent_str * depth)}<NestedBoxes\n{data[0]!s}\n{RecursiveBoxes.__to_str(data[1], depth=depth+1)}(>)"
 
         return f"{(indent_str * depth)}<SimpleBox {data!s}>"
 
@@ -271,7 +273,42 @@ def test_mp4_tagger_parsing(
         ),
     )
 
-    structure2 = MP4BoxStructure(RecursiveBoxes([]))
+    structure2 = MP4BoxStructure(
+        RecursiveBoxes(
+            [
+                PseudoMP4Box(FTYP_ATOM_NAME, 32),
+                (
+                    PseudoMP4Box(MOOV_ATOM_NAME, 3888),
+                    [
+                        PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
+                        (
+                            PseudoMP4Box(TRAK_ATOM_NAME, 3378),
+                            [
+                                PseudoMP4Box(ISOMAtomName(b"tkhd"), 92),
+                                PseudoMP4Box(EDTS_ATOM_NAME, 36),
+                                (
+                                    PseudoMP4Box(MDIA_ATOM_NAME, 3242),
+                                    [
+                                        PseudoMP4Box(MDHD_ATOM_NAME, 32),
+                                        PseudoMP4Box(HDLR_ATOM_NAME, 55),
+                                        PseudoMP4Box(MINF_ATOM_NAME, 3147),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        (
+                            PseudoMP4Box(UDTA_ATOM_NAME, 394),
+                            [
+                                PseudoMP4Box(META_ATOM_NAME, 386),
+                            ],
+                        ),
+                    ],
+                ),
+                PseudoMP4Box(FREE_ATOM_NAME, 8),
+                PseudoMP4Box(ISOMAtomName(b"mdat"), 1041617),
+            ]
+        )
+    )
 
     test_files: list[tuple[Path, MP4BoxStructure]] = list(
         zip(
