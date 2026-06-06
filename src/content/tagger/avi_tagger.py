@@ -2,6 +2,7 @@ from collections.abc import Generator
 from io import BufferedIOBase
 from typing import Optional, Self, override
 
+from content.language import ShortLanguageStr
 from content.tagger.lcid_languages import LCID
 from content.tagger.parser import (
     ByteOrder,
@@ -313,7 +314,7 @@ class AVIStreamHeader(AVIChunk):
     def __language_offset(self: Self) -> int:
         return 4 + 4 + 4 + 4 + 4 + 2
 
-    def read_language(self: Self, f: BufferedIOBase) -> str:
+    def read_language(self: Self, f: BufferedIOBase) -> ShortLanguageStr | str:
         f.seek(self.span.start + self.__language_offset)
 
         lang_bytes = read_checked(f, 2)
@@ -321,7 +322,9 @@ class AVIStreamHeader(AVIChunk):
 
         return LCID.decode_language(packed)
 
-    def patch_language(self: Self, f: BufferedIOBase, new_language: str) -> None:
+    def patch_language(
+        self: Self, f: BufferedIOBase, new_language: ShortLanguageStr,
+    ) -> None:
         packed = LCID.encode_language(new_language)
 
         f.seek(self.span.start + self.__language_offset)

@@ -5,7 +5,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, override
 
-from content.language import Alpha3LanguageStr, Language
+from content.language import Language, ShortLanguageStr
 from content.tagger.parser import (
     ByteOrder,
     Packable,
@@ -559,7 +559,7 @@ class MediaHeaderBox(MP4FullBox):
         return MediaHeaderBox.__read_from_stream_impl(f, box)
 
     @staticmethod
-    def decode_language(value: int) -> str:
+    def decode_language(value: int) -> ShortLanguageStr | str:
         chars = []
 
         for shift in (10, 5, 0):
@@ -571,10 +571,17 @@ class MediaHeaderBox(MP4FullBox):
 
             chars.append(chr(v + 0x60))
 
-        return "".join(chars)
+        val = "".join(chars)
+        short_str = ShortLanguageStr.from_str(val)
+        if short_str is not None:
+            return short_str
+
+        return val
 
     @staticmethod
-    def encode_language(code: str) -> int:
+    def encode_language(lang: ShortLanguageStr) -> int:
+        code = str(lang.to_alpha3())
+
         if len(code) != 3:
             msg = "language code must be 3 characters"
             raise ValueError(msg)
@@ -591,7 +598,7 @@ class MediaHeaderBox(MP4FullBox):
 
         return value
 
-    def read_language(self: Self, f: BufferedIOBase) -> str:
+    def read_language(self: Self, f: BufferedIOBase) -> ShortLanguageStr | str:
         f.seek(self.span.start + self.language_offset)
 
         lang_bytes = read_checked(f, 2)
@@ -599,7 +606,11 @@ class MediaHeaderBox(MP4FullBox):
 
         return MediaHeaderBox.decode_language(packed)
 
-    def patch_language(self: Self, f: BufferedIOBase, new_language: str) -> None:
+    def patch_language(
+        self: Self,
+        f: BufferedIOBase,
+        new_language: ShortLanguageStr,
+    ) -> None:
         packed = MediaHeaderBox.encode_language(new_language)
 
         f.seek(self.span.start + self.language_offset)
@@ -937,7 +948,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
         metadata: dict[str, str],
     ) -> None:
 
-        new_language = language.to_alpha3()
+        new_language = language.short
 
         bar: CounterInterface = self.manager.counter(
             total=float(self.__streams + 1),
@@ -953,7 +964,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             self.__writer.seek(0)
             # NOTE: we always patch the language, no matter what
             for mdhd in find_mdhd_boxes_with_type(self.__writer, self.__types):
-                mdhd.patch_language(self.__writer, str(new_language))
+                mdhd.patch_language(self.__writer, new_language)
                 bar.update(1, force=True)
 
             free_tag = b"vld\x42\x42\x69-->"
@@ -1054,9 +1065,8 @@ class VideoTaggerMP4(VideoTagger):
                     streams = streams + 1
                     lang = mdhd.read_language(f)
                     # check if this lang is valid
-                    validated_lang = Alpha3LanguageStr.from_str(lang)
 
-                    if validated_lang is None:
+                    if isinstance(lang, str):
                         msg = _("Invalid language in mp4 detected: {lang}").format(
                             lang=lang,
                         )

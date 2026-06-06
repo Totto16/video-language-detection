@@ -128,7 +128,7 @@ class RecursiveChunks:
             if isinstance(c1, AVIList):
                 if c1.type == FOURCC(b"movi"):
                     if not isinstance(c2, PseudoMOVIChunk):
-                        msg = f"Found MOVI Chunk without matching PseudoMOVIChunk"
+                        msg = "Found MOVI Chunk without matching PseudoMOVIChunk"
                         raise RuntimeError(msg)
 
                     return c2.children == len(d1)
@@ -258,7 +258,7 @@ def test_avi_tagger_parsing(
                                 [
                                     (
                                         PseudoAVIList(
-                                            LIST_FOURCC, 8902, FOURCC(b"hdrl")
+                                            LIST_FOURCC, 8902, FOURCC(b"hdrl"),
                                         ),
                                         [
                                             PseudoAVIChunk(FOURCC(b"avih"), 64),
@@ -434,7 +434,7 @@ def test_avi_tagger_language_patching(
 
                     assert old_lang.short == old_file_lang, "Old language should match"
 
-                    strh.patch_language(f, str(new_language.to_alpha3()))
+                    strh.patch_language(f, new_language.short)
 
             # validate language
             with file.open("rb") as f:

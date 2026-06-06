@@ -693,6 +693,15 @@ class ShortLanguageStr:
         return ShortLanguageStr.__from_str_impl(val)
 
     @staticmethod
+    def from_str_unsafe(inp: str) -> "ShortLanguageStr":
+        lan: Optional[ShortLanguageStr] = ShortLanguageStr.from_str(inp)
+        if lan is None:
+            msg = _("Couldn't get the Short Language from str: '{inp}'").format(inp=inp)
+            raise RuntimeError(msg)
+
+        return lan
+
+    @staticmethod
     def __alpha2_to_3_impl(alpha_2: Alpha2LanguageStr) -> Optional[Alpha3LanguageStr]:
         val = lang_code_validation_list_impl.map_alpha_2_to_alpha3.get(
             str(alpha_2),

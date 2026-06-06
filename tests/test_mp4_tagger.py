@@ -2,10 +2,10 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
 
-from content.language import Language
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
 from pytest_subtests import SubTests
 
+from content.language import Language
 from content.tagger.mp4_tagger import (
     EDTS_ATOM_NAME,
     FREE_ATOM_NAME,
@@ -309,7 +309,7 @@ def test_mp4_tagger_parsing(
                         )
                         box = box_data[0]
                         boxes_stack.append(
-                            (box.span.payload_start, box.span.end, box_data[1])
+                            (box.span.payload_start, box.span.end, box_data[1]),
                         )
                     else:
                         box = box_data
@@ -386,17 +386,15 @@ def test_mp4_tagger_language_patching(
                 for mdhd in find_mdhd_boxes_with_type(f, types):
                     old_file_lang = mdhd.read_language(f)
 
-                    assert old_file_lang == str(
-                        old_lang.to_alpha3()
-                    ), "Old language should match"
+                    assert old_lang.short == old_file_lang, "Old language should match"
 
-                    mdhd.patch_language(f, str(new_language.to_alpha3()))
+                    mdhd.patch_language(f, new_language.short)
 
             # validate language
             with file.open("rb") as f:
                 for mdhd in find_mdhd_boxes_with_type(f, types):
                     old_file_lang = mdhd.read_language(f)
 
-                    assert old_file_lang == str(
-                        new_language.to_alpha3()
+                    assert (
+                        new_language.short == old_file_lang
                     ), "New language should be written"
