@@ -92,7 +92,7 @@ from helper.manager import (
 )
 from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 from helper.validator import ReporterWhere, Validator, ValidatorReporter, get_validators
 from main import AllContent
@@ -116,9 +116,6 @@ class BackendRef:
         return self.__backend
 
 
-ProcessResult = Result[Any, str]
-
-
 class WebsocketHandler(ABC):
     __ws: WebSocket
 
@@ -127,7 +124,7 @@ class WebsocketHandler(ABC):
         self.__ws = websocket
 
     @abstractmethod
-    async def process_data(self: Self, data: Any) -> Optional[ProcessResult]: ...
+    async def process_data(self: Self, data: Any) -> Optional[Result[Any, str]]: ...
 
     async def send_data(self: Self, data: Any) -> None:
         await self.__ws.send_json({"type": "ok", "data": data})
@@ -143,10 +140,10 @@ class WebsocketHandler(ABC):
                 data = await self.__ws.receive_json()
                 result = await self.process_data(data)
                 if result is not None:
-                    if result.is_ok():
-                        await self.send_data(result.get_ok())
+                    if result.ok():
+                        await self.send_data(result.as_ok())
                     else:
-                        await self.send_error(result.get_err())
+                        await self.send_error(result.as_err())
             except WebSocketDisconnect:
                 return
             except RuntimeError as err:
@@ -171,9 +168,6 @@ class ManagerWsChoiceMessageAskQuestionReply(pydantic.BaseModel):
 IncomingWsData = ManagerWsChoiceMessageAskQuestionReply
 
 
-ProcessResultTyped = Result["OutgoingWsData", str]
-
-
 class WsSingleManager(WebsocketHandler):
     __parent_ref: "WsManager"
 
@@ -188,7 +182,7 @@ class WsSingleManager(WebsocketHandler):
     async def __process_data(
         self: Self,
         data: IncomingWsData,
-    ) -> Optional[ProcessResultTyped]:
+    ) -> Optional[Result["OutgoingWsData", str]]:
         match data.type:
             case "reply":
                 match data.reply:
@@ -211,16 +205,16 @@ class WsSingleManager(WebsocketHandler):
                                     id=data.id,
                                 ),
                             )
-                            return ProcessResultTyped.ok(response)
+                            return Ok(response)
 
-                        return ProcessResultTyped.err(result)
+                        return Err(result)
                     case _:
                         assert_never(data.reply)
             case _:
                 assert_never(data.type)
 
     @override
-    async def process_data(self: Self, data: Any) -> Optional[ProcessResult]:
+    async def process_data(self: Self, data: Any) -> Optional[Result[Any, str]]:
         typed_data: IncomingWsData = IncomingWsData.model_validate(
             obj=data,
             strict=True,
@@ -1723,11 +1717,11 @@ class BackendScanner:
             raw_config=self.__raw_config,
             cli_name_to_use=options.template_to_use,
         )
-        if parsed_config.is_err():
-            msg = f"error while parsing config: {parsed_config.get_err()}"
+        if parsed_config.err():
+            msg = f"error while parsing config: {parsed_config.as_err()}"
             raise HTTPException(status_code=400, detail=msg)
 
-        parsed_configs = parsed_config.get_ok()
+        parsed_configs = parsed_config.as_ok()
 
         if len(parsed_configs) == 0:
             msg = "parsing returned 0 configs"

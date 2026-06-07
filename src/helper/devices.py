@@ -56,13 +56,13 @@ class DeviceManager:
 
         gpu_result = GPU.get_best(use_integrated=False)
 
-        if gpu_result.is_err():
+        if gpu_result.err():
             logger.warning(
-                _("Got GPU error: {error}").format(error=gpu_result.get_err()),
+                _("Got GPU error: {error}").format(error=gpu_result.as_err()),
             )
             self.__device_allocator = CPUAllocator()
         else:
-            self.__device_allocator = GPUAllocator(gpu_result.get_ok())
+            self.__device_allocator = GPUAllocator(gpu_result.as_ok())
 
     def clear_device_cache(self: Self) -> None:
         if not is_cpu_allocator(self.__device_allocator):

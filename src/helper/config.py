@@ -28,7 +28,7 @@ from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
 from helper.log import get_logger
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.timestamp import parse_int_safely
 
 
@@ -366,14 +366,6 @@ RawConfig = Config | list[Config] | ConfigTemplate
 
 SchemaConfig = Annotated[RawConfig, OneOf]
 
-AdvancedConfig__MergeResult = Result[list[FinalConfig], str]
-
-AdvancedConfig__ResolveAdvancedConfig = Result[tuple[list[FinalConfig], str], str]
-
-AdvancedConfig__LoadAndResolveWithInfo = Result[tuple[list[FinalConfig], str], str]
-
-AdvancedConfig__LoadAndResolve = Result[list[FinalConfig], str]
-
 
 @dataclass
 class AdvancedConfig:
@@ -418,7 +410,7 @@ class AdvancedConfig:
     def __merge_templates(
         defaults_raw: list[FinalConfig],
         template: TemplateConfig,
-    ) -> AdvancedConfig__MergeResult:
+    ) -> Result[list[FinalConfig], str]:
 
         def merge_template(
             default_raw: FinalConfig,
@@ -492,11 +484,11 @@ class AdvancedConfig:
                 template=template,
             )
             if result is None:
-                return AdvancedConfig__MergeResult.err(default_raw.config_name)
+                return Err(default_raw.config_name)
 
             results.append(result)
 
-        return AdvancedConfig__MergeResult.ok(results)
+        return Ok(results)
 
     @staticmethod
     def __resolve_template_to_use(
@@ -556,7 +548,7 @@ class AdvancedConfig:
     def __resolve_advance_config(
         config: ConfigTemplate,
         cli_name_to_use: Optional[str],
-    ) -> AdvancedConfig__ResolveAdvancedConfig:
+    ) -> Result[tuple[list[FinalConfig], str], str]:
         templates = config.templates
 
         defaults: list[FinalConfig] = Config.fill_defaults(templates.defaults)
@@ -568,14 +560,14 @@ class AdvancedConfig:
 
         final_configs = AdvancedConfig.__merge_templates(defaults, template_to_use)
 
-        if final_configs.is_err():
-            return AdvancedConfig__ResolveAdvancedConfig.err(
-                f"Error in config '{final_configs.get_err()}'",
+        if final_configs.err():
+            return Err(
+                f"Error in config '{final_configs.as_err()}'",
             )
 
-        return AdvancedConfig__ResolveAdvancedConfig.ok(
+        return Ok(
             (
-                final_configs.get_ok(),
+                final_configs.as_ok(),
                 f"merging default config and user provided config '{name_used}'",
             ),
         )
@@ -584,11 +576,11 @@ class AdvancedConfig:
     def load_and_resolve_with_info(
         config_file: Path,
         cli_name_to_use: Optional[str],
-    ) -> AdvancedConfig__LoadAndResolveWithInfo:
+    ) -> Result[tuple[list[FinalConfig], str], str]:
         config = AdvancedConfig.__load(config_file)
 
         if config is None:
-            return AdvancedConfig__LoadAndResolveWithInfo.err("No config loaded")
+            return Err("No config loaded")
 
         return AdvancedConfig.resolve_raw_with_info(config, cli_name_to_use)
 
@@ -596,16 +588,16 @@ class AdvancedConfig:
     def resolve_raw_with_info(
         raw_config: RawConfig,
         cli_name_to_use: Optional[str],
-    ) -> AdvancedConfig__LoadAndResolveWithInfo:
+    ) -> Result[tuple[list[FinalConfig], str], str]:
 
         if isinstance(raw_config, Config):
             final_config = Config.fill_defaults(raw_config)
-            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+            return Ok(
                 (final_config, "Normal Config"),
             )
         if isinstance(raw_config, list):
             final_config = Config.fill_defaults(raw_config)
-            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+            return Ok(
                 (final_config, "Normal Configs"),
             )
         if isinstance(raw_config, ConfigTemplate):
@@ -616,14 +608,14 @@ class AdvancedConfig:
                 )
             )
 
-            if resolved_config.is_err():
-                return AdvancedConfig__LoadAndResolveWithInfo.err(
-                    resolved_config.get_err(),
+            if resolved_config.err():
+                return Err(
+                    resolved_config.as_err(),
                 )
 
-            merged_config, msg = resolved_config.get_ok()
+            merged_config, msg = resolved_config.as_ok()
 
-            return AdvancedConfig__LoadAndResolveWithInfo.ok(
+            return Ok(
                 (merged_config, f"Templated Config created by {msg}"),
             )
         assert_never(raw_config)
@@ -638,25 +630,25 @@ class AdvancedConfig:
     def load_and_resolve(
         config_file: Path,
         cli_name_to_use: Optional[str],
-    ) -> AdvancedConfig__LoadAndResolve:
+    ) -> Result[list[FinalConfig], str]:
         res = AdvancedConfig.load_and_resolve_with_info(config_file, cli_name_to_use)
 
-        if res.is_err():
-            return AdvancedConfig__LoadAndResolve.err(res.get_err())
+        if res.err():
+            return Err(res.as_err())
 
-        return AdvancedConfig__LoadAndResolve.ok(res.get_ok()[0])
+        return Ok(res.as_ok()[0])
 
     @staticmethod
     def resolve_raw(
         raw_config: RawConfig,
         cli_name_to_use: Optional[str],
-    ) -> AdvancedConfig__LoadAndResolve:
+    ) -> Result[list[FinalConfig], str]:
         res = AdvancedConfig.resolve_raw_with_info(raw_config, cli_name_to_use)
 
-        if res.is_err():
-            return AdvancedConfig__LoadAndResolve.err(res.get_err())
+        if res.err():
+            return Err(res.as_err())
 
-        return AdvancedConfig__LoadAndResolve.ok(res.get_ok()[0])
+        return Ok(res.as_ok()[0])
 
 
 type ConfigFilterItem = str | int

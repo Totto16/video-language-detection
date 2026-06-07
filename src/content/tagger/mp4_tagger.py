@@ -20,10 +20,10 @@ from content.tagger.parser import (
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     VideoTagger,
-    VideoTagger__HandleResult,
     VideoTaggerWriter,
 )
 from helper.manager import CounterInterface, ManagerInterface
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -1137,14 +1137,14 @@ class VideoTaggerMP4(VideoTagger):
         streams = 0
 
     @staticmethod
-    def get_handle(file: Path) -> VideoTagger__HandleResult:
+    def get_handle(file: Path) -> Result["VideoTagger", str]:
 
         try:
 
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f)
                 if mp4_res is not None:
-                    return VideoTagger__HandleResult.err(mp4_res)
+                    return Err(mp4_res)
 
                 f.seek(0)
 
@@ -1161,15 +1161,15 @@ class VideoTaggerMP4(VideoTagger):
                         msg = _("Invalid language in mp4 detected: {lang}").format(
                             lang=lang,
                         )
-                        return VideoTagger__HandleResult.err(msg)
+                        return Err(msg)
 
-                return VideoTagger__HandleResult.ok(
+                return Ok(
                     VideoTaggerMP4(file, streams, types),
                 )
         except RuntimeError as err:
-            return VideoTagger__HandleResult.err(str(err))
+            return Err(str(err))
         except ValueError as err:
-            return VideoTagger__HandleResult.err(str(err))
+            return Err(str(err))
 
     @override
     def writer(

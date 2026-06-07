@@ -338,13 +338,13 @@ def subcommand_run(
         Path(args.config),
         args.template_to_use,
     )
-    if parsed_config.is_err():
+    if parsed_config.err():
         logger.error(
-            _("error while parsing config: {err}").format(err=parsed_config.get_err()),
+            _("error while parsing config: {err}").format(err=parsed_config.as_err()),
         )
         return 1
 
-    parsed_configs = parsed_config.get_ok()
+    parsed_configs = parsed_config.as_ok()
 
     if len(parsed_configs) == 0:
         logger.error(_("parsing returned 0 configs"))
@@ -397,16 +397,16 @@ def subcommand_config_check(
         config,
         args.template_to_use,
     )
-    if parsed_config.is_err():
+    if parsed_config.err():
         logger.error(
             _("Config '{config}' is not valid: {err}").format(
                 config=config,
-                err=parsed_config.get_err(),
+                err=parsed_config.as_err(),
             ),
         )
         return 1
 
-    final_config, info = parsed_config.get_ok()
+    final_config, info = parsed_config.as_ok()
 
     logger.info(_("Config '{config}' is valid!").format(config=config))
     logger.info(_("Info about config: {info}").format(info=info))

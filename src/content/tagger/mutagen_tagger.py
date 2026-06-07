@@ -16,11 +16,10 @@ from content.language import Language
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     VideoTagger,
-    VideoTagger__HandleResult,
     VideoTaggerWriter,
 )
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -427,12 +426,6 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
         self.__save_impl()
 
 
-VideoTaggerMutagen__HandleResult = Result[
-    tuple[MutagenFileWrapper, mutagen.FileType],
-    str,
-]
-
-
 class VideoTaggerMutagen(VideoTagger):
     __file: Path
 
@@ -447,7 +440,10 @@ class VideoTaggerMutagen(VideoTagger):
         file: Path,
         *,
         read_only: bool,
-    ) -> VideoTaggerMutagen__HandleResult:
+    ) -> Result[
+        tuple[MutagenFileWrapper, mutagen.FileType],
+        str,
+    ]:
         filething = MutagenFileWrapper(
             file=file,
             chunk_size=PROGRESS_CHUNK_SIZE,
@@ -459,32 +455,32 @@ class VideoTaggerMutagen(VideoTagger):
             instance = mutagen.File(filething, easy=False)
 
             if instance is None:
-                return VideoTaggerMutagen__HandleResult.err(
+                return Err(
                     _("Not supported file type"),
                 )
 
-            return VideoTaggerMutagen__HandleResult.ok((filething, instance))
+            return Ok((filething, instance))
         except RuntimeError as err:
-            return VideoTaggerMutagen__HandleResult.err(
+            return Err(
                 _("get tag handle {err}").format(err=err),
             )
         except MutagenError as err:
-            return VideoTaggerMutagen__HandleResult.err(
+            return Err(
                 _("get tag handle (mutagen impl error): {err}").format(err=err),
             )
 
     @staticmethod
-    def get_handle(file: Path) -> VideoTagger__HandleResult:
+    def get_handle(file: Path) -> Result["VideoTagger", str]:
         result = VideoTaggerMutagen.__get_handle_impl(file, read_only=True)
 
-        if result.is_err():
-            return VideoTagger__HandleResult.err(result.get_err())
+        if result.err():
+            return Err(result.as_err())
 
-        filething, _instance = result.get_ok()
+        filething, _instance = result.as_ok()
 
         filething.close()
 
-        return VideoTagger__HandleResult.ok(VideoTaggerMutagen(file))
+        return Ok(VideoTaggerMutagen(file))
 
     @override
     def writer(
@@ -495,13 +491,13 @@ class VideoTaggerMutagen(VideoTagger):
         def get_things() -> tuple[MutagenFileWrapper, mutagen.FileType]:
             result = VideoTaggerMutagen.__get_handle_impl(self.__file, read_only=False)
 
-            if result.is_err():
+            if result.err():
                 msg = _(
                     "Mutagen failed, after we checked, that it would work: {err}"  # noqa: COM812
-                ).format(err=result.get_err())
+                ).format(err=result.as_err())
                 raise RuntimeError(msg)
 
-            return result.get_ok()
+            return result.as_ok()
 
         class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
             __filething: Optional[MutagenFileWrapper]

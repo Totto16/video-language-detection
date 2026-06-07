@@ -11,7 +11,7 @@ from typing import Any, Optional, Self, assert_never, cast, override
 import pyopencl as opencl
 import torch
 
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.timestamp import parse_int_safely
 
 
@@ -38,12 +38,9 @@ class GPUDevice:
     num_compute_units: Optional[int]  # bigger is better
 
 
-GetDevicesResult = Result[list[GPUDevice], str]
-
-
-def list_gpus_linux() -> GetDevicesResult:
+def list_gpus_linux() -> Result[list[GPUDevice], str]:
     if sys.platform != "linux":
-        return GetDevicesResult.err(f"Not supported on {sys.platform}")
+        return Err(f"Not supported on {sys.platform}")
 
     try:
         result = subprocess.check_output(["lspci", "-nn"]).decode()  # noqa: S607
@@ -80,14 +77,14 @@ def list_gpus_linux() -> GetDevicesResult:
                 )
                 devices.append(device)
 
-        return GetDevicesResult.ok(devices)
+        return Ok(devices)
 
     except subprocess.CalledProcessError as err:
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
     except subprocess.SubprocessError as err:
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
     except Exception as err:  # noqa:  BLE001
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
 
 
 class NvmlMemoryPy:
@@ -96,7 +93,7 @@ class NvmlMemoryPy:
     used: int
 
 
-def list_gpus_nvidia() -> GetDevicesResult:
+def list_gpus_nvidia() -> Result[list[GPUDevice], str]:
     try:
         import pynvml  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
 
@@ -132,18 +129,18 @@ def list_gpus_nvidia() -> GetDevicesResult:
                 )
                 devices.append(device)
 
-            return GetDevicesResult.ok(devices)
+            return Ok(devices)
 
         except pynvml.NVMLError as err:
-            return GetDevicesResult.err(str(err))
+            return Err(str(err))
         except Exception as err:  # noqa:  BLE001
-            return GetDevicesResult.err(str(err))
+            return Err(str(err))
         finally:
             with contextlib.suppress(Exception):
                 # this can fail, but here we just ignore it
                 pynvml.nvmlShutdown()
     except ImportError:
-        return GetDevicesResult.err("not build with nvidia support")
+        return Err("not build with nvidia support")
 
 
 @dataclass
@@ -222,7 +219,7 @@ class DeviceTopologyAmdSmi:
         )
 
 
-def list_gpus_amd() -> GetDevicesResult:
+def list_gpus_amd() -> Result[list[GPUDevice], str]:
 
     try:
         import amdsmi.amdsmi_wrapper as amdsmi  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
@@ -318,24 +315,24 @@ def list_gpus_amd() -> GetDevicesResult:
                 )
                 devices.append(device)
 
-            return GetDevicesResult.ok(devices)
+            return Ok(devices)
 
         except amdsmi_exception.AmdSmiException as err:
-            return GetDevicesResult.err(str(err))
+            return Err(str(err))
         except Exception as err:  # noqa:  BLE001
-            return GetDevicesResult.err(str(err))
+            return Err(str(err))
         finally:
             with contextlib.suppress(Exception):
                 # this can fail, but here we just ignore it
                 amdsmi.amdsmi_shut_down()
     except ImportError:
-        return GetDevicesResult.err("not build with amd support")
+        return Err("not build with amd support")
 
 
-def list_gpus_native() -> GetDevicesResult:
+def list_gpus_native() -> Result[list[GPUDevice], str]:
 
     ## try best detection methods in order, if no one succeeds, return an error
-    methods: list[tuple[str, Callable[[], GetDevicesResult]]] = [
+    methods: list[tuple[str, Callable[[], Result[list[GPUDevice], str]]]] = [
         ("list_gpus_nvidia", list_gpus_nvidia),
         ("list_gpus_amd", list_gpus_amd),
     ]
@@ -346,22 +343,22 @@ def list_gpus_native() -> GetDevicesResult:
     for name, fun in methods:
         result = fun()
 
-        if result.is_ok():
-            devices.extend(result.get_ok())
+        if result.ok():
+            devices.extend(result.as_ok())
         else:
-            fails.append(f"{name} failed with error: {result.get_err()}")
+            fails.append(f"{name} failed with error: {result.as_err()}")
 
     if len(devices) == 0:
-        return GetDevicesResult.err(
+        return Err(
             f"All gpu detection methods failed: {", ".join(fails)}",
         )
 
-    return GetDevicesResult.ok(devices)
+    return Ok(devices)
 
 
-def list_gpus_torch() -> GetDevicesResult:
+def list_gpus_torch() -> Result[list[GPUDevice], str]:
     if not torch.cuda.is_available():
-        return GetDevicesResult.err("cuda not available")
+        return Err("cuda not available")
 
     try:
         devices: list[GPUDevice] = []
@@ -403,15 +400,15 @@ def list_gpus_torch() -> GetDevicesResult:
             )
             devices.append(device)
 
-        return GetDevicesResult.ok(devices)
+        return Ok(devices)
 
     except torch.cuda.AcceleratorError as err:
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
     except Exception as err:  # noqa:  BLE001
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
 
 
-def list_gpus_opencl() -> GetDevicesResult:
+def list_gpus_opencl() -> Result[list[GPUDevice], str]:
 
     def has_id(dev_id: str) -> Callable[[GPUDevice], bool]:
 
@@ -505,16 +502,16 @@ def list_gpus_opencl() -> GetDevicesResult:
                 )
                 devices.append(device_to_add)
 
-        return GetDevicesResult.ok(devices)
+        return Ok(devices)
 
     except Exception as err:  # noqa:  BLE001
-        return GetDevicesResult.err(str(err))
+        return Err(str(err))
 
 
-def get_devices() -> GetDevicesResult:
+def get_devices() -> Result[list[GPUDevice], str]:
 
     ## try best detection methods in order, if no one succeeds, return an error
-    methods: list[tuple[str, Callable[[], GetDevicesResult]]] = [
+    methods: list[tuple[str, Callable[[], Result[list[GPUDevice], str]]]] = [
         ("list_gpus_native", list_gpus_native),
         ("list_gpus_torch", list_gpus_torch),
         ("list_gpus_opencl", list_gpus_opencl),
@@ -526,12 +523,12 @@ def get_devices() -> GetDevicesResult:
     for name, fun in methods:
         result = fun()
 
-        if result.is_ok():
-            return GetDevicesResult.ok(result.get_ok())
+        if result.ok():
+            return Ok(result.as_ok())
 
-        fails.append(f"{name} failed with error: {result.get_err()}")
+        fails.append(f"{name} failed with error: {result.as_err()}")
 
-    return GetDevicesResult.err(f"All gpu detection methods failed: {", ".join(fails)}")
+    return Err(f"All gpu detection methods failed: {", ".join(fails)}")
 
 
 @dataclass
@@ -547,9 +544,6 @@ class AvailableMemory:
     total: int
 
 
-GpuGetResult = Result["GPU", str]
-
-
 class GPU(ABC):
     __device: GPUDevice
 
@@ -558,14 +552,14 @@ class GPU(ABC):
         self.__device = device
 
     @staticmethod
-    def get_best(*, use_integrated: bool = False) -> GpuGetResult:
+    def get_best(*, use_integrated: bool = False) -> Result["GPU", str]:
         try:
             devices_res = get_devices()
 
-            if devices_res.is_err():
-                return GpuGetResult.err(devices_res.get_err())
+            if devices_res.err():
+                return Err(devices_res.as_err())
 
-            devices = devices_res.get_ok()
+            devices = devices_res.as_ok()
 
             if not use_integrated:
 
@@ -575,7 +569,7 @@ class GPU(ABC):
                 devices = list(filter(remove_integrated_devices, devices))
 
             if len(devices) == 0:
-                return GpuGetResult.err("No suitable devices found")
+                return Err("No suitable devices found")
 
             cu_mult = 10**18
 
@@ -606,12 +600,12 @@ class GPU(ABC):
             device = devices[0]
 
             if not torch.cuda.is_available():
-                GpuGetResult.err("Cuda not available")
+                Err("Cuda not available")
 
-            return GpuGetResult.ok(GPU.from_device(device))
+            return Ok(GPU.from_device(device))
 
         except Exception as err:  # noqa:  BLE001
-            return GpuGetResult.err(str(err))
+            return Err(str(err))
 
     @staticmethod
     def from_device(device: GPUDevice) -> "GPU":

@@ -27,7 +27,7 @@ from content.tagger.mp4_tagger import (
     is_mp4_file,
     mp4_iter_boxes,
 )
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 mark_as_used(mp4_test_parse_files)
@@ -169,7 +169,6 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
     return result
 
 
-MP4BoxStructure__GetResult = Result["MP4BoxStructure", str]
 
 
 class MP4BoxStructure:
@@ -179,18 +178,18 @@ class MP4BoxStructure:
         self.boxes = boxes
 
     @staticmethod
-    def from_file(file: Path) -> MP4BoxStructure__GetResult:
+    def from_file(file: Path) -> Result["MP4BoxStructure", str]:
         try:
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f)
 
                 if mp4_res is not None:
-                    return MP4BoxStructure__GetResult.err(mp4_res)
+                    return Err(mp4_res)
 
                 boxes = list_all_boxes_recursively(f)
-                return MP4BoxStructure__GetResult.ok(MP4BoxStructure(boxes))
+                return Ok(MP4BoxStructure(boxes))
         except RuntimeError as err:
-            return MP4BoxStructure__GetResult.err(str(err))
+            return Err(str(err))
 
     def __str__(self: Self) -> str:
         return f"<MP4BoxStructure boxes: {self.boxes!s}>"
@@ -306,8 +305,8 @@ def test_mp4_tagger_parsing(
                 ),
                 PseudoMP4Box(FREE_ATOM_NAME, 8),
                 PseudoMP4Box(ISOMAtomName(b"mdat"), 1041617),
-            ]
-        )
+            ],
+        ),
     )
 
     test_files: list[tuple[Path, MP4BoxStructure]] = list(
@@ -322,11 +321,11 @@ def test_mp4_tagger_parsing(
         with subtests.test("video gets parsed correctly"):
             structure_res = MP4BoxStructure.from_file(file)
 
-            if structure_res.is_err():
-                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+            if structure_res.err():
+                msg = f"structure not parsed correctly: {structure_res.as_err()}"
                 raise AssertionError(msg)
 
-            structure = structure_res.get_ok()
+            structure = structure_res.as_ok()
 
             # check box consistency
             boxes_stack: list[tuple[int, int, RecursiveBoxes.RecursiveBoxesData]] = [
@@ -420,8 +419,8 @@ def test_mp4_tagger_language_patching(
         with subtests.test("video gets parsed correctly"):
             structure_res = MP4BoxStructure.from_file(file)
 
-            if structure_res.is_err():
-                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+            if structure_res.err():
+                msg = f"structure not parsed correctly: {structure_res.as_err()}"
                 raise AssertionError(msg)
 
             with file.open("rb+") as f:

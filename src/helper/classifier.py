@@ -44,7 +44,7 @@ from helper.error import ErrorMode
 from helper.ffprobe import ffprobe, ffprobe_check
 from helper.log import get_logger, setup_global_logger
 from helper.manager import CounterInterface, ManagerInterface
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.timestamp import (
     ConfigTimeStamp,
     Timestamp,
@@ -541,10 +541,6 @@ class GeneratedWavFileManager(AbstractContextManager[Path]):
         return False
 
 
-WAVFile__InfoResult = Result[tuple[FileStatus, Timestamp], str]
-WavFile__WavFileResult = Result[AbstractContextManager[Path], tuple[()]]
-
-
 class WAVFile:
     __file: Path
     __status: FileStatus
@@ -555,13 +551,15 @@ class WAVFile:
             raise FileNotFoundError(file)
         self.__file = file
         info = self.__get_info(error_mode=error_mode)
-        if info.is_err():
-            raise FileMetadataError(info.get_err())
-        status, runtime = info.get_ok()
+        if info.err():
+            raise FileMetadataError(info.as_err())
+        status, runtime = info.as_ok()
         self.__status = status
         self.__runtime = runtime
 
-    def __get_info(self: Self, error_mode: ErrorMode) -> WAVFile__InfoResult:
+    def __get_info(
+        self: Self, error_mode: ErrorMode,
+    ) -> Result[tuple[FileStatus, Timestamp], str]:
         metadata, err = ffprobe(self.__file.absolute())
         if err is not None or metadata is None:
             error_mode.write_error(f'"{self.__file}",')
@@ -571,7 +569,7 @@ class WAVFile:
             ).format(err=err, file=self.__file)
             logger.error(err_msg)
 
-            return WAVFile__InfoResult.err(err_msg)
+            return Err(err_msg)
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 
@@ -587,7 +585,7 @@ class WAVFile:
             duration = video_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return WAVFile__InfoResult.err("No video duration was found")
+                    return Err("No video duration was found")
 
                 duration = file_duration
 
@@ -596,7 +594,7 @@ class WAVFile:
 
             # only one audio stream supported atm
             if len(audio_streams) == 1:
-                return WAVFile__InfoResult.ok(
+                return Ok(
                     (
                         FileAnnotation(
                             type=FileType.video,
@@ -610,7 +608,7 @@ class WAVFile:
                 err_msg = _(
                     "Got a Video with no Audio Stream, aborting: '{file}'"  # noqa: COM812
                 ).format(file=self.__file)
-                return WAVFile__InfoResult.err(err_msg)
+                return Err(err_msg)
 
             msg = _(
                 "Got a Video with {audio_streams} Audio Streams, aborting: '{file}'"  # noqa: COM812
@@ -633,26 +631,26 @@ class WAVFile:
             duration = audio_streams[0].duration_seconds()
             if duration is None:
                 if file_duration is None:
-                    return WAVFile__InfoResult.err("No audio duration was found")
+                    return Err("No audio duration was found")
 
                 duration = file_duration
 
             if audio_streams[0].codec() == "pcm_s16le":
-                return WAVFile__InfoResult.ok(
+                return Ok(
                     (
                         WavFile(),
                         Timestamp.from_seconds(duration),
                     ),
                 )
 
-            return WAVFile__InfoResult.ok(
+            return Ok(
                 (
                     FileAnnotation(type=FileType.audio, status=ConversionStatus.raw),
                     Timestamp.from_seconds(duration),
                 ),
             )
 
-        return WAVFile__InfoResult.err("Unknown media type, not video or audio")
+        return Err("Unknown media type, not video or audio")
 
     @property
     def runtime(self: Self) -> Timestamp:
@@ -664,14 +662,14 @@ class WAVFile:
         *,
         force_recreation: bool = False,
         manager: ManagerInterface,
-    ) -> WavFile__WavFileResult:
+    ) -> Result[AbstractContextManager[Path], tuple[()]]:
 
         if force_recreation:
             return self.__convert_to_wav(options, manager)
 
         match self.__status:
             case WavFile():
-                return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
+                return Ok(OriginalWavFileManager(self.__file))
             case FileAnnotation(_, status):
                 match status:
                     case ConversionStatus.ready:
@@ -697,9 +695,9 @@ class WAVFile:
         self: Self,
         options: WAVOptions,
         manager: ManagerInterface,
-    ) -> WavFile__WavFileResult:
+    ) -> Result[AbstractContextManager[Path], tuple[()]]:
         if isinstance(self.__status, WavFile):
-            return WavFile__WavFileResult.ok(OriginalWavFileManager(self.__file))
+            return Ok(OriginalWavFileManager(self.__file))
 
         if not options.segment.is_valid:
             msg = _("Segment is not valid: start > end: {start:3n} > {end:3n}").format(
@@ -777,7 +775,7 @@ class WAVFile:
 
                 bar.close(clear=True)
 
-                return WavFile__WavFileResult.err(error=())
+                return Err(error=())
 
             match self.__status:
                 case FileAnnotation(type_, _):
@@ -790,7 +788,7 @@ class WAVFile:
 
             bar.close(clear=True)
 
-            return WavFile__WavFileResult.ok(wav_manager.release())
+            return Ok(wav_manager.release())
 
 
 # TODO: relativate to the root path
@@ -1465,16 +1463,18 @@ class Classifier:
         segment: Segment,
         manager: ManagerInterface,
     ) -> Optional[Prediction]:
-        result: WavFile__WavFileResult = wav_file.create_wav_file(
-            WAVOptions(bitrate=self.__manager.model.bitrate, segment=segment),
-            force_recreation=True,
-            manager=manager,
+        result: Result[AbstractContextManager[Path], tuple[()]] = (
+            wav_file.create_wav_file(
+                WAVOptions(bitrate=self.__manager.model.bitrate, segment=segment),
+                force_recreation=True,
+                manager=manager,
+            )
         )
 
-        if result.is_err():
+        if result.err():
             return None
 
-        with result.get_ok() as wav_path:
+        with result.as_ok() as wav_path:
 
             # TODO: say to the manager, that we try to use the gpu, so that if we switched to the cpu in the previous run, it maybe now has enough gpu memory to switch back
 

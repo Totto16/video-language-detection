@@ -20,7 +20,7 @@ from content.tagger.avi_tagger import (
     find_strh_chunks_with_type,
     is_avi_file,
 )
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 mark_as_used(avi_test_parse_files)
@@ -197,9 +197,6 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
     return result
 
 
-AVIChunkStructure__GetResult = Result["AVIChunkStructure", str]
-
-
 class AVIChunkStructure:
     chunks: RecursiveChunks
 
@@ -207,18 +204,18 @@ class AVIChunkStructure:
         self.chunks = chunks
 
     @staticmethod
-    def from_file(file: Path) -> AVIChunkStructure__GetResult:
+    def from_file(file: Path) -> Result["AVIChunkStructure", str]:
         try:
             with file.open("rb") as f:
                 avi_res = is_avi_file(f)
 
                 if avi_res is not None:
-                    return AVIChunkStructure__GetResult.err(avi_res)
+                    return Err(avi_res)
 
                 chunks = list_all_chunks_recursively(f)
-                return AVIChunkStructure__GetResult.ok(AVIChunkStructure(chunks))
+                return Ok(AVIChunkStructure(chunks))
         except RuntimeError as err:
-            return AVIChunkStructure__GetResult.err(str(err))
+            return Err(str(err))
 
     def __str__(self: Self) -> str:
         return f"<AVIChunkStructure chunks: {self.chunks!s}>"
@@ -328,11 +325,11 @@ def test_avi_tagger_parsing(
         with subtests.test("video gets parsed correctly"):
             structure_res = AVIChunkStructure.from_file(file)
 
-            if structure_res.is_err():
-                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+            if structure_res.err():
+                msg = f"structure not parsed correctly: {structure_res.as_err()}"
                 raise AssertionError(msg)
 
-            structure = structure_res.get_ok()
+            structure = structure_res.as_ok()
 
             # check chunk consistency
             chunks_stack: list[tuple[int, int, RecursiveChunks.RecursiveChunkData]] = [
@@ -367,9 +364,9 @@ def test_avi_tagger_parsing(
                     if (start % 2) != 0:
                         start += 1
 
-            if chunks_end != start:
-                msg = f"chunks don't reach at the parent end: size is {chunks_end} but chunks reach only to {start}"
-                raise AssertionError(msg)
+                if chunks_end != start:
+                    msg = f"chunks don't reach at the parent end: size is {chunks_end} but chunks reach only to {start}"
+                    raise AssertionError(msg)
 
             if structure != result:
                 msg = f"Parsing was incorrect:\n{structure!s}"
@@ -424,8 +421,8 @@ def test_avi_tagger_language_patching(
         with subtests.test("video gets parsed correctly"):
             structure_res = AVIChunkStructure.from_file(file)
 
-            if structure_res.is_err():
-                msg = f"structure not parsed correctly: {structure_res.get_err()}"
+            if structure_res.err():
+                msg = f"structure not parsed correctly: {structure_res.as_err()}"
                 raise AssertionError(msg)
 
             with file.open("rb+") as f:

@@ -9,7 +9,6 @@ from uuid import UUID
 from content.language import Language
 from helper.log import get_logger
 from helper.manager import ManagerInterface
-from helper.result import Result
 from helper.translation import get_translator
 
 logger: Logger = get_logger()
@@ -46,7 +45,6 @@ class VideoTaggerWriter(ABC):
         return self.__manager
 
 
-VideoTagger__HandleResult = Result["VideoTagger", str]
 
 
 class VideoTagger(ABC):

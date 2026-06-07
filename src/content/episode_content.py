@@ -206,16 +206,16 @@ class EpisodeContent(Content):
             # print(f"Try to tag file {self.scanned_file.path}")
 
             handle_result = get_tagger_for_file(self.scanned_file.path)
-            if handle_result.is_err():
+            if handle_result.err():
                 logger.error(
                     _("Can't tag the file '{file}': {reason}").format(
                         file=self.scanned_file.path,
-                        reason=handle_result.get_err(),
+                        reason=handle_result.as_err(),
                     ),
                 )
                 return
 
-            handle = handle_result.get_ok()
+            handle = handle_result.as_ok()
 
             try:
 
@@ -285,15 +285,15 @@ class EpisodeContent(Content):
                         file=self.scanned_file.path,
                         error_mode=error_mode,
                     )
-                    if result.is_ok():
-                        self.__video_metadata = result.get_ok()
+                    if result.ok():
+                        self.__video_metadata = result.as_ok()
                     else:
                         logger.error(
                             _(
                                 "Error in getting video metadata for file '{file}': {reason}"  # noqa: COM812
                             ).format(
                                 file=self.scanned_file.path,
-                                reason=result.get_err(),
+                                reason=result.as_err(),
                             ),
                         )
 
