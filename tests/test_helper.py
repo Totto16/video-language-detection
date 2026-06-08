@@ -15,7 +15,7 @@ from helper.manager import (
 )
 
 
-class TestStatusBar(StatusBarInterface):
+class NoopStatusBar(StatusBarInterface):
 
     def __init__(self: Self) -> None:
         super().__init__()
@@ -29,7 +29,7 @@ class TestStatusBar(StatusBarInterface):
         pass
 
 
-class TestCounter(CounterInterface):
+class NoopCounter(CounterInterface):
 
     def __init__(self: Self) -> None:
         super().__init__()
@@ -43,7 +43,7 @@ class TestCounter(CounterInterface):
         pass
 
 
-class TestManager(ManagerInterface):
+class NoopManager(ManagerInterface):
 
     def __init__(self: Self) -> None:
         super().__init__()
@@ -53,11 +53,11 @@ class TestManager(ManagerInterface):
         self: Self,
         **kwargs: Unpack[StatusBarGetOptions],
     ) -> StatusBarInterface:
-        return TestStatusBar()
+        return NoopStatusBar()
 
     @override
     def counter(self: Self, **kwargs: Unpack[CounterOptions]) -> CounterInterface:
-        return TestCounter()
+        return NoopCounter()
 
     def stop(
         self: Self,

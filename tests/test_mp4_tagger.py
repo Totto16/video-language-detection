@@ -6,7 +6,8 @@ from uuid import UUID, uuid4
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
-from test_helper import TestManager, file_duplicates
+from helper.manager import ManagerInterface
+from test_helper import file_duplicates
 
 from content.language import Language
 from content.tagger.mp4_tagger import (
@@ -455,7 +456,7 @@ class MetadataTags:
 def test_mp4_tagger_metadata_tags_mutagen(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
-    test_manager: TestManager,
+    test_manager: ManagerInterface,
 ) -> None:
 
     with file_duplicates(mp4_test_parse_files.data) as data:

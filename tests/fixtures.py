@@ -7,7 +7,7 @@ from typing import Any, Optional, Protocol, Self
 
 import pytest
 import requests
-from test_helper import TestManager
+from test_helper import NoopManager
 
 
 @dataclass
@@ -288,8 +288,8 @@ and what stays off.""",
 
 
 @pytest.fixture(scope="package")
-def test_manager() -> TestManager:
-    return TestManager()
+def test_manager() -> NoopManager:
+    return NoopManager()
 
 
 def mark_as_used(value: Any) -> None:
