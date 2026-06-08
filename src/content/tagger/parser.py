@@ -1,8 +1,11 @@
+from calendar import c
 import struct
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from io import BufferedIOBase
-from typing import Any, Self, override
+import sys
+from typing import Any, Literal, Self, assert_never, override
+from uuid import UUID
 
 from helper.translation import get_translator
 
@@ -28,6 +31,47 @@ class ByteOrder(StrEnum):
     Little = "<"
     Big = ">"
     Network = "!"
+
+
+def convert_byteorder(order: ByteOrder) -> Literal["little", "big"]:
+    match order.value:
+        case ByteOrder.NativeNative.value:
+            return sys.byteorder
+        case ByteOrder.Native.value:
+            return sys.byteorder
+        case ByteOrder.Little.value:
+            return "little"
+        case ByteOrder.Big.value:
+            return "big"
+        case ByteOrder.Network.value:
+            return "big"
+        case _:
+            assert_never(order.value)
+
+
+def uuid_from_bytes(order: ByteOrder, value: bytes) -> UUID:
+    if len(value) != 16:
+        msg = f"Invalid length of a UUID: {len(value)}"
+        raise RuntimeError(msg)
+
+    byte_order = convert_byteorder(order)
+
+    int_value = int.from_bytes(value, byte_order, signed=False)
+
+    return UUID(int=int_value)
+
+
+def uuid_to_bytes(order: ByteOrder, uuid: UUID) -> bytes:
+
+    byte_order = convert_byteorder(order)
+
+    result = uuid.int.to_bytes(16, byte_order, signed=False)
+
+    if len(result) != 16:
+        msg = f"Invalid length of a UUID: {len(result)}"
+        raise RuntimeError(msg)
+
+    return result
 
 
 class Packable[T](ABC):

@@ -39,6 +39,7 @@ from content.metadata.metadata import (
 from content.shared import ScanType
 from content.summary import Summary
 from content.tagger.tagger import get_tagger_for_file
+from content.tagger.video_tagger import SerializableDict
 from content.video_metadata import VideoMetadata
 from helper.apischema import narrow_type
 from helper.error import ErrorMode
@@ -165,8 +166,8 @@ class EpisodeContent(Content):
         self.__video_metadata = None
         # note, reset other metadata here, once new one is added
 
-    def __metadata_for_file(self: Self) -> str:
-        metadata: dict[str, str | int | dict[str, Any] | dict[str, str | int]] = {
+    def __metadata_for_file(self: Self) -> SerializableDict:
+        metadata: SerializableDict = {
             "original_path": str(self.scanned_file.path.absolute()),
             "description": {
                 "name": self.__description.name,
@@ -188,7 +189,7 @@ class EpisodeContent(Content):
         if serialized_metadata is not None:
             metadata["metadata"] = serialized_metadata
 
-        return json.dumps(metadata)
+        return metadata
 
     def update_video_metadata(
         self: Self,
@@ -224,15 +225,15 @@ class EpisodeContent(Content):
 
                 now = datetime.now()  # noqa: DTZ005
 
-                metadata: dict[str, str] = {
+                metadata: SerializableDict = {
                     metadata_prefix("metadata"): self.__metadata_for_file(),
                     metadata_prefix("version"): PROGRAM_VERSION,
                     metadata_prefix("iso_time"): now.isoformat(),
                 }
 
-                comment: list[str] = [
-                    "see other metadata for more info by video_language_detect",
-                ]
+                comment: str = (
+                    "see other metadata for more info by video_language_detect"
+                )
 
                 # NOTE: this should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
                 uuid = uuid4()
@@ -259,6 +260,10 @@ class EpisodeContent(Content):
                     _("Write Video Metadata: {err}").format(err=err),
                 )
             except ValueError as err:
+                logger.error(  # noqa: TRY400
+                    _("Write Video Metadata: {err}").format(err=err),
+                )
+            except TypeError as err:
                 logger.error(  # noqa: TRY400
                     _("Write Video Metadata: {err}").format(err=err),
                 )

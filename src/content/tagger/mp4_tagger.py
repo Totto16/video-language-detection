@@ -1,9 +1,10 @@
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from contextlib import AbstractContextManager
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
-from typing import Literal, Optional, Self, override
+from typing import Literal, Optional, Self, final, override
 from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
@@ -16,9 +17,12 @@ from content.tagger.parser import (
     UnsignedLongLong,
     UnsignedShort,
     read_checked,
+    uuid_from_bytes,
+    uuid_to_bytes,
 )
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
 )
@@ -242,14 +246,16 @@ class MP4Box:
             header_size = 8
 
         if typ == UUID_ATOM_NAME:
-            usertype = read_checked(f, 16)
+            usertype_raw = read_checked(f, 16)
+
+            usertype = uuid_from_bytes(ISOM_BYTE_ORDER, usertype_raw)
 
             header_size = header_size + 16
 
             span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
             box = MP4Box(typ, span, is_container=False)
             user_box = UserExtensionBox(box, usertype, is_container=False)
-            return user_extension_box_determine_correct_extension(user_box)
+            return user_extension_box_determine_correct_extension(f, user_box)
 
         span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
         return MP4Box(typ, span, is_container=False)
@@ -308,12 +314,12 @@ class MP4Box:
 
 
 class UserExtensionBox(MP4Box):
-    usertype: bytes
+    usertype: UUID
 
     def __init__(
         self: Self,
         parent: MP4Box,
-        usertype: bytes,
+        usertype: UUID,
         *,
         is_container: bool,
     ) -> None:
@@ -321,18 +327,124 @@ class UserExtensionBox(MP4Box):
 
         self.usertype = usertype
 
+    @staticmethod
+    def write_to_buffer(uuid: UUID) -> bytes:
+
+        data: bytes = uuid_to_bytes(ISOM_BYTE_ORDER, uuid)
+
+        return UserExtensionBox.write_to_buffer_uuid_box(UUIDExtension_UUID, data)
+
+
     def __str__(self: Self) -> str:
-        return f"<UserExtensionBox parent: {MP4Box.__str__(self)} usertype: {self.usertype!s}>"
+        return f"<UserExtensionBox parent: {MP4Box.__str__(self)} usertype: {self.usertype.hex}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+UUIDExtension_UUID = UUID("90e175d1-efdb-4144-a214-ebfab6258ae7")
+JSONExtension_UUID = UUID("90e175d1-efdb-4144-a214-ebfab6258ae8")
+
+
+class UserExtensions:
+    UUIDExtension_UUID = UUIDExtension_UUID
+    JSONExtension_UUID = JSONExtension_UUID
+
+
+@final
+class UUIDExtensionBox(UserExtensionBox):
+    def __init__(
+        self: Self,
+        parent: UserExtensionBox,
+        uuid: UUID,
+    ) -> None:
+        super().__init__(parent, parent.usertype, is_container=False)
+
+        self.uuid: UUID = uuid
+
+    @staticmethod
+    def read_from_stream_parent(
+        f: BufferedIOBase, parent: UserExtensionBox
+    ) -> "UUIDExtensionBox":
+
+        # this is a custom user box, it contains one UUID
+
+        f.seek(parent.span.payload_start)
+
+        if parent.span.payload_size != 16:
+            msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
+            raise RuntimeError(msg)
+
+        uuid_raw = read_checked(f, 16)
+
+        uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
+
+        parent.span.add_header_size(16)
+
+        return UUIDExtensionBox(parent, uuid)
+
+    @staticmethod
+    def write_to_buffer(uuid: UUID) -> bytes:
+
+        data: bytes = uuid_to_bytes(ISOM_BYTE_ORDER, uuid)
+
+        return UserExtensionBox.write_to_buffer_uuid_box(UUIDExtension_UUID, data)
+
+    def __str__(self: Self) -> str:
+        return f"<UUIDExtensionBox parent: {UserExtensionBox.__str__(self)} uuid: {self.uuid.hex}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+class JsonExtensionBox(UserExtensionBox):
+    def __init__(
+        self: Self,
+        parent: UserExtensionBox,
+        uuid: UUID,
+    ) -> None:
+        super().__init__(parent, parent.usertype, is_container=False)
+
+        self.uuid: UUID = uuid
+
+    @staticmethod
+    def read_from_stream_parent(
+        f: BufferedIOBase, parent: UserExtensionBox
+    ) -> "UUIDExtensionBox":
+
+        # this is a custom user box, it contains one UUID
+
+        f.seek(parent.span.payload_start)
+
+        if parent.span.payload_size != 16:
+            msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
+            raise RuntimeError(msg)
+
+        uuid_raw = read_checked(f, 16)
+
+        uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
+
+        parent.span.add_header_size(16)
+
+        return UUIDExtensionBox(parent, uuid)
+
+    def __str__(self: Self) -> str:
+        return f"<UUIDExtensionBox parent: {UserExtensionBox.__str__(self)} uuid: {self.uuid.hex}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
 
 
 def user_extension_box_determine_correct_extension(
+    f: BufferedIOBase,
     box: UserExtensionBox,
 ) -> UserExtensionBox:
     match box.usertype:
-        # TODO: dispatch to custom boxes
+        case UserExtensions.UUIDExtension_UUID:
+            return UUIDExtensionBox.read_from_stream_parent(f, box)
+        case UserExtensions.JSONExtension_UUID:
+            return JsonExtensionBox.read_from_stream_parent(f, box)
         case _:
             return box
 
@@ -393,6 +505,7 @@ class MP4FullBox(MP4Box):
         return str(self)
 
 
+@final
 class FileTypeBox(MP4Box):
     major_brand: ISOMAtomName
     minor_version: int
@@ -467,6 +580,7 @@ class FileTypeBox(MP4Box):
         return str(self)
 
 
+@final
 class FreeSpaceBox(MP4Box):
     data: bytes
 
@@ -518,6 +632,7 @@ class FreeSpaceBox(MP4Box):
         return str(self)
 
 
+@final
 class MediaHeaderBox(MP4FullBox):
     language_offset: int
 
@@ -674,6 +789,7 @@ class MediaHeaderBox(MP4FullBox):
         return str(self)
 
 
+@final
 class MediaBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -703,6 +819,7 @@ class MediaBox(MP4Box):
         return str(self)
 
 
+@final
 class MovieBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -732,6 +849,7 @@ class MovieBox(MP4Box):
         return str(self)
 
 
+@final
 class HandlerBox(MP4FullBox):
     handler_type: ISOMAtomName
 
@@ -792,6 +910,7 @@ class HandlerBox(MP4FullBox):
         return str(self)
 
 
+@final
 class TrackBox(MP4Box):
     hdlr: HandlerBox
 
@@ -821,7 +940,7 @@ class TrackBox(MP4Box):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
                     msg = "Invalid MediaBox: type not dispatched to correct class"
-                    raise ValueError(msg)
+                    raise TypeError(msg)
 
                 mdia_box = box
                 break
@@ -838,7 +957,7 @@ class TrackBox(MP4Box):
             if box.type == HDLR_ATOM_NAME:
                 if not isinstance(box, HandlerBox):
                     msg = "Invalid HandlerBox: type not dispatched to correct class"
-                    raise ValueError(msg)
+                    raise TypeError(msg)
 
                 return TrackBox(parent, box)
 
@@ -857,6 +976,7 @@ class TrackBox(MP4Box):
         return str(self)
 
 
+@final
 class UserDataBox(MP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -943,7 +1063,7 @@ def find_mdhd_boxes_with_type(
             if box.type == TRAK_ATOM_NAME:
                 if not isinstance(box, TrackBox):
                     msg = "Invalid TrackBox: type not dispatched to correct class"
-                    raise ValueError(msg)
+                    raise TypeError(msg)
 
                 hdlr = box.hdlr.handler_type
 
@@ -953,7 +1073,7 @@ def find_mdhd_boxes_with_type(
             if box.type == MDHD_ATOM_NAME:
                 if not isinstance(box, MediaHeaderBox):
                     msg = "Invalid MediaHeaderBox: type not dispatched to correct class"
-                    raise ValueError(msg)
+                    raise TypeError(msg)
 
                 current = path
                 if current != [
@@ -993,6 +1113,134 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
     return None
 
 
+class Mp4MetadataHandler:
+    __uuid_box: Optional[UUIDExtensionBox]
+    __our_boxes_start: Optional[MP4Box]
+
+    def __init__(
+        self: Self,
+        uuid_box: Optional[UUIDExtensionBox],
+        our_boxes_start: Optional[MP4Box],
+    ):
+        self.__uuid_box = uuid_box
+        self.__our_boxes_start = our_boxes_start
+
+    def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
+        # delete old metadata
+        if self.__our_boxes_start is not None:
+            f.truncate(self.__our_boxes_start.span.start)
+
+    def write_new_matadata(
+        self: Self,
+        f: BufferedIOBase,
+        metadata: list[SerializableDict],
+        uuid: UUID,
+    ) -> None:
+        f.seek(0, 2)
+
+        # note: can write 0 or more free space or user extension boxes, and its allowed everywhere
+
+        if self.__uuid_box is not None:
+            buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
+
+            f.write(buffer)
+        else:
+            buffer = UUIDExtensionBox.write_to_buffer(uuid)
+
+            f.write(buffer)
+
+        # TODO: also write some metadata into these boxes
+        # use either top level "meta" or "meco" boxes
+
+        # meta:
+        # location, file (0 or 1), inside meco (1 or more, per handler, one meta box!)
+
+        # meco:
+        # location, file (0 or 1)
+
+        for mdt in metadata:
+            buffer = JsonExtensionBox.write_to_buffer(mdt)
+
+            f.write(buffer)
+
+        f.flush()
+
+    @staticmethod
+    def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
+
+        uuid_box: Optional[UUIDExtensionBox] = None
+
+        def free_box_is_written_by_us(box: FreeSpaceBox) -> bool:
+            free_tag = b"vld\x42\x42\x69-->"
+
+            # NOTE. there are some old legacy ones, that were only used during testing and the new one (which is shorter)
+            free_tags: list[bytes] = [
+                b"video_language_detect_",
+                b"see other metadata for more info by video_language_detect",
+                b"vld\x42\x42\x69",
+                free_tag,
+            ]
+
+            return any(box.data.startswith(tag) for tag in free_tags)
+
+        def uuid_box_is_written_by_us(box: UserExtensionBox) -> bool:
+            match box.usertype:
+                case UserExtensions.UUIDExtension_UUID:
+                    if not isinstance(box, UUIDExtensionBox):
+                        msg = "Invalid UUIDExtensionBox: type not dispatched to correct class"
+                        raise TypeError(msg)
+                    nonlocal uuid_box
+
+                    if uuid_box is not None:
+                        msg = "Duplicate uuid box found"
+                        raise RuntimeError(msg)
+
+                    uuid_box = box
+                    return True
+                case _:
+                    return False
+
+        def box_is_written_by_us(box: MP4Box) -> bool:
+            if box.type == FREE_ATOM_NAME:
+                if not isinstance(box, FreeSpaceBox):
+                    msg = "Invalid FreeSpaceBox: type not dispatched to correct class"
+                    raise TypeError(msg)
+
+                return free_box_is_written_by_us(box)
+
+            if box.type == UUID_ATOM_NAME:
+                if not isinstance(box, UserExtensionBox):
+                    msg = (
+                        "Invalid UserExtensionBox: type not dispatched to correct class"
+                    )
+                    raise TypeError(msg)
+
+                return uuid_box_is_written_by_us(box)
+
+            return False
+
+        f.seek(0, 2)
+        end = f.tell()
+
+        f.seek(0)
+
+        top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, 0, end=end))
+
+        first_box_written_by_us: Optional[MP4Box] = None
+        other_box_encountered = False
+        for box in reversed(top_boxes):
+            if other_box_encountered:
+                break
+
+            if box_is_written_by_us(box):
+                first_box_written_by_us = box
+            else:
+                other_box_encountered = True
+                break
+
+        return Mp4MetadataHandler(uuid_box, first_box_written_by_us)
+
+
 class VideoTaggerWriterMP4(VideoTaggerWriter):
     __writer: BufferedIOBase
     __streams: int
@@ -1013,10 +1261,10 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
     @override
     def write_metadata(
         self: Self,
-        comment: list[str],
+        comment: str,
         uuid: UUID,
         language: Language,
-        metadata: dict[str, str],
+        metadata: SerializableDict,
     ) -> None:
 
         new_language = language.short
@@ -1046,76 +1294,18 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
                 bar.update(1, force=True)
 
-            free_tag = b"vld\x42\x42\x69-->"
+            mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
+                f=self.__writer
+            )
 
-            # NOTE. there are some old legacy ones, that were only used during testing and the new one (which is shorter)
-            free_tags: list[bytes] = [
-                b"video_language_detect_",
-                b"see other metadata for more info by video_language_detect",
-                b"vld\x42\x42\x69",
-                free_tag,
-            ]
+            mp4_metadata_handler.remove_old_metadata(self.__writer)
 
-            # TODO: write uuid once
-
-            self.__writer.seek(0, 2)
-            end = self.__writer.tell()
-
-            self.__writer.seek(0)
-
-            top_boxes: list[MP4Box] = list(mp4_iter_boxes(self.__writer, 0, end=end))
-
-            first_free_box: Optional[FreeSpaceBox] = None
-            other_box_encountered = False
-            for box in reversed(top_boxes):
-                if other_box_encountered:
-                    continue
-
-                if box.type == FREE_ATOM_NAME:
-                    if not isinstance(box, FreeSpaceBox):
-                        msg = (
-                            "Invalid FreeSpaceBox: type not dispatched to correct class"
-                        )
-                        raise ValueError(msg)
-
-                    is_tagged_box = any(box.data.startswith(tag) for tag in free_tags)
-
-                    if not is_tagged_box:
-                        other_box_encountered = True
-                    else:
-                        first_free_box = box
-
-                else:
-                    other_box_encountered = True
-
-            # delete old metadata
-            if first_free_box is not None:
-                self.__writer.truncate(first_free_box.span.start)
-
-            # write other metadata into free space box
-            self.__writer.seek(0, 2)
-
-            data_list: list[bytes] = [
+            metadata_list: list[bytes] = [
                 *[(f"comment:{cmt}").encode() for cmt in comment],
                 *[(f"{key}:{val}").encode() for key, val in metadata.items()],
             ]
 
-            for data in data_list:
-                # NOTE: use another scheme to do this:
-                # use either top level "meta", "meco" or "uuid" boxes
-
-                # meta:
-                # location, file (0 or 1), inside meco (1 or more, per handler, one meta box!)
-
-                # meco:
-                # location, file (0 or 1)
-
-                # note: can write 0 or more free space boxes, and its allowed everywhere
-                buffer = FreeSpaceBox.write_to_buffer(free_tag + data)
-
-                self.__writer.write(buffer)
-
-            self.__writer.flush()
+            mp4_metadata_handler.write_new_matadata(self.__writer, metadata_list, uuid)
         finally:
             bar.close(clear=True)
 
@@ -1169,6 +1359,8 @@ class VideoTaggerMP4(VideoTagger):
         except RuntimeError as err:
             return Err(str(err))
         except ValueError as err:
+            return Err(str(err))
+        except TypeError as err:
             return Err(str(err))
 
     @override

@@ -1,3 +1,4 @@
+import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from mutagen._util import MutagenError
 from content.language import Language
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
 )
@@ -401,19 +403,30 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
     @override
     def write_metadata(
         self: Self,
-        comment: list[str],
+        comment: str,
         uuid: UUID,
         language: Language,
-        metadata: dict[str, str],
+        metadata: SerializableDict,
     ) -> None:
-        self.__instance["\xa9cmt"] = comment
+        self.__instance["\xa9cmt"] = [comment]
         if isinstance(self.__instance, mp4.MP4):
+            DOMAIN = "lt.totto:video_language_detect"
+
             for key, value in metadata.items():
-                self.__instance[f"----:lt.totto:video_language_detect:{key}"] = [
-                    mp4.MP4FreeForm(value.encode(), mp4.AtomDataType.IMPLICIT),
+                value_enc = json.dumps(value).encode()
+                self.__instance[f"----:{DOMAIN}:{key}"] = [
+                    mp4.MP4FreeForm(value_enc, mp4.AtomDataType.UTF8),
                 ]
 
-                self.__instance[key] = value
+            UUID_KEY = f"----:{DOMAIN}-uuid:file"
+
+            previous_uuid = self.__instance[UUID_KEY]
+
+            if not previous_uuid:
+                self.__instance[UUID_KEY] = [
+                    mp4.MP4FreeForm(uuid, mp4.AtomDataType.UUID),
+                ]
+
         else:
             msg = _(
                 "Unrecognized mutagen instance, this is an implementation error: {clazz}"  # noqa: COM812

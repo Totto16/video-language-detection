@@ -3,7 +3,7 @@ from contextlib import AbstractContextManager
 from logging import Logger
 from pathlib import Path
 from types import TracebackType
-from typing import Literal, Optional, Self, override
+from typing import Any, Literal, Optional, Self, override
 from uuid import UUID
 
 from content.language import Language
@@ -21,6 +21,9 @@ VIDEO_FILE_TAG_UPDATE_BAR_FORMAT: str = (
 )
 
 
+SerializableDict = dict[str, str | int | dict[str, str | int] | dict[str, Any]]
+
+
 class VideoTaggerWriter(ABC):
     __manager: ManagerInterface
 
@@ -34,17 +37,15 @@ class VideoTaggerWriter(ABC):
     @abstractmethod
     def write_metadata(
         self: Self,
-        comment: list[str],
+        comment: str,
         uuid: UUID,
         language: Language,
-        metadata: dict[str, str],
+        metadata: SerializableDict,
     ) -> None: ...
 
     @property
     def manager(self: Self) -> ManagerInterface:
         return self.__manager
-
-
 
 
 class VideoTagger(ABC):
@@ -79,10 +80,10 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
     @override
     def write_metadata(
         self: Self,
-        comment: list[str],
+        comment: str,
         uuid: UUID,
         language: Language,
-        metadata: dict[str, str],
+        metadata: SerializableDict,
     ) -> None:
         for writer in self.__writer:
             with writer as w:
