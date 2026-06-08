@@ -25,6 +25,7 @@ from content.tagger.mp4_tagger import (
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
+    VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
     mp4_iter_boxes,
@@ -482,6 +483,102 @@ def test_mp4_tagger_metadata_tags_mutagen(
         for file, tags in test_files:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
+
+                if tagger_res.err():
+                    msg = f"video tagger handle err: {tagger_res.as_err()}"
+                    raise AssertionError(msg)
+
+                tagger = tagger_res.as_ok()
+
+                with tagger.writer(manager=test_manager) as w:
+                    early_tags = w.get_tags()
+
+                    assert early_tags.uuid is None, "uuid can't be found yet"
+                    assert [
+                        *early_tags.metadata.items(),
+                    ] == [], "no metadata tags can be found already"
+
+                    w.write_tags(tags)
+
+                    next_tags = w.get_tags()
+
+                    assert next_tags.uuid == tags.uuid, "UUID was written correctly"
+                    assert (
+                        next_tags.comment == tags.comment
+                    ), "Comment was written correctly"
+                    assert (
+                        next_tags.unrecognized == early_tags.unrecognized
+                    ), "no new unrecognized tags"
+                    assert (
+                        next_tags.metadata == tags.metadata
+                    ), "Metadata was written correctly"
+
+                    # write again, test that the uuid doesn't get overwritten
+
+                    new_tags = MetadataTags(
+                        comment=tags.comment,
+                        uuid=uuid4(),
+                        language=tags.language,
+                        metadata=tags.metadata,
+                    )
+
+                    assert new_tags.uuid != tags.uuid, "UUID should be unique"
+
+                    w.write_tags(new_tags)
+
+                    write_again_tags = w.get_tags()
+
+                    assert (
+                        next_tags.uuid == write_again_tags.uuid
+                    ), "UUID was not overwritten"
+                    assert (
+                        next_tags.comment == write_again_tags.comment
+                    ), "Comment was written correctly"
+                    assert (
+                        next_tags.unrecognized == write_again_tags.unrecognized
+                    ), "no new unrecognized tags"
+                    assert (
+                        next_tags.metadata == write_again_tags.metadata
+                    ), "Metadata was written correctly"
+
+
+def test_mp4_tagger_metadata_tags_custom(
+    subtests: SubTests,
+    mp4_test_parse_files: TempVideoFiles,
+    test_manager: ManagerInterface,
+) -> None:
+
+    with file_duplicates(mp4_test_parse_files.data) as data:
+        test_files: list[tuple[Path, MetadataTags]] = list(
+            zip(
+                data,
+                [
+                    MetadataTags(
+                        comment="Test comment 1",
+                        uuid=uuid4(),
+                        language=Language.get_default(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key1": "value1", "int1": 1414},
+                        },
+                    ),
+                    MetadataTags(
+                        comment="Test comment 2",
+                        uuid=uuid4(),
+                        language=Language.get_default(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key2": "value2", "int2": 1321},
+                        },
+                    ),
+                ],
+                strict=True,
+            ),
+        )
+
+        for file, tags in test_files:
+            with subtests.test("video gets tagged correctly"):
+                tagger_res = VideoTaggerMP4.get_handle(file)
 
                 if tagger_res.err():
                     msg = f"video tagger handle err: {tagger_res.as_err()}"

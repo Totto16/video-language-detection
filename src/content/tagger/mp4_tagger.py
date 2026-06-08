@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
-from typing import Literal, Optional, Self, final, override
+from typing import Any, Literal, Optional, Self, final, override
 from uuid import UUID
 
 from content.language import ShortLanguageStr
@@ -1136,20 +1136,20 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
 
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
-    __our_boxes_start: Optional[MP4Box]
+    __our_boxes: list[MP4Box]
 
     def __init__(
         self: Self,
         uuid_box: Optional[UUIDExtensionBox],
-        our_boxes_start: Optional[MP4Box],
-    ):
+        our_boxes: list[MP4Box],
+    ) -> None:
         self.__uuid_box = uuid_box
-        self.__our_boxes_start = our_boxes_start
+        self.__our_boxes = our_boxes
 
     def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
         # delete old metadata
-        if self.__our_boxes_start is not None:
-            f.truncate(self.__our_boxes_start.span.start)
+        if len(self.__our_boxes) != 0:
+            f.truncate(self.__our_boxes[0].span.start)
 
     def write_new_matadata(
         self: Self,
@@ -1185,6 +1185,26 @@ class Mp4MetadataHandler:
             f.write(buffer)
 
         f.flush()
+
+    def read_matadata(
+        self: Self,
+    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+        uuid = None if self.__uuid_box is None else self.__uuid_box.uuid
+        metadata: list[SerializableDict] = []
+
+        for box in self.__our_boxes:
+            if isinstance(box, JsonExtensionBox):
+                metadata.append(box.data)
+            elif isinstance(box, UUIDExtensionBox):
+                if uuid is None:
+                    msg = f"Found uuid box manually, but constructor didn't find it: {box}"
+                    raise RuntimeError(msg)
+
+            else:
+                msg = f"Invalid box for tags found: {type(box)}"
+                raise TypeError(msg)
+
+        return (metadata, uuid)
 
     @staticmethod
     def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
@@ -1249,19 +1269,20 @@ class Mp4MetadataHandler:
 
         top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, 0, end=end))
 
-        first_box_written_by_us: Optional[MP4Box] = None
+
+        our_boxes: list[MP4Box] = []
         other_box_encountered = False
         for box in reversed(top_boxes):
             if other_box_encountered:
                 break
 
             if box_is_written_by_us(box):
-                first_box_written_by_us = box
+                our_boxes.append(box)
             else:
                 other_box_encountered = True
                 break
 
-        return Mp4MetadataHandler(uuid_box, first_box_written_by_us)
+        return Mp4MetadataHandler(uuid_box, our_boxes)
 
 
 class VideoTaggerWriterMP4(VideoTaggerWriter):
@@ -1315,18 +1336,20 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
                 bar.update(1, force=True)
 
             mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
-                f=self.__writer
+                f=self.__writer,
             )
 
             mp4_metadata_handler.remove_old_metadata(self.__writer)
 
-            metadata_list: list[SerializableDict] = [
-                {"comment": tags.comment},
-                {"metadata": tags.metadata},
-            ]
+            metadata_dict: SerializableDict = {
+                "comment": tags.comment,
+                "metadata": tags.metadata,
+            }
 
             mp4_metadata_handler.write_new_matadata(
-                self.__writer, metadata_list, tags.uuid
+                self.__writer,
+                [metadata_dict],
+                tags.uuid,
             )
         finally:
             bar.close(clear=True)
@@ -1335,7 +1358,54 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead:
-        raise NotImplementedError
+
+        def decode_as_str(value: Any) -> str:
+            if not isinstance(value, str):
+                msg = f"Invalid type in decode_as_str: {type(value)}"
+                raise TypeError(msg)
+
+            return value
+
+        def decode_as_dict(value: Any) -> SerializableDict:
+            if not isinstance(value, dict):
+                msg = f"Invalid type in decode_as_dict: {type(value)}"
+                raise TypeError(msg)
+
+            return value
+
+        mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
+            f=self.__writer,
+        )
+
+        metadata, uuid = mp4_metadata_handler.read_matadata()
+
+        result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
+
+        if uuid is not None:
+            result.uuid = uuid
+
+        for mdt in metadata:
+            for key, value in mdt.items():
+
+                if key == "comment":
+                    if result.comment is not None:
+                        msg = f"Duplicate comment tag read: {value}"
+                        raise RuntimeError(msg)
+
+                    result.comment = decode_as_str(value)
+
+                elif key == "metadata":
+                    if len(result.metadata.items()) != 0:
+                        msg = f"Duplicate metadata tag read: {value}"
+                        raise RuntimeError(msg)
+
+                    result.metadata = decode_as_dict(value)
+                else:
+                    result.unrecognized.append(
+                        (key, decode_as_str(value)),
+                    )
+
+        return result
 
 
 class VideoTaggerMP4(VideoTagger):

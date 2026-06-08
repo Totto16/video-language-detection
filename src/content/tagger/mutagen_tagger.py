@@ -417,7 +417,6 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                 ]
 
             previous_uuid = self.__instance.get(MUTAGEN_UUID_KEY)
-            print("previous_uuid", previous_uuid)
 
             if not previous_uuid:
                 self.__instance[MUTAGEN_UUID_KEY] = [
