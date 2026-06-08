@@ -25,15 +25,20 @@ VIDEO_FILE_TAG_UPDATE_BAR_FORMAT: str = (
 SerializableDict = dict[str, str | int | dict[str, str | int] | dict[str, Any]]
 
 
-Serializable = SerializableDict | list["Serializable"] | int | str
-
-
 @dataclass
 class MetadataTags:
     comment: str
     uuid: UUID
     language: Language
     metadata: SerializableDict
+
+
+@dataclass
+class MetadataTagsRead:
+    comment: Optional[str]
+    uuid: Optional[UUID]
+    metadata: SerializableDict
+    unrecognized: list[tuple[str, str]]
 
 
 class VideoTaggerWriter(ABC):
@@ -55,7 +60,7 @@ class VideoTaggerWriter(ABC):
     @abstractmethod
     def get_tags(
         self: Self,
-    ) -> Serializable: ...
+    ) -> MetadataTagsRead: ...
 
     @property
     def manager(self: Self) -> ManagerInterface:
@@ -98,13 +103,8 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
                 w.write_tags(tags)
 
     @override
-    def get_tags(self: Self) -> Serializable:
-        result: list[Serializable] = []
-        for writer in self.__writer:
-            with writer as w:
-                result.append(w.get_tags())
-
-        return result
+    def get_tags(self: Self) -> MetadataTagsRead:
+        raise NotImplementedError("Merging the tags is not implemented yet!")
 
 
 class VideoTaggerMultiple(VideoTagger):

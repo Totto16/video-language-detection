@@ -6,18 +6,17 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import BinaryIO, Literal, Optional, Self, assert_never, override
+from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, override
 from uuid import UUID
 
 import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
-from content.language import Language
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     MetadataTags,
-    Serializable,
+    MetadataTagsRead,
     SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
@@ -334,6 +333,10 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
+MUTAGEN_DOMAIN = "lt.totto:video_language_detect"
+MUTAGEN_UUID_KEY = f"----:{MUTAGEN_DOMAIN}_uuid:file_uuid"
+
+
 class VideoTaggerWriterMutagen(VideoTaggerWriter):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
@@ -406,20 +409,18 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
     def write_tags(self: Self, tags: MetadataTags) -> None:
         self.__instance["\xa9cmt"] = [tags.comment]
         if isinstance(self.__instance, mp4.MP4):
-            DOMAIN = "lt.totto:video_language_detect"
 
             for key, value in tags.metadata.items():
                 value_enc = json.dumps(value).encode()
-                self.__instance[f"----:{DOMAIN}:{key}"] = [
+                self.__instance[f"----:{MUTAGEN_DOMAIN}:{key}"] = [
                     mp4.MP4FreeForm(value_enc, mp4.AtomDataType.UTF8),
                 ]
 
-            UUID_KEY = f"----:{DOMAIN}_uuid:file_uuid"
-
-            previous_uuid = self.__instance.get(UUID_KEY)
+            previous_uuid = self.__instance.get(MUTAGEN_UUID_KEY)
+            print("previous_uuid", previous_uuid)
 
             if not previous_uuid:
-                self.__instance[UUID_KEY] = [
+                self.__instance[MUTAGEN_UUID_KEY] = [
                     mp4.MP4FreeForm(tags.uuid.bytes, mp4.AtomDataType.UUID),
                 ]
 
@@ -429,16 +430,110 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             ).format(clazz=type(self.__instance))
             raise TypeError(msg)
 
-        for key, value in tags.metadata.items():
-            self.__instance[key] = value
-
         self.__save_impl()
 
     @override
     def get_tags(
         self: Self,
-    ) -> Serializable:
-        raise NotImplementedError
+    ) -> MetadataTagsRead:
+
+        def decode_mutagen_tag_value[A](
+            value: list[str] | list[mp4.MP4FreeForm] | str | mp4.MP4FreeForm | Any,
+            cb: Callable[[str | mp4.MP4FreeForm], A],
+        ) -> A:
+            if isinstance(value, list):
+                if len(value) != 1:
+                    msg = f"Invalid amount of tags: {len(value)}"
+                    raise RuntimeError(msg)
+                return cb(value[0])
+
+            if isinstance(value, (str, mp4.MP4FreeForm)):
+                return cb(value)
+
+            msg = f"Invalid type in decode_mutagen_tag_value: {type(value)}"
+            raise TypeError(msg)
+
+        def mutagen_tag_as_str(value: str | mp4.MP4FreeForm) -> str:
+            if isinstance(value, str):
+                return value
+
+            if isinstance(value, mp4.MP4FreeForm):
+                if value.dataformat != mp4.AtomDataType.UTF8:
+                    msg = f"Invalid AtomDataType for str tag: {value.dataformat}"
+                    raise RuntimeError(msg)
+                return bytes(value).decode()
+
+            assert_never(value)
+
+        def mutagen_tag_as_json(
+            value: str | mp4.MP4FreeForm,
+        ) -> SerializableDict | str | int:
+            str_value = mutagen_tag_as_str(value)
+
+            return json.loads(str_value)
+
+        def mutagen_tag_as_uuid(
+            value: str | mp4.MP4FreeForm,
+        ) -> UUID:
+            if isinstance(value, str):
+                msg = "Invalid type for UUID: str"
+                raise TypeError(msg)
+
+            if isinstance(value, mp4.MP4FreeForm):
+                if value.dataformat != mp4.AtomDataType.UUID:
+                    msg = f"Invalid AtomDataType for uuid tag: {value.dataformat}"
+                    raise RuntimeError(msg)
+
+                return UUID(bytes=bytes(value))
+
+            assert_never(value)
+
+        result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
+
+        if not isinstance(self.__instance, mp4.MP4):
+            msg = _(
+                "Unrecognized mutagen instance, this is an implementation error: {clazz}"  # noqa: COM812
+            ).format(clazz=type(self.__instance))
+            raise TypeError(msg)
+
+        for key, value in self.__instance.items():
+            if key == "\xa9cmt":
+                if result.comment is not None:
+                    msg = f"Duplicate comment tag read: {value}"
+                    raise RuntimeError(msg)
+
+                result.comment = decode_mutagen_tag_value(value, mutagen_tag_as_str)
+
+            elif key.startswith(f"----:{MUTAGEN_DOMAIN}:"):
+                actual_key = key.replace(f"----:{MUTAGEN_DOMAIN}:", "")
+
+                if result.metadata.get(actual_key, None) is not None:
+                    msg = f"Duplicate metadata key tag read: {actual_key} -> {value}"
+                    raise RuntimeError(msg)
+
+                result.metadata[actual_key] = decode_mutagen_tag_value(
+                    value,
+                    mutagen_tag_as_json,
+                )
+
+            elif key == MUTAGEN_UUID_KEY:
+                uuid = decode_mutagen_tag_value(
+                    value,
+                    mutagen_tag_as_uuid,
+                )
+
+                if result.uuid is not None:
+                    msg = f"Duplicate uuid tag read: {uuid}"
+                    raise RuntimeError(msg)
+
+                result.uuid = uuid
+
+            else:
+                result.unrecognized.append(
+                    (key, decode_mutagen_tag_value(value, mutagen_tag_as_str)),
+                )
+
+        return result
 
 
 class VideoTaggerMutagen(VideoTagger):

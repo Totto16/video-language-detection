@@ -6,7 +6,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, final, override
 from uuid import UUID
-from content.language import Language, ShortLanguageStr
+
+from content.language import ShortLanguageStr
 from content.tagger.parser import (
     ByteOrder,
     Packable,
@@ -22,7 +23,7 @@ from content.tagger.parser import (
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     MetadataTags,
-    Serializable,
+    MetadataTagsRead,
     SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
@@ -1333,7 +1334,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
     @override
     def get_tags(
         self: Self,
-    ) -> Serializable:
+    ) -> MetadataTagsRead:
         raise NotImplementedError
 
 
