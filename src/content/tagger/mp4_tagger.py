@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
 from io import BufferedIOBase, BytesIO
@@ -261,12 +261,7 @@ class MP4Box:
         return MP4Box(typ, span, is_container=False)
 
     @staticmethod
-    def write_to_buffer_mp4_box(typ: ISOMAtomName, data: bytes) -> bytes:
-
-        if typ == UUID_ATOM_NAME:
-            msg = "'uuid' type not implemented, the box header size differs with that type"
-            raise RuntimeError(msg)
-
+    def __impl_write_to_buffer_mp4_box(typ: ISOMAtomName, data: bytes) -> bytes:
         buf = BytesIO()
 
         final_size: int = 4 + 4 + len(data)
@@ -298,13 +293,32 @@ class MP4Box:
 
             buf.write(largsize)
 
-            if (buf.tell() % 8) != 0:
-                msg = "Error, serialization of MP4Box invalid, not aligned by 8!"
-                raise RuntimeError(msg)
-
         buf.write(data)
 
         return buf.getvalue()
+
+    @staticmethod
+    def write_to_buffer_mp4_box(
+        typ: ISOMAtomName,
+        data: bytes,
+        *,
+        usertype: Optional[UUID] = None,
+    ) -> bytes:
+
+        if typ == UUID_ATOM_NAME:
+            if usertype is None:
+                msg = f"usertype HAS TO BE given, if we have th UUID atom name: {usertype}"
+                raise RuntimeError(msg)
+
+            uuid_bytes = uuid_to_bytes(ISOM_BYTE_ORDER, usertype)
+
+            return MP4Box.__impl_write_to_buffer_mp4_box(typ, uuid_bytes + data)
+
+        if usertype is not None:
+            msg = f"usertype can only be given, if we have th UUID atom name: {typ}"
+            raise RuntimeError(msg)
+
+        return MP4Box.__impl_write_to_buffer_mp4_box(typ, data)
 
     def __str__(self: Self) -> str:
         return f"<MP4Box type: {self.type} span: {self.span} is_container: {self.is_container}>"
@@ -328,12 +342,9 @@ class UserExtensionBox(MP4Box):
         self.usertype = usertype
 
     @staticmethod
-    def write_to_buffer(uuid: UUID) -> bytes:
+    def write_to_buffer_uuid_box(uuid: UUID, data: bytes) -> bytes:
 
-        data: bytes = uuid_to_bytes(ISOM_BYTE_ORDER, uuid)
-
-        return UserExtensionBox.write_to_buffer_uuid_box(UUIDExtension_UUID, data)
-
+        return MP4Box.write_to_buffer_mp4_box(UUID_ATOM_NAME, data, usertype=uuid)
 
     def __str__(self: Self) -> str:
         return f"<UserExtensionBox parent: {MP4Box.__str__(self)} usertype: {self.usertype.hex}>"
@@ -353,6 +364,8 @@ class UserExtensions:
 
 @final
 class UUIDExtensionBox(UserExtensionBox):
+    uuid: UUID
+
     def __init__(
         self: Self,
         parent: UserExtensionBox,
@@ -360,7 +373,7 @@ class UUIDExtensionBox(UserExtensionBox):
     ) -> None:
         super().__init__(parent, parent.usertype, is_container=False)
 
-        self.uuid: UUID = uuid
+        self.uuid = uuid
 
     @staticmethod
     def read_from_stream_parent(
@@ -399,38 +412,44 @@ class UUIDExtensionBox(UserExtensionBox):
 
 @final
 class JsonExtensionBox(UserExtensionBox):
+    data: SerializableDict
+
     def __init__(
         self: Self,
         parent: UserExtensionBox,
-        uuid: UUID,
+        data: SerializableDict,
     ) -> None:
         super().__init__(parent, parent.usertype, is_container=False)
 
-        self.uuid: UUID = uuid
+        self.data = data
 
     @staticmethod
     def read_from_stream_parent(
-        f: BufferedIOBase, parent: UserExtensionBox
-    ) -> "UUIDExtensionBox":
+        f: BufferedIOBase,
+        parent: UserExtensionBox,
+    ) -> "JsonExtensionBox":
 
-        # this is a custom user box, it contains one UUID
+        # this is a custom user box, it contains a json payload
 
         f.seek(parent.span.payload_start)
 
-        if parent.span.payload_size != 16:
-            msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
-            raise RuntimeError(msg)
+        data_raw = read_checked(f, parent.span.payload_size)
 
-        uuid_raw = read_checked(f, 16)
-
-        uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
+        data = json.loads(data_raw.decode())
 
         parent.span.add_header_size(16)
 
-        return UUIDExtensionBox(parent, uuid)
+        return JsonExtensionBox(parent, data)
+
+    @staticmethod
+    def write_to_buffer(data: SerializableDict) -> bytes:
+
+        byte_data: bytes = json.dumps(data).encode()
+
+        return UserExtensionBox.write_to_buffer_uuid_box(JSONExtension_UUID, byte_data)
 
     def __str__(self: Self) -> str:
-        return f"<UUIDExtensionBox parent: {UserExtensionBox.__str__(self)} uuid: {self.uuid.hex}>"
+        return f"<JsonExtensionBox parent: {UserExtensionBox.__str__(self)} data: {self.data!r}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -1197,6 +1216,8 @@ class Mp4MetadataHandler:
 
                     uuid_box = box
                     return True
+                case UserExtensions.JSONExtension_UUID:
+                    return True
                 case _:
                     return False
 
@@ -1300,9 +1321,9 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
             mp4_metadata_handler.remove_old_metadata(self.__writer)
 
-            metadata_list: list[bytes] = [
-                *[(f"comment:{cmt}").encode() for cmt in comment],
-                *[(f"{key}:{val}").encode() for key, val in metadata.items()],
+            metadata_list: list[SerializableDict] = [
+                {"comment": comment},
+                {"metadata": metadata},
             ]
 
             mp4_metadata_handler.write_new_matadata(self.__writer, metadata_list, uuid)

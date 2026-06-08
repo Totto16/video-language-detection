@@ -1,9 +1,8 @@
-from calendar import c
 import struct
+import sys
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from io import BufferedIOBase
-import sys
 from typing import Any, Literal, Self, assert_never, override
 from uuid import UUID
 
