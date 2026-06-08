@@ -7,6 +7,7 @@ from typing import Any, Optional, Protocol, Self
 
 import pytest
 import requests
+from test_helper import TestManager
 
 
 @dataclass
@@ -284,6 +285,11 @@ and what stays off.""",
     return DummyFiles(
         Finalizer[list[tuple[Path, bool]]](results, delete_results),
     )
+
+
+@pytest.fixture(scope="package")
+def test_manager() -> TestManager:
+    return TestManager()
 
 
 def mark_as_used(value: Any) -> None:

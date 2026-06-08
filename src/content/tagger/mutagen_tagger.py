@@ -418,13 +418,13 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                     mp4.MP4FreeForm(value_enc, mp4.AtomDataType.UTF8),
                 ]
 
-            UUID_KEY = f"----:{DOMAIN}-uuid:file"
+            UUID_KEY = f"----:{DOMAIN}_uuid:file_uuid"
 
-            previous_uuid = self.__instance[UUID_KEY]
+            previous_uuid = self.__instance.get(UUID_KEY)
 
             if not previous_uuid:
                 self.__instance[UUID_KEY] = [
-                    mp4.MP4FreeForm(uuid, mp4.AtomDataType.UUID),
+                    mp4.MP4FreeForm(uuid.bytes, mp4.AtomDataType.UUID),
                 ]
 
         else:
@@ -483,7 +483,7 @@ class VideoTaggerMutagen(VideoTagger):
             )
 
     @staticmethod
-    def get_handle(file: Path) -> Result["VideoTagger", str]:
+    def get_handle(file: Path) -> Result["VideoTaggerMutagen", str]:
         result = VideoTaggerMutagen.__get_handle_impl(file, read_only=True)
 
         if result.err():

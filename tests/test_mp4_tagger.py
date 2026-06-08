@@ -1,9 +1,12 @@
+from dataclasses import dataclass
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
+from uuid import UUID, uuid4
 
-from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files
+from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
+from test_helper import TestManager, file_duplicates
 
 from content.language import Language
 from content.tagger.mp4_tagger import (
@@ -27,10 +30,13 @@ from content.tagger.mp4_tagger import (
     is_mp4_file,
     mp4_iter_boxes,
 )
+from content.tagger.mutagen_tagger import VideoTaggerMutagen
+from content.tagger.video_tagger import SerializableDict
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 mark_as_used(mp4_test_parse_files)
+mark_as_used(test_manager)
 
 # TODO: force locale in test cases!
 _ = get_translator()
@@ -167,8 +173,6 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
                 current_target.append(box)
 
     return result
-
-
 
 
 class MP4BoxStructure:
@@ -439,3 +443,61 @@ def test_mp4_tagger_language_patching(
                     assert (
                         new_language.short == old_file_lang
                     ), "New language should be written"
+
+
+@dataclass
+class MetadataTags:
+    uuid: UUID
+    comment: str
+    metadata: SerializableDict
+
+
+def test_mp4_tagger_metadata_tags_mutagen(
+    subtests: SubTests,
+    mp4_test_parse_files: TempVideoFiles,
+    test_manager: TestManager,
+) -> None:
+
+    with file_duplicates(mp4_test_parse_files.data) as data:
+        test_files: list[tuple[Path, MetadataTags]] = list(
+            zip(
+                data,
+                [
+                    MetadataTags(
+                        uuid4(),
+                        comment="Test comment 1",
+                        metadata={
+                            "test": "str",
+                            "dict": {"key1": "value1", "int1": 1414},
+                        },
+                    ),
+                    MetadataTags(
+                        uuid4(),
+                        comment="Test comment 2",
+                        metadata={
+                            "test": "str",
+                            "dict": {"key2": "value2", "int2": 1321},
+                        },
+                    ),
+                ],
+                strict=True,
+            ),
+        )
+
+        for file, metadata in test_files:
+            with subtests.test("video gets tagged correctly"):
+                tagger_res = VideoTaggerMutagen.get_handle(file)
+
+                if tagger_res.err():
+                    msg = f"video tagger handle err: {tagger_res.as_err()}"
+                    raise AssertionError(msg)
+
+                tagger = tagger_res.as_ok()
+
+                with tagger.writer(manager=test_manager) as w:
+                    w.write_metadata(
+                        comment=metadata.comment,
+                        language=Language.get_default(),
+                        metadata=metadata.metadata,
+                        uuid=metadata.uuid,
+                    )
