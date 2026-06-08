@@ -16,6 +16,8 @@ from mutagen._util import MutagenError
 from content.language import Language
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    MetadataTags,
+    Serializable,
     SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
@@ -401,18 +403,12 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             bar.close(clear=True)
 
     @override
-    def write_metadata(
-        self: Self,
-        comment: str,
-        uuid: UUID,
-        language: Language,
-        metadata: SerializableDict,
-    ) -> None:
-        self.__instance["\xa9cmt"] = [comment]
+    def write_tags(self: Self, tags: MetadataTags) -> None:
+        self.__instance["\xa9cmt"] = [tags.comment]
         if isinstance(self.__instance, mp4.MP4):
             DOMAIN = "lt.totto:video_language_detect"
 
-            for key, value in metadata.items():
+            for key, value in tags.metadata.items():
                 value_enc = json.dumps(value).encode()
                 self.__instance[f"----:{DOMAIN}:{key}"] = [
                     mp4.MP4FreeForm(value_enc, mp4.AtomDataType.UTF8),
@@ -424,7 +420,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             if not previous_uuid:
                 self.__instance[UUID_KEY] = [
-                    mp4.MP4FreeForm(uuid.bytes, mp4.AtomDataType.UUID),
+                    mp4.MP4FreeForm(tags.uuid.bytes, mp4.AtomDataType.UUID),
                 ]
 
         else:
@@ -433,10 +429,16 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             ).format(clazz=type(self.__instance))
             raise TypeError(msg)
 
-        for key, value in metadata.items():
+        for key, value in tags.metadata.items():
             self.__instance[key] = value
 
         self.__save_impl()
+
+    @override
+    def get_tags(
+        self: Self,
+    ) -> Serializable:
+        raise NotImplementedError
 
 
 class VideoTaggerMutagen(VideoTagger):

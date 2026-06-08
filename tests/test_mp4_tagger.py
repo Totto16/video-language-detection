@@ -1,12 +1,10 @@
-from dataclasses import dataclass
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Self
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
-from helper.manager import ManagerInterface
 from test_helper import file_duplicates
 
 from content.language import Language
@@ -32,7 +30,8 @@ from content.tagger.mp4_tagger import (
     mp4_iter_boxes,
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
-from content.tagger.video_tagger import SerializableDict
+from content.tagger.video_tagger import MetadataTags
+from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
@@ -446,13 +445,6 @@ def test_mp4_tagger_language_patching(
                     ), "New language should be written"
 
 
-@dataclass
-class MetadataTags:
-    uuid: UUID
-    comment: str
-    metadata: SerializableDict
-
-
 def test_mp4_tagger_metadata_tags_mutagen(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
@@ -465,16 +457,18 @@ def test_mp4_tagger_metadata_tags_mutagen(
                 data,
                 [
                     MetadataTags(
-                        uuid4(),
                         comment="Test comment 1",
+                        uuid=uuid4(),
+                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key1": "value1", "int1": 1414},
                         },
                     ),
                     MetadataTags(
-                        uuid4(),
                         comment="Test comment 2",
+                        uuid=uuid4(),
+                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key2": "value2", "int2": 1321},
@@ -485,7 +479,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
             ),
         )
 
-        for file, metadata in test_files:
+        for file, tags in test_files:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -496,9 +490,9 @@ def test_mp4_tagger_metadata_tags_mutagen(
                 tagger = tagger_res.as_ok()
 
                 with tagger.writer(manager=test_manager) as w:
-                    w.write_metadata(
-                        comment=metadata.comment,
-                        language=Language.get_default(),
-                        metadata=metadata.metadata,
-                        uuid=metadata.uuid,
-                    )
+                    early_tags = w.get_tags()
+                    w.write_tags(tags)
+
+                    next_tags = w.get_tags()
+
+                    assert early_tags == next_tags

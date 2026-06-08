@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from types import TracebackType
@@ -24,6 +25,17 @@ VIDEO_FILE_TAG_UPDATE_BAR_FORMAT: str = (
 SerializableDict = dict[str, str | int | dict[str, str | int] | dict[str, Any]]
 
 
+Serializable = SerializableDict | list["Serializable"] | int | str
+
+
+@dataclass
+class MetadataTags:
+    comment: str
+    uuid: UUID
+    language: Language
+    metadata: SerializableDict
+
+
 class VideoTaggerWriter(ABC):
     __manager: ManagerInterface
 
@@ -35,13 +47,15 @@ class VideoTaggerWriter(ABC):
         self.__manager = manager
 
     @abstractmethod
-    def write_metadata(
+    def write_tags(
         self: Self,
-        comment: str,
-        uuid: UUID,
-        language: Language,
-        metadata: SerializableDict,
+        tags: MetadataTags,
     ) -> None: ...
+
+    @abstractmethod
+    def get_tags(
+        self: Self,
+    ) -> Serializable: ...
 
     @property
     def manager(self: Self) -> ManagerInterface:
@@ -78,16 +92,19 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
         self.__writer = writer
 
     @override
-    def write_metadata(
-        self: Self,
-        comment: str,
-        uuid: UUID,
-        language: Language,
-        metadata: SerializableDict,
-    ) -> None:
+    def write_tags(self: Self, tags: MetadataTags) -> None:
         for writer in self.__writer:
             with writer as w:
-                w.write_metadata(comment, uuid, language, metadata)
+                w.write_tags(tags)
+
+    @override
+    def get_tags(self: Self) -> Serializable:
+        result: list[Serializable] = []
+        for writer in self.__writer:
+            with writer as w:
+                result.append(w.get_tags())
+
+        return result
 
 
 class VideoTaggerMultiple(VideoTagger):

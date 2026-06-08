@@ -39,7 +39,7 @@ from content.metadata.metadata import (
 from content.shared import ScanType
 from content.summary import Summary
 from content.tagger.tagger import get_tagger_for_file
-from content.tagger.video_tagger import SerializableDict
+from content.tagger.video_tagger import MetadataTags, SerializableDict
 from content.video_metadata import VideoMetadata
 from helper.apischema import narrow_type
 from helper.error import ErrorMode
@@ -235,8 +235,14 @@ class EpisodeContent(Content):
                     "see other metadata for more info by video_language_detect"
                 )
 
-                # NOTE: this should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
-                uuid = uuid4()
+                # NOTE: the uuid should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
+
+                tags = MetadataTags(
+                    comment=comment,
+                    uuid=uuid4(),
+                    language=self.language,
+                    metadata=metadata,
+                )
 
                 # TODO: remove
                 global global_counter_wip
@@ -246,12 +252,7 @@ class EpisodeContent(Content):
                     print(f"Tagging file {self.scanned_file.path}")
 
                     with handle.writer(manager=manager) as writer:
-                        writer.write_metadata(
-                            comment,
-                            uuid,
-                            language=self.language,
-                            metadata=metadata,
-                        )
+                        writer.write_tags(tags)
                         print(metadata)
                         self.scanned_file.reset_file_data()
                         changed_file = True

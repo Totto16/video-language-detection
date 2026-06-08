@@ -6,7 +6,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, final, override
 from uuid import UUID
-
 from content.language import Language, ShortLanguageStr
 from content.tagger.parser import (
     ByteOrder,
@@ -22,6 +21,8 @@ from content.tagger.parser import (
 )
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    MetadataTags,
+    Serializable,
     SerializableDict,
     VideoTagger,
     VideoTaggerWriter,
@@ -1280,15 +1281,12 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
         self.__types = types
 
     @override
-    def write_metadata(
+    def write_tags(
         self: Self,
-        comment: str,
-        uuid: UUID,
-        language: Language,
-        metadata: SerializableDict,
+        tags: MetadataTags,
     ) -> None:
 
-        new_language = language.short
+        new_language = tags.language.short
 
         bar: CounterInterface = self.manager.counter(
             total=float(self.__streams + 1),
@@ -1322,13 +1320,21 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             mp4_metadata_handler.remove_old_metadata(self.__writer)
 
             metadata_list: list[SerializableDict] = [
-                {"comment": comment},
-                {"metadata": metadata},
+                {"comment": tags.comment},
+                {"metadata": tags.metadata},
             ]
 
-            mp4_metadata_handler.write_new_matadata(self.__writer, metadata_list, uuid)
+            mp4_metadata_handler.write_new_matadata(
+                self.__writer, metadata_list, tags.uuid
+            )
         finally:
             bar.close(clear=True)
+
+    @override
+    def get_tags(
+        self: Self,
+    ) -> Serializable:
+        raise NotImplementedError
 
 
 class VideoTaggerMP4(VideoTagger):
