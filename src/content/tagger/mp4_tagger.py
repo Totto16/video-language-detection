@@ -1162,9 +1162,8 @@ class Mp4MetadataHandler:
         # note: can write 0 or more free space or user extension boxes, and its allowed everywhere
 
         if self.__uuid_box is not None:
-            buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
-
-            f.write(buffer)
+            # ignore uuid write
+            pass
         else:
             buffer = UUIDExtensionBox.write_to_buffer(uuid)
 
@@ -1268,7 +1267,6 @@ class Mp4MetadataHandler:
         f.seek(0)
 
         top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, 0, end=end))
-
 
         our_boxes: list[MP4Box] = []
         other_box_encountered = False
