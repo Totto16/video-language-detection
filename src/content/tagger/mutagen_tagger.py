@@ -399,6 +399,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             with self.__filething.callback_ctx(process_op):
                 self.__instance.save(self.__filething)
+                self.__filething.flush()
         except MutagenError as err:
             msg = "tag error"
             raise RuntimeError(msg) from err

@@ -78,9 +78,12 @@ def test_ffprobe_with_intact_videos(
 ) -> None:
     for video, ffprobe_data in ffprobe_temp_mp4_files.data:
         with subtests.test("video get's parsed correctly"):
-            result, err = ffprobe(video)
-            assert err is None, "No error occurred"
-            assert result is not None, "a result was returned"
+            err_result = ffprobe(video)
+            if err_result.err():
+                msg = f"FFProbe error: {err_result.as_err()}"
+                raise AssertionError(msg)
+
+            result = err_result.as_ok()
 
             assert (
                 result.file_info.duration_seconds() is not None
@@ -109,10 +112,8 @@ def test_ffprobe_with_intact_videos(
 
 
 def test_ffprobe_errors() -> None:
-    assert ffprobe(Path("/zt/e.mp4")) == (
-        None,
-        "File doesn't exist",
-    ), "file doesn't exist"
+    err = ffprobe(Path("/zt/e.mp4"))
+    assert err.as_err() == "File doesn't exist", "file doesn't exist"
 
     path = os.environ["PATH"]
     os.environ["PATH"] = ""
@@ -132,13 +133,12 @@ def test_ffprobe_errors_with_files(
 ) -> None:
     with subtests.test("dummy wrong file fails "):
         for file, should_pass in ffprobe_dummy_files.data:
-            result, _err = ffprobe(file)
-            assert (result is not None) == should_pass, "pass status is correct"
-            if should_pass:
-                assert (
-                    result is not None
-                ), "pass status is correct"  # only for type checking!
-                for stream in result.streams:
+            result = ffprobe(file)
+            if not should_pass:
+                assert result.err(), "pass status is correct"
+            else:
+                assert result.ok(), "pass status is correct"
+                for stream in result.as_ok().streams:
                     assert (
                         stream.duration_seconds() is None
                     ), "dummy files have no duration"

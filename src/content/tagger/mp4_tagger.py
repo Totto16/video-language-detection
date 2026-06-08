@@ -1349,6 +1349,8 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
                 [metadata_dict],
                 tags.uuid,
             )
+
+            self.__writer.flush()
         finally:
             bar.close(clear=True)
 

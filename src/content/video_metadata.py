@@ -126,17 +126,20 @@ class VideoMetadata:
 
     @staticmethod
     def __read_metadata(
-        file: Path, error_mode: ErrorMode,
+        file: Path,
+        error_mode: ErrorMode,
     ) -> Result["VideoMetadata", str]:
-        metadata, err = ffprobe(file.absolute())
+        metadata_res = ffprobe(file.absolute())
 
-        if err is not None or metadata is None:
+        if metadata_res.err():
             error_mode.write_error(f'"{file}",')
 
             err_msg: str = _(
                 "Unable to get a valid stream from file:\n{err}"  # noqa: COM812
-            ).format(err=err)
+            ).format(err=metadata_res.as_err())
             return Err(err_msg)
+
+        metadata = metadata_res.as_ok()
 
         if not metadata.is_video():
             return Err(

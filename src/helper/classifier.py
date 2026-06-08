@@ -558,18 +558,21 @@ class WAVFile:
         self.__runtime = runtime
 
     def __get_info(
-        self: Self, error_mode: ErrorMode,
+        self: Self,
+        error_mode: ErrorMode,
     ) -> Result[tuple[FileStatus, Timestamp], str]:
-        metadata, err = ffprobe(self.__file.absolute())
-        if err is not None or metadata is None:
+        metadata_res = ffprobe(self.__file.absolute())
+        if metadata_res.err():
             error_mode.write_error(f'"{self.__file}",')
 
             err_msg: str = _(
                 "Unable to get a valid stream from file '{file}':\n{err}"  # noqa: COM812
-            ).format(err=err, file=self.__file)
+            ).format(err=metadata_res.as_err(), file=self.__file)
             logger.error(err_msg)
 
             return Err(err_msg)
+
+        metadata = metadata_res.as_ok()
 
         file_duration: Optional[float] = metadata.file_info.duration_seconds()
 

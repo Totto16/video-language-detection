@@ -7,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict
 
+from helper.result import Err, Ok, Result
 from helper.timestamp import parse_int_safely
 
 
@@ -138,6 +139,10 @@ class FormatInfo:
     def __init__(self: Self, raw: dict[str, Any]) -> None:
         self.__raw = raw
 
+    @property
+    def raw(self: Self) -> dict[str, Any]:
+        return self.__raw
+
     def duration_seconds(self: Self) -> Optional[float]:
         """
         Returns the runtime duration of the file as a floating point number of seconds.
@@ -214,7 +219,7 @@ def ffprobe_check() -> bool:
     return True
 
 
-def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
+def ffprobe(file_path: Path) -> Result[FFProbeResult, str]:
     # some things here were copied and modified from the original ffprobe-python repo:
     # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
     try:
@@ -243,7 +248,7 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
         commands = [" ".join(commands)]
 
     if not file_path.exists():
-        return None, "File doesn't exist"
+        return Err("File doesn't exist")
 
     result = subprocess.run(  # noqa: PLW1510, S602
         commands,
@@ -251,6 +256,6 @@ def ffprobe(file_path: Path) -> tuple[Optional[FFProbeResult], Optional[str]]:
         shell=True,
     )
     if result.returncode == 0:
-        return FFProbeResult(json.loads(result.stdout)), None
+        return Ok(FFProbeResult(json.loads(result.stdout)))
 
-    return None, f"FFProbe failed for {file_path}, output:\n{result.stderr.decode()}"
+    return Err(f"FFProbe failed for {file_path}, output:\n{result.stderr.decode()}")
