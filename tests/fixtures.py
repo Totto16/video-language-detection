@@ -163,7 +163,10 @@ def temp_video_files(
     results: list[Path] = []
     for name, file in videos:
         file_data = cached_manager.get(name, file)
-        with tempfile.NamedTemporaryFile(delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            prefix="video_language_detect_tests_",
+        ) as f:
             f.write(file_data)
             results.append(Path(f.file.name))
 
@@ -274,7 +277,11 @@ and what stays off.""",
     ]
     results: list[tuple[Path, bool]] = []
     for suffix, content, res in content_description:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=suffix,
+            prefix="video_language_detect_tests_",
+        ) as f:
             f.write(bytes(content, encoding="utf-8"))
             results.append((Path(f.file.name), res))
 

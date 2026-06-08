@@ -78,7 +78,9 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
         def __enter__(self: Self) -> list[Path]:
             results: list[Path] = []
             for path in paths:
-                with tempfile.NamedTemporaryFile(delete=False) as f:
+                with tempfile.NamedTemporaryFile(
+                    delete=False, prefix="video_language_detect_tests_",
+                ) as f:
                     f.write(path.read_bytes())
                     results.append(Path(f.file.name))
 
