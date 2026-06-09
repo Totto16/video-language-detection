@@ -28,7 +28,7 @@ class FOURCC:
             msg = f"Invalid FOURCC name length {len(value)}"
             raise ValueError(msg)
 
-        def is_valid_byte(byte: int) -> bool:
+        def is_valid_byte(byte: int, pos: int) -> bool:
             val = bytes([byte])
 
             if val.islower():
@@ -37,9 +37,12 @@ class FOURCC:
             if val.isupper():
                 return True
 
+            if pos != 0 and val.isdigit():
+                return True
+
             return val == b" "
 
-        if not all(is_valid_byte(val) for val in value):
+        if not all(is_valid_byte(val, i) for i, val in enumerate(value)):
             msg = f"FOURCC not valid {value!s}"
             raise ValueError(msg)
 
@@ -323,7 +326,9 @@ class AVIStreamHeader(AVIChunk):
         return LCID.decode_language(packed)
 
     def patch_language(
-        self: Self, f: BufferedIOBase, new_language: ShortLanguageStr,
+        self: Self,
+        f: BufferedIOBase,
+        new_language: ShortLanguageStr,
     ) -> None:
         packed = LCID.encode_language(new_language)
 
