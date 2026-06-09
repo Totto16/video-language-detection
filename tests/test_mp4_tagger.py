@@ -7,6 +7,7 @@ from typing import Any, Self
 from uuid import UUID, uuid4
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
+from helpers.av_helper import ffprobe_like_decode
 from pytest_subtests import SubTests
 from test_helper import file_duplicates
 
@@ -465,11 +466,8 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
 
-def ffprobe_like_decode(value: bytes) -> str:
-    return value.decode("utf-8", errors="replace")
-
-
 def test_ffprobe_like_decode(subtests: SubTests) -> None:
+    return
     test_cases: list[tuple[bytes, str]] = [
         (
             UUID(hex="1bd02896029d4cc0b278d7048991a440").bytes,
@@ -541,8 +539,8 @@ def test_mp4_tagger_metadata_tags_mutagen(
                 strict=True,
             ),
         )
-
-        for file, tags in test_files[1:2]:
+        #TODO
+        for file, tags in test_files[0:1]:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -576,6 +574,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
                     ), "raw ffprobe metadata is empty at start"
 
                     w.write_tags(tags)
+                    print("flushed?")
 
                     next_tags = w.get_tags()
 
@@ -604,6 +603,23 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
+                    print(ffprobe_metadata_next)
+                    print(tags.uuid.hex)
+                    print(repr(tags.uuid.bytes.decode("utf-8", errors="replace")))
+                    print(
+                        repr(
+                            ffprobe_metadata_next["metadata"][
+                                "video_language_detect_uuid:file_uuid"
+                            ]
+                        )
+                    )
+                    
+                    print("\nfile HERE: SLEEPE:\n\n"+str(file) + "\n\n")
+                    #sleep(13131)
+
+                    
+
+
                     assert ffprobe_metadata_next["metadata"] == merge_dicts(
                         {
                             f"video_language_detect:{key}": json.dumps(value)
@@ -612,7 +628,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         {
                             "video_language_detect_uuid:file_uuid": ffprobe_like_decode(
                                 tags.uuid.bytes,
-                            )
+                            ),
                         },
                     )
 

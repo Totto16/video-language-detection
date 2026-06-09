@@ -188,7 +188,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         season: SeasonDescription,
         contents: list[EpisodeContent],
     ) -> list[list["Validator.__Any1"]]:
-        state: list[list[Validator.__Any1]] = []
+        state: list[list[Validator.__Any1]] = [[] for _ in validators]
         # TODO: refactor validator multiple parsing with other approach, initialize lists and than append to each one, instead dof transposing, also solves the special case in transposing!
 
         for content in contents:
