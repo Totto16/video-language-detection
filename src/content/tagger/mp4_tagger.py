@@ -1306,7 +1306,7 @@ class AppleItunesItemDataBox(MP4FullBox):
     ) -> AppleItunesItemDataContent:
 
         match type_indicator:
-            case AppleItunesItemDataType.implicit:
+            case AppleItunesItemDataType.implicit | AppleItunesItemDataType.reserved:
                 msg = "No implicit type allowed here!"
                 raise RuntimeError(msg)
             case AppleItunesItemDataType.utf_8:
@@ -1315,6 +1315,21 @@ class AppleItunesItemDataBox(MP4FullBox):
                 return value.decode("utf-16")
             case AppleItunesItemDataType.uuid:
                 return UUID(bytes=value)
+            case (
+                AppleItunesItemDataType.be_signed_integer_var
+                | AppleItunesItemDataType.integer
+            ):
+                if len(value) not in [1, 2, 4, 8]:
+                    msg = f"Invalid integer conversion length: {len(value)}"
+                    raise RuntimeError(msg)
+
+                return int.from_bytes(value, byteorder="big", signed=True)
+            case AppleItunesItemDataType.be_unsigned_integer_var:
+                if len(value) not in [1, 2, 4, 8]:
+                    msg = f"Invalid integer conversion length: {len(value)}"
+                    raise RuntimeError(msg)
+
+                return int.from_bytes(value, byteorder="big", signed=False)
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
                 raise RuntimeError(msg)
@@ -1346,6 +1361,11 @@ class AppleItunesItemDataBox(MP4FullBox):
             case AppleItunesItemDataType.uuid.value:
                 return AppleItunesItemDataBox.__decode_value_impl(
                     AppleItunesItemDataType.uuid,
+                    value,
+                )
+            case AppleItunesItemDataType.integer.value:
+                return AppleItunesItemDataBox.__decode_value_impl(
+                    AppleItunesItemDataType.integer,
                     value,
                 )
             case _:
