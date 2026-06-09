@@ -399,10 +399,10 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             with self.__filething.callback_ctx(process_op):
                 self.__instance.save(self.__filething)
-                self.__filething.flush()
-                self.__filething.flush()
-                self.__filething.flush()
-                self.__filething.flush()
+                # self.__filething.flush()
+                # self.__filething.flush()
+                # self.__filething.flush()
+                # self.__filething.flush()
                 
         except MutagenError as err:
             msg = "tag error"
@@ -649,7 +649,9 @@ class VideoTaggerMutagen(VideoTagger):
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
                 if self.__filething is not None:
+                    print("CLOSED")
                     self.__filething.close()
+                print("ERROR IN CLOSE")
                 return False
 
         return VideoTaggerWriterCtx()

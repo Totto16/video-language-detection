@@ -1,3 +1,4 @@
+import gc
 import json
 from copy import deepcopy
 from io import BufferedIOBase, BytesIO
@@ -539,8 +540,8 @@ def test_mp4_tagger_metadata_tags_mutagen(
                 strict=True,
             ),
         )
-        #TODO
-        for file, tags in test_files[0:1]:
+        # TODO
+        for file, tags in test_files[1:2]:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -573,9 +574,23 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         or keys_that_are_not_none(ffprobe_metadata_early) == []
                     ), "raw ffprobe metadata is empty at start"
 
+                    print("before tags: " + str(file))
+                   #sleep(20)
+
                     w.write_tags(tags)
+
+                    print("WROTE TAGS TO " + str(file))
                     print("flushed?")
 
+                print("FLUSHED TWICE?")
+                gc.collect()
+                print("\nfile HERE: SLEEPE:\n\n" + str(file) + "\n\n")
+                sleep(13131)
+
+                with tagger.writer(manager=test_manager) as w:
+                    print(
+                        "CORRECT WRITE", b"video_language_detect" in file.read_bytes()
+                    )
                     next_tags = w.get_tags()
 
                     assert next_tags.uuid == tags.uuid, "UUID was written correctly"
@@ -613,12 +628,6 @@ def test_mp4_tagger_metadata_tags_mutagen(
                             ]
                         )
                     )
-                    
-                    print("\nfile HERE: SLEEPE:\n\n"+str(file) + "\n\n")
-                    #sleep(13131)
-
-                    
-
 
                     assert ffprobe_metadata_next["metadata"] == merge_dicts(
                         {
@@ -644,6 +653,9 @@ def test_mp4_tagger_metadata_tags_mutagen(
                     assert new_tags.uuid != tags.uuid, "UUID should be unique"
 
                     w.write_tags(new_tags)
+
+                print("FLUSHED")
+                with tagger.writer(manager=test_manager) as w:
 
                     write_again_tags = w.get_tags()
 
