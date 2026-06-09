@@ -2,10 +2,11 @@ import json
 from copy import deepcopy
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Callable, Optional, Self, override
 from unittest import mock
 from uuid import uuid4
 
+from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
 from test_helper import file_duplicates
@@ -16,15 +17,22 @@ from content.tagger.mp4_tagger import (
     FREE_ATOM_NAME,
     FTYP_ATOM_NAME,
     HDLR_ATOM_NAME,
+    IODS_ATOM_NAME,
+    MDAT_ATOM_NAME,
     MDHD_ATOM_NAME,
     MDIA_ATOM_NAME,
     META_ATOM_NAME,
     MINF_ATOM_NAME,
     MOOV_ATOM_NAME,
+    MVHD_ATOM_NAME,
     SOUN_ATOM_NAME,
+    TKHD_ATOM_NAME,
     TRAK_ATOM_NAME,
     UDTA_ATOM_NAME,
     VIDE_ATOM_NAME,
+    AppleItunesItemBox,
+    AppleItunesItemDataContent,
+    AppleItunesItemDataType,
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
@@ -51,6 +59,23 @@ class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
         super().__init__(typ, span=MP4BoxSpan(0, size, 8), is_container=False)
+
+
+class PseudoAppleItunesMP4Box(MP4Box):
+    type_indicator: AppleItunesItemDataType
+    value: AppleItunesItemDataContent
+
+    def __init__(
+        self: Self,
+        typ: ISOMAtomName,
+        size: int,
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+    ) -> None:
+        super().__init__(typ, span=MP4BoxSpan(0, size, 8), is_container=False)
+
+        self.type_indicator = type_indicator
+        self.value = value
 
 
 class RecursiveBoxes:
@@ -98,48 +123,119 @@ class RecursiveBoxes:
     def __is_box_eq(
         box1: MP4Box,
         box2: MP4Box,
-    ) -> bool:
+        depth: int,
+    ) -> Result[None, list[str]]:
         # pseudo comparison based on pseudo boxes, alias just size and type!
         if box1.type != box2.type:
-            return False
+            return Err[list[str]](
+                [
+                    "Atom type of data is not eq:",
+                    str(box1.type),
+                    str(box2.type),
+                    f"Depth {depth}",
+                    str(box1),
+                    str(box2),
+                ],
+            )
 
-        return box1.span.size == box2.span.size
+        if box1.span.size != box2.span.size:
+            return Err[list[str]](
+                [
+                    "Sizeof data is not eq:",
+                    str(box1.span.size),
+                    str(box2.span.size),
+                    f"Depth {depth}",
+                    str(box1),
+                    str(box2),
+                ],
+            )
+
+        if isinstance(box1, AppleItunesItemBox) and isinstance(
+            box2,
+            PseudoAppleItunesMP4Box,
+        ):
+
+            if box1.data.type_indicator != box2.type_indicator.value:
+                return Err[list[str]](
+                    [
+                        "AppleItunesItemBox type_indicator is not eq:",
+                        str(box1.data.type_indicator),
+                        str(box2.type_indicator.value),
+                        f"Depth {depth}",
+                        str(box1),
+                        str(box2),
+                    ],
+                )
+
+            if box1.data.value != box2.value:
+                return Err[list[str]](
+                    [
+                        "AppleItunesItemBox value is not eq:",
+                        str(box1.data.value),
+                        str(box2.value),
+                        f"Depth {depth}",
+                        str(box1),
+                        str(box2),
+                    ],
+                )
+
+        return Ok(None)
 
     @staticmethod
     def __is_elem_eq(
         data1: MP4Box | tuple[MP4Box, RecursiveBoxesData],
         data2: MP4Box | tuple[MP4Box, RecursiveBoxesData],
         depth: int,
-    ) -> bool:
+    ) -> Result[None, list[str]]:
         if isinstance(data1, tuple) and isinstance(data2, tuple):
             b1, d1 = data1
             b2, d2 = data2
 
-            if not RecursiveBoxes.__is_box_eq(b1, b2):
-                return False
+            res = RecursiveBoxes.__is_box_eq(b1, b2, depth)
+            if res.err():
+                return res
 
             return RecursiveBoxes.__eq_impl_both(d1, d2, depth=depth + 1)
         if isinstance(data1, MP4Box) and isinstance(data2, MP4Box):
-            return RecursiveBoxes.__is_box_eq(data1, data2)
+            return RecursiveBoxes.__is_box_eq(data1, data2, depth)
 
-        return False
+        return Err[list[str]](
+            [
+                "Type of data is not eq:",
+                str(type(data1)),
+                str(type(data2)),
+                f"Depth {depth}",
+                str(data1),
+                str(data2),
+            ],
+        )
 
     @staticmethod
     def __eq_impl_both(
         data1: RecursiveBoxesData,
         data2: RecursiveBoxesData,
         depth: int,
-    ) -> bool:
+    ) -> Result[None, list[str]]:
         if len(data1) != len(data2):
-            return False
+            return Err[list[str]](
+                [
+                    "Length of data is not eq:",
+                    str(len(data1)),
+                    str(len(data2)),
+                    f"Depth {depth}",
+                    str(data1),
+                    str(data2),
+                ],
+            )
 
         for d1, d2 in zip(data1, data2, strict=True):
-            if not RecursiveBoxes.__is_elem_eq(d1, d2, depth):
-                return False
+            res = RecursiveBoxes.__is_elem_eq(d1, d2, depth)
+            if res.err():
+                return res
 
-        return True
+        return Ok(None)
 
-    def __eq_impl(self: Self, data: RecursiveBoxesData) -> bool:
+    def __eq_impl(self: Self, data: RecursiveBoxesData) -> Result[None, list[str]]:
         return RecursiveBoxes.__eq_impl_both(self.__data, data, depth=0)
 
     def __str__(self: Self) -> str:
@@ -148,9 +244,12 @@ class RecursiveBoxes:
     def __repr__(self: Self) -> str:
         return RecursiveBoxes.__to_str(self.__data, 0, "  ")
 
+    def eq_impl(self: Self, other: "RecursiveBoxes") -> Result[None, list[str]]:
+        return self.__eq_impl(other.data)
+
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, RecursiveBoxes):
-            return self.__eq_impl(other.__data)
+            return self.__eq_impl(other.__data).ok()
 
         return False
 
@@ -180,7 +279,7 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
     return result
 
 
-class MP4BoxStructure:
+class MP4BoxStructure(FancyEq):
     boxes: RecursiveBoxes
 
     def __init__(self: Self, boxes: RecursiveBoxes) -> None:
@@ -206,14 +305,29 @@ class MP4BoxStructure:
     def __repr__(self: Self) -> str:
         return str(self)
 
-    def __eq__(self: Self, other: object) -> bool:
+    def __eq_impl(
+        self: Self, other: object
+    ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
         if isinstance(other, RecursiveBoxes):
-            return self.boxes == other
+            return (True, lambda: self.boxes.eq_impl(other))
 
         if isinstance(other, MP4BoxStructure):
-            return self.boxes == other.boxes
+            return (True, lambda: self.boxes.eq_impl(other.boxes))
 
-        return False
+        return (False, lambda: Err([]))
+
+    def __eq__(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[1]().ok()
+
+    @override
+    def support_fancy_eq(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[0]
+
+    @override
+    def fancy_eq(self: Self, other: object) -> Optional[list[str]]:
+        supports_fancy_eq, cb = self.__eq_impl(other)
+        assert supports_fancy_eq
+        return cb().err_or(None)
 
     def __hash__(self: Self) -> int:
         return hash(self.boxes)
@@ -231,15 +345,13 @@ def test_mp4_tagger_parsing(
                 (
                     PseudoMP4Box(MOOV_ATOM_NAME, 11824),
                     [
-                        PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
-                        PseudoMP4Box(ISOMAtomName(b"iods"), 42),
+                        PseudoMP4Box(MVHD_ATOM_NAME, 108),
+                        PseudoMP4Box(IODS_ATOM_NAME, 42),
                         (
                             PseudoMP4Box(TRAK_ATOM_NAME, 5317),
                             [
                                 PseudoMP4Box(
-                                    ISOMAtomName(
-                                        b"tkhd",
-                                    ),
+                                    TKHD_ATOM_NAME,
                                     92,
                                 ),
                                 PseudoMP4Box(EDTS_ATOM_NAME, 36),
@@ -257,9 +369,7 @@ def test_mp4_tagger_parsing(
                             PseudoMP4Box(TRAK_ATOM_NAME, 6349),
                             [
                                 PseudoMP4Box(
-                                    ISOMAtomName(
-                                        b"tkhd",
-                                    ),
+                                    TKHD_ATOM_NAME,
                                     92,
                                 ),
                                 PseudoMP4Box(EDTS_ATOM_NAME, 36),
@@ -276,7 +386,7 @@ def test_mp4_tagger_parsing(
                     ],
                 ),
                 PseudoMP4Box(FREE_ATOM_NAME, 8),
-                PseudoMP4Box(ISOMAtomName(b"mdat"), 1558160),
+                PseudoMP4Box(MDAT_ATOM_NAME, 1558160),
             ],
         ),
     )
@@ -288,11 +398,11 @@ def test_mp4_tagger_parsing(
                 (
                     PseudoMP4Box(MOOV_ATOM_NAME, 3888),
                     [
-                        PseudoMP4Box(ISOMAtomName(b"mvhd"), 108),
+                        PseudoMP4Box(MVHD_ATOM_NAME, 108),
                         (
                             PseudoMP4Box(TRAK_ATOM_NAME, 3378),
                             [
-                                PseudoMP4Box(ISOMAtomName(b"tkhd"), 92),
+                                PseudoMP4Box(TKHD_ATOM_NAME, 92),
                                 PseudoMP4Box(EDTS_ATOM_NAME, 36),
                                 (
                                     PseudoMP4Box(MDIA_ATOM_NAME, 3242),
@@ -307,13 +417,58 @@ def test_mp4_tagger_parsing(
                         (
                             PseudoMP4Box(UDTA_ATOM_NAME, 394),
                             [
-                                PseudoMP4Box(META_ATOM_NAME, 386),
+                                (
+                                    PseudoMP4Box(META_ATOM_NAME, 386),
+                                    [
+                                        (
+                                            PseudoMP4Box(ISOMAtomName(b"ilst"), 341),
+                                            [
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9nam"),
+                                                    57,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Big Buck Bunny, Sunflower version",
+                                                ),
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9ART"),
+                                                    76,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Blender Foundation 2008, Janus Bager Kristensen 2013",
+                                                ),
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9wrt"),
+                                                    41,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Sacha Goedegebure",
+                                                ),
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9too"),
+                                                    37,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Lavf58.63.100",
+                                                ),
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9cmt"),
+                                                    89,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Creative Commons Attribution 3.0 - http://bbb3d.renderfarming.net",
+                                                ),
+                                                PseudoAppleItunesMP4Box(
+                                                    ISOMAtomName(b"\xa9gen"),
+                                                    33,
+                                                    AppleItunesItemDataType.utf_8,
+                                                    "Animation",
+                                                ),
+                                            ],
+                                        )
+                                    ],
+                                )
                             ],
                         ),
                     ],
                 ),
                 PseudoMP4Box(FREE_ATOM_NAME, 8),
-                PseudoMP4Box(ISOMAtomName(b"mdat"), 1041617),
+                PseudoMP4Box(MDAT_ATOM_NAME, 1041617),
             ],
         ),
     )
@@ -371,9 +526,7 @@ def test_mp4_tagger_parsing(
                     msg = f"boxes don't reach at the parent end: size is {boxes_end} but boxes reach only to {start}"
                     raise AssertionError(msg)
 
-            if structure != result:
-                msg = f"Parsing was incorrect:\n{structure!s}"
-                raise AssertionError(msg)
+            assert structure == result, "Parsing was incorrect"
 
 
 def test_mp4_invalid_bytes(

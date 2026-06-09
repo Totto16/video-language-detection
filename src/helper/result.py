@@ -12,6 +12,8 @@ class Result[T, E](Protocol):
 
     def ok_or[U](self: Self, default: U) -> T | U: ...
 
+    def err_or[U](self: Self, default: U) -> E | U: ...
+
 
 class Ok[T]:
     __value: T
@@ -34,6 +36,9 @@ class Ok[T]:
 
     def ok_or[U](self: Self, default: U) -> T:  # noqa: ARG002
         return self.__value
+
+    def err_or[U](self: Self, default: U) -> U:
+        return default
 
     def __str__(self: Self) -> str:
         return f"<Ok {self.as_ok()!s}>"
@@ -63,6 +68,9 @@ class Err[E]:
 
     def ok_or[U](self: Self, default: U) -> U:
         return default
+
+    def err_or[U](self: Self, default: U) -> E:  # noqa: ARG002
+        return self.__error
 
     def __str__(self: Self) -> str:
         return f"<Err {self.as_err()!s}>"
