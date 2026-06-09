@@ -28,7 +28,7 @@ class FOURCC:
             msg = f"Invalid FOURCC name length {len(value)}"
             raise ValueError(msg)
 
-        def is_valid_byte(byte: int, pos: int) -> bool:
+        def is_valid_byte(byte: int) -> bool:
             val = bytes([byte])
 
             if val.islower():
@@ -37,12 +37,12 @@ class FOURCC:
             if val.isupper():
                 return True
 
-            if pos != 0 and val.isdigit():
+            if val.isdigit():
                 return True
 
             return val == b" "
 
-        if not all(is_valid_byte(val, i) for i, val in enumerate(value)):
+        if not all(is_valid_byte(val) for val in value):
             msg = f"FOURCC not valid {value!s}"
             raise ValueError(msg)
 
