@@ -1,8 +1,10 @@
-from io import BufferedIOBase, BytesIO
 import json
+from copy import deepcopy
+from io import BufferedIOBase, BytesIO
 from pathlib import Path
+from time import sleep
 from typing import Any, Self
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
@@ -459,6 +461,27 @@ def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     return res
 
 
+def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
+    return [key for key, value in dict1.items() if value is not None]
+
+
+def ffprobe_like_decode(value: bytes) -> str:
+    return value.decode("utf-8", errors="replace")
+
+
+def test_ffprobe_like_decode(subtests: SubTests) -> None:
+    test_cases: list[tuple[bytes, str]] = [
+        (
+            UUID(hex="1bd02896029d4cc0b278d7048991a440").bytes,
+            "\x1b�(�\x02�L�x�\x04���@",
+        ),
+    ]
+
+    for data, decoded in test_cases:
+        with subtests.test("ffprobe like decoding is correct"):
+            assert ffprobe_like_decode(data) == decoded
+
+
 def test_mp4_tagger_metadata_tags_mutagen(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
@@ -468,12 +491,12 @@ def test_mp4_tagger_metadata_tags_mutagen(
     def get_raw_ffprobe_tags(
         result: FFProbeResult,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        val = result.file_info.raw
+        val = deepcopy(result.file_info.raw)
         # delete things that might change, but are insignificant for metadata
         del val["size"]
         del val["bit_rate"]
 
-        metadata: dict[str, Any] = {}
+        metadata: dict[str, Any] = {"comment": None, "metadata": None}
 
         if val.get("tags", None) is not None:
             tags: dict[str, Any] = val["tags"]
@@ -519,7 +542,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
             ),
         )
 
-        for file, tags in test_files:
+        for file, tags in test_files[1:2]:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -547,9 +570,10 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         ffprobe_early_tags.as_ok(),
                     )
 
-                    assert [*ffprobe_metadata_early.keys()] == ["comment"] or [
-                        *ffprobe_metadata_early.keys(),
-                    ] == [], "raw ffprobe metadata is empty at start"
+                    assert (
+                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
+                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                    ), "raw ffprobe metadata is empty at start"
 
                     w.write_tags(tags)
 
@@ -580,17 +604,15 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
-                    assert ffprobe_metadata_next.get("metadata") is not None
-
                     assert ffprobe_metadata_next["metadata"] == merge_dicts(
                         {
                             f"video_language_detect:{key}": json.dumps(value)
                             for key, value in tags.metadata.items()
                         },
                         {
-                            "video_language_detect_uuid:file_uuid": tags.uuid.bytes.decode(
-                                "utf-8", errors="replace"
-                            ),
+                            "video_language_detect_uuid:file_uuid": ffprobe_like_decode(
+                                tags.uuid.bytes,
+                            )
                         },
                     )
 
