@@ -4,6 +4,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, Unpack, override
 
+from torch import Value
+
 from helper.manager import (
     CounterInterface,
     CounterOptions,
@@ -13,6 +15,7 @@ from helper.manager import (
     StatusBarInterface,
     StatusBarInterfaceUpdateOptions,
 )
+from helper.result import Err, Ok
 
 
 class NoopStatusBar(StatusBarInterface):
@@ -79,7 +82,8 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
             results: list[Path] = []
             for path in paths:
                 with tempfile.NamedTemporaryFile(
-                    delete=False, prefix="video_language_detect_tests_",
+                    delete=False,
+                    prefix="video_language_detect_tests_",
                 ) as f:
                     f.write(path.read_bytes())
                     results.append(Path(f.file.name))
@@ -99,3 +103,27 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
             return False
 
     return DuplicatesCtx()
+
+
+def count_successfull_assert()->None:
+    assert True, "Successful"
+
+class OkResult:
+
+    def __eq__(self, value: object) -> bool:
+        if isinstance(value, Err):
+            return False
+        if isinstance(value, Ok):
+            return True
+
+        msg = f"Invalid comapre type for OkResult and {type(value)}"
+        raise ValueError(msg)
+
+    def __str__(self: Self) -> str:
+        return "<OkResult>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(id(self))

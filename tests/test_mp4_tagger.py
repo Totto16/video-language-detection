@@ -9,7 +9,7 @@ from uuid import uuid4
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
-from test_helper import file_duplicates
+from test_helper import OkResult, count_successfull_assert, file_duplicates
 
 from content.language import Language
 from content.tagger.mp4_tagger import (
@@ -485,9 +485,7 @@ def test_mp4_tagger_parsing(
         with subtests.test("video gets parsed correctly"):
             structure_res = MP4BoxStructure.from_file(file)
 
-            if structure_res.err():
-                msg = f"structure not parsed correctly: {structure_res.as_err()}"
-                raise AssertionError(msg)
+            assert structure_res == OkResult(), "structure not parsed correctly"
 
             structure = structure_res.as_ok()
 
@@ -520,11 +518,15 @@ def test_mp4_tagger_parsing(
                         msg = f"Next box start is invalid, expected {start} but got {box.span.start}: {box!s}"
                         raise AssertionError(msg)
 
+                    count_successfull_assert()
+
                     start = box.span.end
 
                 if boxes_end != start:
                     msg = f"boxes don't reach at the parent end: size is {boxes_end} but boxes reach only to {start}"
                     raise AssertionError(msg)
+
+                count_successfull_assert()
 
             assert structure == result, "Parsing was incorrect"
 
@@ -581,9 +583,7 @@ def test_mp4_tagger_language_patching(
         with subtests.test("video gets parsed correctly"):
             structure_res = MP4BoxStructure.from_file(file)
 
-            if structure_res.err():
-                msg = f"structure not parsed correctly: {structure_res.as_err()}"
-                raise AssertionError(msg)
+            assert structure_res == OkResult(), "structure not parsed correctly"
 
             with file.open("rb+") as f:
                 for mdhd in find_mdhd_boxes_with_type(f, types):
@@ -605,9 +605,7 @@ def test_mp4_tagger_language_patching(
             # validate with ffprobe
             ffprobe_res = ffprobe(file)
 
-            if ffprobe_res.err():
-                msg = f"FFProbe error: {ffprobe_res.as_err()}"
-                raise AssertionError(msg)
+            assert ffprobe_res == OkResult(), "FFProbe error"
 
             for stream in ffprobe_res.as_ok().audio_streams():
                 assert stream.is_audio()
@@ -632,9 +630,7 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
 def mp4_has_already_udta_box(file: Path) -> bool:
     structure_res = MP4BoxStructure.from_file(file)
 
-    if structure_res.err():
-        msg = f"structure not parsed correctly: {structure_res.as_err()}"
-        raise AssertionError(msg)
+    assert structure_res == OkResult(), "structure not parsed correctly"
 
     structure = structure_res.as_ok()
 
@@ -734,9 +730,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
-                if tagger_res.err():
-                    msg = f"video tagger handle err: {tagger_res.as_err()}"
-                    raise AssertionError(msg)
+                assert tagger_res == OkResult(), "video tagger handle err"
 
                 tagger = tagger_res.as_ok()
 
@@ -750,9 +744,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     ffprobe_early_tags = ffprobe(file)
 
-                    if ffprobe_early_tags.err():
-                        msg = f"FFProbe error: {ffprobe_early_tags.as_err()}"
-                        raise AssertionError(msg)
+                    assert ffprobe_early_tags == OkResult(), "FFProbe error"
 
                     raw_early_tags, ffprobe_metadata_early = get_raw_ffprobe_tags(
                         ffprobe_early_tags.as_ok(),
@@ -780,9 +772,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     ffprobe_next_tags = ffprobe(file)
 
-                    if ffprobe_next_tags.err():
-                        msg = f"FFProbe error: {ffprobe_next_tags.as_err()}"
-                        raise AssertionError(msg)
+                    assert ffprobe_next_tags == OkResult(), "FFProbe error"
 
                     raw_next_tags, ffprobe_metadata_next = get_raw_ffprobe_tags(
                         ffprobe_next_tags.as_ok(),
@@ -838,15 +828,11 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     ffprobe_next_tags = ffprobe(file)
 
-                    if ffprobe_next_tags.err():
-                        msg = f"FFProbe error: {ffprobe_next_tags.as_err()}"
-                        raise AssertionError(msg)
+                    assert ffprobe_next_tags == OkResult(), "FFProbe error"
 
                     ffprobe_again_tags = ffprobe(file)
 
-                    if ffprobe_again_tags.err():
-                        msg = f"FFProbe error: {ffprobe_again_tags.as_err()}"
-                        raise AssertionError(msg)
+                    assert ffprobe_again_tags == OkResult(), "FFProbe error"
 
                     raw_again_tags, ffprobe_metadata_again = get_raw_ffprobe_tags(
                         ffprobe_again_tags.as_ok(),

@@ -11,6 +11,7 @@ from fixtures import (
     mark_as_used,
 )
 from pytest_subtests import SubTests
+from test_helper import OkResult
 
 from helper.ffprobe import ffprobe, parse_float_safely
 
@@ -79,9 +80,7 @@ def test_ffprobe_with_intact_videos(
     for video, ffprobe_data in ffprobe_temp_mp4_files.data:
         with subtests.test("video get's parsed correctly"):
             err_result = ffprobe(video)
-            if err_result.err():
-                msg = f"FFProbe error: {err_result.as_err()}"
-                raise AssertionError(msg)
+            assert err_result == OkResult(), "FFProbe error"
 
             result = err_result.as_ok()
 

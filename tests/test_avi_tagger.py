@@ -4,6 +4,7 @@ from typing import Self
 
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
+from test_helper import OkResult, count_successfull_assert
 
 from content.language import Language
 from content.tagger.avi_tagger import (
@@ -325,9 +326,7 @@ def test_avi_tagger_parsing(
         with subtests.test("video gets parsed correctly"):
             structure_res = AVIChunkStructure.from_file(file)
 
-            if structure_res.err():
-                msg = f"structure not parsed correctly: {structure_res.as_err()}"
-                raise AssertionError(msg)
+            assert structure_res == OkResult(), "structure not parsed correctly"
 
             structure = structure_res.as_ok()
 
@@ -358,6 +357,8 @@ def test_avi_tagger_parsing(
                         msg = f"Next chunk start is invalid, expected {start} but got {chunk.span.start}: {chunk!s}"
                         raise AssertionError(msg)
 
+                    count_successfull_assert()
+
                     start = chunk.span.end
 
                     # adjust padding
@@ -368,9 +369,13 @@ def test_avi_tagger_parsing(
                     msg = f"chunks don't reach at the parent end: size is {chunks_end} but chunks reach only to {start}"
                     raise AssertionError(msg)
 
+                count_successfull_assert()
+
             if structure != result:
                 msg = f"Parsing was incorrect:\n{structure!s}"
                 raise AssertionError(msg)
+
+            count_successfull_assert()
 
 
 def test_avi_invalid_bytes(
@@ -421,9 +426,7 @@ def test_avi_tagger_language_patching(
         with subtests.test("video gets parsed correctly"):
             structure_res = AVIChunkStructure.from_file(file)
 
-            if structure_res.err():
-                msg = f"structure not parsed correctly: {structure_res.as_err()}"
-                raise AssertionError(msg)
+            assert structure_res == OkResult(), "structure not parsed correctly"
 
             with file.open("rb+") as f:
                 for strh in find_strh_chunks_with_type(f, types):
