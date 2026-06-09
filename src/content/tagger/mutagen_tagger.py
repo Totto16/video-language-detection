@@ -347,7 +347,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
         instance: mutagen.FileType,
         manager: ManagerInterface,
     ) -> None:
-        super().__init__(manager=manager)
+        super().__init__(manager)
         self.__instance = instance
         self.__filething = filething
 
@@ -399,27 +399,13 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             with self.__filething.callback_ctx(process_op):
                 self.__instance.save(self.__filething)
-                # self.__filething.flush()
-                # self.__filething.flush()
-                # self.__filething.flush()
-                # self.__filething.flush()
-                
+                self.__filething.flush()
+
         except MutagenError as err:
             msg = "tag error"
             raise RuntimeError(msg) from err
         finally:
             bar.close(clear=True)
-            
-        # res = VideoTaggerMutagen._VideoTaggerMutagen__get_handle_impl(self.__filething._MutagenFileWrapper__file, read_only=False)
-
-        # resok = res.as_ok()
-
-        # del self.__instance
-        # del self.__filething
-        
-        # self.__filething = resok[0]
-        # self.__instance = resok[1]
-
 
     @override
     def write_tags(self: Self, tags: MetadataTags) -> None:
