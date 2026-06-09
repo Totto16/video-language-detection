@@ -45,7 +45,7 @@ class ISOMAtomName:
             msg = f"Invalid atom name length {len(value)}"
             raise ValueError(msg)
 
-        def is_valid_byte(byte: int) -> bool:
+        def is_valid_byte(byte: int, pos: int) -> bool:
             val = bytes([byte])
 
             if val.islower():
@@ -54,10 +54,15 @@ class ISOMAtomName:
             if val.isupper():
                 return True
 
-            # TODO
-            return val in []
+            if val.isupper():
+                return True
 
-        if not all(is_valid_byte(val) for val in value):
+            if pos != 0 and val.isdigit():
+                return True
+
+            return val in [b"\xa9"]
+
+        if not all(is_valid_byte(val, i) for i, val in enumerate(value)):
             msg = f"Atom name not valid {value!r}"
             raise ValueError(msg)
 

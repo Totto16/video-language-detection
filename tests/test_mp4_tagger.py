@@ -402,7 +402,6 @@ def test_mp4_invalid_bytes(
 
             assert res is not None, "valid mp4 is incorrect here"
 
-            print(data, res)
             assert res == err, "incorrect error"
 
 
