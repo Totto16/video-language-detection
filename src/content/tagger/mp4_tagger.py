@@ -1,7 +1,7 @@
-from enum import Enum
 import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
+from enum import Enum
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
@@ -128,6 +128,10 @@ FREE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"free")
 SKIP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"skip")
 ILST_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"ilst")
 DATA_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"data")
+MVHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mvhd")
+IODS_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"iods")
+TKHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"tkhd")
+MDAT_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mdat")
 
 
 class MP4BoxSpan:
@@ -1639,8 +1643,8 @@ class Mp4MetadataHandler:
         # note: can write 0 or more free space or user extension boxes, and its allowed everywhere
 
         if self.__uuid_box is not None:
-            # ignore uuid write
-            pass
+            buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
+            f.write(buffer)
         else:
             buffer = UUIDExtensionBox.write_to_buffer(uuid)
 
@@ -1745,19 +1749,19 @@ class Mp4MetadataHandler:
 
         top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, 0, end=end))
 
-        our_boxes: list[MP4Box] = []
+        our_boxes_reversed: list[MP4Box] = []
         other_box_encountered = False
         for box in reversed(top_boxes):
             if other_box_encountered:
                 break
 
             if box_is_written_by_us(box):
-                our_boxes.append(box)
+                our_boxes_reversed.append(box)
             else:
                 other_box_encountered = True
                 break
 
-        return Mp4MetadataHandler(uuid_box, our_boxes)
+        return Mp4MetadataHandler(uuid_box, list(reversed(our_boxes_reversed)))
 
 
 class VideoTaggerWriterMP4(VideoTaggerWriter):
