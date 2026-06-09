@@ -333,8 +333,23 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
-MUTAGEN_DOMAIN = "lt.totto:video_language_detect"
-MUTAGEN_UUID_KEY = f"----:{MUTAGEN_DOMAIN}_uuid:file_uuid"
+MUTAGEN_DOMAIN1 = "lt.totto.vld"
+
+
+def mutagen_domain_with_key(key: str) -> str:
+    return f"----:{MUTAGEN_DOMAIN1}:video_language_detect:{key}"
+
+
+def key_start_with_domain_key(key: str) -> bool:
+    return key.startswith(f"----:{MUTAGEN_DOMAIN1}:video_language_detect:")
+
+
+def key_get_raw_key(key: str) -> str:
+    return key.replace(f"----:{MUTAGEN_DOMAIN1}:video_language_detect:", "")
+
+
+MUTAGEN_UUID_RAW_KEY = f"----:{MUTAGEN_DOMAIN1}:video_language_detect_uuid:raw"
+MUTAGEN_UUID_HEX_KEY = f"----:{MUTAGEN_DOMAIN1}:video_language_detect_uuid:hex"
 
 
 class VideoTaggerWriterMutagen(VideoTaggerWriter):
@@ -414,15 +429,22 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             for key, value in tags.metadata.items():
                 value_enc = json.dumps(value).encode()
-                self.__instance[f"----:{MUTAGEN_DOMAIN}:{key}"] = [
+                self.__instance[mutagen_domain_with_key(key)] = [
                     mp4.MP4FreeForm(value_enc, mp4.AtomDataType.UTF8),
                 ]
 
-            previous_uuid = self.__instance.get(MUTAGEN_UUID_KEY)
+            previous_uuid_raw = self.__instance.get(MUTAGEN_UUID_RAW_KEY)
 
-            if not previous_uuid:
-                self.__instance[MUTAGEN_UUID_KEY] = [
+            if not previous_uuid_raw:
+                self.__instance[MUTAGEN_UUID_RAW_KEY] = [
                     mp4.MP4FreeForm(tags.uuid.bytes, mp4.AtomDataType.UUID),
+                ]
+
+            previous_uuid_hex = self.__instance.get(MUTAGEN_UUID_HEX_KEY)
+
+            if not previous_uuid_hex:
+                self.__instance[MUTAGEN_UUID_HEX_KEY] = [
+                    mp4.MP4FreeForm(tags.uuid.hex.encode(), mp4.AtomDataType.UTF8),
                 ]
 
         else:
@@ -474,20 +496,42 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             return json.loads(str_value)
 
         def mutagen_tag_as_uuid(
-            value: str | mp4.MP4FreeForm,
-        ) -> UUID:
-            if isinstance(value, str):
-                msg = "Invalid type for UUID: str"
-                raise TypeError(msg)
+            is_hex: bool,
+        ) -> Callable[[str | mp4.MP4FreeForm], UUID]:
+            if not is_hex:
 
-            if isinstance(value, mp4.MP4FreeForm):
-                if value.dataformat != mp4.AtomDataType.UUID:
-                    msg = f"Invalid AtomDataType for uuid tag: {value.dataformat}"
-                    raise RuntimeError(msg)
+                def impl_raw(value: str | mp4.MP4FreeForm) -> UUID:
+                    if isinstance(value, str):
+                        msg = "Invalid type for raw UUID: str"
+                        raise TypeError(msg)
 
-                return UUID(bytes=bytes(value))
+                    if isinstance(value, mp4.MP4FreeForm):
+                        if value.dataformat != mp4.AtomDataType.UUID:
+                            msg = f"Invalid AtomDataType for raw uuid tag: {value.dataformat}"
+                            raise RuntimeError(msg)
 
-            assert_never(value)
+                        return UUID(bytes=bytes(value))
+
+                    assert_never(value)
+
+                return impl_raw
+
+            def impl_hex(value: str | mp4.MP4FreeForm) -> UUID:
+                if isinstance(value, str):
+                    return UUID(hex=value)
+
+                if isinstance(value, mp4.MP4FreeForm):
+                    if value.dataformat != mp4.AtomDataType.UTF8:
+                        msg = (
+                            f"Invalid AtomDataType for hex uuid tag: {value.dataformat}"
+                        )
+                        raise RuntimeError(msg)
+
+                    return UUID(hex=bytes(value).decode())
+
+                assert_never(value)
+
+            return impl_hex
 
         result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
 
@@ -505,8 +549,8 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
                 result.comment = decode_mutagen_tag_value(value, mutagen_tag_as_str)
 
-            elif key.startswith(f"----:{MUTAGEN_DOMAIN}:"):
-                actual_key = key.replace(f"----:{MUTAGEN_DOMAIN}:", "")
+            elif key_start_with_domain_key(key):
+                actual_key = key_get_raw_key(key)
 
                 if result.metadata.get(actual_key, None) is not None:
                     msg = f"Duplicate metadata key tag read: {actual_key} -> {value}"
@@ -517,17 +561,18 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                     mutagen_tag_as_json,
                 )
 
-            elif key == MUTAGEN_UUID_KEY:
+            elif key in (MUTAGEN_UUID_HEX_KEY, MUTAGEN_UUID_RAW_KEY):
                 uuid = decode_mutagen_tag_value(
                     value,
-                    mutagen_tag_as_uuid,
+                    mutagen_tag_as_uuid(key == MUTAGEN_UUID_HEX_KEY),
                 )
 
                 if result.uuid is not None:
-                    msg = f"Duplicate uuid tag read: {uuid}"
-                    raise RuntimeError(msg)
-
-                result.uuid = uuid
+                    if result.uuid != uuid:
+                        msg = f"Duplicate uuid tag read, that are not the same: {uuid}"
+                        raise RuntimeError(msg)
+                else:
+                    result.uuid = uuid
 
             else:
                 result.unrecognized.append(

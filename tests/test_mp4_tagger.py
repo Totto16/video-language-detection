@@ -789,7 +789,8 @@ def test_mp4_tagger_metadata_tags_mutagen(
                                 for key, value in tags.metadata.items()
                             },
                             {
-                                "video_language_detect_uuid:file_uuid": mock.ANY,
+                                "video_language_detect_uuid:raw": mock.ANY,
+                                "video_language_detect_uuid:hex": tags.uuid.hex,
                             },
                         )
 
@@ -849,11 +850,10 @@ def test_mp4_tagger_metadata_tags_mutagen(
                                 for key, value in tags.metadata.items()
                             },
                             {
-                                "video_language_detect_uuid:file_uuid": ffprobe_metadata_next[
+                                "video_language_detect_uuid:raw": ffprobe_metadata_next[
                                     "metadata"
-                                ][
-                                    "video_language_detect_uuid:file_uuid"
-                                ],
+                                ]["video_language_detect_uuid:raw"],
+                                "video_language_detect_uuid:hex": tags.uuid.hex,
                             },
                         )
 
@@ -892,7 +892,7 @@ def test_mp4_tagger_metadata_tags_custom(
             ),
         )
 
-        #TODO
+        # TODO
         for file, tags in test_files[0:1]:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMP4.get_handle(file)
