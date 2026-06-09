@@ -873,8 +873,11 @@ class MovieBox(MP4Box):
 @final
 class HandlerBox(MP4FullBox):
     handler_type: ISOMAtomName
+    name: str
 
-    def __init__(self: Self, parent: MP4FullBox, handler_type: ISOMAtomName) -> None:
+    def __init__(
+        self: Self, parent: MP4FullBox, handler_type: ISOMAtomName, name: str
+    ) -> None:
         super().__init__(
             parent,
             parent.version,
@@ -882,6 +885,7 @@ class HandlerBox(MP4FullBox):
             is_container=False,
         )
         self.handler_type = handler_type
+        self.name = name
 
     @staticmethod
     def __read_from_stream_impl(f: BufferedIOBase, parent: MP4FullBox) -> "HandlerBox":
@@ -907,17 +911,37 @@ class HandlerBox(MP4FullBox):
             msg = "Invalid hdlr version"
             raise RuntimeError(msg)
 
-        f.seek(parent.span.payload_start + 4)
+        pre_defined = read_checked(f, 4)
+
+        if pre_defined != b"\x00" * 4:
+            msg = f"HandlerBox: pre_defined has to be 0, but was: {pre_defined!r}"
+            raise ValueError(msg)
 
         handler_type_raw = read_checked(f, 4)
         handler_type = ISOMAtomName(handler_type_raw)
 
+        reserved = read_checked(f, 4 * 3)
+
+        if reserved != b"\x00" * (3 * 4):
+            # make exception for apples usage of these types
+            if reserved.startswith(b"appl"):
+                pass
+            else:
+                msg = f"HandlerBox: reserved has to be 0, but was: {reserved!r}"
+                raise ValueError(msg)
+
         # omitting dynamic sized string "name"
-        additional_header_size = 4 + 4 + (4 * 3)
+        fixed_header_size = 4 + 4 + (4 * 3)
 
-        parent.span.add_header_size(additional_header_size)
+        name_size = parent.span.payload_size - fixed_header_size
 
-        return HandlerBox(parent, handler_type)
+        name_raw = read_checked(f, name_size)
+
+        name = name_raw.decode()
+
+        parent.span.add_header_size(parent.span.payload_size)
+
+        return HandlerBox(parent, handler_type, name)
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "HandlerBox":
@@ -925,7 +949,7 @@ class HandlerBox(MP4FullBox):
         return HandlerBox.__read_from_stream_impl(f, box)
 
     def __str__(self: Self) -> str:
-        return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type}>"
+        return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type} name: {self.name}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -1027,6 +1051,99 @@ class UserDataBox(MP4Box):
         return str(self)
 
 
+@final
+class MetaBox(MP4FullBox):
+    handler_box: HandlerBox
+
+    def __init__(
+        self: Self, parent: MP4FullBox, handler_box: HandlerBox, *, is_container: bool
+    ) -> None:
+        super().__init__(
+            parent,
+            parent.version,
+            parent.flags,
+            is_container=is_container,
+        )
+
+        self.handler_box = handler_box
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase,
+        parent: MP4FullBox,
+    ) -> "MetaBox":
+        # spec: ISO/IEC 14496-12
+        # ISO meta box structure:
+        # full_box     | <full box size> bytes | parent full box
+        # ... data
+
+        # aligned(8) class MetaBox (handler_type)
+        # extends FullBox(
+        #     ‘meta’,
+        #     version = 0,
+        #     0)
+        # {
+        #     HandlerBox(handler_type) theHandler;
+        #     PrimaryItemBox primary_resource; // optional
+        #     DataInformationBox file_locations; // optional
+        #     ItemLocationBox item_locations; // optional
+        #     ItemProtectionBox protections; // optional
+        #     ItemInfoBox item_infos; // optional
+        #     IPMPControlBox IPMP_control; // optional
+        #     ItemReferenceBox item_refs; // optional
+        #     ItemDataBox item_data; // optional
+        #     Box other_boxes[]; // optional
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        if parent.version != 0:
+            msg = "Invalid meta version"
+            raise RuntimeError(msg)
+
+        handler_box = HandlerBox.read_from_stream(f, parent.span.payload_start)
+
+        parent.span.add_header_size(handler_box.span.size)
+
+        # peek the next box, if it's an optional box, we read that, otherwise we are at the end and read the last box array
+        OPTIONAL_BOXES: list[ISOMAtomName] = [
+            ISOMAtomName(b"pitm"),  # PrimaryItemBox
+            ISOMAtomName(b"dinf"),  # DataInformationBox
+            ISOMAtomName(b"iloc"),  # ItemLocationBox
+            ISOMAtomName(b"ipro"),  # ItemProtectionBox
+            ISOMAtomName(b"iinf"),  # ItemInfoBox
+            ISOMAtomName(b"ipmc"),  # IPMPControlBox
+            ISOMAtomName(b"iref"),  # ItemReferenceBox
+            ISOMAtomName(b"idat"),  # ItemDataBox
+        ]
+        while True:
+            f.seek(parent.span.payload_start)
+
+            simple_box = MP4Box.read_from_stream(f, parent.span.payload_start)
+
+            if simple_box.type not in OPTIONAL_BOXES:
+                break
+
+            msg = f"MetaBox: parsing of optional box {simple_box.type} not implemented yet"
+            raise RuntimeError(msg)
+
+        # treat the box as container, if there is some payload left
+        is_container = parent.span.payload_size != 0
+
+        return MetaBox(parent, handler_box, is_container=is_container)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "MetaBox":
+        box = MP4FullBox.read_from_stream(f, offset)
+        return MetaBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<MetaBox parent: {MP4FullBox.__str__(self)} handler_box: {self.handler_box}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
     box = MP4Box.read_from_stream(f, pos)
 
@@ -1049,6 +1166,8 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             return FreeSpaceBox.read_from_stream(f, pos)
         case b"udta":
             return UserDataBox.read_from_stream(f, pos)
+        case b"meta":
+            return MetaBox.read_from_stream(f, pos)
         case _:
             return box
 

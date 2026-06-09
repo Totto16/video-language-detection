@@ -5,7 +5,7 @@ import shlex
 import subprocess
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict
+from typing import Any, Optional, Self, TypedDict, cast
 
 from helper.result import Err, Ok, Result
 from helper.timestamp import parse_int_safely
@@ -39,8 +39,8 @@ class FFprobeStream:
         self.__stream = stream
 
     @property
-    def raw(self: Self) -> FFprobeRawStream:
-        return self.__stream
+    def raw(self: Self) -> dict[str, Any]:
+        return cast(dict[str, Any], self.__stream)
 
     def is_audio(self: Self) -> bool:
         """
