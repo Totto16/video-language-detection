@@ -379,7 +379,8 @@ class UUIDExtensionBox(UserExtensionBox):
 
     @staticmethod
     def read_from_stream_parent(
-        f: BufferedIOBase, parent: UserExtensionBox
+        f: BufferedIOBase,
+        parent: UserExtensionBox,
     ) -> "UUIDExtensionBox":
 
         # this is a custom user box, it contains one UUID
@@ -519,6 +520,12 @@ class MP4FullBox(MP4Box):
         box = MP4Box.read_from_stream(f, offset)
         return MP4FullBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def read_from_stream_parent_mp4_full_box(
+        f: BufferedIOBase, parent: MP4Box
+    ) -> "MP4FullBox":
+        return MP4FullBox.__read_from_stream_impl(f, parent)
+
     def __str__(self: Self) -> str:
         return f"<MP4FullBox parent: {MP4Box.__str__(self)} version: {self.version} flags: {self.flags.hex()}>"
 
@@ -555,7 +562,7 @@ class FileTypeBox(MP4Box):
         # .. string data for the rest of the size
 
         # aligned(8) class FileTypeBox extends Box(
-        #     ‘ftyp’
+        #     'ftyp'
         # ) {
         #     unsigned int(32) major_brand;
         #     unsigned int(32) minor_version;
@@ -594,6 +601,10 @@ class FileTypeBox(MP4Box):
         box = MP4Box.read_from_stream(f, offset)
         return FileTypeBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "FileTypeBox":
+        return FileTypeBox.__read_from_stream_impl(f, parent)
+
     def __str__(self: Self) -> str:
         return f"<FileTypeBox parent: {MP4Box.__str__(self)} major_brand: {self.major_brand} minor_version: {self.minor_version} compatible_brands: {self.compatible_brands!s}>"
 
@@ -621,7 +632,7 @@ class FreeSpaceBox(MP4Box):
         # box     | <box size> bytes | parent box
         # .. string data for the rest of the size
 
-        # free_type may be ‘free’ or ‘skip’.
+        # free_type may be 'free' or 'skip'.
         # aligned(8) class FreeSpaceBox extends Box(
         #     free_type
         # ) {
@@ -640,6 +651,10 @@ class FreeSpaceBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "FreeSpaceBox":
         box = MP4Box.read_from_stream(f, offset)
         return FreeSpaceBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "FreeSpaceBox":
+        return FreeSpaceBox.__read_from_stream_impl(f, parent)
 
     @staticmethod
     def write_to_buffer(data: bytes) -> bytes:
@@ -678,7 +693,7 @@ class MediaHeaderBox(MP4FullBox):
 
         # aligned(8) class MediaHeaderBox
         # extends FullBox(
-        #     ‘mdhd’,
+        #     'mdhd',
         #     version,
         #     0
         # ) {
@@ -731,6 +746,11 @@ class MediaHeaderBox(MP4FullBox):
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaHeaderBox":
         box = MP4FullBox.read_from_stream(f, offset)
+        return MediaHeaderBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MediaHeaderBox":
+        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return MediaHeaderBox.__read_from_stream_impl(f, box)
 
     @staticmethod
@@ -822,7 +842,7 @@ class MediaBox(MP4Box):
         # box     | <box size> bytes | parent box
 
         # aligned(8) class MediaBox extends Box(
-        #     ‘mdia’
+        #     'mdia'
         #     ) {
         # }
 
@@ -832,6 +852,10 @@ class MediaBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaBox":
         box = MP4Box.read_from_stream(f, offset)
         return MediaBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
+        return MediaBox.__read_from_stream_impl(f, parent)
 
     def __str__(self: Self) -> str:
         return f"<MediaBox parent: {MP4Box.__str__(self)}>"
@@ -852,7 +876,7 @@ class MovieBox(MP4Box):
         # box     | <box size> bytes | parent box
 
         # aligned(8) class MovieBox extends Box(
-        #     ‘moov’
+        #     'moov'
         #     ){
         # }
 
@@ -862,6 +886,10 @@ class MovieBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MovieBox":
         box = MP4Box.read_from_stream(f, offset)
         return MovieBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MovieBox":
+        return MovieBox.__read_from_stream_impl(f, parent)
 
     def __str__(self: Self) -> str:
         return f"<MovieBox parent: {MP4Box.__str__(self)}>"
@@ -895,7 +923,7 @@ class HandlerBox(MP4FullBox):
         # ... data, see below
 
         # aligned(8) class HandlerBox extends FullBox(
-        #     ‘hdlr’,
+        #     'hdlr',
         #     version = 0,
         #     0)
         # {
@@ -948,6 +976,11 @@ class HandlerBox(MP4FullBox):
         box = MP4FullBox.read_from_stream(f, offset)
         return HandlerBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "HandlerBox":
+        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
+        return HandlerBox.__read_from_stream_impl(f, box)
+
     def __str__(self: Self) -> str:
         return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type} name: {self.name}>"
 
@@ -971,7 +1004,7 @@ class TrackBox(MP4Box):
         # box     | <box size> bytes | parent box
 
         # aligned(8) class TrackBox extends Box(
-        #     ‘trak’
+        #     'trak'
         # ) {
         # }
 
@@ -1014,6 +1047,10 @@ class TrackBox(MP4Box):
         box = MP4Box.read_from_stream(f, offset)
         return TrackBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "TrackBox":
+        return TrackBox.__read_from_stream_impl(f, parent)
+
     def __str__(self: Self) -> str:
         return f"<TrackBox parent: {MP4Box.__str__(self)} hdlr: {self.hdlr}>"
 
@@ -1033,7 +1070,7 @@ class UserDataBox(MP4Box):
         # box     | <box size> bytes | parent box
 
         # aligned(8) class UserDataBox extends Box(
-        #     ‘udta’
+        #     'udta'
         #     ) {
         # }
 
@@ -1043,6 +1080,10 @@ class UserDataBox(MP4Box):
     def read_from_stream(f: BufferedIOBase, offset: int) -> "UserDataBox":
         box = MP4Box.read_from_stream(f, offset)
         return UserDataBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "UserDataBox":
+        return UserDataBox.__read_from_stream_impl(f, parent)
 
     def __str__(self: Self) -> str:
         return f"<UserDataBox parent: {MP4Box.__str__(self)}>"
@@ -1079,7 +1120,7 @@ class MetaBox(MP4FullBox):
 
         # aligned(8) class MetaBox (handler_type)
         # extends FullBox(
-        #     ‘meta’,
+        #     'meta',
         #     version = 0,
         #     0)
         # {
@@ -1137,8 +1178,52 @@ class MetaBox(MP4FullBox):
         box = MP4FullBox.read_from_stream(f, offset)
         return MetaBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MetaBox":
+        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
+        return MetaBox.__read_from_stream_impl(f, box)
+
     def __str__(self: Self) -> str:
         return f"<MetaBox parent: {MP4FullBox.__str__(self)} handler_box: {self.handler_box}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+class AppleItunesItemList(MP4Box):
+    def __init__(self: Self, parent: MP4Box) -> None:
+        super().__init__(parent.type, parent.span, is_container=True)
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase,
+        parent: MP4Box,
+    ) -> "AppleItunesItemList":
+        # spec: https://developer.apple.com/documentation/quicktime-file-format/metadata_item_list_atom
+        # Apple Itunes Item List structure:
+        # box     | <box size> bytes | parent box
+
+        # aligned(8) class AppleItunesItemList extends Box(
+        #     'ilst'
+        #     ) {
+        # }
+
+        return AppleItunesItemList(parent)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AppleItunesItemList":
+        box = MP4Box.read_from_stream(f, offset)
+        return AppleItunesItemList.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(
+        f: BufferedIOBase, parent: MP4Box
+    ) -> "AppleItunesItemList":
+        return AppleItunesItemList.__read_from_stream_impl(f, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<AppleItunesItemList parent: {MP4Box.__str__(self)}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -1149,25 +1234,27 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
 
     match box.type.value:
         case b"mdhd":
-            return MediaHeaderBox.read_from_stream(f, pos)
+            return MediaHeaderBox.read_from_stream_parent(f, box)
         case b"mdia":
-            return MediaBox.read_from_stream(f, pos)
+            return MediaBox.read_from_stream_parent(f, box)
         case b"hdlr":
-            return HandlerBox.read_from_stream(f, pos)
+            return HandlerBox.read_from_stream_parent(f, box)
         case b"trak":
-            return TrackBox.read_from_stream(f, pos)
+            return TrackBox.read_from_stream_parent(f, box)
         case b"moov":
-            return MovieBox.read_from_stream(f, pos)
+            return MovieBox.read_from_stream_parent(f, box)
         case b"ftyp":
-            return FileTypeBox.read_from_stream(f, pos)
+            return FileTypeBox.read_from_stream_parent(f, box)
         case b"free":
-            return FreeSpaceBox.read_from_stream(f, pos)
+            return FreeSpaceBox.read_from_stream_parent(f, box)
         case b"skip":
-            return FreeSpaceBox.read_from_stream(f, pos)
+            return FreeSpaceBox.read_from_stream_parent(f, box)
         case b"udta":
-            return UserDataBox.read_from_stream(f, pos)
+            return UserDataBox.read_from_stream_parent(f, box)
         case b"meta":
-            return MetaBox.read_from_stream(f, pos)
+            return MetaBox.read_from_stream_parent(f, box)
+        case b"ilst":
+            return AppleItunesItemList.read_from_stream_parent(f, box)
         case _:
             return box
 
