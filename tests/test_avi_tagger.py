@@ -4,7 +4,7 @@ from typing import Self
 
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
-from test_helper import OkResult, count_successfull_assert
+from test_helper import OkResult
 
 from content.language import Language
 from content.tagger.avi_tagger import (
@@ -353,11 +353,9 @@ def test_avi_tagger_parsing(
                     else:
                         chunk = chunk_data
 
-                    if chunk.span.start != start:
-                        msg = f"Next chunk start is invalid, expected {start} but got {chunk.span.start}: {chunk!s}"
-                        raise AssertionError(msg)
-
-                    count_successfull_assert()
+                    assert (
+                        chunk.span.start == start
+                    ), f"Next chunk start is invalid: {chunk!s}"
 
                     start = chunk.span.end
 
@@ -365,17 +363,9 @@ def test_avi_tagger_parsing(
                     if (start % 2) != 0:
                         start += 1
 
-                if chunks_end != start:
-                    msg = f"chunks don't reach at the parent end: size is {chunks_end} but chunks reach only to {start}"
-                    raise AssertionError(msg)
+                assert chunks_end == start, "chunks don't reach at the parent end"
 
-                count_successfull_assert()
-
-            if structure != result:
-                msg = f"Parsing was incorrect:\n{structure!s}"
-                raise AssertionError(msg)
-
-            count_successfull_assert()
+            assert structure == result, "Parsing was incorrect"
 
 
 def test_avi_invalid_bytes(

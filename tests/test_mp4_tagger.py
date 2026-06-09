@@ -1,15 +1,16 @@
+from collections.abc import Callable
 import json
 from copy import deepcopy
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
-from typing import Any, Callable, Optional, Self, override
+from typing import Any, Optional, Self, override
 from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
-from test_helper import OkResult, count_successfull_assert, file_duplicates
+from test_helper import OkResult, file_duplicates
 
 from content.language import Language
 from content.tagger.mp4_tagger import (
@@ -514,19 +515,13 @@ def test_mp4_tagger_parsing(
                     else:
                         box = box_data
 
-                    if box.span.start != start:
-                        msg = f"Next box start is invalid, expected {start} but got {box.span.start}: {box!s}"
-                        raise AssertionError(msg)
-
-                    count_successfull_assert()
+                    assert (
+                        box.span.start == start
+                    ), f"Next box start is invalid: {box!s}"
 
                     start = box.span.end
 
-                if boxes_end != start:
-                    msg = f"boxes don't reach at the parent end: size is {boxes_end} but boxes reach only to {start}"
-                    raise AssertionError(msg)
-
-                count_successfull_assert()
+                assert boxes_end == start, "boxes don't reach at the parent end"
 
             assert structure == result, "Parsing was incorrect"
 
@@ -901,9 +896,7 @@ def test_mp4_tagger_metadata_tags_custom(
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMP4.get_handle(file)
 
-                if tagger_res.err():
-                    msg = f"video tagger handle err: {tagger_res.as_err()}"
-                    raise AssertionError(msg)
+                assert tagger_res == OkResult(), "video tagger handle err"
 
                 tagger = tagger_res.as_ok()
 

@@ -105,9 +105,6 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
     return DuplicatesCtx()
 
 
-def count_successfull_assert()->None:
-    assert True, "Successful"
-
 class OkResult:
 
     def __eq__(self, value: object) -> bool:
