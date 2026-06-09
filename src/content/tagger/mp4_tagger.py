@@ -1249,7 +1249,7 @@ class AppleItunesItemList(MP4Box):
         return str(self)
 
 
-AppleItunesItemDataContent = str | int
+AppleItunesItemDataContent = str | int | UUID
 
 
 # see: https://developer.apple.com/documentation/quicktime-file-format/well-known_types
@@ -1259,6 +1259,9 @@ class AppleItunesItemDataType(Enum):
     utf_8 = 1
     utf_16 = 2
 
+    # see https://taglib.org/api/namespaceTagLib_1_1MP4.html#a86c3870b24b4cdb2887d3e47f5f9a39b
+    uuid = 8
+
     jpeg = 13
     png = 14
 
@@ -1267,19 +1270,19 @@ class AppleItunesItemDataType(Enum):
 
 
 @final
-class AppleItunesItemDataBox(MP4Box):
+class AppleItunesItemDataBox(MP4FullBox):
     type_indicator: int
     locale_indicator: int
     value: AppleItunesItemDataContent
 
     def __init__(
         self: Self,
-        parent: MP4Box,
+        parent: MP4FullBox,
         type_indicator: int,
         locale_indicator: int,
         value: AppleItunesItemDataContent,
     ) -> None:
-        super().__init__(parent.type, parent.span, is_container=False)
+        super().__init__(parent, parent.version, parent.flags, is_container=False)
 
         self.type_indicator = type_indicator
         self.locale_indicator = locale_indicator
@@ -1287,13 +1290,16 @@ class AppleItunesItemDataBox(MP4Box):
 
     @staticmethod
     def __decode_value(
-        type_indicator: int, value_raw: bytes
+        type_indicator: int,
+        value: bytes,
     ) -> AppleItunesItemDataContent:
         match type_indicator:
             case AppleItunesItemDataType.utf_8.value:
-                return value_raw.decode("utf-8")
+                return value.decode("utf-8")
             case AppleItunesItemDataType.utf_16.value:
-                return value_raw.decode("utf-8")
+                return value.decode("utf-8")
+            case AppleItunesItemDataType.uuid.value:
+                return UUID(bytes=value)
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
                 raise RuntimeError(msg)
@@ -1301,31 +1307,29 @@ class AppleItunesItemDataBox(MP4Box):
     @staticmethod
     def __read_from_stream_impl(
         f: BufferedIOBase,
-        parent: MP4Box,
+        parent: MP4FullBox,
     ) -> "AppleItunesItemDataBox":
         # spec: https://developer.apple.com/documentation/quicktime-file-format/data_atom
         # Apple Itunes Item Box structure:
-        # box     | <box size> bytes | parent box
+        # box     | <full box size> bytes | parent full box
         # ... data
 
-        # aligned(8) class AppleItunesItemDataBox extends Box(
+        # aligned(8) class AppleItunesItemDataBox extends FullBox(
         #     'data'
         #     ) {
         # }
 
         f.seek(parent.span.payload_start)
 
-        type_indicator_raw = read_checked(f, 4)
-
         # see: https://developer.apple.com/documentation/quicktime-file-format/type_indicator
-        if type_indicator_raw[0] != 0:
-            msg = f"AppleItunesItemDataBox: type indicator byte 0 has to be 0, but was {type_indicator_raw[0]}"
+        if parent.version != 0:
+            msg = f"AppleItunesItemDataBox: type indicator byte 0 has to be 0, but was {parent.version} (it is the FullBox version field)"
             raise ValueError(msg)
 
         type_indicator = Unpacker.unpack_one(
             ISOM_BYTE_ORDER,
             UnsignedInt(),
-            type_indicator_raw,
+            b"\x00" + parent.flags,
         )
 
         locale_indicator_raw = read_checked(f, 4)
@@ -1338,7 +1342,7 @@ class AppleItunesItemDataBox(MP4Box):
         )
 
         # omitting dynamic sized string "value"
-        fixed_header_size = 4 + 4
+        fixed_header_size = 4
 
         value_size = parent.span.payload_size - fixed_header_size
 
@@ -1352,7 +1356,7 @@ class AppleItunesItemDataBox(MP4Box):
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "AppleItunesItemDataBox":
-        box: MP4Box = MP4Box.read_from_stream(f, offset)
+        box: MP4FullBox = MP4FullBox.read_from_stream(f, offset)
         return AppleItunesItemDataBox.__read_from_stream_impl(f, box)
 
     @staticmethod
@@ -1360,10 +1364,11 @@ class AppleItunesItemDataBox(MP4Box):
         f: BufferedIOBase,
         parent: MP4Box,
     ) -> "AppleItunesItemDataBox":
-        return AppleItunesItemDataBox.__read_from_stream_impl(f, parent)
+        box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
+        return AppleItunesItemDataBox.__read_from_stream_impl(f, box)
 
     def __str__(self: Self) -> str:
-        return f"<AppleItunesItemDataBox parent: {MP4Box.__str__(self)} type_indicator: {self.type_indicator} value: {self.value}>"
+        return f"<AppleItunesItemDataBox parent: {MP4FullBox.__str__(self)} type_indicator: {self.type_indicator} value: {self.value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -1420,7 +1425,7 @@ class AppleItunesItemBox(MP4Box):
 
 
 AppleItunesItemBoxAtoms: list[ISOMAtomName] = [
-    ISOMAtomName(b"----"),
+    ISOMAtomName(b"----"),  # TODO: special case this!
     ISOMAtomName(b"trkn"),
     ISOMAtomName(b"disk"),
     ISOMAtomName(b"gnre"),
