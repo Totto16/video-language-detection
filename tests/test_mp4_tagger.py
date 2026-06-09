@@ -498,7 +498,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
         return (val, metadata)
 
     with file_duplicates(mp4_test_parse_files.data) as data:
-        test_files: list[tuple[Path, MetadataTags]] = list(
+        test_files: list[tuple[Path, MetadataTags, bool]] = list(
             zip(
                 data,
                 [
@@ -521,11 +521,12 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         },
                     ),
                 ],
+                [False, True],
                 strict=True,
             ),
         )
-        # TODO
-        for file, tags in test_files:
+
+        for file, tags, is_recognized_by_ffprobe in test_files:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -587,6 +588,11 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
+                    if is_recognized_by_ffprobe:
+                        assert ffprobe_metadata_next.get("metadata", None) is not None
+                    else:
+                        assert ffprobe_metadata_next.get("metadata", None) is None
+
                     if ffprobe_metadata_next.get("metadata", None) is not None:
                         assert ffprobe_metadata_next["metadata"] == merge_dicts(
                             {
@@ -645,6 +651,12 @@ def test_mp4_tagger_metadata_tags_mutagen(
                     assert raw_again_tags == raw_early_tags
 
                     assert ffprobe_metadata_again["comment"] == tags.comment
+
+                    if is_recognized_by_ffprobe:
+                        assert ffprobe_metadata_again.get("metadata", None) is not None
+                    else:
+                        assert ffprobe_metadata_again.get("metadata", None) is None
+
 
                     if ffprobe_metadata_again.get("metadata", None) is not None:
                         assert ffprobe_metadata_again["metadata"] == merge_dicts(
