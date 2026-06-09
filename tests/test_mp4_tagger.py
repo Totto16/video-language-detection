@@ -78,7 +78,7 @@ class RecursiveBoxes:
         indent_str: str = " ",
     ) -> str:
         if isinstance(data, tuple):
-            return f"{(indent_str * depth)}<NestedBoxes\n{data[0]!s}\n{RecursiveBoxes.__to_str(data[1], depth=depth+1)}(>)"
+            return f"{(indent_str * depth)}<NestedBoxes\n{data[0]!s}\n{RecursiveBoxes.__to_str(data[1], depth=depth+1)}>"
 
         return f"{(indent_str * depth)}<SimpleBox {data!s}>"
 

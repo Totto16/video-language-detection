@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
@@ -60,7 +61,7 @@ class ISOMAtomName:
             if pos != 0 and val.isdigit():
                 return True
 
-            return val in [b"\xa9"]
+            return val in [b"\xa9", b"-"]
 
         if not all(is_valid_byte(val, i) for i, val in enumerate(value)):
             msg = f"Atom name not valid {value!r}"
@@ -125,6 +126,8 @@ VIDE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"vide")
 FTYP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"ftyp")
 FREE_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"free")
 SKIP_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"skip")
+ILST_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"ilst")
+DATA_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"data")
 
 
 class MP4BoxSpan:
@@ -1246,32 +1249,278 @@ class AppleItunesItemList(MP4Box):
         return str(self)
 
 
+AppleItunesItemDataContent = str | int
+
+
+# see: https://developer.apple.com/documentation/quicktime-file-format/well-known_types
+class AppleItunesItemDataType(Enum):
+    # NOTE: only some are implemented here
+    reserved = 0
+    utf_8 = 1
+    utf_16 = 2
+
+    jpeg = 13
+    png = 14
+
+    be_signed_integer_var = 21
+    be_unsigned_integer_var = 22
+
+
+@final
+class AppleItunesItemDataBox(MP4Box):
+    type_indicator: int
+    locale_indicator: int
+    value: AppleItunesItemDataContent
+
+    def __init__(
+        self: Self,
+        parent: MP4Box,
+        type_indicator: int,
+        locale_indicator: int,
+        value: AppleItunesItemDataContent,
+    ) -> None:
+        super().__init__(parent.type, parent.span, is_container=False)
+
+        self.type_indicator = type_indicator
+        self.locale_indicator = locale_indicator
+        self.value = value
+
+    @staticmethod
+    def __decode_value(
+        type_indicator: int, value_raw: bytes
+    ) -> AppleItunesItemDataContent:
+        match type_indicator:
+            case AppleItunesItemDataType.utf_8.value:
+                return value_raw.decode("utf-8")
+            case AppleItunesItemDataType.utf_16.value:
+                return value_raw.decode("utf-8")
+            case _:
+                msg = f"Not implemented type_indicator conversion: {type_indicator}"
+                raise RuntimeError(msg)
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase,
+        parent: MP4Box,
+    ) -> "AppleItunesItemDataBox":
+        # spec: https://developer.apple.com/documentation/quicktime-file-format/data_atom
+        # Apple Itunes Item Box structure:
+        # box     | <box size> bytes | parent box
+        # ... data
+
+        # aligned(8) class AppleItunesItemDataBox extends Box(
+        #     'data'
+        #     ) {
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        type_indicator_raw = read_checked(f, 4)
+
+        # see: https://developer.apple.com/documentation/quicktime-file-format/type_indicator
+        if type_indicator_raw[0] != 0:
+            msg = f"AppleItunesItemDataBox: type indicator byte 0 has to be 0, but was {type_indicator_raw[0]}"
+            raise ValueError(msg)
+
+        type_indicator = Unpacker.unpack_one(
+            ISOM_BYTE_ORDER,
+            UnsignedInt(),
+            type_indicator_raw,
+        )
+
+        locale_indicator_raw = read_checked(f, 4)
+
+        # see: https://developer.apple.com/documentation/quicktime-file-format/locale_indicator
+        locale_indicator = Unpacker.unpack_one(
+            ISOM_BYTE_ORDER,
+            UnsignedInt(),
+            locale_indicator_raw,
+        )
+
+        # omitting dynamic sized string "value"
+        fixed_header_size = 4 + 4
+
+        value_size = parent.span.payload_size - fixed_header_size
+
+        value_raw = read_checked(f, value_size)
+
+        value = AppleItunesItemDataBox.__decode_value(type_indicator, value_raw)
+
+        parent.span.add_header_size(parent.span.payload_size)
+
+        return AppleItunesItemDataBox(parent, type_indicator, locale_indicator, value)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AppleItunesItemDataBox":
+        box: MP4Box = MP4Box.read_from_stream(f, offset)
+        return AppleItunesItemDataBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(
+        f: BufferedIOBase,
+        parent: MP4Box,
+    ) -> "AppleItunesItemDataBox":
+        return AppleItunesItemDataBox.__read_from_stream_impl(f, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<AppleItunesItemDataBox parent: {MP4Box.__str__(self)} type_indicator: {self.type_indicator} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+class AppleItunesItemBox(MP4Box):
+    data: AppleItunesItemDataBox
+
+    def __init__(self: Self, parent: MP4Box, data: AppleItunesItemDataBox) -> None:
+        super().__init__(parent.type, parent.span, is_container=False)
+
+        self.data = data
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase,
+        parent: MP4Box,
+    ) -> "AppleItunesItemBox":
+        # spec: https://developer.apple.com/documentation/quicktime-file-format/value_atom
+        # Apple Itunes Item Box structure:
+        # box     | <box size> bytes | parent box
+
+        # aligned(8) class AppleItunesItemBox extends Box(
+        #     '<any>' // any type specified, see below
+        #     ) {
+        # }
+
+        f.seek(parent.span.payload_start)
+
+        data = AppleItunesItemDataBox.read_from_stream(f, parent.span.payload_start)
+
+        parent.span.add_header_size(data.span.size)
+
+        return AppleItunesItemBox(parent, data)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "AppleItunesItemBox":
+        box = MP4Box.read_from_stream(f, offset)
+        return AppleItunesItemBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(
+        f: BufferedIOBase,
+        parent: MP4Box,
+    ) -> "AppleItunesItemBox":
+        return AppleItunesItemBox.__read_from_stream_impl(f, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<AppleItunesItemBox parent: {MP4Box.__str__(self)} data: {self.data}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+AppleItunesItemBoxAtoms: list[ISOMAtomName] = [
+    ISOMAtomName(b"----"),
+    ISOMAtomName(b"trkn"),
+    ISOMAtomName(b"disk"),
+    ISOMAtomName(b"gnre"),
+    ISOMAtomName(b"plID"),
+    ISOMAtomName(b"cnID"),
+    ISOMAtomName(b"geID"),
+    ISOMAtomName(b"atID"),
+    ISOMAtomName(b"sfID"),
+    ISOMAtomName(b"cmID"),
+    ISOMAtomName(b"akID"),
+    ISOMAtomName(b"tvsn"),
+    ISOMAtomName(b"tves"),
+    ISOMAtomName(b"tmpo"),
+    ISOMAtomName(b"\xa9mvi"),
+    ISOMAtomName(b"\xa9mvc"),
+    ISOMAtomName(b"cpil"),
+    ISOMAtomName(b"pgap"),
+    ISOMAtomName(b"pcst"),
+    ISOMAtomName(b"shwm"),
+    ISOMAtomName(b"stik"),
+    ISOMAtomName(b"hdvd"),
+    ISOMAtomName(b"rtng"),
+    ISOMAtomName(b"covr"),
+    ISOMAtomName(b"purl"),
+    ISOMAtomName(b"egid"),
+    ISOMAtomName(b"\xa9nam"),
+    ISOMAtomName(b"\xa9alb"),
+    ISOMAtomName(b"\xa9ART"),
+    ISOMAtomName(b"aART"),
+    ISOMAtomName(b"\xa9wrt"),
+    ISOMAtomName(b"\xa9day"),
+    ISOMAtomName(b"\xa9cmt"),
+    ISOMAtomName(b"desc"),
+    ISOMAtomName(b"purd"),
+    ISOMAtomName(b"\xa9grp"),
+    ISOMAtomName(b"\xa9gen"),
+    ISOMAtomName(b"\xa9lyr"),
+    ISOMAtomName(b"catg"),
+    ISOMAtomName(b"keyw"),
+    ISOMAtomName(b"\xa9too"),
+    ISOMAtomName(b"cprt"),
+    ISOMAtomName(b"soal"),
+    ISOMAtomName(b"soaa"),
+    ISOMAtomName(b"soar"),
+    ISOMAtomName(b"sonm"),
+    ISOMAtomName(b"soco"),
+    ISOMAtomName(b"sosn"),
+    ISOMAtomName(b"tvsh"),
+]
+
+
+class SupportedBoxes:
+    MDHD = MDHD_ATOM_NAME
+    MDIA = MDIA_ATOM_NAME
+    HDLR = HDLR_ATOM_NAME
+    TRAK = TRAK_ATOM_NAME
+    MOOV = MOOV_ATOM_NAME
+    FTYP = FTYP_ATOM_NAME
+    FREE = FREE_ATOM_NAME
+    SKIP = SKIP_ATOM_NAME
+    UDTA = UDTA_ATOM_NAME
+    META = META_ATOM_NAME
+
+    ILST = ILST_ATOM_NAME
+
+    AppleItunesItemBox = AppleItunesItemBoxAtoms
+
+    DATA = DATA_ATOM_NAME
+
+
 def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
     box = MP4Box.read_from_stream(f, pos)
 
-    match box.type.value:
-        case b"mdhd":
+    match box.type:
+        case SupportedBoxes.MDHD:
             return MediaHeaderBox.read_from_stream_parent(f, box)
-        case b"mdia":
+        case SupportedBoxes.MDIA:
             return MediaBox.read_from_stream_parent(f, box)
-        case b"hdlr":
+        case SupportedBoxes.HDLR:
             return HandlerBox.read_from_stream_parent(f, box)
-        case b"trak":
+        case SupportedBoxes.TRAK:
             return TrackBox.read_from_stream_parent(f, box)
-        case b"moov":
+        case SupportedBoxes.MOOV:
             return MovieBox.read_from_stream_parent(f, box)
-        case b"ftyp":
+        case SupportedBoxes.FTYP:
             return FileTypeBox.read_from_stream_parent(f, box)
-        case b"free":
+        case SupportedBoxes.FREE:
             return FreeSpaceBox.read_from_stream_parent(f, box)
-        case b"skip":
+        case SupportedBoxes.SKIP:
             return FreeSpaceBox.read_from_stream_parent(f, box)
-        case b"udta":
+        case SupportedBoxes.UDTA:
             return UserDataBox.read_from_stream_parent(f, box)
-        case b"meta":
+        case SupportedBoxes.META:
             return MetaBox.read_from_stream_parent(f, box)
-        case b"ilst":
+        case SupportedBoxes.ILST:
             return AppleItunesItemList.read_from_stream_parent(f, box)
+        case _ if box.type in SupportedBoxes.AppleItunesItemBox:
+            return AppleItunesItemBox.read_from_stream_parent(f, box)
+        case SupportedBoxes.DATA:
+            return AppleItunesItemDataBox.read_from_stream_parent(f, box)
         case _:
             return box
 
