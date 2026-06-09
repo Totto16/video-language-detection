@@ -476,6 +476,43 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
 
+def mp4_has_already_udta_box(file: Path) -> bool:
+    structure_res = MP4BoxStructure.from_file(file)
+
+    if structure_res.err():
+        msg = f"structure not parsed correctly: {structure_res.as_err()}"
+        raise AssertionError(msg)
+
+    structure = structure_res.as_ok()
+
+    # check box consistency
+    boxes_stack: list[RecursiveBoxes.RecursiveBoxesData] = [
+        structure.boxes.data,
+    ]
+
+    while len(boxes_stack) != 0:
+
+        boxes = boxes_stack.pop()
+        for box_data in boxes:
+
+            box: MP4Box
+            if isinstance(box_data, tuple):
+                assert box_data[
+                    0
+                ].is_container, "boxes resulting in children have to be a container"
+                box = box_data[0]
+                boxes_stack.append(
+                    box_data[1],
+                )
+            else:
+                box = box_data
+
+            if box.type == UDTA_ATOM_NAME:
+                return True
+
+    return False
+
+
 def test_mp4_tagger_metadata_tags_mutagen(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
@@ -509,7 +546,7 @@ def test_mp4_tagger_metadata_tags_mutagen(
         return (val, metadata)
 
     with file_duplicates(mp4_test_parse_files.data) as data:
-        test_files: list[tuple[Path, MetadataTags, bool]] = list(
+        test_files: list[tuple[Path, MetadataTags]] = list(
             zip(
                 data,
                 [
@@ -532,13 +569,16 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         },
                     ),
                 ],
-                [False, True],
                 strict=True,
             ),
         )
 
-        for file, tags, is_recognized_by_ffprobe in test_files:
+        for file, tags in test_files:
             with subtests.test("video gets tagged correctly"):
+                #TODO: fix this somehow???
+                # mutagen reqrite the udta, if it is already present, otherwise it creates its own, which is not recognized by ffprobe
+                is_recognized_by_ffprobe = mp4_has_already_udta_box(file)
+
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
                 if tagger_res.err():
