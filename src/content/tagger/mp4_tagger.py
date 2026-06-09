@@ -1260,6 +1260,8 @@ AppleItunesItemDataContent = str | int | UUID
 class AppleItunesItemDataType(Enum):
     # NOTE: only some are implemented here
     reserved = 0
+    implicit = reserved
+
     utf_8 = 1
     utf_16 = 2
 
@@ -1270,6 +1272,8 @@ class AppleItunesItemDataType(Enum):
     png = 14
 
     be_signed_integer_var = 21
+    integer = be_signed_integer_var
+
     be_unsigned_integer_var = 22
 
 
@@ -1428,56 +1432,59 @@ class AppleItunesItemBox(MP4Box):
         return str(self)
 
 
-AppleItunesItemBoxAtoms: list[ISOMAtomName] = [
-    ISOMAtomName(b"----"),  # TODO: special case this!
-    ISOMAtomName(b"trkn"),
-    ISOMAtomName(b"disk"),
-    ISOMAtomName(b"gnre"),
-    ISOMAtomName(b"plID"),
-    ISOMAtomName(b"cnID"),
-    ISOMAtomName(b"geID"),
-    ISOMAtomName(b"atID"),
-    ISOMAtomName(b"sfID"),
-    ISOMAtomName(b"cmID"),
-    ISOMAtomName(b"akID"),
-    ISOMAtomName(b"tvsn"),
-    ISOMAtomName(b"tves"),
-    ISOMAtomName(b"tmpo"),
-    ISOMAtomName(b"\xa9mvi"),
-    ISOMAtomName(b"\xa9mvc"),
-    ISOMAtomName(b"cpil"),
-    ISOMAtomName(b"pgap"),
-    ISOMAtomName(b"pcst"),
-    ISOMAtomName(b"shwm"),
-    ISOMAtomName(b"stik"),
-    ISOMAtomName(b"hdvd"),
-    ISOMAtomName(b"rtng"),
-    ISOMAtomName(b"covr"),
-    ISOMAtomName(b"purl"),
-    ISOMAtomName(b"egid"),
-    ISOMAtomName(b"\xa9nam"),
-    ISOMAtomName(b"\xa9alb"),
-    ISOMAtomName(b"\xa9ART"),
-    ISOMAtomName(b"aART"),
-    ISOMAtomName(b"\xa9wrt"),
-    ISOMAtomName(b"\xa9day"),
-    ISOMAtomName(b"\xa9cmt"),
-    ISOMAtomName(b"desc"),
-    ISOMAtomName(b"purd"),
-    ISOMAtomName(b"\xa9grp"),
-    ISOMAtomName(b"\xa9gen"),
-    ISOMAtomName(b"\xa9lyr"),
-    ISOMAtomName(b"catg"),
-    ISOMAtomName(b"keyw"),
-    ISOMAtomName(b"\xa9too"),
-    ISOMAtomName(b"cprt"),
-    ISOMAtomName(b"soal"),
-    ISOMAtomName(b"soaa"),
-    ISOMAtomName(b"soar"),
-    ISOMAtomName(b"sonm"),
-    ISOMAtomName(b"soco"),
-    ISOMAtomName(b"sosn"),
-    ISOMAtomName(b"tvsh"),
+AppleItunesItemBoxAtoms: list[
+    tuple[ISOMAtomName, Optional[AppleItunesItemDataType]]
+] = [
+    (ISOMAtomName(b"----"), None),  # TODO: special case this!
+    (ISOMAtomName(b"trkn"), None),
+    (ISOMAtomName(b"disk"), None),
+    (ISOMAtomName(b"gnre"), None),
+    (ISOMAtomName(b"plID"), None),
+    (ISOMAtomName(b"cnID"), None),
+    (ISOMAtomName(b"geID"), None),
+    (ISOMAtomName(b"atID"), None),
+    (ISOMAtomName(b"sfID"), None),
+    (ISOMAtomName(b"cmID"), None),
+    (ISOMAtomName(b"akID"), None),
+    (ISOMAtomName(b"tvsh"), AppleItunesItemDataType.utf_8),  # TV Show, show name
+    (ISOMAtomName(b"tven"), AppleItunesItemDataType.integer),  # TV Episode id
+    (ISOMAtomName(b"tvsn"), AppleItunesItemDataType.integer),  # -- TV Season
+    (ISOMAtomName(b"tves"), AppleItunesItemDataType.integer),  # -- TV Episode
+    (ISOMAtomName(b"tmpo"), None),
+    (ISOMAtomName(b"\xa9mvi"), None),
+    (ISOMAtomName(b"\xa9mvc"), None),
+    (ISOMAtomName(b"cpil"), None),
+    (ISOMAtomName(b"pgap"), None),
+    (ISOMAtomName(b"pcst"), None),
+    (ISOMAtomName(b"shwm"), None),
+    (ISOMAtomName(b"stik"), AppleItunesItemDataType.integer),  # -- MediaKind
+    (ISOMAtomName(b"hdvd"), None),
+    (ISOMAtomName(b"rtng"), None),
+    (ISOMAtomName(b"covr"), None),
+    (ISOMAtomName(b"purl"), None),
+    (ISOMAtomName(b"egid"), None),
+    (ISOMAtomName(b"\xa9nam"), None),
+    (ISOMAtomName(b"\xa9alb"), None),
+    (ISOMAtomName(b"\xa9ART"), None),
+    (ISOMAtomName(b"aART"), None),
+    (ISOMAtomName(b"\xa9wrt"), None),
+    (ISOMAtomName(b"\xa9day"), None),
+    (ISOMAtomName(b"\xa9cmt"), AppleItunesItemDataType.utf_8),  # -- comment
+    (ISOMAtomName(b"desc"), None),
+    (ISOMAtomName(b"purd"), None),
+    (ISOMAtomName(b"\xa9grp"), None),
+    (ISOMAtomName(b"\xa9gen"), None),
+    (ISOMAtomName(b"\xa9lyr"), None),
+    (ISOMAtomName(b"catg"), None),
+    (ISOMAtomName(b"keyw"), None),
+    (ISOMAtomName(b"\xa9too"), AppleItunesItemDataType.utf_8),  # -- encoded by, tool
+    (ISOMAtomName(b"cprt"), None),
+    (ISOMAtomName(b"soal"), None),
+    (ISOMAtomName(b"soaa"), None),
+    (ISOMAtomName(b"soar"), None),
+    (ISOMAtomName(b"sonm"), None),
+    (ISOMAtomName(b"soco"), None),
+    (ISOMAtomName(b"sosn"), None),
 ]
 
 
