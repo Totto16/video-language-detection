@@ -31,10 +31,10 @@ class FOURCC:
         def is_valid_byte(byte: int) -> bool:
             val = bytes([byte])
 
-            if val.lower():
+            if val.islower():
                 return True
 
-            if val.upper():
+            if val.isupper():
                 return True
 
             return val == b" "

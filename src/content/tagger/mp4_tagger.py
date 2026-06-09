@@ -45,8 +45,20 @@ class ISOMAtomName:
             msg = f"Invalid atom name length {len(value)}"
             raise ValueError(msg)
 
-        if not value.islower():
-            msg = f"Atom name is not lowercase {value!s}"
+        def is_valid_byte(byte: int) -> bool:
+            val = bytes([byte])
+
+            if val.islower():
+                return True
+
+            if val.isupper():
+                return True
+
+            # TODO
+            return val in []
+
+        if not all(is_valid_byte(val) for val in value):
+            msg = f"Atom name not valid {value!r}"
             raise ValueError(msg)
 
     @property

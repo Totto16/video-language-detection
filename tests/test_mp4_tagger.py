@@ -382,8 +382,8 @@ def test_mp4_invalid_bytes(
 
     test_data: list[tuple[bytes, str]] = [
         (b"", "Read failed to produce 8 bytes, got 0"),
-        (b"hello world", _("Not a valid ISOM / MP4 file")),
-        (b"ftyp    ", "Atom name is not lowercase b'    '"),
+        (b"helloworld", _("Not a valid ISOM / MP4 file")),
+        (b"ftyp    ", "Atom name not valid b'    '"),
         (b"\x00\x00\x00\x04ftyp", "Invalid box: sitze too small: 4"),
         (
             b"\x00\x00\x00\x0eftypabcddcba",
@@ -402,6 +402,7 @@ def test_mp4_invalid_bytes(
 
             assert res is not None, "valid mp4 is incorrect here"
 
+            print(data, res)
             assert res == err, "incorrect error"
 
 
