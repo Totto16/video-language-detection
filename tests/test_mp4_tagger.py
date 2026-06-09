@@ -449,6 +449,17 @@ def test_mp4_tagger_language_patching(
                         new_language.short == old_file_lang
                     ), "New language should be written"
 
+            # validate with ffprobe
+            ffprobe_res = ffprobe(file)
+
+            if ffprobe_res.err():
+                msg = f"FFProbe error: {ffprobe_res.as_err()}"
+                raise AssertionError(msg)
+
+            for stream in ffprobe_res.as_ok().audio_streams():
+                assert stream.is_audio()
+                assert stream.raw["tags"]["language"] == new_language.short
+
 
 def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     res: dict[str, Any] = {}
@@ -656,7 +667,6 @@ def test_mp4_tagger_metadata_tags_mutagen(
                         assert ffprobe_metadata_again.get("metadata", None) is not None
                     else:
                         assert ffprobe_metadata_again.get("metadata", None) is None
-
 
                     if ffprobe_metadata_again.get("metadata", None) is not None:
                         assert ffprobe_metadata_again["metadata"] == merge_dicts(

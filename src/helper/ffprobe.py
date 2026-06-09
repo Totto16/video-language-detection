@@ -38,6 +38,10 @@ class FFprobeStream:
     def __init__(self: Self, stream: FFprobeRawStream) -> None:
         self.__stream = stream
 
+    @property
+    def raw(self: Self) -> FFprobeRawStream:
+        return self.__stream
+
     def is_audio(self: Self) -> bool:
         """
         Is this stream labelled as an audio stream?
