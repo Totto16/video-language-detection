@@ -1,7 +1,9 @@
+from collections.abc import Callable
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
-from typing import Self
+from typing import Optional, Self, override
 
+from conftest import FancyEq
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
 from test_helper import OkResult
@@ -99,61 +101,156 @@ class RecursiveChunks:
     def __is_chunk_eq(
         chunk1: AVIChunk,
         chunk2: AVIChunk,
-    ) -> bool:
+        depth: int,
+    ) -> Result[None, list[str]]:
         # pseudo comparison based on pseudo chunks, alias just size and type! (and list type if it is one)
         if chunk1.fourcc != chunk2.fourcc:
-            return False
+            return Err[list[str]](
+                [
+                    "FOURCC of data is not eq:",
+                    str(chunk1.fourcc),
+                    str(chunk2.fourcc),
+                    f"Depth {depth}",
+                    str(chunk1),
+                    str(chunk2),
+                ],
+            )
 
         if chunk1.span.size != chunk2.span.size:
-            return False
+            return Err[list[str]](
+                [
+                    "Sizeof data is not eq:",
+                    str(chunk1.span.size),
+                    str(chunk2.span.size),
+                    f"Depth {depth}",
+                    str(chunk1),
+                    str(chunk2),
+                ],
+            )
+        if isinstance(chunk1, AVIList):
+            if not isinstance(chunk2, AVIList):
+                return Err[list[str]](
+                    [
+                        "AVIList on left side of eq, but right side is not correct class:",
+                        str(type(chunk1)),
+                        str(type(chunk2)),
+                        f"Depth {depth}",
+                        str(chunk1),
+                        str(chunk2),
+                    ],
+                )
 
-        if isinstance(chunk1, AVIList) and isinstance(chunk2, AVIList):
-            return chunk1.type == chunk2.type
+            if chunk1.type != chunk2.type:
+                return Err[list[str]](
+                    [
+                        "FOURCC of list type is not eq:",
+                        str(chunk1.type),
+                        str(chunk2.type),
+                        f"Depth {depth}",
+                        str(chunk1),
+                        str(chunk2),
+                    ],
+                )
 
-        return not (isinstance(chunk1, AVIList) or isinstance(chunk2, AVIList))
+            return Ok(None)
+
+        if isinstance(chunk2, AVIList):
+            return Err[list[str]](
+                [
+                    "AVIList on right side of eq, but left side is not correct class:",
+                    str(type(chunk1)),
+                    str(type(chunk2)),
+                    f"Depth {depth}",
+                    str(chunk1),
+                    str(chunk2),
+                ],
+            )
+
+        return Ok(None)
 
     @staticmethod
     def __is_elem_eq(
         data1: AVIChunk | tuple[AVIChunk, RecursiveChunkData],
         data2: AVIChunk | tuple[AVIChunk, RecursiveChunkData],
         depth: int,
-    ) -> bool:
+    ) -> Result[None, list[str]]:
         if isinstance(data1, tuple) and isinstance(data2, tuple):
             c1, d1 = data1
             c2, d2 = data2
 
-            if not RecursiveChunks.__is_chunk_eq(c1, c2):
-                return False
+            res = RecursiveChunks.__is_chunk_eq(c1, c2, depth)
+            if res.err():
+                return res
 
             if isinstance(c1, AVIList) and c1.type == FOURCC(b"movi"):
                 if not isinstance(c2, PseudoMOVIChunk):
-                    msg = "Found MOVI Chunk without matching PseudoMOVIChunk"
-                    raise RuntimeError(msg)
+                    return Err[list[str]](
+                        [
+                            "MOVIChunk on left side of eq, but right side is not correct class:",
+                            str(type(c1)),
+                            str(type(c2)),
+                            f"Depth {depth}",
+                            str(c1),
+                            str(c2),
+                        ],
+                    )
 
-                return c2.children == len(d1)
+                if c2.children != len(d1):
+                    return Err[list[str]](
+                        [
+                            "Sizeof MOVIChunk children is not eq:",
+                            str(c2.children),
+                            str(len(d1)),
+                            f"Depth {depth}",
+                            str(c2),
+                            str(d1),
+                        ],
+                    )
+
+                return Ok(None)
 
             return RecursiveChunks.__eq_impl_both(d1, d2, depth=depth + 1)
-        if isinstance(data1, AVIChunk) and isinstance(data2, AVIChunk):
-            return RecursiveChunks.__is_chunk_eq(data1, data2)
 
-        return False
+        if isinstance(data1, AVIChunk) and isinstance(data2, AVIChunk):
+            return RecursiveChunks.__is_chunk_eq(data1, data2, depth)
+
+        return Err[list[str]](
+            [
+                "Type of data is not eq:",
+                str(type(data1)),
+                str(type(data2)),
+                f"Depth {depth}",
+                str(data1),
+                str(data2),
+            ],
+        )
 
     @staticmethod
     def __eq_impl_both(
         data1: RecursiveChunkData,
         data2: RecursiveChunkData,
         depth: int,
-    ) -> bool:
+    ) -> Result[None, list[str]]:
         if len(data1) != len(data2):
-            return False
+            return Err[list[str]](
+                [
+                    "Length of data is not eq:",
+                    str(len(data1)),
+                    str(len(data2)),
+                    f"Depth {depth}",
+                    str(data1),
+                    str(data2),
+                ],
+            )
 
         for d1, d2 in zip(data1, data2, strict=True):
-            if not RecursiveChunks.__is_elem_eq(d1, d2, depth):
-                return False
+            res = RecursiveChunks.__is_elem_eq(d1, d2, depth)
+            if res.err():
+                return res
 
-        return True
+        return Ok(None)
 
-    def __eq_impl(self: Self, data: RecursiveChunkData) -> bool:
+    def __eq_impl(self: Self, data: RecursiveChunkData) -> Result[None, list[str]]:
         return RecursiveChunks.__eq_impl_both(self.__data, data, depth=0)
 
     def __str__(self: Self) -> str:
@@ -162,9 +259,12 @@ class RecursiveChunks:
     def __repr__(self: Self) -> str:
         return RecursiveChunks.__to_str(self.__data, 0, "  ")
 
+    def eq_impl(self: Self, other: "RecursiveChunks") -> Result[None, list[str]]:
+        return self.__eq_impl(other.data)
+
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, RecursiveChunks):
-            return self.__eq_impl(other.__data)
+            return self.__eq_impl(other.__data).ok()
 
         return False
 
@@ -198,7 +298,7 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
     return result
 
 
-class AVIChunkStructure:
+class AVIChunkStructure(FancyEq):
     chunks: RecursiveChunks
 
     def __init__(self: Self, chunks: RecursiveChunks) -> None:
@@ -224,14 +324,30 @@ class AVIChunkStructure:
     def __repr__(self: Self) -> str:
         return str(self)
 
-    def __eq__(self: Self, other: object) -> bool:
+    def __eq_impl(
+        self: Self,
+        other: object,
+    ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
         if isinstance(other, RecursiveChunks):
-            return self.chunks == other
+            return (True, lambda: self.chunks.eq_impl(other))
 
         if isinstance(other, AVIChunkStructure):
-            return self.chunks == other.chunks
+            return (True, lambda: self.chunks.eq_impl(other.chunks))
 
-        return False
+        return (False, lambda: Err([]))
+
+    def __eq__(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[1]().ok()
+
+    @override
+    def support_fancy_eq(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[0]
+
+    @override
+    def fancy_eq(self: Self, other: object) -> Optional[list[str]]:
+        supports_fancy_eq, cb = self.__eq_impl(other)
+        assert supports_fancy_eq
+        return cb().err_or(None)
 
     def __hash__(self: Self) -> int:
         return hash(self.chunks)

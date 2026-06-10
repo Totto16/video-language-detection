@@ -18,7 +18,7 @@ class FancyEq(ABC):
 
 
 def pytest_assertrepr_compare(
-    config: pytest.Config,
+    config: pytest.Config,  # noqa: ARG001
     op: str,
     left: object,
     right: object,

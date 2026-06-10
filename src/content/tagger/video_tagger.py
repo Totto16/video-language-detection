@@ -104,7 +104,8 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
 
     @override
     def get_tags(self: Self) -> MetadataTagsRead:
-        raise NotImplementedError("Merging the tags is not implemented yet!")
+        msg = "Merging the tags is not implemented yet!"
+        raise NotImplementedError(msg)
 
 
 class VideoTaggerMultiple(VideoTagger):

@@ -456,7 +456,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
         self.__save_impl()
 
     @override
-    def get_tags(
+    def get_tags(  # noqa: PLR0915
         self: Self,
     ) -> MetadataTagsRead:
 
@@ -496,6 +496,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             return json.loads(str_value)
 
         def mutagen_tag_as_uuid(
+            *,
             is_hex: bool,
         ) -> Callable[[str | mp4.MP4FreeForm], UUID]:
             if not is_hex:
@@ -564,7 +565,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             elif key in (MUTAGEN_UUID_HEX_KEY, MUTAGEN_UUID_RAW_KEY):
                 uuid = decode_mutagen_tag_value(
                     value,
-                    mutagen_tag_as_uuid(key == MUTAGEN_UUID_HEX_KEY),
+                    mutagen_tag_as_uuid(is_hex=key == MUTAGEN_UUID_HEX_KEY),
                 )
 
                 if result.uuid is not None:

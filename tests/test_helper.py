@@ -4,8 +4,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, Unpack, override
 
-from torch import Value
-
 from helper.manager import (
     CounterInterface,
     CounterOptions,
