@@ -719,8 +719,9 @@ def test_mp4_tagger_metadata_tags_mutagen(
 
         for file, tags in test_files:
             with subtests.test("video gets tagged correctly"):
-                # TODO: fix this somehow???
                 # mutagen reqrite the udta, if it is already present, otherwise it creates its own, which is not recognized by ffprobe
+                # the reason for that is, that it writes the udta box before any trak box, so ffprobe ignores custom tags alias freeform keys
+                # see: https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/23427
                 is_recognized_by_ffprobe = mp4_has_already_udta_box(file)
 
                 tagger_res = VideoTaggerMutagen.get_handle(file)

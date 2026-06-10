@@ -1613,7 +1613,8 @@ def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
             value = SupportedBoxes.AppleItunesItemBox[box.type]
             return AppleItunesItemBox.read_from_stream_parent(f, box, value)
         case SupportedBoxes.AppleItunesItemBoxAtomFreeform:
-            return AppleItunesItemFreeformBox.read_from_stream_parent(f, box)
+            raise NotImplementedError("TODO")
+            # return AppleItunesItemFreeformBox.read_from_stream_parent(f, box)
         case SupportedBoxes.DATA:
             return AppleItunesItemDataBox.read_from_stream_parent(f, box, None)
         case _:
