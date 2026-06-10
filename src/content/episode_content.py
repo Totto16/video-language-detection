@@ -256,15 +256,7 @@ class EpisodeContent(Content):
                         print(metadata)
                         self.scanned_file.reset_file_data()
                         changed_file = True
-            except RuntimeError as err:
-                logger.error(  # noqa: TRY400
-                    _("Write Video Metadata: {err}").format(err=err),
-                )
-            except ValueError as err:
-                logger.error(  # noqa: TRY400
-                    _("Write Video Metadata: {err}").format(err=err),
-                )
-            except TypeError as err:
+            except (RuntimeError, ValueError, TypeError) as err:
                 logger.error(  # noqa: TRY400
                     _("Write Video Metadata: {err}").format(err=err),
                 )

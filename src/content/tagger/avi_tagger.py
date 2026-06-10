@@ -454,8 +454,6 @@ def is_avi_file(f: BufferedIOBase) -> Optional[str]:
             ).format(list_type=first_chunk.type)
 
         f.seek(0)
-    except RuntimeError as err:
-        return str(err)
-    except ValueError as err:
+    except (RuntimeError, ValueError) as err:
         return str(err)
     return None

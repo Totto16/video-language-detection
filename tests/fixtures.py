@@ -3,7 +3,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Protocol, Self
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 
 import pytest
 import requests
@@ -39,7 +39,7 @@ class VideoFile(Protocol):
 
 
 @dataclass
-class VideoFileURL:
+class VideoFileURL(VideoFile):
     url: str
     type: str
 
@@ -56,7 +56,7 @@ class VideoFileURL:
 
 
 @dataclass
-class VideoFileLocal:
+class VideoFileLocal(VideoFile):
     file: Path | str
 
     def get(self: Self) -> bytes:
@@ -67,6 +67,12 @@ class VideoFileLocal:
         )
 
         return file.read_bytes()
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check1: VideoFile = VideoFileURL("", "")
+    _check2: VideoFile = VideoFileLocal("")
 
 
 @pytest.fixture(scope="package")

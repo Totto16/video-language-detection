@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Any, Never, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Never, Optional, Self, override
 
 import pydantic
 import pydantic_core
@@ -205,6 +205,11 @@ class Timestamp(SupportsFloat):
 
         msg = f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
         raise TypeError(msg)
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check: SupportsFloat = Timestamp.zero()
 
 
 @schema(min=1, max=60 * 60 * 24, deprecated=True)

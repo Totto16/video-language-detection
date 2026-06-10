@@ -1,4 +1,4 @@
-from typing import Never, Protocol, Self
+from typing import TYPE_CHECKING, Never, Protocol, Self
 
 
 class Result[T, E](Protocol):
@@ -15,7 +15,7 @@ class Result[T, E](Protocol):
     def err_or[U](self: Self, default: U) -> E | U: ...
 
 
-class Ok[T]:
+class Ok[T, O = None](Result[T, O]):
     __value: T
 
     def __init__(self: Self, value: T) -> None:
@@ -47,7 +47,7 @@ class Ok[T]:
         return str(self)
 
 
-class Err[E]:
+class Err[E, O = None](Result[O, E]):
     __error: E
 
     def __init__(self: Self, error: E) -> None:
@@ -77,3 +77,9 @@ class Err[E]:
 
     def __repr__(self: Self) -> str:
         return str(self)
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check1: Result[None, str] = Err[str]("")
+    _check2: Result[str, None] = Ok[str]("")
