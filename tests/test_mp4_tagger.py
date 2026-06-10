@@ -5,7 +5,7 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Any, Optional, Self, override
 from unittest import mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
@@ -18,6 +18,7 @@ from content.tagger.mp4_tagger import (
     FREE_ATOM_NAME,
     FTYP_ATOM_NAME,
     HDLR_ATOM_NAME,
+    ILST_ATOM_NAME,
     IODS_ATOM_NAME,
     MDAT_ATOM_NAME,
     MDHD_ATOM_NAME,
@@ -32,8 +33,10 @@ from content.tagger.mp4_tagger import (
     UDTA_ATOM_NAME,
     VIDE_ATOM_NAME,
     AppleItunesItemBox,
+    AppleItunesItemBoxAtomFreeform,
     AppleItunesItemDataContent,
     AppleItunesItemDataType,
+    AppleItunesItemFreeformBox,
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
@@ -77,6 +80,24 @@ class PseudoAppleItunesMP4Box(MP4Box):
 
         self.type_indicator = type_indicator
         self.value = value
+
+
+class PseudoAppleItunesMP4FreeformBox(PseudoAppleItunesMP4Box):
+    mean: str
+    name: str
+
+    def __init__(
+        self: Self,
+        size: int,
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+        mean: str,
+        name: str,
+    ) -> None:
+        super().__init__(AppleItunesItemBoxAtomFreeform, size, type_indicator, value)
+
+        self.mean = mean
+        self.name = name
 
 
 class RecursiveBoxes:
@@ -151,10 +172,24 @@ class RecursiveBoxes:
                 ],
             )
 
-        if isinstance(box1, AppleItunesItemBox) and isinstance(
-            box2,
-            PseudoAppleItunesMP4Box,
+        if isinstance(
+            box1,
+            (AppleItunesItemBox, AppleItunesItemFreeformBox),
         ):
+            if not isinstance(
+                box2,
+                PseudoAppleItunesMP4Box,
+            ):
+                return Err[list[str]](
+                    [
+                        "AppleItunesItemBox on left side of eq, but right side is not correct class:",
+                        str(type(box1)),
+                        str(type(box2)),
+                        f"Depth {depth}",
+                        str(box1),
+                        str(box2),
+                    ],
+                )
 
             if box1.data.type_indicator != box2.type_indicator.value:
                 return Err[list[str]](
@@ -179,6 +214,47 @@ class RecursiveBoxes:
                         str(box2),
                     ],
                 )
+
+            if isinstance(box1, AppleItunesItemFreeformBox):
+
+                if not isinstance(
+                    box2,
+                    PseudoAppleItunesMP4FreeformBox,
+                ):
+                    return Err[list[str]](
+                        [
+                            "AppleItunesItemFreeformBox on left side of eq, but right side is not correct class:",
+                            str(type(box1)),
+                            str(type(box2)),
+                            f"Depth {depth}",
+                            str(box1),
+                            str(box2),
+                        ],
+                    )
+
+                if box1.mean.value != box2.mean:
+                    return Err[list[str]](
+                        [
+                            "AppleItunesItemFreeformBox mean is not eq:",
+                            str(box1.mean.value),
+                            str(box2.mean),
+                            f"Depth {depth}",
+                            str(box1),
+                            str(box2),
+                        ],
+                    )
+
+                if box1.name.value != box2.name:
+                    return Err[list[str]](
+                        [
+                            "AppleItunesItemFreeformBox name is not eq:",
+                            str(box1.name.value),
+                            str(box2.name),
+                            f"Depth {depth}",
+                            str(box1),
+                            str(box2),
+                        ],
+                    )
 
         return Ok(None)
 
@@ -333,6 +409,38 @@ class MP4BoxStructure(FancyEq):
     def __hash__(self: Self) -> int:
         return hash(self.boxes)
 
+    def find_boxes(
+        self: Self, atom_name: ISOMAtomName
+    ) -> RecursiveBoxes.RecursiveBoxesData:
+
+        boxes_stack: list[RecursiveBoxes.RecursiveBoxesData] = [
+            self.boxes.data,
+        ]
+
+        result: RecursiveBoxes.RecursiveBoxesData = []
+
+        while len(boxes_stack) != 0:
+
+            boxes = boxes_stack.pop()
+            for box_data in boxes:
+
+                box: MP4Box
+                if isinstance(box_data, tuple):
+                    assert box_data[
+                        0
+                    ].is_container, "boxes resulting in children have to be a container"
+                    box = box_data[0]
+                    boxes_stack.append(
+                        box_data[1],
+                    )
+                else:
+                    box = box_data
+
+                if box.type == atom_name:
+                    result.append(box_data)
+
+        return result
+
 
 def test_mp4_tagger_parsing(
     subtests: SubTests,
@@ -422,7 +530,7 @@ def test_mp4_tagger_parsing(
                                     PseudoMP4Box(META_ATOM_NAME, 386),
                                     [
                                         (
-                                            PseudoMP4Box(ISOMAtomName(b"ilst"), 341),
+                                            PseudoMP4Box(ILST_ATOM_NAME, 341),
                                             [
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9nam"),
@@ -629,32 +737,9 @@ def mp4_has_already_udta_box(file: Path) -> bool:
 
     structure = structure_res.as_ok()
 
-    # check box consistency
-    boxes_stack: list[RecursiveBoxes.RecursiveBoxesData] = [
-        structure.boxes.data,
-    ]
+    udta_boxes = structure.find_boxes(UDTA_ATOM_NAME)
 
-    while len(boxes_stack) != 0:
-
-        boxes = boxes_stack.pop()
-        for box_data in boxes:
-
-            box: MP4Box
-            if isinstance(box_data, tuple):
-                assert box_data[
-                    0
-                ].is_container, "boxes resulting in children have to be a container"
-                box = box_data[0]
-                boxes_stack.append(
-                    box_data[1],
-                )
-            else:
-                box = box_data
-
-            if box.type == UDTA_ATOM_NAME:
-                return True
-
-    return False
+    return len(udta_boxes) != 0
 
 
 def test_mp4_tagger_metadata_tags_mutagen(
@@ -893,8 +978,7 @@ def test_mp4_tagger_metadata_tags_custom(
             ),
         )
 
-        # TODO
-        for file, tags in test_files[0:1]:
+        for file, tags in test_files:
             with subtests.test("video gets tagged correctly"):
                 tagger_res = VideoTaggerMP4.get_handle(file)
 
@@ -952,3 +1036,207 @@ def test_mp4_tagger_metadata_tags_custom(
                     assert (
                         next_tags.metadata == write_again_tags.metadata
                     ), "Metadata was written correctly"
+
+
+def test_mp4_metadata_tags_apple_custom(
+    subtests: SubTests,
+    mp4_test_parse_files: TempVideoFiles,
+    test_manager: ManagerInterface,
+) -> None:
+
+    with file_duplicates(mp4_test_parse_files.data) as data:
+
+        uuids: list[UUID] = [uuid4(), uuid4()]
+
+        test_files: list[tuple[Path, MetadataTags, MP4BoxStructure]] = list(
+            zip(
+                data,
+                [
+                    MetadataTags(
+                        comment="Test comment 1",
+                        uuid=uuids[0],
+                        language=Language.get_default(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key1": "value1", "int1": 1414},
+                        },
+                    ),
+                    MetadataTags(
+                        comment="Test comment 2",
+                        uuid=uuids[1],
+                        language=Language.get_default(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key2": "value2", "int2": 1321},
+                        },
+                    ),
+                ],
+                [
+                    MP4BoxStructure(
+                        RecursiveBoxes(
+                            [
+                                (
+                                    PseudoMP4Box(UDTA_ATOM_NAME, 3137),
+                                    [
+                                        (
+                                            PseudoMP4Box(META_ATOM_NAME, 3129),
+                                            [
+                                                (
+                                                    PseudoMP4Box(
+                                                        ILST_ATOM_NAME,
+                                                        483,
+                                                    ),
+                                                    [
+                                                        PseudoAppleItunesMP4FreeformBox(
+                                                            91,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            '"str"',
+                                                            "lt.totto.vld",
+                                                            "video_language_detect:test",
+                                                        ),
+                                                        PseudoAppleItunesMP4FreeformBox(
+                                                            122,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            uuids[0].hex,
+                                                            "lt.totto.vld",
+                                                            "video_language_detect_uuid:hex",
+                                                        ),
+                                                        PseudoAppleItunesMP4FreeformBox(
+                                                            118,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            '{"key1": "value1", "int1": 1414}',
+                                                            "lt.totto.vld",
+                                                            "video_language_detect:dict",
+                                                        ),
+                                                        PseudoAppleItunesMP4FreeformBox(
+                                                            106,
+                                                            AppleItunesItemDataType.uuid,
+                                                            uuids[0],
+                                                            "lt.totto.vld",
+                                                            "video_language_detect_uuid:raw",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9cmt"),
+                                                            38,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Test comment 1",
+                                                        ),
+                                                    ],
+                                                ),
+                                                PseudoMP4Box(FREE_ATOM_NAME, 2601),
+                                            ],
+                                        )
+                                    ],
+                                )
+                            ]
+                        )
+                    ),
+                    MP4BoxStructure(
+                        RecursiveBoxes(
+                            [
+                                (
+                                    PseudoMP4Box(UDTA_ATOM_NAME, 394),
+                                    [
+                                        (
+                                            PseudoMP4Box(META_ATOM_NAME, 386),
+                                            [
+                                                (
+                                                    PseudoMP4Box(ILST_ATOM_NAME, 483),
+                                                    [
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9nam"),
+                                                            57,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Big Buck Bunny, Sunflower version",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9ART"),
+                                                            76,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Blender Foundation 2008, Janus Bager Kristensen 2013",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9wrt"),
+                                                            41,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Sacha Goedegebure",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9too"),
+                                                            37,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Lavf58.63.100",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9cmt"),
+                                                            89,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Creative Commons Attribution 3.0 - http://bbb3d.renderfarming.net",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9gen"),
+                                                            33,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Animation",
+                                                        ),
+                                                    ],
+                                                ),
+                                                PseudoMP4Box(FREE_ATOM_NAME, 2601),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                            ]
+                        )
+                    ),
+                ],
+                strict=True,
+            ),
+        )
+
+        # TODO
+        for file, tags, apple_boxes in test_files[0:1]:
+            with subtests.test("video gets tagged correctly"):
+                tagger_res = VideoTaggerMutagen.get_handle(file)
+
+                assert tagger_res == OkResult(), "video tagger handle err"
+
+                tagger = tagger_res.as_ok()
+
+                with tagger.writer(manager=test_manager) as w:
+                    early_tags = w.get_tags()
+
+                    assert early_tags.uuid is None, "uuid can't be found yet"
+                    assert [
+                        *early_tags.metadata.items(),
+                    ] == [], "no metadata tags can be found already"
+
+                    w.write_tags(tags)
+
+                    next_tags = w.get_tags()
+
+                    assert next_tags.uuid == tags.uuid, "UUID was written correctly"
+                    assert (
+                        next_tags.comment == tags.comment
+                    ), "Comment was written correctly"
+                    assert (
+                        next_tags.unrecognized == early_tags.unrecognized
+                    ), "no new unrecognized tags"
+                    assert (
+                        next_tags.metadata == tags.metadata
+                    ), "Metadata was written correctly"
+
+                # test the parsing of these apple tags
+
+                structure_res = MP4BoxStructure.from_file(file)
+                assert structure_res == OkResult(), "structure not parsed correctly"
+
+                structure = structure_res.as_ok()
+
+                udta_boxes = structure.find_boxes(UDTA_ATOM_NAME)
+
+                assert len(udta_boxes) == 1
+
+                udta_box = MP4BoxStructure(RecursiveBoxes(udta_boxes))
+
+                assert udta_box == apple_boxes

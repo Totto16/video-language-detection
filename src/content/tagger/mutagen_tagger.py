@@ -680,9 +680,7 @@ class VideoTaggerMutagen(VideoTagger):
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
                 if self.__filething is not None:
-                    print("CLOSED")
                     self.__filething.close()
-                print("ERROR IN CLOSE")
                 return False
 
         return VideoTaggerWriterCtx()
