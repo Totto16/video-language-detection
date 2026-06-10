@@ -141,3 +141,45 @@ class VideoTaggerMultiple(VideoTagger):
                 return False
 
         return VideoTaggerWriterCtx()
+
+
+__TAGGER_DOMAIN = "lt.totto.vld"
+
+
+@dataclass
+class AppleItunesFreeformKey:
+    mean: str
+    name: str
+
+
+class TaggerDomain:
+    @staticmethod
+    def get(key: str) -> str:
+        return f"----:{__TAGGER_DOMAIN}:video_language_detect:{key}"
+
+    @staticmethod
+    def get_freeform(key: str) -> AppleItunesFreeformKey:
+        return AppleItunesFreeformKey(
+            mean=__TAGGER_DOMAIN,
+            name=f"video_language_detect:{key}",
+        )
+
+    @staticmethod
+    def key_start_with(key: str) -> bool:
+        return key.startswith(f"----:{__TAGGER_DOMAIN}:video_language_detect:")
+
+    @staticmethod
+    def get_raw(key: str) -> str:
+        return key.replace(f"----:{__TAGGER_DOMAIN}:video_language_detect:", "")
+
+    UUID_RAW_KEY: str = f"----:{__TAGGER_DOMAIN}:video_language_detect_uuid:raw"
+
+    UUID_HEX_KEY: str = f"----:{__TAGGER_DOMAIN}:video_language_detect_uuid:hex"
+
+    UUID_RAW_KEY_FREEFORM: AppleItunesFreeformKey = AppleItunesFreeformKey(
+        mean=__TAGGER_DOMAIN, name="video_language_detect_uuid:raw",
+    )
+
+    UUID_HEX_KEY_FREEFORM: AppleItunesFreeformKey = AppleItunesFreeformKey(
+        mean=__TAGGER_DOMAIN, name="video_language_detect_uuid:hex",
+    )

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
@@ -23,9 +24,11 @@ from content.tagger.parser import (
 )
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    AppleItunesFreeformKey,
     MetadataTags,
     MetadataTagsRead,
     SerializableDict,
+    TaggerDomain,
     VideoTagger,
     VideoTaggerWriter,
 )
@@ -471,7 +474,7 @@ class JsonExtensionBox(UserExtensionBox):
         return JsonExtensionBox(parent, data)
 
     @staticmethod
-    def write_to_buffer(data: SerializableDict) -> bytes:
+    def write_to_buffer(data: SerializableDict | str) -> bytes:
 
         byte_data: bytes = json.dumps(data).encode()
 
@@ -1264,22 +1267,22 @@ AppleItunesItemDataContent = str | int | UUID
 # see: https://developer.apple.com/documentation/quicktime-file-format/well-known_types
 class AppleItunesItemDataType(Enum):
     # NOTE: only some are implemented here
-    reserved = 0
-    implicit = reserved
+    RESERVED = 0
+    IMPLICIT = RESERVED
 
-    utf_8 = 1
-    utf_16 = 2
+    UTF8 = 1
+    UTF16 = 2
 
     # see https://taglib.org/api/namespaceTagLib_1_1MP4.html#a86c3870b24b4cdb2887d3e47f5f9a39b
-    uuid = 8
+    UUID = 8
 
-    jpeg = 13
-    png = 14
+    JPEG = 13
+    PNG = 14
 
-    be_signed_integer_var = 21
-    integer = be_signed_integer_var
+    BE_SIGNED_INTEGER_VAR = 21
+    INTEGER = BE_SIGNED_INTEGER_VAR
 
-    be_unsigned_integer_var = 22
+    BE_UNSIGNED_INTEGER_VAR = 22
 
 
 @final
@@ -1308,25 +1311,25 @@ class AppleItunesItemDataBox(MP4FullBox):
     ) -> AppleItunesItemDataContent:
 
         match type_indicator:
-            case AppleItunesItemDataType.implicit | AppleItunesItemDataType.reserved:
+            case AppleItunesItemDataType.IMPLICIT | AppleItunesItemDataType.RESERVED:
                 msg = "No implicit type allowed here!"
                 raise RuntimeError(msg)
-            case AppleItunesItemDataType.utf_8:
+            case AppleItunesItemDataType.UTF8:
                 return value.decode("utf-8")
-            case AppleItunesItemDataType.utf_16:
+            case AppleItunesItemDataType.UTF16:
                 return value.decode("utf-16")
-            case AppleItunesItemDataType.uuid:
+            case AppleItunesItemDataType.UUID:
                 return UUID(bytes=value)
             case (
-                AppleItunesItemDataType.be_signed_integer_var
-                | AppleItunesItemDataType.integer
+                AppleItunesItemDataType.BE_SIGNED_INTEGER_VAR
+                | AppleItunesItemDataType.INTEGER
             ):
                 if len(value) not in [1, 2, 4, 8]:
                     msg = f"Invalid integer conversion length: {len(value)}"
                     raise RuntimeError(msg)
 
                 return int.from_bytes(value, byteorder="big", signed=True)
-            case AppleItunesItemDataType.be_unsigned_integer_var:
+            case AppleItunesItemDataType.BE_UNSIGNED_INTEGER_VAR:
                 if len(value) not in [1, 2, 4, 8]:
                     msg = f"Invalid integer conversion length: {len(value)}"
                     raise RuntimeError(msg)
@@ -1344,35 +1347,93 @@ class AppleItunesItemDataBox(MP4FullBox):
     ) -> AppleItunesItemDataContent:
 
         match type_indicator:
-            case AppleItunesItemDataType.implicit.value:
+            case AppleItunesItemDataType.IMPLICIT.value:
                 if expected_type is None:
                     msg = f"No implicit type known for value: {value!r}"
                     raise RuntimeError(msg)
 
                 return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
-            case AppleItunesItemDataType.utf_8.value:
+            case AppleItunesItemDataType.UTF8.value:
                 return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.utf_8,
+                    AppleItunesItemDataType.UTF8,
                     value,
                 )
-            case AppleItunesItemDataType.utf_16.value:
+            case AppleItunesItemDataType.UTF16.value:
                 return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.utf_16,
+                    AppleItunesItemDataType.UTF16,
                     value,
                 )
-            case AppleItunesItemDataType.uuid.value:
+            case AppleItunesItemDataType.UUID.value:
                 return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.uuid,
+                    AppleItunesItemDataType.UUID,
                     value,
                 )
-            case AppleItunesItemDataType.integer.value:
+            case AppleItunesItemDataType.INTEGER.value:
                 return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.integer,
+                    AppleItunesItemDataType.INTEGER,
                     value,
                 )
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
                 raise RuntimeError(msg)
+
+    @staticmethod
+    def __can_encode_value_impl(
+        type_indicator: int,
+        value: AppleItunesItemDataContent,
+    ) -> Optional[str]:
+        match type_indicator:
+            case AppleItunesItemDataType.IMPLICIT.value:
+                return "Can't encode implict value"
+            case AppleItunesItemDataType.UTF8.value:
+                if isinstance(value, str):
+                    return None
+
+                return f"Can't encode value of type {type(value)} with UTF-8"
+            case AppleItunesItemDataType.UTF16.value:
+                if isinstance(value, str):
+                    return None
+
+                return f"Can't encode value of type {type(value)} with UTF-16"
+            case AppleItunesItemDataType.UUID.value:
+                if isinstance(value, UUID):
+                    return None
+
+                return f"Can't encode value of type {type(value)} ass UUID"
+            case AppleItunesItemDataType.BE_SIGNED_INTEGER_VAR.value:
+                if isinstance(value, int):
+                    if value < -(1 << 63):
+                        return f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+
+                    if value > (1 << 63) - 1:
+                        return f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+
+                    return None
+
+                return f"Can't encode value of type {type(value)} as int"
+            case AppleItunesItemDataType.BE_UNSIGNED_INTEGER_VAR.value:
+                if isinstance(value, int):
+                    if value < 0:
+                        return f"Can't encode negative int value as unsigned integer: {value}"
+
+                    if value > 0xFFFFFFFFFFFFFFFF:
+                        return f"Can't encode int value as unsigned integer, value too big for 8 bytes: {value}"
+
+                    return None
+
+                return f"Can't encode value of type {type(value)} as int"
+            case _:
+                msg = f"Not implemented type_indicator conversion: {type_indicator}"
+                raise RuntimeError(msg)
+
+    @staticmethod
+    def can_encode_value(
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+    ) -> Optional[str]:
+        return AppleItunesItemDataBox.__can_encode_value_impl(
+            type_indicator.value, value
+        )
 
     @staticmethod
     def __read_from_stream_impl(
@@ -1761,12 +1822,64 @@ class AppleItunesItemFreeformBox(MP4Box):
         return str(self)
 
 
+@dataclass
+class ApplItunesTagsData:
+    type: AppleItunesItemDataType
+    value: AppleItunesItemDataContent
+
+
+@dataclass
+class ApplItunesTags:
+    key: ISOMAtomName | AppleItunesFreeformKey
+    data: ApplItunesTagsData
+
+    @staticmethod
+    def validate_init(
+        key: ISOMAtomName | AppleItunesFreeformKey,
+        data: ApplItunesTagsData,
+    ) -> "ApplItunesTags":
+        encode_res = AppleItunesItemDataBox.can_encode_value(data.type, data.value)
+        if encode_res is not None:
+            msg = f"Atom {key} not encodable: {encode_res}"
+            raise RuntimeError(msg)
+
+        return ApplItunesTags(key=key, data=data)
+
+    @staticmethod
+    def from_known_atom(
+        name: ISOMAtomName,
+        value: AppleItunesItemDataContent,
+    ) -> "ApplItunesTags":
+        data_type = AppleItunesItemBoxAtoms.get(name, None)  # noqa: SIM910
+        if data_type is None:
+            msg = f"Atom name not known: {name}"
+            raise RuntimeError(msg)
+
+        return ApplItunesTags.validate_init(
+            key=name,
+            data=ApplItunesTagsData(data_type, value),
+        )
+
+
+class AppleItunesMetaBoxBuilder:
+    __tags: list[ApplItunesTags]
+
+    def __init__(self: Self) -> None:
+        self.__tags = []
+
+    def add_tag(self: Self, tag: ApplItunesTags) -> None:
+        self.__tags.append(tag)
+
+    def build(self: Self) -> bytes:
+        raise NotImplementedError("TODO")
+
+
 AppleItunesItemBoxAtomFreeform = ISOMAtomName(b"----")
 
 AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] = {
     ISOMAtomName(b"trkn"): None,
     ISOMAtomName(b"disk"): None,
-    ISOMAtomName(b"gnre"): None,
+    ISOMAtomName(value=b"gnre"): None,
     ISOMAtomName(b"plID"): None,
     ISOMAtomName(b"cnID"): None,
     ISOMAtomName(b"geID"): None,
@@ -1774,10 +1887,10 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"sfID"): None,
     ISOMAtomName(b"cmID"): None,
     ISOMAtomName(b"akID"): None,
-    ISOMAtomName(b"tvsh"): AppleItunesItemDataType.utf_8,  # TV Show, show name
-    ISOMAtomName(b"tven"): AppleItunesItemDataType.integer,  # TV Episode id
-    ISOMAtomName(b"tvsn"): AppleItunesItemDataType.integer,  # -- TV Season
-    ISOMAtomName(b"tves"): AppleItunesItemDataType.integer,  # -- TV Episode
+    ISOMAtomName(b"tvsh"): AppleItunesItemDataType.UTF8,  # TV Show, show name
+    ISOMAtomName(b"tven"): AppleItunesItemDataType.INTEGER,  # TV Episode id
+    ISOMAtomName(b"tvsn"): AppleItunesItemDataType.INTEGER,  # -- TV Season
+    ISOMAtomName(b"tves"): AppleItunesItemDataType.INTEGER,  # -- TV Episode
     ISOMAtomName(b"tmpo"): None,
     ISOMAtomName(b"\xa9mvi"): None,
     ISOMAtomName(b"\xa9mvc"): None,
@@ -1785,7 +1898,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"pgap"): None,
     ISOMAtomName(b"pcst"): None,
     ISOMAtomName(b"shwm"): None,
-    ISOMAtomName(b"stik"): AppleItunesItemDataType.integer,  # -- MediaKind
+    ISOMAtomName(b"stik"): AppleItunesItemDataType.INTEGER,  # -- MediaKind
     ISOMAtomName(b"hdvd"): None,
     ISOMAtomName(b"rtng"): None,
     ISOMAtomName(b"covr"): None,
@@ -1797,7 +1910,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"aART"): None,
     ISOMAtomName(b"\xa9wrt"): None,
     ISOMAtomName(b"\xa9day"): None,
-    ISOMAtomName(b"\xa9cmt"): AppleItunesItemDataType.utf_8,  # -- comment
+    ISOMAtomName(b"\xa9cmt"): AppleItunesItemDataType.UTF8,  # -- comment
     ISOMAtomName(b"desc"): None,
     ISOMAtomName(b"purd"): None,
     ISOMAtomName(b"\xa9grp"): None,
@@ -1805,7 +1918,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"\xa9lyr"): None,
     ISOMAtomName(b"catg"): None,
     ISOMAtomName(b"keyw"): None,
-    ISOMAtomName(b"\xa9too"): AppleItunesItemDataType.utf_8,  # -- encoded by, tool
+    ISOMAtomName(b"\xa9too"): AppleItunesItemDataType.UTF8,  # -- encoded by, tool
     ISOMAtomName(b"cprt"): None,
     ISOMAtomName(b"soal"): None,
     ISOMAtomName(b"soaa"): None,
@@ -1962,14 +2075,17 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
 
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
+    __meta_box: Optional[MetaBox]
     __our_boxes: list[MP4Box]
 
     def __init__(
         self: Self,
         uuid_box: Optional[UUIDExtensionBox],
+        meta_box: Optional[MetaBox],
         our_boxes: list[MP4Box],
     ) -> None:
         self.__uuid_box = uuid_box
+        self.__meta_box = meta_box
         self.__our_boxes = our_boxes
 
     def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
@@ -1977,41 +2093,83 @@ class Mp4MetadataHandler:
         if len(self.__our_boxes) != 0:
             f.truncate(self.__our_boxes[0].span.start)
 
-    def write_new_matadata(
-        self: Self,
-        f: BufferedIOBase,
-        metadata: list[SerializableDict],
-        uuid: UUID,
-    ) -> None:
+    def write_new_metadata(self: Self, f: BufferedIOBase, tags: MetadataTags) -> None:
         f.seek(0, 2)
 
-        # note: can write 0 or more free space or user extension boxes, and its allowed everywhere
+        # note: can write 0 or more free space or user extension boxes, and there both allowed everywhere
 
         if self.__uuid_box is not None:
             buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
             f.write(buffer)
         else:
-            buffer = UUIDExtensionBox.write_to_buffer(uuid)
+            buffer = UUIDExtensionBox.write_to_buffer(tags.uuid)
 
             f.write(buffer)
 
-        # TODO: also write some metadata into these boxes
-        # use either top level "meta" or "meco" boxes
+        # NOTE: using top level meta box
 
         # meta:
-        # location, file (0 or 1), inside meco (1 or more, per handler, one meta box!)
+        # location: file , amount: 0 or 1
 
-        # meco:
-        # location, file (0 or 1)
+        if self.__meta_box is not None:
+            raise NotImplementedError("TODO")
+        else:
+            meta_box = AppleItunesMetaBoxBuilder()
+            meta_box.add_tag(
+                ApplItunesTags.from_known_atom(
+                    ISOMAtomName(b"\xa9cmt"),
+                    tags.comment,
+                ),
+            )
 
-        for mdt in metadata:
+            for key, value in tags.metadata.items():
+                value_str = json.dumps(value)
+                meta_box.add_tag(
+                    ApplItunesTags.validate_init(
+                        key=TaggerDomain.get_freeform(key),
+                        data=ApplItunesTagsData(
+                            type=AppleItunesItemDataType.UTF8,
+                            value=value_str,
+                        ),
+                    ),
+                )
+
+            meta_box.add_tag(
+                ApplItunesTags.validate_init(
+                    key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
+                    data=ApplItunesTagsData(
+                        type=AppleItunesItemDataType.UUID,
+                        value=tags.uuid,
+                    ),
+                ),
+            )
+
+            meta_box.add_tag(
+                ApplItunesTags.validate_init(
+                    key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
+                    data=ApplItunesTagsData(
+                        type=AppleItunesItemDataType.UTF8,
+                        value=tags.uuid.hex,
+                    ),
+                ),
+            )
+
+            buffer = meta_box.build()
+            f.write(buffer)
+
+        metadata_dict: dict[str, SerializableDict | str] = {
+            "comment": tags.comment,
+            "metadata": tags.metadata,
+        }
+
+        for mdt in metadata_dict:
             buffer = JsonExtensionBox.write_to_buffer(mdt)
 
             f.write(buffer)
 
         f.flush()
 
-    def read_matadata(
+    def read_metadata(
         self: Self,
     ) -> tuple[list[SerializableDict], Optional[UUID]]:
         uuid = None if self.__uuid_box is None else self.__uuid_box.uuid
@@ -2029,12 +2187,15 @@ class Mp4MetadataHandler:
                 msg = f"Invalid box for tags found: {type(box)}"
                 raise TypeError(msg)
 
+        # TODO: read top level meta box and merge values, they have to be the same!
+
         return (metadata, uuid)
 
     @staticmethod
     def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
+        meta_box: Optional[MetaBox] = None
 
         def free_box_is_written_by_us(box: FreeSpaceBox) -> bool:
             free_tag = b"vld\x42\x42\x69-->"
@@ -2082,8 +2243,10 @@ class Mp4MetadataHandler:
                         "Invalid UserExtensionBox: type not dispatched to correct class"
                     )
                     raise TypeError(msg)
-
                 return uuid_box_is_written_by_us(box)
+
+            if box.type == META_ATOM_NAME:
+                raise RuntimeError("TODO implement")
 
             return False
 
@@ -2106,7 +2269,9 @@ class Mp4MetadataHandler:
                 other_box_encountered = True
                 break
 
-        return Mp4MetadataHandler(uuid_box, list(reversed(our_boxes_reversed)))
+        return Mp4MetadataHandler(
+            uuid_box, meta_box, list(reversed(our_boxes_reversed)),
+        )
 
 
 class VideoTaggerWriterMP4(VideoTaggerWriter):
@@ -2165,15 +2330,9 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
             mp4_metadata_handler.remove_old_metadata(self.__writer)
 
-            metadata_dict: SerializableDict = {
-                "comment": tags.comment,
-                "metadata": tags.metadata,
-            }
-
-            mp4_metadata_handler.write_new_matadata(
+            mp4_metadata_handler.write_new_metadata(
                 self.__writer,
-                [metadata_dict],
-                tags.uuid,
+                tags,
             )
 
             self.__writer.flush()
@@ -2203,7 +2362,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             f=self.__writer,
         )
 
-        metadata, uuid = mp4_metadata_handler.read_matadata()
+        metadata, uuid = mp4_metadata_handler.read_metadata()
 
         result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
 

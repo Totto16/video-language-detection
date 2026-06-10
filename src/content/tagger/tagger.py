@@ -12,7 +12,7 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
+def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]:
 
     try:
 
@@ -41,6 +41,23 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
         result = VideoTaggerMultiple(file, tagger)
 
         return Ok(result)
+
+    except RuntimeError as err:
+        return Err(
+            _("get tagger {err}").format(err=err),
+        )
+
+
+def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
+
+    try:
+
+        mp4_handle = VideoTaggerMP4.get_handle(file)
+
+        if mp4_handle.err():
+            return Err(mp4_handle.as_err())
+
+        return Ok(mp4_handle.as_ok())
 
     except RuntimeError as err:
         return Err(

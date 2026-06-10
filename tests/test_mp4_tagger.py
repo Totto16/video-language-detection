@@ -5,7 +5,7 @@ from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from typing import Any, Optional, Self, override
 from unittest import mock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
@@ -537,37 +537,37 @@ def test_mp4_tagger_parsing(
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9nam"),
                                                     57,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Big Buck Bunny, Sunflower version",
                                                 ),
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9ART"),
                                                     76,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Blender Foundation 2008, Janus Bager Kristensen 2013",
                                                 ),
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9wrt"),
                                                     41,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Sacha Goedegebure",
                                                 ),
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9too"),
                                                     37,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Lavf58.63.100",
                                                 ),
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9cmt"),
                                                     89,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Creative Commons Attribution 3.0 - http://bbb3d.renderfarming.net",
                                                 ),
                                                 PseudoAppleItunesMP4Box(
                                                     ISOMAtomName(b"\xa9gen"),
                                                     33,
-                                                    AppleItunesItemDataType.utf_8,
+                                                    AppleItunesItemDataType.UTF8,
                                                     "Animation",
                                                 ),
                                             ],
@@ -1091,7 +1091,7 @@ def test_mp4_metadata_tags_apple_custom(
                                                     [
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             99,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             json.dumps(
                                                                 metadatas[0].metadata[
                                                                     "test"
@@ -1102,14 +1102,14 @@ def test_mp4_metadata_tags_apple_custom(
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             metadatas[0].uuid.hex,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             119,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             json.dumps(
                                                                 metadatas[0].metadata[
                                                                     "dict"
@@ -1120,7 +1120,7 @@ def test_mp4_metadata_tags_apple_custom(
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             106,
-                                                            AppleItunesItemDataType.uuid,
+                                                            AppleItunesItemDataType.UUID,
                                                             metadatas[0].uuid,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:raw",
@@ -1128,7 +1128,7 @@ def test_mp4_metadata_tags_apple_custom(
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9cmt"),
                                                             40,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             metadatas[0].comment,
                                                         ),
                                                     ],
@@ -1159,36 +1159,36 @@ def test_mp4_metadata_tags_apple_custom(
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9nam"),
                                                             57,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             "Big Buck Bunny, Sunflower version",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9ART"),
                                                             76,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             "Blender Foundation 2008, Janus Bager Kristensen 2013",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9wrt"),
                                                             41,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             "Sacha Goedegebure",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9gen"),
                                                             33,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             "Animation",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9too"),
                                                             37,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             "Lavf58.63.100",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             99,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             json.dumps(
                                                                 metadatas[1].metadata[
                                                                     "test"
@@ -1199,14 +1199,14 @@ def test_mp4_metadata_tags_apple_custom(
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             metadatas[1].uuid.hex,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             119,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             json.dumps(
                                                                 metadatas[1].metadata[
                                                                     "dict"
@@ -1217,7 +1217,7 @@ def test_mp4_metadata_tags_apple_custom(
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             106,
-                                                            AppleItunesItemDataType.uuid,
+                                                            AppleItunesItemDataType.UUID,
                                                             metadatas[1].uuid,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:raw",
@@ -1225,7 +1225,7 @@ def test_mp4_metadata_tags_apple_custom(
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9cmt"),
                                                             40,
-                                                            AppleItunesItemDataType.utf_8,
+                                                            AppleItunesItemDataType.UTF8,
                                                             metadatas[1].comment,
                                                         ),
                                                     ],
