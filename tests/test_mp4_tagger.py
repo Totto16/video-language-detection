@@ -383,7 +383,8 @@ class MP4BoxStructure(FancyEq):
         return str(self)
 
     def __eq_impl(
-        self: Self, other: object,
+        self: Self,
+        other: object,
     ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
         if isinstance(other, RecursiveBoxes):
             return (True, lambda: self.boxes.eq_impl(other))
@@ -410,7 +411,8 @@ class MP4BoxStructure(FancyEq):
         return hash(self.boxes)
 
     def find_boxes(
-        self: Self, atom_name: ISOMAtomName,
+        self: Self,
+        atom_name: ISOMAtomName,
     ) -> RecursiveBoxes.RecursiveBoxesData:
 
         boxes_stack: list[RecursiveBoxes.RecursiveBoxesData] = [
@@ -1046,80 +1048,88 @@ def test_mp4_metadata_tags_apple_custom(
 
     with file_duplicates(mp4_test_parse_files.data) as data:
 
-        uuids: list[UUID] = [uuid4(), uuid4()]
+        metadatas = [
+            MetadataTags(
+                comment="Test comment (1)",
+                uuid=uuid4(),
+                language=Language.get_default(),
+                metadata={
+                    "test": "str value 1",
+                    "dict": {"key1": "value1", "int1": 14141},
+                },
+            ),
+            MetadataTags(
+                comment="Test comment (2)",
+                uuid=uuid4(),
+                language=Language.get_default(),
+                metadata={
+                    "test": "str value 2",
+                    "dict": {"key2": "value2", "int2": 13213},
+                },
+            ),
+        ]
 
         test_files: list[tuple[Path, MetadataTags, MP4BoxStructure]] = list(
             zip(
                 data,
-                [
-                    MetadataTags(
-                        comment="Test comment 1",
-                        uuid=uuids[0],
-                        language=Language.get_default(),
-                        metadata={
-                            "test": "str",
-                            "dict": {"key1": "value1", "int1": 1414},
-                        },
-                    ),
-                    MetadataTags(
-                        comment="Test comment 2",
-                        uuid=uuids[1],
-                        language=Language.get_default(),
-                        metadata={
-                            "test": "str",
-                            "dict": {"key2": "value2", "int2": 1321},
-                        },
-                    ),
-                ],
+                metadatas,
                 [
                     MP4BoxStructure(
                         RecursiveBoxes(
                             [
                                 (
-                                    PseudoMP4Box(UDTA_ATOM_NAME, 3137),
+                                    PseudoMP4Box(UDTA_ATOM_NAME, 3148),
                                     [
                                         (
-                                            PseudoMP4Box(META_ATOM_NAME, 3129),
+                                            PseudoMP4Box(META_ATOM_NAME, 3140),
                                             [
                                                 (
                                                     PseudoMP4Box(
                                                         ILST_ATOM_NAME,
-                                                        483,
+                                                        494,
                                                     ),
                                                     [
                                                         PseudoAppleItunesMP4FreeformBox(
-                                                            91,
+                                                            99,
                                                             AppleItunesItemDataType.utf_8,
-                                                            '"str"',
+                                                            json.dumps(
+                                                                metadatas[0].metadata[
+                                                                    "test"
+                                                                ],
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect:test",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
                                                             AppleItunesItemDataType.utf_8,
-                                                            uuids[0].hex,
+                                                            metadatas[0].uuid.hex,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
-                                                            118,
+                                                            119,
                                                             AppleItunesItemDataType.utf_8,
-                                                            '{"key1": "value1", "int1": 1414}',
+                                                            json.dumps(
+                                                                metadatas[0].metadata[
+                                                                    "dict"
+                                                                ],
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect:dict",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             106,
                                                             AppleItunesItemDataType.uuid,
-                                                            uuids[0],
+                                                            metadatas[0].uuid,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:raw",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9cmt"),
-                                                            38,
+                                                            40,
                                                             AppleItunesItemDataType.utf_8,
-                                                            "Test comment 1",
+                                                            metadatas[0].comment,
                                                         ),
                                                     ],
                                                 ),
@@ -1135,54 +1145,92 @@ def test_mp4_metadata_tags_apple_custom(
                         RecursiveBoxes(
                             [
                                 (
-                                    PseudoMP4Box(UDTA_ATOM_NAME, 3137),
+                                    PseudoMP4Box(UDTA_ATOM_NAME, 2864),
                                     [
                                         (
-                                            PseudoMP4Box(META_ATOM_NAME, 3129),
+                                            PseudoMP4Box(META_ATOM_NAME, 2856),
                                             [
                                                 (
                                                     PseudoMP4Box(
                                                         ILST_ATOM_NAME,
-                                                        483,
+                                                        738,
                                                     ),
                                                     [
-                                                        PseudoAppleItunesMP4FreeformBox(
-                                                            91,
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9nam"),
+                                                            57,
                                                             AppleItunesItemDataType.utf_8,
-                                                            '"str"',
+                                                            "Big Buck Bunny, Sunflower version",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9ART"),
+                                                            76,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Blender Foundation 2008, Janus Bager Kristensen 2013",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9wrt"),
+                                                            41,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Sacha Goedegebure",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9gen"),
+                                                            33,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Animation",
+                                                        ),
+                                                        PseudoAppleItunesMP4Box(
+                                                            ISOMAtomName(b"\xa9too"),
+                                                            37,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            "Lavf58.63.100",
+                                                        ),
+                                                        PseudoAppleItunesMP4FreeformBox(
+                                                            99,
+                                                            AppleItunesItemDataType.utf_8,
+                                                            json.dumps(
+                                                                metadatas[1].metadata[
+                                                                    "test"
+                                                                ],
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect:test",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
                                                             AppleItunesItemDataType.utf_8,
-                                                            uuids[0].hex,
+                                                            metadatas[1].uuid.hex,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
-                                                            118,
+                                                            119,
                                                             AppleItunesItemDataType.utf_8,
-                                                            '{"key1": "value1", "int1": 1414}',
+                                                            json.dumps(
+                                                                metadatas[1].metadata[
+                                                                    "dict"
+                                                                ],
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect:dict",
                                                         ),
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             106,
                                                             AppleItunesItemDataType.uuid,
-                                                            uuids[0],
+                                                            metadatas[1].uuid,
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:raw",
                                                         ),
                                                         PseudoAppleItunesMP4Box(
                                                             ISOMAtomName(b"\xa9cmt"),
-                                                            38,
+                                                            40,
                                                             AppleItunesItemDataType.utf_8,
-                                                            "Test comment 1",
+                                                            metadatas[1].comment,
                                                         ),
                                                     ],
                                                 ),
-                                                PseudoMP4Box(FREE_ATOM_NAME, 2601),
+                                                PseudoMP4Box(FREE_ATOM_NAME, 2073),
                                             ],
                                         ),
                                     ],
