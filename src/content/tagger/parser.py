@@ -4,7 +4,7 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from enum import StrEnum
-from io import BufferedIOBase
+from io import BufferedIOBase, UnsupportedOperation
 from types import TracebackType
 from typing import Literal, Optional, Protocol, Self, assert_never, cast, override
 from uuid import UUID
@@ -54,6 +54,20 @@ class ExclusiveIOBase:
         self.__assert_no_holder()
         self.__f.seek(0, 2)
         return self.__f.tell()
+
+    def size_no_seek(self: Self) -> int:
+        self.__assert_holder()
+
+        try:
+            fileno = self.__f.fileno()
+            return os.fstat(fileno).st_size
+        except UnsupportedOperation:
+            # use double seek instead of fstat
+            current_pos = self.__f.tell()
+            self.__f.seek(0, 2)
+            filesize = self.__f.tell()
+            self.__f.seek(current_pos)
+            return filesize
 
     def tell(self: Self) -> int:
         self.__assert_holder()
@@ -295,10 +309,19 @@ class BoundedIO:
             raise RuntimeError(msg)
 
         if start + size != self.end:
-            msg = f"New payload io isn't correctly sized, it doesnÄt rech the end of the üarentz: {start + size} != {self.end}"
+            msg = f"New payload io isn't correctly sized, it doesn't reach the end of the parent: {start + size} != {self.end}"
             raise RuntimeError(msg)
 
         return BoundedIO(self.__io, start, size)
+
+    def special_checked_filesize(self: Self) -> int:
+        filesize = self.__io.size_no_seek()
+
+        if self.end != filesize:
+            msg = f"can only span to the filesize end, if the current bound also ends at the end: {self.end} != {filesize}"
+            raise RuntimeError(msg)
+
+        return filesize
 
 
 class ByteOrder(StrEnum):

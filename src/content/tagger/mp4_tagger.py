@@ -20,13 +20,13 @@ from uuid import UUID
 from content.language import ShortLanguageStr
 from content.tagger.parser import (
     ISOM_BYTE_ORDER,
+    BoundedIO,
     Packable,
     Packer,
     Unpacker,
     UnsignedInt,
     UnsignedLongLong,
     UnsignedShort,
-    read_checked,
     uuid_from_bytes,
     uuid_to_bytes,
 )
@@ -220,9 +220,9 @@ class NonFinalMP4Box:
 
         if not is_final:
             for fn_name in [
-                "read_from_stream",
+                "read",
                 "write_to_buffer",
-                "read_from_stream_parent",
+                "read_from_parent",
             ]:
                 if fn_name in cls.__dict__:
                     msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
@@ -246,7 +246,7 @@ class MP4Box(NonFinalMP4Box):
         self.is_container = is_container
 
     @staticmethod
-    def read_from_stream_mp4_box(f: BufferedIOBase, offset: int) -> "MP4Box":
+    def read_mp4_box(io: BoundedIO) -> "MP4Box":
         # spec: ISO/IEC 14496-12
         # MP4 atom / ISO box structure:
         # size | 4 bytes | unsigned integer
@@ -271,62 +271,60 @@ class MP4Box(NonFinalMP4Box):
         #     }
         # }
 
-        f.seek(offset)
+        with io.r_ctx(force_entire_read=False) as f:
 
-        hdr = read_checked(f, 8)
+            hdr = f.read(8)
 
-        size, typ = Unpacker.unpack_two(
-            ISOM_BYTE_ORDER,
-            (UnsignedInt(), PackableISOMAtomName()),
-            hdr,
-        )
-
-        if typ == CMOV_ATOM_NAME:
-            msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
-            raise RuntimeError(msg)
-
-        if typ == MOOF_ATOM_NAME:
-            msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
-            raise RuntimeError(msg)
-
-        final_size: int = size
-        header_size: int = 8
-
-        if size == 1:
-            ext = read_checked(f, 8)
-
-            largesize = Unpacker.unpack_one(
+            size, typ = Unpacker.unpack_two(
                 ISOM_BYTE_ORDER,
-                UnsignedLongLong(),
-                ext,
+                (UnsignedInt(), PackableISOMAtomName()),
+                hdr,
             )
 
-            if largesize < 16:
-                msg = f"Invalid extended box size {largesize}"
+            if typ == CMOV_ATOM_NAME:
+                msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
                 raise RuntimeError(msg)
 
-            final_size = largesize
-            header_size = 16
-        elif size == 0:
-            f.seek(0, 2)
-            eof = f.tell()
-            final_size = eof - offset
-            header_size = 8
+            if typ == MOOF_ATOM_NAME:
+                msg = f"Fragmented MP4 '{MOOF_ATOM_NAME}' not supported"
+                raise RuntimeError(msg)
 
-        if typ == UUID_ATOM_NAME:
-            usertype_raw = read_checked(f, 16)
+            final_size: int = size
+            header_size: int = 8
 
-            usertype = uuid_from_bytes(ISOM_BYTE_ORDER, usertype_raw)
+            if size == 1:
+                ext = f.read(8)
 
-            header_size = header_size + 16
+                largesize = Unpacker.unpack_one(
+                    ISOM_BYTE_ORDER,
+                    UnsignedLongLong(),
+                    ext,
+                )
 
-            span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
-            box = MP4Box(typ, span, is_container=False)
-            user_box = UserExtensionBox(box, usertype, is_container=False)
-            return user_extension_box_determine_correct_extension(f, user_box)
+                if largesize < 16:
+                    msg = f"Invalid extended box size {largesize}"
+                    raise RuntimeError(msg)
 
-        span = MP4BoxSpan(offset, size=final_size, header_size=header_size)
-        return MP4Box(typ, span, is_container=False)
+                final_size = largesize
+                header_size = 16
+            elif size == 0:
+                final_size = io.special_checked_filesize()
+                header_size = 8
+
+            if typ == UUID_ATOM_NAME:
+                usertype_raw = f.read(16)
+
+                usertype = uuid_from_bytes(ISOM_BYTE_ORDER, usertype_raw)
+
+                header_size = header_size + 16
+
+                span = MP4BoxSpan(io.start, size=final_size, header_size=header_size)
+                box = MP4Box(typ, span, is_container=False)
+                user_box = UserExtensionBox(box, usertype, is_container=False)
+                return user_extension_box_determine_correct_extension(io, user_box)
+
+            span = MP4BoxSpan(io.start, size=final_size, header_size=header_size)
+            return MP4Box(typ, span, is_container=False)
 
     @staticmethod
     def __impl_write_to_buffer_mp4_box(typ: ISOMAtomName, data: bytes) -> bytes:
@@ -388,6 +386,21 @@ class MP4Box(NonFinalMP4Box):
 
         return MP4Box.__impl_write_to_buffer_mp4_box(typ, data)
 
+    @final
+    def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
+        return io.new_payload_io(
+            self.span.payload_start,
+            self.span.payload_size,
+        )
+
+    @final
+    def payload_io_from_base(self: Self, f: BufferedIOBase) -> BoundedIO:
+        return BoundedIO.get_new(
+            f,
+            self.span.payload_start,
+            self.span.payload_size,
+        )
+
     def __str__(self: Self) -> str:
         return f"<MP4Box type: {self.type} span: {self.span} is_container: {self.is_container}>"
 
@@ -444,26 +457,26 @@ class UUIDExtensionBox(UserExtensionBox, FinalMp4Box):
         self.uuid = uuid
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: UserExtensionBox,
     ) -> "UUIDExtensionBox":
 
         # this is a custom user box, it contains one UUID
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        if parent.span.payload_size != 16:
-            msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
-            raise RuntimeError(msg)
+            if parent.span.payload_size != 16:
+                msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
+                raise RuntimeError(msg)
 
-        uuid_raw = read_checked(f, 16)
+            uuid_raw = f.read(16)
 
-        uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
+            uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
 
-        parent.span.add_header_size(16)
+            parent.span.add_header_size(16)
 
-        return UUIDExtensionBox(parent, uuid)
+            return UUIDExtensionBox(parent, uuid)
 
     @staticmethod
     def write_to_buffer(uuid: UUID) -> bytes:
@@ -493,22 +506,22 @@ class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
         self.data = data
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: UserExtensionBox,
     ) -> "JsonExtensionBox":
 
         # this is a custom user box, it contains a json payload
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        data_raw = read_checked(f, parent.span.payload_size)
+            data_raw = f.read(parent.span.payload_size)
 
-        data = json.loads(data_raw.decode())
+            data = json.loads(data_raw.decode())
 
-        parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header_size(parent.span.payload_size)
 
-        return JsonExtensionBox(parent, data)
+            return JsonExtensionBox(parent, data)
 
     @staticmethod
     def write_to_buffer(data: SerializableDict) -> bytes:
@@ -525,14 +538,14 @@ class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
 
 
 def user_extension_box_determine_correct_extension(
-    f: BufferedIOBase,
+    io: BoundedIO,
     box: UserExtensionBox,
 ) -> UserExtensionBox:
     match box.usertype:
         case UserExtensions.UUIDExtension_UUID:
-            return UUIDExtensionBox.read_from_stream_parent(f, box)
+            return UUIDExtensionBox.read_from_parent(io, box)
         case UserExtensions.JSONExtension_UUID:
-            return JsonExtensionBox.read_from_stream_parent(f, box)
+            return JsonExtensionBox.read_from_parent(io, box)
         case _:
             return box
 
@@ -555,7 +568,7 @@ class MP4FullBox(MP4Box):
         self.flags = flags
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MP4FullBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "MP4FullBox":
         # spec: ISO/IEC 14496-12
         # ISO full box structure:
         # box     | <box size> bytes | parent box
@@ -571,26 +584,24 @@ class MP4FullBox(MP4Box):
         #     bit(24) flags = f;
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=False) as f:
 
-        version = read_checked(f, 1)[0]
+            version = f.read(1)[0]
 
-        flags = read_checked(f, 3)
+            flags = f.read(3)
 
-        parent.span.add_header_size(4)
+            parent.span.add_header_size(4)
 
-        return MP4FullBox(parent, version, flags, is_container=False)
-
-    @staticmethod
-    def read_from_stream_mp4_full_box(f: BufferedIOBase, offset: int) -> "MP4FullBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return MP4FullBox.__read_from_stream_impl(f, box)
+            return MP4FullBox(parent, version, flags, is_container=False)
 
     @staticmethod
-    def read_from_stream_parent_mp4_full_box(
-        f: BufferedIOBase, parent: MP4Box
-    ) -> "MP4FullBox":
-        return MP4FullBox.__read_from_stream_impl(f, parent)
+    def read_mp4_full_box(io: BoundedIO) -> "MP4FullBox":
+        box = MP4Box.read_mp4_box(io)
+        return MP4FullBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_from_parent_mp4_full_box(io: BoundedIO, parent: MP4Box) -> "MP4FullBox":
+        return MP4FullBox.__read_impl(io, parent)
 
     @staticmethod
     def __impl_write_to_buffer_mp4_full_box(
@@ -654,7 +665,7 @@ class FileTypeBox(MP4Box, FinalMp4Box):
         self.compatible_brands = compatible_brands
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "FileTypeBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "FileTypeBox":
         # spec: ISO/IEC 14496-12
         # ISO file type structure:
         # box     | <box size> bytes | parent box
@@ -670,41 +681,41 @@ class FileTypeBox(MP4Box, FinalMp4Box):
         #     unsigned int(32) compatible_brands[];
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        major_brand_raw = read_checked(f, 4)
-        major_brand = ISOMAtomName(major_brand_raw)
+            major_brand_raw = f.read(4)
+            major_brand = ISOMAtomName(major_brand_raw)
 
-        minor_version_bytes = read_checked(f, 4)
+            minor_version_bytes = f.read(4)
 
-        minor_version = Unpacker.unpack_one(
-            ISOM_BYTE_ORDER,
-            UnsignedInt(),
-            minor_version_bytes,
-        )
+            minor_version = Unpacker.unpack_one(
+                ISOM_BYTE_ORDER,
+                UnsignedInt(),
+                minor_version_bytes,
+            )
 
-        compatible_brands_size = parent.span.payload_size - (4 + 4)
+            compatible_brands_size = parent.span.payload_size - (4 + 4)
 
-        if compatible_brands_size < 0:
-            msg = f"Invalid box size: not enough data for complete FileTypeBox: have {parent.span.payload_size} but need at least {(4 + 4)}"
-            raise RuntimeError(msg)
+            if compatible_brands_size < 0:
+                msg = f"Invalid box size: not enough data for complete FileTypeBox: have {parent.span.payload_size} but need at least {(4 + 4)}"
+                raise RuntimeError(msg)
 
-        compatible_brands = read_checked(f, compatible_brands_size)
+            compatible_brands = f.read(compatible_brands_size)
 
-        additional_header_size = 4 + 4 + compatible_brands_size
+            additional_header_size = 4 + 4 + compatible_brands_size
 
-        parent.span.add_header_size(additional_header_size)
+            parent.span.add_header_size(additional_header_size)
 
-        return FileTypeBox(parent, major_brand, minor_version, compatible_brands)
-
-    @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "FileTypeBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return FileTypeBox.__read_from_stream_impl(f, box)
+            return FileTypeBox(parent, major_brand, minor_version, compatible_brands)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "FileTypeBox":
-        return FileTypeBox.__read_from_stream_impl(f, parent)
+    def read(io: BoundedIO) -> "FileTypeBox":
+        box = MP4Box.read_mp4_box(io)
+        return FileTypeBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "FileTypeBox":
+        return FileTypeBox.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<FileTypeBox parent: {MP4Box.__str__(self)} major_brand: {self.major_brand} minor_version: {self.minor_version} compatible_brands: {self.compatible_brands!s}>"
@@ -727,7 +738,7 @@ class FreeSpaceBox(MP4Box, FinalMp4Box):
         self.data = data
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "FreeSpaceBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "FreeSpaceBox":
         # spec: ISO/IEC 14496-12
         # ISO free space structure:
         # box     | <box size> bytes | parent box
@@ -740,22 +751,21 @@ class FreeSpaceBox(MP4Box, FinalMp4Box):
         #     unsigned int(8) data[];
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
+            data = f.read(parent.span.payload_size)
 
-        data = read_checked(f, parent.span.payload_size)
+            parent.span.add_header_size(parent.span.payload_size)
 
-        parent.span.add_header_size(parent.span.payload_size)
-
-        return FreeSpaceBox(parent, data)
-
-    @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "FreeSpaceBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return FreeSpaceBox.__read_from_stream_impl(f, box)
+            return FreeSpaceBox(parent, data)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "FreeSpaceBox":
-        return FreeSpaceBox.__read_from_stream_impl(f, parent)
+    def read(io: BoundedIO) -> "FreeSpaceBox":
+        box = MP4Box.read_mp4_box(io)
+        return FreeSpaceBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "FreeSpaceBox":
+        return FreeSpaceBox.__read_impl(io, parent)
 
     @staticmethod
     def write_to_buffer(data: bytes) -> bytes:
@@ -782,8 +792,8 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
         self.language_offset = language_offset
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4FullBox,
     ) -> "MediaHeaderBox":
         # spec: ISO/IEC 14496-12
@@ -814,44 +824,50 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
         #     unsigned int(16) pre_defined = 0;
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        version_dependend_size: int
+            version_dependend_size: int
 
-        if parent.version == 0:
-            version_dependend_size = 4 + 4 + 4 + 4
-        elif parent.version == 1:
-            additional_header_size = 1
-            version_dependend_size = 8 + 8 + 4 + 8
+            if parent.version == 0:
+                version_dependend_size = 4 + 4 + 4 + 4
+            elif parent.version == 1:
+                additional_header_size = 1
+                version_dependend_size = 8 + 8 + 4 + 8
+            else:
+                msg = "Invalid mdhd version"
+                raise RuntimeError(msg)
+
+            additional_header_size = version_dependend_size + (2 + 2)
+
+            if parent.span.payload_size < additional_header_size:
+                msg = f"Truncated mdhd header {parent.span.payload_size} < {additional_header_size}"
+                raise RuntimeError(msg)
+
+            language_offset = parent.span.header_size + version_dependend_size
+
+            if parent.span.start + language_offset + 2 > parent.span.end:
+                msg = "Language field outside mdhd bounds"
+                raise RuntimeError(msg)
+
+            f.skip(additional_header_size)
+
+            parent.span.add_header_size(additional_header_size)
+
+            return MediaHeaderBox(parent, language_offset)
+
+    @staticmethod
+    def read(io: BoundedIO) -> "MediaHeaderBox":
+        box = MP4FullBox.read_mp4_full_box(io)
+        return MediaHeaderBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "MediaHeaderBox":
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
         else:
-            msg = "Invalid mdhd version"
-            raise RuntimeError(msg)
-
-        additional_header_size = version_dependend_size + (2 + 2)
-
-        if parent.span.payload_size < additional_header_size:
-            msg = f"Truncated mdhd header {parent.span.payload_size} < {additional_header_size}"
-            raise RuntimeError(msg)
-
-        language_offset = parent.span.header_size + version_dependend_size
-
-        if parent.span.start + language_offset + 2 > parent.span.end:
-            msg = "Language field outside mdhd bounds"
-            raise RuntimeError(msg)
-
-        parent.span.add_header_size(additional_header_size)
-
-        return MediaHeaderBox(parent, language_offset)
-
-    @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaHeaderBox":
-        box = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return MediaHeaderBox.__read_from_stream_impl(f, box)
-
-    @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MediaHeaderBox":
-        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return MediaHeaderBox.__read_from_stream_impl(f, box)
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return MediaHeaderBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
     def __decode_language_impl(value: int) -> ShortLanguageStr | str:
@@ -893,35 +909,42 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
 
         return value
 
-    def read_language(self: Self, f: BufferedIOBase) -> ShortLanguageStr | str:
-        f.seek(self.span.start + self.language_offset)
+    def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
+        io = self.payload_io_from_base(io_base)
 
-        lang_bytes = read_checked(f, 2)
-        packed = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), lang_bytes)
+        with io.r_ctx(force_entire_read=False) as f:
+            f.skip(self.language_offset)
 
-        return MediaHeaderBox.__decode_language_impl(packed)
+            lang_bytes = f.read(2)
+            packed = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), lang_bytes)
+
+            return MediaHeaderBox.__decode_language_impl(packed)
 
     def patch_language(
         self: Self,
-        f: BufferedIOBase,
+        io_base: BufferedIOBase,
         new_language: ShortLanguageStr,
     ) -> None:
         packed = MediaHeaderBox.__encode_language_impl(new_language)
 
-        f.seek(self.span.start + self.language_offset)
+        io = self.payload_io_from_base(io_base)
 
-        packed_bytes = Packer.pack_one(ISOM_BYTE_ORDER, UnsignedShort(), packed, 2)
+        with io.rw_ctx(force_entire_read=False) as f:
+            f.skip(self.language_offset)
 
-        f.write(packed_bytes)
-        f.flush()
+            packed_bytes = Packer.pack_one(ISOM_BYTE_ORDER, UnsignedShort(), packed, 2)
 
-        f.seek(self.span.start + self.language_offset)
-        verify_bytes = read_checked(f, 2)
-        verify = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), verify_bytes)
+            f.write(packed_bytes)
+            f.flush()
 
-        if verify != packed:
-            msg = "Invalid overwrite"
-            raise RuntimeError(msg)
+        with io.r_ctx(force_entire_read=False) as f:
+            f.skip(self.language_offset)
+            verify_bytes = f.read(2)
+            verify = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), verify_bytes)
+
+            if verify != packed:
+                msg = "Invalid overwrite"
+                raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
         return f"<MediaHeaderBox parent: {MP4FullBox.__str__(self)}>"
@@ -936,7 +959,7 @@ class MediaBox(MP4Box, FinalMp4Box):
         super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "MediaBox":
         # spec: ISO/IEC 14496-12
         # ISO media box structure:
         # box     | <box size> bytes | parent box
@@ -946,16 +969,19 @@ class MediaBox(MP4Box, FinalMp4Box):
         #     ) {
         # }
 
+        with io.r_ctx(force_entire_read=True) as f:
+            f.skip(parent.span.payload_size)
+
         return MediaBox(parent)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "MediaBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return MediaBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "MediaBox":
+        box = MP4Box.read_mp4_box(io)
+        return MediaBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MediaBox":
-        return MediaBox.__read_from_stream_impl(f, parent)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "MediaBox":
+        return MediaBox.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<MediaBox parent: {MP4Box.__str__(self)}>"
@@ -970,7 +996,7 @@ class MovieBox(MP4Box, FinalMp4Box):
         super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "MovieBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "MovieBox":
         # spec: ISO/IEC 14496-12
         # ISO movie box structure:
         # box     | <box size> bytes | parent box
@@ -980,16 +1006,19 @@ class MovieBox(MP4Box, FinalMp4Box):
         #     ){
         # }
 
+        with io.r_ctx(force_entire_read=True) as f:
+            f.skip(parent.span.payload_size)
+
         return MovieBox(parent)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "MovieBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return MovieBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "MovieBox":
+        box = MP4Box.read_mp4_box(io)
+        return MovieBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MovieBox":
-        return MovieBox.__read_from_stream_impl(f, parent)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "MovieBox":
+        return MovieBox.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<MovieBox parent: {MP4Box.__str__(self)}>"
@@ -1019,7 +1048,7 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
         self.name = name
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4FullBox) -> "HandlerBox":
+    def __read_impl(io: BoundedIO, parent: MP4FullBox) -> "HandlerBox":
         # spec: ISO/IEC 14496-12
         # ISO handler box structure:
         # box     | <full box size> bytes | parent full box
@@ -1036,56 +1065,60 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
         #     string name;
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        if parent.version != 0:
-            msg = "Invalid hdlr version"
-            raise RuntimeError(msg)
+            if parent.version != 0:
+                msg = "Invalid hdlr version"
+                raise RuntimeError(msg)
 
-        pre_defined = read_checked(f, 4)
+            pre_defined = f.read(4)
 
-        if pre_defined != b"\x00" * 4:
-            msg = f"HandlerBox: pre_defined has to be 0, but was: {pre_defined!r}"
-            raise ValueError(msg)
-
-        handler_type = Unpacker.unpack_one(
-            ISOM_BYTE_ORDER,
-            PackableISOMAtomName(),
-            read_checked(f, 4),
-        )
-
-        reserved = read_checked(f, 4 * 3)
-
-        if reserved != b"\x00" * (3 * 4):
-            # make exception for apples usage of these types
-            if reserved.startswith(b"appl"):
-                pass
-            else:
-                msg = f"HandlerBox: reserved has to be 0, but was: {reserved!r}"
+            if pre_defined != b"\x00" * 4:
+                msg = f"HandlerBox: pre_defined has to be 0, but was: {pre_defined!r}"
                 raise ValueError(msg)
 
-        # omitting dynamic sized string "name"
-        fixed_header_size = 4 + 4 + (4 * 3)
+            handler_type = Unpacker.unpack_one(
+                ISOM_BYTE_ORDER,
+                PackableISOMAtomName(),
+                f.read(4),
+            )
 
-        name_size = parent.span.payload_size - fixed_header_size
+            reserved = f.read(4 * 3)
 
-        name_raw = read_checked(f, name_size)
+            if reserved != b"\x00" * (3 * 4):
+                # make exception for apples usage of these types
+                if reserved.startswith(b"appl"):
+                    pass
+                else:
+                    msg = f"HandlerBox: reserved has to be 0, but was: {reserved!r}"
+                    raise ValueError(msg)
 
-        name = name_raw.decode()
+            # omitting dynamic sized string "name"
+            fixed_header_size = 4 + 4 + (4 * 3)
 
-        parent.span.add_header_size(parent.span.payload_size)
+            name_size = parent.span.payload_size - fixed_header_size
 
-        return HandlerBox(parent, handler_type, name)
+            name_raw = f.read(name_size)
+
+            name = name_raw.decode()
+
+            parent.span.add_header_size(parent.span.payload_size)
+
+            return HandlerBox(parent, handler_type, name)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "HandlerBox":
-        box = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return HandlerBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "HandlerBox":
+        box = MP4FullBox.read_mp4_full_box(io)
+        return HandlerBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "HandlerBox":
-        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return HandlerBox.__read_from_stream_impl(f, box)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "HandlerBox":
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return HandlerBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
     def write_to_buffer(
@@ -1145,7 +1178,7 @@ class TrackBox(MP4Box, FinalMp4Box):
         self.hdlr = hdlr
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "TrackBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "TrackBox":
         # spec: ISO/IEC 14496-12
         # ISO track box structure:
         # box     | <box size> bytes | parent box
@@ -1157,10 +1190,8 @@ class TrackBox(MP4Box, FinalMp4Box):
 
         mdia_box: Optional[MediaBox] = None
 
-        for box in mp4_iter_boxes(
-            f,
-            start=parent.span.payload_start,
-            end=parent.span.end,
+        for box in mp4_iter_boxes_io(
+            parent.payload_io(io),
         ):
             if box.type == MDIA_ATOM_NAME:
                 if not isinstance(box, MediaBox):
@@ -1174,10 +1205,8 @@ class TrackBox(MP4Box, FinalMp4Box):
             msg = "Missing mdia box in trak"
             raise RuntimeError(msg)
 
-        for box in mp4_iter_boxes(
-            f,
-            start=mdia_box.span.payload_start,
-            end=mdia_box.span.end,
+        for box in mp4_iter_boxes_io(
+            mdia_box.payload_io(io),
         ):
             if box.type == HDLR_ATOM_NAME:
                 if not isinstance(box, HandlerBox):
@@ -1190,13 +1219,13 @@ class TrackBox(MP4Box, FinalMp4Box):
         raise RuntimeError(msg)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "TrackBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return TrackBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "TrackBox":
+        box = MP4Box.read_mp4_box(io)
+        return TrackBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "TrackBox":
-        return TrackBox.__read_from_stream_impl(f, parent)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "TrackBox":
+        return TrackBox.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<TrackBox parent: {MP4Box.__str__(self)} hdlr: {self.hdlr}>"
@@ -1211,7 +1240,7 @@ class UserDataBox(MP4Box, FinalMp4Box):
         super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
-    def __read_from_stream_impl(f: BufferedIOBase, parent: MP4Box) -> "UserDataBox":
+    def __read_impl(io: BoundedIO, parent: MP4Box) -> "UserDataBox":
         # spec: ISO/IEC 14496-12
         # ISO user data box structure:
         # box     | <box size> bytes | parent box
@@ -1221,16 +1250,19 @@ class UserDataBox(MP4Box, FinalMp4Box):
         #     ) {
         # }
 
+        with io.rw_ctx(force_entire_read=True) as f:
+            f.skip(parent.span.payload_size)
+
         return UserDataBox(parent)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "UserDataBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return UserDataBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "UserDataBox":
+        box = MP4Box.read_mp4_box(io)
+        return UserDataBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "UserDataBox":
-        return UserDataBox.__read_from_stream_impl(f, parent)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "UserDataBox":
+        return UserDataBox.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<UserDataBox parent: {MP4Box.__str__(self)}>"
@@ -1257,9 +1289,7 @@ class PrimaryItemBox(MP4FullBox, FinalMp4Box):
         self.item_id = item_id
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase, parent: MP4FullBox
-    ) -> "PrimaryItemBox":
+    def __read_impl(io: BoundedIO, parent: MP4FullBox) -> "PrimaryItemBox":
         # spec: ISO/IEC 14496-12
         # ISO Primary item box structure:
         # box     | <full box size> bytes | parent full box
@@ -1277,29 +1307,33 @@ class PrimaryItemBox(MP4FullBox, FinalMp4Box):
         # see https://mpeggroup.github.io/FileFormatConformance/?query=%3D%22pitm%22
         # for known ids
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        if parent.version != 0:
-            msg = "Invalid pitm version"
-            raise RuntimeError(msg)
+            if parent.version != 0:
+                msg = "Invalid pitm version"
+                raise RuntimeError(msg)
 
-        item_id_raw = read_checked(f, 2)
+            item_id_raw = f.read(2)
 
-        item_id = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), item_id_raw)
+            item_id = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), item_id_raw)
 
-        parent.span.add_header_size(2)
+            parent.span.add_header_size(2)
 
-        return PrimaryItemBox(parent, item_id)
-
-    @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "PrimaryItemBox":
-        box = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return PrimaryItemBox.__read_from_stream_impl(f, box)
+            return PrimaryItemBox(parent, item_id)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "PrimaryItemBox":
-        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return PrimaryItemBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "PrimaryItemBox":
+        box = MP4FullBox.read_mp4_full_box(io)
+        return PrimaryItemBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "PrimaryItemBox":
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return PrimaryItemBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
     def write_to_buffer(item_id: int) -> bytes:
@@ -1426,8 +1460,8 @@ class MetaBox(MP4FullBox, FinalMp4Box):
         self.optional_boxes = optional_boxes
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4FullBox,
     ) -> "MetaBox":
         # spec: ISO/IEC 14496-12
@@ -1453,24 +1487,19 @@ class MetaBox(MP4FullBox, FinalMp4Box):
         #     Box other_boxes[]; // optional
         # }
 
-        f.seek(parent.span.payload_start)
-
         if parent.version != 0:
             msg = "Invalid meta version"
             raise RuntimeError(msg)
 
-        handler_box = HandlerBox.read_from_stream(f, parent.span.payload_start)
+        handler_box = HandlerBox.read(parent.payload_io(io))
         parent.span.add_header_size(handler_box.span.size)
 
         optional_boxes = OptionalMetaBoxes.empty()
 
         # peek the next box, if it's an optional box, we read that, otherwise we are at the end and read the last box array
         while True:
-            f.seek(parent.span.payload_start)
-
-            simple_box: MP4Box = MP4Box.read_from_stream_mp4_box(
-                f,
-                parent.span.payload_start,
+            simple_box: MP4Box = MP4Box.read_mp4_box(
+                parent.payload_io(io),
             )
 
             if simple_box.type not in META_OPTIONAL_BOXES:
@@ -1481,7 +1510,10 @@ class MetaBox(MP4FullBox, FinalMp4Box):
                         msg = "Duplicate PrimaryItemBox in MetaBox"
                         raise RuntimeError(msg)
 
-                    pitm_box = PrimaryItemBox.read_from_stream_parent(f, simple_box)
+                    pitm_box = PrimaryItemBox.read_from_parent(
+                        simple_box.payload_io(io),
+                        simple_box,
+                    )
                     parent.span.add_header_size(pitm_box.span.size)
                     optional_boxes.pitm = pitm_box
                 case _:
@@ -1494,14 +1526,18 @@ class MetaBox(MP4FullBox, FinalMp4Box):
         return MetaBox(parent, handler_box, optional_boxes, is_container=is_container)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "MetaBox":
-        box = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return MetaBox.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "MetaBox":
+        box = MP4FullBox.read_mp4_full_box(io)
+        return MetaBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "MetaBox":
-        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return MetaBox.__read_from_stream_impl(f, box)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "MetaBox":
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return MetaBox.__read_impl(io, box)
 
     @staticmethod
     def write_to_buffer(
@@ -1521,7 +1557,7 @@ class MetaBox(MP4FullBox, FinalMp4Box):
 
         if primary_item_info is not None:
             primary_item_bytes = PrimaryItemBox.write_to_buffer(
-                primary_item_info.item_id
+                primary_item_info.item_id,
             )
             buf.write(primary_item_bytes)
 
@@ -1549,8 +1585,8 @@ class AppleItunesItemList(MP4Box, FinalMp4Box):
         super().__init__(parent.type, parent.span, is_container=True)
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4Box,
     ) -> "AppleItunesItemList":
         # spec: https://developer.apple.com/documentation/quicktime-file-format/metadata_item_list_atom
@@ -1562,18 +1598,19 @@ class AppleItunesItemList(MP4Box, FinalMp4Box):
         #     ) {
         # }
 
+        with io.rw_ctx(force_entire_read=True) as f:
+            f.skip(parent.span.payload_size)
+
         return AppleItunesItemList(parent)
 
     @staticmethod
-    def read_from_stream(f: BufferedIOBase, offset: int) -> "AppleItunesItemList":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return AppleItunesItemList.__read_from_stream_impl(f, box)
+    def read(io: BoundedIO) -> "AppleItunesItemList":
+        box = MP4Box.read_mp4_box(io)
+        return AppleItunesItemList.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase, parent: MP4Box
-    ) -> "AppleItunesItemList":
-        return AppleItunesItemList.__read_from_stream_impl(f, parent)
+    def read_from_parent(io: BoundedIO, parent: MP4Box) -> "AppleItunesItemList":
+        return AppleItunesItemList.__read_impl(io, parent)
 
     @staticmethod
     def write_to_buffer(
@@ -1803,8 +1840,8 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         return encoded.err_or(None)
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4FullBox,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemDataBox":
@@ -1818,75 +1855,90 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         #     ) {
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.rw_ctx(force_entire_read=True) as f:
 
-        # see: https://developer.apple.com/documentation/quicktime-file-format/type_indicator
-        if parent.version != 0:
-            msg = f"AppleItunesItemDataBox: type indicator byte 0 has to be 0, but was {parent.version} (it is the FullBox version field)"
-            raise ValueError(msg)
+            # see: https://developer.apple.com/documentation/quicktime-file-format/type_indicator
+            if parent.version != 0:
+                msg = f"AppleItunesItemDataBox: type indicator byte 0 has to be 0, but was {parent.version} (it is the FullBox version field)"
+                raise ValueError(msg)
 
-        type_indicator = Unpacker.unpack_one(
-            ISOM_BYTE_ORDER,
-            UnsignedInt(),
-            b"\x00" + parent.flags,
-        )
+            type_indicator = Unpacker.unpack_one(
+                ISOM_BYTE_ORDER,
+                UnsignedInt(),
+                b"\x00" + parent.flags,
+            )
 
-        locale_indicator_raw = read_checked(f, 4)
+            locale_indicator_raw = f.read(4)
 
-        # see: https://developer.apple.com/documentation/quicktime-file-format/locale_indicator
-        locale_indicator = Unpacker.unpack_one(
-            ISOM_BYTE_ORDER,
-            UnsignedInt(),
-            locale_indicator_raw,
-        )
+            # see: https://developer.apple.com/documentation/quicktime-file-format/locale_indicator
+            locale_indicator = Unpacker.unpack_one(
+                ISOM_BYTE_ORDER,
+                UnsignedInt(),
+                locale_indicator_raw,
+            )
 
-        # omitting dynamic sized string "value"
-        fixed_header_size = 4
+            # omitting dynamic sized string "value"
+            fixed_header_size = 4
 
-        value_size = parent.span.payload_size - fixed_header_size
+            value_size = parent.span.payload_size - fixed_header_size
 
-        value_raw = read_checked(f, value_size)
+            value_raw = f.read(value_size)
 
-        value = AppleItunesItemDataBox.__decode_value(
-            type_indicator,
-            value_raw,
+            value = AppleItunesItemDataBox.__decode_value(
+                type_indicator,
+                value_raw,
+                expected_type,
+            )
+
+            parent.span.add_header_size(parent.span.payload_size)
+
+            return AppleItunesItemDataBox(
+                parent,
+                type_indicator,
+                locale_indicator,
+                value,
+            )
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        expected_type: Optional[AppleItunesItemDataType],
+    ) -> "AppleItunesItemDataBox":
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
+        return AppleItunesItemDataBox.__read_impl(
+            box.payload_io(io),
+            box,
             expected_type,
         )
 
-        parent.span.add_header_size(parent.span.payload_size)
-
-        return AppleItunesItemDataBox(parent, type_indicator, locale_indicator, value)
-
     @staticmethod
-    def read_from_stream(
-        f: BufferedIOBase,
-        offset: int,
+    def read_checked(
+        io: BoundedIO,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemDataBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return AppleItunesItemDataBox.__read_from_stream_impl(f, box, expected_type)
-
-    @staticmethod
-    def read_from_stream_checked(
-        f: BufferedIOBase,
-        offset: int,
-        expected_type: Optional[AppleItunesItemDataType],
-    ) -> "AppleItunesItemDataBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != DATA_ATOM_NAME:
             msg = f"Invalid AppleItunesItemDataBox tag: {box.type}"
             raise RuntimeError(msg)
 
-        return AppleItunesItemDataBox.__read_from_stream_impl(f, box, expected_type)
+        return AppleItunesItemDataBox.__read_impl(
+            box.payload_io(io), box, expected_type
+        )
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemDataBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return AppleItunesItemDataBox.__read_from_stream_impl(f, box, expected_type)
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return AppleItunesItemDataBox.__read_impl(
+            box.payload_io(io), box, expected_type
+        )
 
     @staticmethod
     def write_to_buffer(
@@ -1953,8 +2005,8 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
         self.value = value
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4FullBox,
     ) -> "AppleItunesItemMeanBox":
         # spec: N/A
@@ -1967,47 +2019,49 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
         #     ) {
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        if parent.version != 0:
-            msg = "Invalid mean version"
-            raise RuntimeError(msg)
+            if parent.version != 0:
+                msg = "Invalid mean version"
+                raise RuntimeError(msg)
 
-        data = read_checked(f, parent.span.payload_size)
+            data = f.read(parent.span.payload_size)
 
-        value = data.decode()
+            value = data.decode()
 
-        parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header_size(parent.span.payload_size)
 
-        return AppleItunesItemMeanBox(parent, value)
-
-    @staticmethod
-    def read_from_stream(
-        f: BufferedIOBase,
-        offset: int,
-    ) -> "AppleItunesItemMeanBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return AppleItunesItemMeanBox.__read_from_stream_impl(f, box)
+            return AppleItunesItemMeanBox(parent, value)
 
     @staticmethod
-    def read_from_stream_checked(
-        f: BufferedIOBase,
-        offset: int,
+    def read(
+        io: BoundedIO,
     ) -> "AppleItunesItemMeanBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
+        return AppleItunesItemMeanBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_checked(
+        io: BoundedIO,
+    ) -> "AppleItunesItemMeanBox":
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != MEAN_ATOM_NAME:
             msg = f"Invalid AppleItunesItemMeanBox tag: {box.type}"
             raise RuntimeError(msg)
 
-        return AppleItunesItemMeanBox.__read_from_stream_impl(f, box)
+        return AppleItunesItemMeanBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: MP4Box,
     ) -> "AppleItunesItemMeanBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return AppleItunesItemMeanBox.__read_from_stream_impl(f, box)
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return AppleItunesItemMeanBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
     def write_to_buffer(
@@ -2047,8 +2101,8 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
         self.value = value
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4FullBox,
     ) -> "AppleItunesItemNameBox":
         # spec: https://developer.apple.com/documentation/quicktime-file-format/name_atom
@@ -2061,47 +2115,49 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
         #     ) {
         # }
 
-        f.seek(parent.span.payload_start)
+        with io.r_ctx(force_entire_read=True) as f:
 
-        if parent.version != 0:
-            msg = "Invalid name version"
-            raise RuntimeError(msg)
+            if parent.version != 0:
+                msg = "Invalid name version"
+                raise RuntimeError(msg)
 
-        data = read_checked(f, parent.span.payload_size)
+            data = f.read(parent.span.payload_size)
 
-        value = data.decode()
+            value = data.decode()
 
-        parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header_size(parent.span.payload_size)
 
-        return AppleItunesItemNameBox(parent, value)
-
-    @staticmethod
-    def read_from_stream(
-        f: BufferedIOBase,
-        offset: int,
-    ) -> "AppleItunesItemNameBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
-        return AppleItunesItemNameBox.__read_from_stream_impl(f, box)
+            return AppleItunesItemNameBox(parent, value)
 
     @staticmethod
-    def read_from_stream_checked(
-        f: BufferedIOBase,
-        offset: int,
+    def read(
+        io: BoundedIO,
     ) -> "AppleItunesItemNameBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
+        return AppleItunesItemNameBox.__read_impl(box.payload_io(io), box)
+
+    @staticmethod
+    def read_checked(
+        io: BoundedIO,
+    ) -> "AppleItunesItemNameBox":
+        box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != NAME_ATOM_NAME:
             msg = f"Invalid AppleItunesItemNameBox tag: {box.type}"
             raise RuntimeError(msg)
 
-        return AppleItunesItemNameBox.__read_from_stream_impl(f, box)
+        return AppleItunesItemNameBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: MP4Box,
     ) -> "AppleItunesItemNameBox":
-        box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
-        return AppleItunesItemNameBox.__read_from_stream_impl(f, box)
+        box: MP4FullBox
+        if isinstance(parent, MP4FullBox):
+            box = parent
+        else:
+            box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
+        return AppleItunesItemNameBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
     def write_to_buffer(
@@ -2137,8 +2193,8 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
         self.data = data
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemBox":
@@ -2151,11 +2207,8 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
         #     ) {
         # }
 
-        f.seek(parent.span.payload_start)
-
-        data = AppleItunesItemDataBox.read_from_stream_checked(
-            f,
-            parent.span.payload_start,
+        data = AppleItunesItemDataBox.read_checked(
+            parent.payload_io(io),
             expected_type,
         )
 
@@ -2168,21 +2221,20 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
         return AppleItunesItemBox(parent, data)
 
     @staticmethod
-    def read_from_stream(
-        f: BufferedIOBase,
-        offset: int,
+    def read(
+        io: BoundedIO,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return AppleItunesItemBox.__read_from_stream_impl(f, box, expected_type)
+        box = MP4Box.read_mp4_box(io)
+        return AppleItunesItemBox.__read_impl(box.payload_io(io), box, expected_type)
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
     ) -> "AppleItunesItemBox":
-        return AppleItunesItemBox.__read_from_stream_impl(f, parent, expected_type)
+        return AppleItunesItemBox.__read_impl(io, parent, expected_type)
 
     @staticmethod
     def write_to_buffer(
@@ -2232,8 +2284,8 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
         self.data = data
 
     @staticmethod
-    def __read_from_stream_impl(
-        f: BufferedIOBase,
+    def __read_impl(
+        io: BoundedIO,
         parent: MP4Box,
     ) -> "AppleItunesItemFreeformBox":
         # spec: N/A
@@ -2245,25 +2297,20 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
         #     ) {
         # }
 
-        f.seek(parent.span.payload_start)
-
-        mean = AppleItunesItemMeanBox.read_from_stream_checked(
-            f,
-            parent.span.payload_start,
+        mean = AppleItunesItemMeanBox.read_checked(
+            parent.payload_io(io),
         )
 
         parent.span.add_header_size(mean.span.size)
 
-        name: AppleItunesItemNameBox = AppleItunesItemNameBox.read_from_stream_checked(
-            f,
-            parent.span.payload_start,
+        name: AppleItunesItemNameBox = AppleItunesItemNameBox.read_checked(
+            parent.payload_io(io),
         )
 
         parent.span.add_header_size(name.span.size)
 
-        data = AppleItunesItemDataBox.read_from_stream_checked(
-            f,
-            parent.span.payload_start,
+        data = AppleItunesItemDataBox.read_checked(
+            parent.payload_io(io),
             None,
         )
 
@@ -2276,19 +2323,18 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
         return AppleItunesItemFreeformBox(parent, mean, name, data)
 
     @staticmethod
-    def read_from_stream(
-        f: BufferedIOBase,
-        offset: int,
+    def read(
+        io: BoundedIO,
     ) -> "AppleItunesItemFreeformBox":
-        box = MP4Box.read_from_stream_mp4_box(f, offset)
-        return AppleItunesItemFreeformBox.__read_from_stream_impl(f, box)
+        box = MP4Box.read_mp4_box(io)
+        return AppleItunesItemFreeformBox.__read_impl(box.payload_io(io), box)
 
     @staticmethod
-    def read_from_stream_parent(
-        f: BufferedIOBase,
+    def read_from_parent(
+        io: BoundedIO,
         parent: MP4Box,
     ) -> "AppleItunesItemFreeformBox":
-        return AppleItunesItemFreeformBox.__read_from_stream_impl(f, parent)
+        return AppleItunesItemFreeformBox.__read_impl(io, parent)
 
     @staticmethod
     def write_to_buffer(
@@ -2487,52 +2533,69 @@ class SupportedBoxes:
     NAME = NAME_ATOM_NAME
 
 
-def read_box_from_stream(f: BufferedIOBase, pos: int) -> MP4Box:
-    box = MP4Box.read_from_stream_mp4_box(f, pos)
+def read_box(io: BoundedIO) -> MP4Box:
+    box = MP4Box.read_mp4_box(io)
 
     match box.type:
         case SupportedBoxes.MDHD:
-            return MediaHeaderBox.read_from_stream_parent(f, box)
+            return MediaHeaderBox.read_from_parent(io, box)
         case SupportedBoxes.MDIA:
-            return MediaBox.read_from_stream_parent(f, box)
+            return MediaBox.read_from_parent(io, box)
         case SupportedBoxes.HDLR:
-            return HandlerBox.read_from_stream_parent(f, box)
+            return HandlerBox.read_from_parent(io, box)
         case SupportedBoxes.TRAK:
-            return TrackBox.read_from_stream_parent(f, box)
+            return TrackBox.read_from_parent(io, box)
         case SupportedBoxes.MOOV:
-            return MovieBox.read_from_stream_parent(f, box)
+            return MovieBox.read_from_parent(io, box)
         case SupportedBoxes.FTYP:
-            return FileTypeBox.read_from_stream_parent(f, box)
+            return FileTypeBox.read_from_parent(io, box)
         case SupportedBoxes.FREE:
-            return FreeSpaceBox.read_from_stream_parent(f, box)
+            return FreeSpaceBox.read_from_parent(io, box)
         case SupportedBoxes.SKIP:
-            return FreeSpaceBox.read_from_stream_parent(f, box)
+            return FreeSpaceBox.read_from_parent(io, box)
         case SupportedBoxes.UDTA:
-            return UserDataBox.read_from_stream_parent(f, box)
+            return UserDataBox.read_from_parent(io, box)
         case SupportedBoxes.META:
-            return MetaBox.read_from_stream_parent(f, box)
+            return MetaBox.read_from_parent(io, box)
         case SupportedBoxes.ILST:
-            return AppleItunesItemList.read_from_stream_parent(f, box)
+            return AppleItunesItemList.read_from_parent(io, box)
         case _ if box.type in SupportedBoxes.AppleItunesItemBox:
             value = SupportedBoxes.AppleItunesItemBox[box.type]
-            return AppleItunesItemBox.read_from_stream_parent(f, box, value)
+            return AppleItunesItemBox.read_from_parent(io, box, value)
         case SupportedBoxes.AppleItunesItemBoxAtomFreeform:
-            return AppleItunesItemFreeformBox.read_from_stream_parent(f, box)
+            return AppleItunesItemFreeformBox.read_from_parent(io, box)
         case SupportedBoxes.DATA:
-            return AppleItunesItemDataBox.read_from_stream_parent(f, box, None)
+            return AppleItunesItemDataBox.read_from_parent(io, box, None)
         case SupportedBoxes.MEAN:
-            return AppleItunesItemMeanBox.read_from_stream_parent(f, box)
+            return AppleItunesItemMeanBox.read_from_parent(io, box)
         case SupportedBoxes.NAME:
-            return AppleItunesItemNameBox.read_from_stream_parent(f, box)
+            return AppleItunesItemNameBox.read_from_parent(io, box)
         case _:
             return box
 
 
-def mp4_iter_boxes(f: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
+def mp4_iter_boxes(io_base: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
     pos = start
 
     while pos < end:
-        box = read_box_from_stream(f, pos)
+        io = BoundedIO.get_new(io_base, pos, end - pos)
+        box = read_box(io)
+
+        if pos + box.span.size > end:
+            msg = f"Box {box.type!r} at {pos} extends past parent boundary"
+            raise RuntimeError(msg)
+
+        yield box
+        pos += box.span.size
+
+
+def mp4_iter_boxes_io(io: BoundedIO) -> Generator[MP4Box]:
+    pos = io.start
+    end = io.end
+
+    while pos < end:
+        new_io = io.new_payload_io(pos, end - pos)
+        box = read_box(new_io)
 
         if pos + box.span.size > end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
@@ -2586,12 +2649,15 @@ def find_mdhd_boxes_with_type(
                 stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
 
 
-def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
+def is_mp4_file(
+    f: BufferedIOBase,
+) -> Optional[str]:
     f.seek(0)
 
     try:
-
-        first_box = read_box_from_stream(f, 0)
+        f.seek(0, 2)
+        filesize = f.tell()
+        first_box = read_box(BoundedIO.get_new(f, 0, filesize))
 
         if not isinstance(first_box, FileTypeBox):
             return _("Not a valid ISOM / MP4 file")
@@ -2725,6 +2791,8 @@ class Mp4MetadataHandler:
         tags: MetadataTags,
     ) -> None:
         # note: can write 0 or more free space or user extension boxes, and there both allowed everywhere
+
+        f.seek(0, 2)
 
         if self.__uuid_box is not None:
             buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)

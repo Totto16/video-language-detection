@@ -428,13 +428,13 @@ def read_chunk(io: BoundedIO) -> AVIChunk:
 
 
 def avi_iter_chunks(
-    io_base: BufferedIOBase, start: int, end: int
+    io_base: BufferedIOBase, start: int, end: int,
 ) -> Generator[AVIChunk]:
     pos = start
 
     while pos < end:
-        reader = BoundedIO.get_new(io_base, pos, end - pos)
-        chunk = read_chunk(reader)
+        io = BoundedIO.get_new(io_base, pos, end - pos)
+        chunk = read_chunk(io)
 
         if pos + chunk.span.size > end:
             msg = f"chunk {chunk.fourcc!r} at {pos} extends past parent boundary"
