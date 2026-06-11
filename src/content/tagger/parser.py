@@ -23,12 +23,55 @@ class BoundedReaderReadable(Protocol):
 class ExclusiveIOBase:
     __f: BufferedIOBase
 
-    __used: bool
+    __holder: int
 
     def __init__(self: Self, f: BufferedIOBase) -> None:
         self.__f = f
 
-        self.__used = False
+        self.__holder = id(None)
+
+    def __assert_no_holder(self: Self) -> None:
+        if self.__holder != id(None):
+            msg = f"ExclusiveIOBase has a holder, this operation is not possible: {self.__holder}"
+            raise RuntimeError(msg)
+
+    def __assert_holder(self: Self) -> None:
+        if self.__holder == id(None):
+            msg = f"ExclusiveIOBase has no holder, this operation is not possible: {self.__holder}"
+            raise RuntimeError(msg)
+
+    def size(self: Self) -> int:
+        self.__assert_no_holder()
+        self.__f.seek(0, 2)
+        return self.__f.tell()
+
+    def tell(self: Self) -> int:
+        self.__assert_holder()
+        return self.__f.tell()
+
+    def read(self: Self, amount: int) -> bytes:
+        self.__assert_holder()
+        return self.__f.read(amount)
+
+    def reset_seek(self: Self) -> None:
+        self.__assert_no_holder()
+        # seeks to the end, so if someone tries to read, it fails immediately (or returns 0 bytes)
+        self.__f.seek(0, 2)
+
+    def seek_abs(self: Self, offset: int) -> None:
+        self.__assert_holder()
+        self.__f.seek(offset)
+
+    def acquire(self: Self, cls: object) -> None:
+        self.__assert_no_holder()
+        self.__holder = id(cls)
+
+    def release(self: Self, cls: object) -> None:
+        self.__assert_holder()
+        if self.__holder != id(cls):
+            msg = f"ExclusiveIOBase release error: released with different class, than acquired: {self.__holder} != {id(cls)}"
+            raise RuntimeError(msg)
+        self.__holder = id(None)
 
 
 class BoundedReader:
@@ -38,9 +81,6 @@ class BoundedReader:
     __size: int
 
     def __init__(self: Self, io: ExclusiveIOBase, start: int, size: int) -> None:
-        if io.writable():
-            msg = "Only readonly streams supported atm"
-            raise RuntimeError(msg)
 
         if start < 0:
             msg = f"Start negative: {start}"
@@ -50,8 +90,7 @@ class BoundedReader:
             msg = f"Size negative: {size}"
             raise RuntimeError(msg)
 
-        io.seek(0, 2)
-        filesize = io.tell()
+        filesize = io.size()
 
         if start > filesize:
             msg = f"Start outside file size: {start} > {filesize}"
@@ -67,27 +106,20 @@ class BoundedReader:
         self.__start = start
         self.__size = size
 
-        self.__position_at_end()
+        self.__reset_seek()
 
     @staticmethod
     def get_new(f: BufferedIOBase, start: int, size: int) -> "BoundedReader":
-        if f.writable():
-            msg = "Only readonly streams supported atm"
-            raise RuntimeError(msg)
-
         return BoundedReader(ExclusiveIOBase(f), start, size)
 
     def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:
-        if not self.__TODO________:
-            msg = f"Implementation error: {self.__TODO________} should be True"
-            raise RuntimeError(msg)
-
         if amount < 0:
             msg = "Invalid checked read, read amount negative"
             raise ValueError(msg)
 
-        if self.__io.tell() + amount > self.__end:
-            msg = f"Read would overflow bounds [{self.__start}, {self.__end}]: {self.__io.tell() + amount}"
+        current_end = self.__io.tell() + amount
+        if current_end > self.end:
+            msg = f"Read would overflow bounds [{self.__start}, {self.end}]: {current_end}"
             raise RuntimeError(msg)
 
         value = self.__io.read(amount)
@@ -96,6 +128,18 @@ class BoundedReader:
             raise RuntimeError(msg)
 
         return value
+
+    def __skip_exact_bounds_checked(self: Self, amount: int) -> None:
+        if amount < 0:
+            msg = "Invalid checked read, read amount negative"
+            raise ValueError(msg)
+
+        current_end = self.__io.tell() + amount
+        if current_end > self.end:
+            msg = f"Read would overflow bounds [{self.__start}, {self.end}]: {current_end}"
+            raise RuntimeError(msg)
+
+        self.__io.seek_abs(current_end)
 
     @property
     def end(self: Self) -> int:
@@ -106,10 +150,10 @@ class BoundedReader:
         return self.__start
 
     def __position_at_start(self: Self) -> None:
-        self.__io.seek(self.__start)
+        self.__io.seek_abs(self.__start)
 
-    def __position_at_end(self: Self) -> None:
-        self.__io.seek(0, 2)
+    def __reset_seek(self: Self) -> None:
+        self.__io.reset_seek()
 
     def ctx(
         self: Self,
@@ -122,20 +166,16 @@ class BoundedReader:
         class BoundedReaderReadableCtx(AbstractContextManager[BoundedReaderReadable]):
             @override
             def __enter__(self: Self) -> BoundedReaderReadable:
-                parent.__position_at_start()
-
                 class BoundedReaderReadableImpl(BoundedReaderReadable):
                     def read(self: Self, amount: int) -> bytes:
                         return parent.__read_exact_bounds_checked(amount)
 
                     def skip(self: Self, amount: int) -> None:
-                        parent.__read_exact_bounds_checked(amount)
+                        parent.__skip_exact_bounds_checked(amount)
 
-                if parent.__TODO______:
-                    msg = f"Implementation error: {parent.__TODO______} should be False"
-                    raise RuntimeError(msg)
+                parent.__io.acquire(self)
 
-                parent.__TODO______ = True
+                parent.__position_at_start()
 
                 return BoundedReaderReadableImpl()
 
@@ -146,19 +186,15 @@ class BoundedReader:
                 _exc_val: Optional[BaseException],
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
-                parent.__position_at_end()
-
-                if not parent.__TODO______:
-                    msg = f"Implementation error: {parent.__TODO______} should be True"
-                    raise RuntimeError(msg)
-
-                parent.__TODO______ = False
 
                 if force_entire_read:
                     current_pos = parent.__io.tell()
-                    if current_pos != parent.__end:
-                        msg = f"Not the entire data was read: {current_pos} != {parent.__end}"
+                    if current_pos != parent.end:
+                        msg = f"Not the entire data was read: {current_pos} != {parent.end}"
                         raise RuntimeError(msg)
+
+                parent.__io.release(self)
+                parent.__reset_seek()
 
                 return False
 
@@ -168,7 +204,7 @@ class BoundedReader:
         if start < self.__start:
             raise NotImplementedError("S")
 
-        if start + size != self.__end:
+        if start + size != self.end:
             raise NotImplementedError("S")
 
         return BoundedReader(self.__io, start, size)
