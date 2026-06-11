@@ -1777,7 +1777,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                 raise RuntimeError(msg)
 
     @staticmethod
-    def encode_value(
+    def __encode_value(
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> bytes:
@@ -1895,7 +1895,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         value: AppleItunesItemDataContent,
     ) -> bytes:
         type_indicator_bytes_raw = Packer.pack_one(
-            ISOM_BYTE_ORDER, UnsignedInt(), type_indicator.value, 4
+            ISOM_BYTE_ORDER, UnsignedInt(), type_indicator.value, 4,
         )
         if type_indicator_bytes_raw[0] != 0:
             msg = (
@@ -1917,7 +1917,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
 
         buf.write(locale_indicator_bytes)
 
-        value_bytes = AppleItunesItemDataBox.encode_value(type_indicator, value)
+        value_bytes = AppleItunesItemDataBox.__encode_value(type_indicator, value)
 
         buf.write(value_bytes)
 
@@ -2305,9 +2305,9 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
 
         buf.write(name_bytes)
 
-        value_bytes = AppleItunesItemDataBox.encode_value(type_indicator, value)
+        data_bytes = AppleItunesItemDataBox.write_to_buffer(type_indicator, value)
 
-        buf.write(value_bytes)
+        buf.write(data_bytes)
 
         final_data = buf.getvalue()
 
