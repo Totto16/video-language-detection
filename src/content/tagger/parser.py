@@ -3,7 +3,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from io import BufferedIOBase
-from typing import Any, Literal, Self, assert_never, cast, override
+from typing import Literal, Self, assert_never, cast, override
 from uuid import UUID
 
 from helper.translation import get_translator

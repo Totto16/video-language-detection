@@ -507,12 +507,12 @@ class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
 
         data = json.loads(data_raw.decode())
 
-        parent.span.add_header_size(16)
+        parent.span.add_header_size(parent.span.payload_size)
 
         return JsonExtensionBox(parent, data)
 
     @staticmethod
-    def write_to_buffer(data: SerializableDict | str) -> bytes:
+    def write_to_buffer(data: SerializableDict) -> bytes:
 
         byte_data: bytes = json.dumps(data).encode()
 
@@ -2721,12 +2721,14 @@ class Mp4MetadataHandler:
             buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
             f.write(buffer)
 
-        metadata_dict: dict[str, SerializableDict | str] = {
-            "comment": tags.comment,
-            "metadata": tags.metadata,
-        }
+        metadata_dicts: list[SerializableDict] = [
+            {
+                "comment": tags.comment,
+                "metadata": tags.metadata,
+            },
+        ]
 
-        for mdt in metadata_dict:
+        for mdt in metadata_dicts:
             buffer = JsonExtensionBox.write_to_buffer(mdt)
 
             f.write(buffer)
@@ -2746,7 +2748,12 @@ class Mp4MetadataHandler:
                 if uuid is None:
                     msg = f"Found uuid box manually, but constructor didn't find it: {box}"
                     raise RuntimeError(msg)
-
+            elif isinstance(box, MetaBox):
+                # TODO
+                pass
+            elif isinstance(box, FreeSpaceBox):
+                # TODO
+                pass
             else:
                 msg = f"Invalid box for tags found: {type(box)}"
                 raise TypeError(msg)
