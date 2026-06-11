@@ -180,7 +180,7 @@ class BoundedIO:
 
         current_end = self.__io.tell() + amount
         if current_end > self.__span.end:
-            msg = f"Read would overflow bounds [{self.__span.start}, {self.__span.end}]: {current_end} ({current_end - amount}  + {amount})"
+            msg = f"Read would overflow bounds [{self.__span.start}, {self.__span.end}]: {current_end} ({current_end - amount} + {amount})"
             raise RuntimeError(msg)
 
         value = self.__io.read(amount)

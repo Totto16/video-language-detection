@@ -566,8 +566,6 @@ def is_avi_file(
             ).format(list_type=first_chunk.type)
 
         f.seek(0)
-    # TODO
-    # except (RuntimeError, ValueError) as err:
-    except FloatingPointError as err:
+    except (RuntimeError, ValueError) as err:
         return str(err)
     return None

@@ -320,8 +320,7 @@ class AVIChunkStructure(FancyEq):
 
                 chunks = list_all_chunks_recursively(f)
                 return Ok(AVIChunkStructure(chunks))
-        # TODO: RuntimeError
-        except FloatingPointError as err:
+        except RuntimeError as err:
             return Err(str(err))
 
     def __str__(self: Self) -> str:
@@ -498,15 +497,16 @@ def test_avi_invalid_bytes(
 ) -> None:
 
     test_data: list[tuple[bytes, str]] = [
-        (b"", "Read failed to produce 8 bytes, got 0"),
+        (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
         (b"HELLO WORLD", "Not a valid RIFF / AVI file"),
-        (b"LIST WORLD", "Read failed to produce 4 bytes, got 2"),
+        (b"LIST\x22\x00\x00\x00WORLD", "New payload io end overflows parent: 42 > 13"),
+        (b"LIST\x02\x00\x00\x00WO", "Read would overflow bounds [8, 10]: 12 (8 + 4)"),
         (
-            b"LIST WORLD12",
+            b"LIST\x04\x00\x00\x00HELO",
             "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: b'LIST'",
         ),
         (
-            b"RIFF WORLD12",
+            b"RIFF\x04\x00\x00\x00LD12",
             "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: b'LD12'",
         ),
     ]
