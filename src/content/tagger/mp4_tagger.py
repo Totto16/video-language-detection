@@ -1,12 +1,20 @@
-from dataclasses import dataclass
 import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from enum import Enum
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, final, override
+from typing import (
+    Any,
+    Literal,
+    Optional,
+    Self,
+    assert_never,
+    final,
+    override,
+)
 from uuid import UUID
 
 from content.language import ShortLanguageStr
@@ -39,6 +47,7 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
+@final
 class ISOMAtomName:
     __value: bytes
 
@@ -96,6 +105,7 @@ class ISOMAtomName:
         return False
 
 
+@final
 class PackableISOMAtomName(Packable[bytes]):
     @property
     @override
@@ -137,8 +147,10 @@ MVHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mvhd")
 IODS_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"iods")
 TKHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"tkhd")
 MDAT_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mdat")
+PITM_ATOM_NAME: ISOMAtomName = ISOMAtomName(value=b"pitm")
 
 
+@final
 class MP4BoxSpan:
     start: int
     size: int
@@ -190,7 +202,28 @@ class MP4BoxSpan:
 ISOM_BYTE_ORDER = ByteOrder.Big
 
 
-class MP4Box:
+class FinalMp4Box:
+    __final__mp4_box__ = True
+
+
+class NonFinalMP4Box:
+    def __init_subclass__(cls, *args: Any, **kwargs: Any) -> None:
+        super().__init_subclass__(*args, **kwargs)
+
+        is_final = getattr(cls, "__final__mp4_box__", False)
+
+        if not is_final:
+            for fn_name in [
+                "read_from_stream",
+                "write_to_buffer",
+                "read_from_stream_parent",
+            ]:
+                if fn_name in cls.__dict__:
+                    msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
+                    raise TypeError(msg)
+
+
+class MP4Box(NonFinalMP4Box):
     type: ISOMAtomName
     span: MP4BoxSpan
     is_container: bool
@@ -315,14 +348,14 @@ class MP4Box:
         buf.write(hdr)
 
         if additional_size is not None:
-            largsize = Packer.pack_one(
+            largesize = Packer.pack_one(
                 ISOM_BYTE_ORDER,
                 UnsignedLongLong(),
                 additional_size,
                 8,
             )
 
-            buf.write(largsize)
+            buf.write(largesize)
 
         buf.write(data)
 
@@ -394,7 +427,7 @@ class UserExtensions:
 
 
 @final
-class UUIDExtensionBox(UserExtensionBox):
+class UUIDExtensionBox(UserExtensionBox, FinalMp4Box):
     uuid: UUID
 
     def __init__(
@@ -443,7 +476,7 @@ class UUIDExtensionBox(UserExtensionBox):
 
 
 @final
-class JsonExtensionBox(UserExtensionBox):
+class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
     data: SerializableDict
 
     def __init__(
@@ -555,6 +588,36 @@ class MP4FullBox(MP4Box):
     ) -> "MP4FullBox":
         return MP4FullBox.__read_from_stream_impl(f, parent)
 
+    @staticmethod
+    def __impl_write_to_buffer_mp4_full_box(
+        typ: ISOMAtomName,
+        version: int,
+        flags: bytes,
+        data: bytes,
+    ) -> bytes:
+        buf = BytesIO()
+
+        if version < 0 or version > 0xFF:
+            msg = f"Invalid version, only 1 byte values allowed, but got: {version}"
+            raise RuntimeError(msg)
+
+        buf.write(bytes([version]))
+        buf.write(flags)
+        buf.write(data)
+
+        final_data = buf.getvalue()
+
+        return MP4Box.write_to_buffer_mp4_box(typ, final_data, usertype=None)
+
+    @staticmethod
+    def write_to_buffer_mp4_full_box(
+        typ: ISOMAtomName,
+        version: int,
+        flags: bytes,
+        data: bytes,
+    ) -> bytes:
+        return MP4FullBox.__impl_write_to_buffer_mp4_full_box(typ, version, flags, data)
+
     def __str__(self: Self) -> str:
         return f"<MP4FullBox parent: {MP4Box.__str__(self)} version: {self.version} flags: {self.flags.hex()}>"
 
@@ -563,7 +626,7 @@ class MP4FullBox(MP4Box):
 
 
 @final
-class FileTypeBox(MP4Box):
+class FileTypeBox(MP4Box, FinalMp4Box):
     major_brand: ISOMAtomName
     minor_version: int
     compatible_brands: bytes
@@ -642,7 +705,7 @@ class FileTypeBox(MP4Box):
 
 
 @final
-class FreeSpaceBox(MP4Box):
+class FreeSpaceBox(MP4Box, FinalMp4Box):
     data: bytes
 
     def __init__(
@@ -687,7 +750,6 @@ class FreeSpaceBox(MP4Box):
 
     @staticmethod
     def write_to_buffer(data: bytes) -> bytes:
-
         return MP4Box.write_to_buffer_mp4_box(FREE_ATOM_NAME, data)
 
     def __str__(self: Self) -> str:
@@ -698,7 +760,7 @@ class FreeSpaceBox(MP4Box):
 
 
 @final
-class MediaHeaderBox(MP4FullBox):
+class MediaHeaderBox(MP4FullBox, FinalMp4Box):
     language_offset: int
 
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
@@ -860,7 +922,7 @@ class MediaHeaderBox(MP4FullBox):
 
 
 @final
-class MediaBox(MP4Box):
+class MediaBox(MP4Box, FinalMp4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -894,7 +956,7 @@ class MediaBox(MP4Box):
 
 
 @final
-class MovieBox(MP4Box):
+class MovieBox(MP4Box, FinalMp4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -928,12 +990,15 @@ class MovieBox(MP4Box):
 
 
 @final
-class HandlerBox(MP4FullBox):
+class HandlerBox(MP4FullBox, FinalMp4Box):
     handler_type: ISOMAtomName
     name: str
 
     def __init__(
-        self: Self, parent: MP4FullBox, handler_type: ISOMAtomName, name: str
+        self: Self,
+        parent: MP4FullBox,
+        handler_type: ISOMAtomName,
+        name: str,
     ) -> None:
         super().__init__(
             parent,
@@ -1010,6 +1075,16 @@ class HandlerBox(MP4FullBox):
         box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return HandlerBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def write_to_buffer(
+        handler_type: ISOMAtomName,
+        name: str,
+        *,
+        reserved: Optional[bytes] = None,
+    ) -> bytes:
+        # note: 1 0 byte for the name!
+        raise NotImplementedError("TODO")
+
     def __str__(self: Self) -> str:
         return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type} name: {self.name}>"
 
@@ -1018,7 +1093,7 @@ class HandlerBox(MP4FullBox):
 
 
 @final
-class TrackBox(MP4Box):
+class TrackBox(MP4Box, FinalMp4Box):
     hdlr: HandlerBox
 
     def __init__(self: Self, parent: MP4Box, hdlr: HandlerBox) -> None:
@@ -1088,7 +1163,7 @@ class TrackBox(MP4Box):
 
 
 @final
-class UserDataBox(MP4Box):
+class UserDataBox(MP4Box, FinalMp4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1122,11 +1197,158 @@ class UserDataBox(MP4Box):
 
 
 @final
-class MetaBox(MP4FullBox):
-    handler_box: HandlerBox
+class PrimaryItemBox(MP4FullBox, FinalMp4Box):
+    item_id: int
 
     def __init__(
-        self: Self, parent: MP4FullBox, handler_box: HandlerBox, *, is_container: bool
+        self: Self,
+        parent: MP4FullBox,
+        item_id: int,
+    ) -> None:
+        super().__init__(
+            parent,
+            parent.version,
+            parent.flags,
+            is_container=False,
+        )
+        self.item_id = item_id
+
+    @staticmethod
+    def __read_from_stream_impl(
+        f: BufferedIOBase, parent: MP4FullBox
+    ) -> "PrimaryItemBox":
+        # spec: ISO/IEC 14496-12
+        # ISO Primary item box structure:
+        # box     | <full box size> bytes | parent full box
+        # ... data
+
+        # aligned(8) class PrimaryItemBox
+        #     extends FullBox(
+        #         'pitm',
+        #         version = 0,
+        #         0)
+        # {
+        #     unsigned int(16) item_ID;
+        # }
+
+        # see https://mpeggroup.github.io/FileFormatConformance/?query=%3D%22pitm%22
+        # for known ids
+
+        f.seek(parent.span.payload_start)
+
+        if parent.version != 0:
+            msg = "Invalid pitm version"
+            raise RuntimeError(msg)
+
+        item_id_raw = read_checked(f, 2)
+
+        item_id = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), item_id_raw)
+
+        parent.span.add_header_size(2)
+
+        return PrimaryItemBox(parent, item_id)
+
+    @staticmethod
+    def read_from_stream(f: BufferedIOBase, offset: int) -> "PrimaryItemBox":
+        box = MP4FullBox.read_from_stream_mp4_full_box(f, offset)
+        return PrimaryItemBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def read_from_stream_parent(f: BufferedIOBase, parent: MP4Box) -> "PrimaryItemBox":
+        box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
+        return PrimaryItemBox.__read_from_stream_impl(f, box)
+
+    def __str__(self: Self) -> str:
+        return f"<PrimaryItemBox parent: {MP4FullBox.__str__(self)} item_id: {self.item_id}"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass
+class MetaBoxHandlerInformation:
+    todo: int
+
+
+@dataclass
+class PrimaryItemInformation:
+    item_id: int
+
+
+@dataclass
+class OptionalMetaBoxes:
+    pitm: Optional[PrimaryItemBox]  # PrimaryItemBox
+    dinf: Optional[MP4Box]  # DataInformationBox
+    iloc: Optional[MP4Box]  # ItemLocationBox
+    ipro: Optional[MP4Box]  # ItemProtectionBox
+    iinf: Optional[MP4Box]  # ItemInfoBox
+    ipmc: Optional[MP4Box]  # IPMPControlBox
+    iref: Optional[MP4Box]  # ItemReferenceBox
+    idat: Optional[MP4Box]  # ItemDataBox
+
+    @staticmethod
+    def empty() -> "OptionalMetaBoxes":
+        return OptionalMetaBoxes(
+            pitm=None,
+            dinf=None,
+            iloc=None,
+            ipro=None,
+            iinf=None,
+            ipmc=None,
+            iref=None,
+            idat=None,
+        )
+
+    def __str__(self: Self) -> str:
+        values: list[str] = [
+            str(val)
+            for val in [
+                self.pitm,
+                self.dinf,
+                self.iloc,
+                self.ipro,
+                self.iinf,
+                self.ipmc,
+                self.iref,
+                self.idat,
+            ]
+            if val is not None
+        ]
+
+        return f"<OptionalMetaBoxes {{{", ".join(values)}}}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+META_OPTIONAL_BOXES: list[ISOMAtomName] = [
+    PITM_ATOM_NAME,  # PrimaryItemBox
+    ISOMAtomName(b"dinf"),  # DataInformationBox
+    ISOMAtomName(b"iloc"),  # ItemLocationBox
+    ISOMAtomName(b"ipro"),  # ItemProtectionBox
+    ISOMAtomName(b"iinf"),  # ItemInfoBox
+    ISOMAtomName(b"ipmc"),  # IPMPControlBox
+    ISOMAtomName(b"iref"),  # ItemReferenceBox
+    ISOMAtomName(b"idat"),  # ItemDataBox
+]
+
+
+class MetaOptionalBoxes:
+    PITM = PITM_ATOM_NAME
+
+
+@final
+class MetaBox(MP4FullBox, FinalMp4Box):
+    handler_box: HandlerBox
+    optional_boxes: OptionalMetaBoxes
+
+    def __init__(
+        self: Self,
+        parent: MP4FullBox,
+        handler_box: HandlerBox,
+        optional_boxes: OptionalMetaBoxes,
+        *,
+        is_container: bool,
     ) -> None:
         super().__init__(
             parent,
@@ -1136,6 +1358,7 @@ class MetaBox(MP4FullBox):
         )
 
         self.handler_box = handler_box
+        self.optional_boxes = optional_boxes
 
     @staticmethod
     def __read_from_stream_impl(
@@ -1172,20 +1395,11 @@ class MetaBox(MP4FullBox):
             raise RuntimeError(msg)
 
         handler_box = HandlerBox.read_from_stream(f, parent.span.payload_start)
-
         parent.span.add_header_size(handler_box.span.size)
 
+        optional_boxes = OptionalMetaBoxes.empty()
+
         # peek the next box, if it's an optional box, we read that, otherwise we are at the end and read the last box array
-        OPTIONAL_BOXES: list[ISOMAtomName] = [
-            ISOMAtomName(b"pitm"),  # PrimaryItemBox
-            ISOMAtomName(b"dinf"),  # DataInformationBox
-            ISOMAtomName(b"iloc"),  # ItemLocationBox
-            ISOMAtomName(b"ipro"),  # ItemProtectionBox
-            ISOMAtomName(b"iinf"),  # ItemInfoBox
-            ISOMAtomName(b"ipmc"),  # IPMPControlBox
-            ISOMAtomName(b"iref"),  # ItemReferenceBox
-            ISOMAtomName(b"idat"),  # ItemDataBox
-        ]
         while True:
             f.seek(parent.span.payload_start)
 
@@ -1194,16 +1408,25 @@ class MetaBox(MP4FullBox):
                 parent.span.payload_start,
             )
 
-            if simple_box.type not in OPTIONAL_BOXES:
+            if simple_box.type not in META_OPTIONAL_BOXES:
                 break
+            match simple_box.type:
+                case MetaOptionalBoxes.PITM:
+                    if optional_boxes.pitm is not None:
+                        msg = "Duplicate PrimaryItemBox in MetaBox"
+                        raise RuntimeError(msg)
 
-            msg = f"MetaBox: parsing of optional box {simple_box.type} not implemented yet"
-            raise RuntimeError(msg)
+                    pitm_box = PrimaryItemBox.read_from_stream_parent(f, simple_box)
+                    parent.span.add_header_size(pitm_box.span.size)
+                    optional_boxes.pitm = pitm_box
+                case _:
+                    msg = f"MetaBox: parsing of optional box {simple_box.type} not implemented yet"
+                    raise RuntimeError(msg)
 
         # treat the box as container, if there is some payload left
         is_container = parent.span.payload_size != 0
 
-        return MetaBox(parent, handler_box, is_container=is_container)
+        return MetaBox(parent, handler_box, optional_boxes, is_container=is_container)
 
     @staticmethod
     def read_from_stream(f: BufferedIOBase, offset: int) -> "MetaBox":
@@ -1215,6 +1438,14 @@ class MetaBox(MP4FullBox):
         box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return MetaBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def write_to_buffer(
+        handler: MetaBoxHandlerInformation,
+        primary_item_info: Optional[PrimaryItemInformation],
+        data: bytes,
+    ) -> bytes:
+        raise NotImplementedError("TODO")
+
     def __str__(self: Self) -> str:
         return f"<MetaBox parent: {MP4FullBox.__str__(self)} handler_box: {self.handler_box}>"
 
@@ -1223,7 +1454,7 @@ class MetaBox(MP4FullBox):
 
 
 @final
-class AppleItunesItemList(MP4Box):
+class AppleItunesItemList(MP4Box, FinalMp4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1253,6 +1484,12 @@ class AppleItunesItemList(MP4Box):
         f: BufferedIOBase, parent: MP4Box
     ) -> "AppleItunesItemList":
         return AppleItunesItemList.__read_from_stream_impl(f, parent)
+
+    @staticmethod
+    def write_to_buffer(
+        data: bytes,
+    ) -> bytes:
+        raise NotImplementedError("TODO")
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemList parent: {MP4Box.__str__(self)}>"
@@ -1286,7 +1523,7 @@ class AppleItunesItemDataType(Enum):
 
 
 @final
-class AppleItunesItemDataBox(MP4FullBox):
+class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
     type_indicator: int
     locale_indicator: int
     value: AppleItunesItemDataContent
@@ -1529,7 +1766,7 @@ class AppleItunesItemDataBox(MP4FullBox):
 
 
 @final
-class AppleItunesItemMeanBox(MP4FullBox):
+class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
     value: str
 
     def __init__(
@@ -1602,7 +1839,7 @@ class AppleItunesItemMeanBox(MP4FullBox):
 
 
 @final
-class AppleItunesItemNameBox(MP4FullBox):
+class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
     value: str
 
     def __init__(
@@ -1675,7 +1912,7 @@ class AppleItunesItemNameBox(MP4FullBox):
 
 
 @final
-class AppleItunesItemBox(MP4Box):
+class AppleItunesItemBox(MP4Box, FinalMp4Box):
     data: AppleItunesItemDataBox
 
     def __init__(self: Self, parent: MP4Box, data: AppleItunesItemDataBox) -> None:
@@ -1731,6 +1968,15 @@ class AppleItunesItemBox(MP4Box):
     ) -> "AppleItunesItemBox":
         return AppleItunesItemBox.__read_from_stream_impl(f, parent, expected_type)
 
+    @staticmethod
+    def write_to_buffer(
+        name: ISOMAtomName,
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+    ) -> bytes:
+
+        raise NotImplementedError("TODO")
+
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemBox parent: {MP4Box.__str__(self)} data: {self.data}>"
 
@@ -1739,7 +1985,7 @@ class AppleItunesItemBox(MP4Box):
 
 
 @final
-class AppleItunesItemFreeformBox(MP4Box):
+class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
     mean: AppleItunesItemMeanBox
     name: AppleItunesItemNameBox
     data: AppleItunesItemDataBox
@@ -1815,6 +2061,16 @@ class AppleItunesItemFreeformBox(MP4Box):
     ) -> "AppleItunesItemFreeformBox":
         return AppleItunesItemFreeformBox.__read_from_stream_impl(f, parent)
 
+    @staticmethod
+    def write_to_buffer(
+        mean: str,
+        name: str,
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+    ) -> bytes:
+
+        raise NotImplementedError("TODO")
+
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemFreeformBox parent: {MP4Box.__str__(self)} mean: {self.mean} name: {self.name} data: {self.data}>"
 
@@ -1870,8 +2126,37 @@ class AppleItunesMetaBoxBuilder:
     def add_tag(self: Self, tag: ApplItunesTags) -> None:
         self.__tags.append(tag)
 
+    @staticmethod
+    def __render_tag_impl(tag: ApplItunesTags) -> bytes:
+        if isinstance(tag.key, ISOMAtomName):
+            return AppleItunesItemBox.write_to_buffer(
+                tag.key, tag.data.type, tag.data.value
+            )
+
+        if isinstance(tag.key, AppleItunesFreeformKey):
+            return AppleItunesItemFreeformBox.write_to_buffer(
+                tag.key.mean,
+                tag.key.name,
+                tag.data.type,
+                tag.data.value,
+            )
+
+        assert_never(tag.key)
+
     def build(self: Self) -> bytes:
-        raise NotImplementedError("TODO")
+
+        tags_rendered: bytes = b""
+
+        for tag in self.__tags:
+            tags_rendered += self.__render_tag_impl(tag)
+
+        ilst_bytes = AppleItunesItemList.write_to_buffer(tags_rendered)
+
+        return MetaBox.write_to_buffer(
+            MetaBoxHandlerInformation(todo=121),
+            PrimaryItemInformation(item_id=META_BOX_VIDEO_LANGUAGE_DETECTION_ID),
+            ilst_bytes,
+        )
 
 
 AppleItunesItemBoxAtomFreeform = ISOMAtomName(b"----")
@@ -2066,22 +2351,29 @@ def is_mp4_file(f: BufferedIOBase) -> Optional[str]:
             ).format(major_brand=first_box.major_brand)
 
         f.seek(0)
-    except RuntimeError as err:
-        return str(err)
-    except ValueError as err:
+    except (RuntimeError, ValueError) as err:
         return str(err)
     return None
 
 
+# see also: https://mpeggroup.github.io/FileFormatConformance/?query=%3D%22pitm%22
+META_BOX_VIDEO_LANGUAGE_DETECTION_ID: int = 0x41DC
+
+META_PADDING_SIZE = 512
+SIZE_OF_FREE_BOX_HEADER = 8
+
+MetaBoxState = Result[Optional[MetaBox], str]
+
+
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
-    __meta_box: Optional[MetaBox]
+    __meta_box: MetaBoxState
     __our_boxes: list[MP4Box]
 
     def __init__(
         self: Self,
         uuid_box: Optional[UUIDExtensionBox],
-        meta_box: Optional[MetaBox],
+        meta_box: MetaBoxState,
         our_boxes: list[MP4Box],
     ) -> None:
         self.__uuid_box = uuid_box
@@ -2106,21 +2398,27 @@ class Mp4MetadataHandler:
 
             f.write(buffer)
 
-        # NOTE: using top level meta box
-
-        # meta:
-        # location: file , amount: 0 or 1
-
-        if self.__meta_box is not None:
-            raise NotImplementedError("TODO")
+        if self.__meta_box.err():
+            # ignore this and write no top level meta box
+            pass
         else:
-            meta_box = AppleItunesMetaBoxBuilder()
-            meta_box.add_tag(
-                ApplItunesTags.from_known_atom(
-                    ISOMAtomName(b"\xa9cmt"),
-                    tags.comment,
-                ),
-            )
+            meta_box = self.__meta_box.as_ok()
+
+            # NOTE: using top level meta box
+
+            # meta:
+            # location: file , amount: 0 or 1
+
+            if meta_box is not None:
+                raise NotImplementedError("TODO")
+            else:
+                meta_box = AppleItunesMetaBoxBuilder()
+                meta_box.add_tag(
+                    ApplItunesTags.from_known_atom(
+                        ISOMAtomName(b"\xa9cmt"),
+                        tags.comment,
+                    ),
+                )
 
             for key, value in tags.metadata.items():
                 value_str = json.dumps(value)
@@ -2155,6 +2453,23 @@ class Mp4MetadataHandler:
             )
 
             buffer = meta_box.build()
+            f.write(buffer)
+
+            # write padding
+            padding_size = META_PADDING_SIZE - (len(buffer) % META_PADDING_SIZE)
+
+            if padding_size < SIZE_OF_FREE_BOX_HEADER:
+                padding_size = (
+                    META_PADDING_SIZE + padding_size - SIZE_OF_FREE_BOX_HEADER
+                )
+            else:
+                padding_size = padding_size - SIZE_OF_FREE_BOX_HEADER
+
+            if padding_size < 0:
+                msg = f"Implementation error: padding size negative: {padding_size}"
+                raise RuntimeError(msg)
+
+            buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
             f.write(buffer)
 
         metadata_dict: dict[str, SerializableDict | str] = {
@@ -2195,9 +2510,13 @@ class Mp4MetadataHandler:
     def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
-        meta_box: Optional[MetaBox] = None
+        meta_box: MetaBoxState = Ok(None)
 
         def free_box_is_written_by_us(box: FreeSpaceBox) -> bool:
+            # check if it's a padding box
+            if all(x == 0 for x in box.data):
+                return True
+
             free_tag = b"vld\x42\x42\x69-->"
 
             # NOTE. there are some old legacy ones, that were only used during testing and the new one (which is shorter)
@@ -2229,6 +2548,25 @@ class Mp4MetadataHandler:
                 case _:
                     return False
 
+        def meta_box_is_written_by_us(box: MetaBox) -> bool:
+            nonlocal meta_box
+            if not (meta_box.ok() and meta_box.as_ok() is None):
+                msg = f"Duplicate 'meta' box at the top level, only one allowed: {box}"
+                raise RuntimeError(msg)
+
+            if box.optional_boxes.pitm is None:
+                meta_box = Err("Not written by us")
+                return False
+
+            pitm = box.optional_boxes.pitm
+
+            if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
+                meta_box = Err("Not written by us")
+                return False
+
+            meta_box = Ok(box)
+            return True
+
         def box_is_written_by_us(box: MP4Box) -> bool:
             if box.type == FREE_ATOM_NAME:
                 if not isinstance(box, FreeSpaceBox):
@@ -2246,7 +2584,11 @@ class Mp4MetadataHandler:
                 return uuid_box_is_written_by_us(box)
 
             if box.type == META_ATOM_NAME:
-                raise RuntimeError("TODO implement")
+                if not isinstance(box, MetaBox):
+                    msg = "Invalid MetaBox: type not dispatched to correct class"
+                    raise TypeError(msg)
+
+                return meta_box_is_written_by_us(box)
 
             return False
 
@@ -2270,7 +2612,9 @@ class Mp4MetadataHandler:
                 break
 
         return Mp4MetadataHandler(
-            uuid_box, meta_box, list(reversed(our_boxes_reversed)),
+            uuid_box,
+            meta_box,
+            list(reversed(our_boxes_reversed)),
         )
 
 
@@ -2439,11 +2783,7 @@ class VideoTaggerMP4(VideoTagger):
                 return Ok(
                     VideoTaggerMP4(file, streams, types),
                 )
-        except RuntimeError as err:
-            return Err(str(err))
-        except ValueError as err:
-            return Err(str(err))
-        except TypeError as err:
+        except (RuntimeError, ValueError, TypeError) as err:
             return Err(str(err))
 
     @override
