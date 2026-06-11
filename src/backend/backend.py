@@ -168,6 +168,14 @@ class ManagerWsChoiceMessageAskQuestionReply(pydantic.BaseModel):
 IncomingWsData = ManagerWsChoiceMessageAskQuestionReply
 
 
+def uuid_deserialize(value: str) -> uuid.UUID:
+    return uuid.UUID(hex=value)
+
+
+def uuid_serialize(value: uuid.UUID) -> str:
+    return value.hex
+
+
 class WsSingleManager(WebsocketHandler):
     __parent_ref: "WsManager"
 
@@ -192,7 +200,7 @@ class WsSingleManager(WebsocketHandler):
                             if data.result is None
                             else deserialize_select_result(data.result)
                         )
-                        unique_id: uuid.UUID = uuid.UUID(data.id)
+                        unique_id: uuid.UUID = uuid_deserialize(data.id)
                         result: Optional[str] = (
                             self.__parent_ref.process_ask_question_reply(
                                 result=res_data,
@@ -920,7 +928,7 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
                 message=message,
                 choices=choices_impl,
                 default=default_impl,
-                id=str(uid),
+                id=uuid_serialize(uid),
             ),
         )
 
