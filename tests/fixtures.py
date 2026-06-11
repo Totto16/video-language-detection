@@ -119,6 +119,9 @@ def video_file_dict() -> dict[str, VideoFile]:
             "https://file-examples.com/wp-content/storage/2018/04/file_example_WMV_480_1_2MB.wmv",
             "video/mp4",
         ),
+        # see: https://gpac.github.io/mp4box.js/test/filereader.html?https://mpeggroup.github.io/FileFormatConformance/files/published/isobmff/02_dref_edts_img.mp4
+        # file with mdhd version 1
+        "02_dref_edts_img.mp4": VideoFileLocal("02_dref_edts_img.mp4"),
     }
 
     return video
