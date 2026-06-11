@@ -395,6 +395,7 @@ class MP4Box(NonFinalMP4Box):
 
     @final
     def payload_io_from_base(self: Self, f: BufferedIOBase) -> BoundedIO:
+        raise NotImplementedError("TODO")
         return BoundedIO.get_new(
             f,
             self.span.payload_start,

@@ -9,6 +9,7 @@ from content.tagger.parser import (
     ByteOrder,
     Packable,
     Packer,
+    SimpleSpan,
     Unpacker,
     UnsignedInt,
     UnsignedShort,
@@ -110,54 +111,94 @@ VIDS_FOURCC = FOURCC(b"vids")
 
 @final
 class AVIChunkSpan:
-    start: int
-    size: int
-    header_size: int
+    __total: SimpleSpan
+
+    __intervals: list[int]
 
     def __init__(
         self: Self,
-        start: int,
-        size: int,
+        span: SimpleSpan,
         header_size: int,
     ) -> None:
-        self.start = start
-        self.size = size
-        self.header_size = header_size
+        self.__total = span
+        self.__intervals = [header_size]
 
-        if self.size < 8:
-            msg = f"Invalid chunk: sitze too small: {self.size}"
+        if self.__total.size < 8:
+            msg = f"Invalid chunk: sitze too small: {self.__total.size}"
             raise RuntimeError(msg)
 
-        if self.size < self.header_size:
-            msg = f"Invalid chunk size {self.size} at {self.start}"
+        if self.__total.size < header_size:
+            msg = f"Invalid chunk size {self.__total.size} at {self.__total.start}"
             raise RuntimeError(msg)
 
     @staticmethod
     def from_avi_specified_size(
-        start: int, size: int, header_size: int
+        span: SimpleSpan,
+        header_size: int,
     ) -> "AVIChunkSpan":
-        return AVIChunkSpan(start, size + 8, header_size)
+        return AVIChunkSpan(SimpleSpan(span.start, span.size + 8), header_size)
 
-    @property
-    def end(self: Self) -> int:
-        return self.start + self.size
-
-    @property
-    def payload_start(self: Self) -> int:
-        return self.start + self.header_size
-
-    @property
-    def payload_size(self: Self) -> int:
-        return self.size - self.header_size
-
-    def add_header_size(self: Self, header_size: int) -> None:
-        self.header_size = self.header_size + header_size
-        if self.size < self.header_size:
-            msg = f"Invalid chunk size {self.size} at {self.start}"
+    def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
+        if len(self.__intervals) == 0:
+            msg = "Implementation error: intervals list is empty"
             raise RuntimeError(msg)
 
+        if depth < 0:
+            msg = f"Invalid depth, it is negative: {depth}"
+            raise RuntimeError(msg)
+
+        if depth > len(self.__intervals):
+            msg = f"Invalid depth of interval size: {depth}, max is {len(self.__intervals)}"
+            raise RuntimeError(msg)
+
+        interval_start = self.__total.start
+        interval_end = self.__total.end
+
+        if depth != 0:
+            interval_start = self.__total.start + sum(self.__intervals[0 : depth - 1])
+
+        # a | b | c
+
+        if depth != len(self.__intervals):
+            interval_end = self.__total.start + sum(self.__intervals[0 : depth + 1])
+
+        interval_size = interval_end - interval_start
+
+        if interval_size > self.__total.size or interval_size < 0:
+            msg = f"Implementation error, interval_size out of bounds [0, {self.__total.size}]: {interval_size}"
+
+        return SimpleSpan(interval_start, interval_size)
+
+    def header_span(self: Self, depth: int = 0) -> SimpleSpan:
+        if depth == -1:
+            return self.header_span(len(self.__intervals) - 1)
+
+        if depth >= len(self.__intervals):
+            msg = f"Invalid depth of header size: {depth}, max is {len(self.__intervals) - 1}"
+            raise RuntimeError(msg)
+
+        return self.__interval_span_impl(depth)
+
+    @property
+    def payload_span(self: Self) -> SimpleSpan:
+        return self.__interval_span_impl(len(self.__intervals))
+
+    def add_header(self: Self, header_size: int) -> None:
+        self.__intervals.append(header_size)
+
+        if self.__total.size < sum(self.__intervals):
+            msg = f"Invalid total header size {self.__total.size} < {sum(self.__intervals)} at {self.__total.start}"
+            raise RuntimeError(msg)
+
+    @property
+    def total(self: Self) -> SimpleSpan:
+        return self.__total
+
     def __str__(self: Self) -> str:
-        return f"<AVIChunkSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+        header_string = ", ".join(
+            str(self.header_span(i)) for i in range(0, len(self.__intervals))
+        )
+        return f"<AVIChunkSpan total: {self.__total} header: [ {header_string} ] payload: {self.payload_span}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -227,22 +268,22 @@ class AVIChunk(NonFinalAVIChunk):
                 hdr,
             )
 
-            span = AVIChunkSpan.from_avi_specified_size(io.start, size, header_size=8)
+            span = AVIChunkSpan.from_avi_specified_size(
+                SimpleSpan(io.span.start, size),
+                header_size=8,
+            )
             return AVIChunk(fourcc, span, is_list=False)
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
-        return io.new_payload_io(
-            self.span.payload_start,
-            self.span.payload_size,
+        return io.new_span_io(
+            self.span.payload_span,
         )
 
     @final
-    def payload_io_from_base(self: Self, f: BufferedIOBase) -> BoundedIO:
-        return BoundedIO.get_new(
-            f,
-            self.span.payload_start,
-            self.span.payload_size,
+    def header_io(self: Self, io: BoundedIO, depth: int = 0) -> BoundedIO:
+        return io.new_span_io(
+            self.span.header_span(depth),
         )
 
     def __str__(self: Self) -> str:
@@ -279,7 +320,7 @@ class AVIList(AVIChunk):
 
             typ = FOURCC(typ_raw)
 
-            parent.span.add_header_size(4)
+            parent.span.add_header(4)
 
             return AVIList(parent, typ)
 
@@ -351,7 +392,12 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
                 4 + 4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + (2 + 2 + 2 + 2)
             )
 
-            parent.span.add_header_size(additional_header_size)
+            f.skip(additional_header_size - 4)
+            parent.span.add_header(additional_header_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return AVIStreamHeader(parent, typ)
 
@@ -364,13 +410,12 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
     def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "AVIStreamHeader":
         return AVIStreamHeader.__read_impl(io, parent)
 
-
     @property
     def __language_offset(self: Self) -> int:
         return 4 + 4 + 4 + 4 + 4 + 2
 
     def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
-        io = self.payload_io_from_base(io_base)
+        io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.r_ctx(force_entire_read=False) as f:
             f.skip(self.__language_offset)
@@ -387,7 +432,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
     ) -> None:
         packed = LCID.encode_language(new_language)
 
-        io = self.payload_io_from_base(io_base)
+        io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.rw_ctx(force_entire_read=False) as f:
             f.skip(self.__language_offset)
@@ -428,24 +473,27 @@ def read_chunk(io: BoundedIO) -> AVIChunk:
 
 
 def avi_iter_chunks(
-    io_base: BufferedIOBase, start: int, end: int,
+    io_base: BufferedIOBase,
+    span: SimpleSpan,
 ) -> Generator[AVIChunk]:
-    pos = start
+    pos = span.start
 
-    while pos < end:
-        io = BoundedIO.get_new(io_base, pos, end - pos)
+    while pos < span.end:
+        io = BoundedIO.get_new(io_base, SimpleSpan(pos, span.end - pos))
         chunk = read_chunk(io)
 
-        if pos + chunk.span.size > end:
+        if pos + chunk.span.total.size > span.end:
             msg = f"chunk {chunk.fourcc!r} at {pos} extends past parent boundary"
             raise RuntimeError(msg)
 
         yield chunk
-        pos += chunk.span.size
+        pos += chunk.span.total.size
 
         # align by WORD (2 bytes)
         if (pos % 2) != 0:
-            with BoundedIO.get_new(io_base, pos, 1).r_ctx(force_entire_read=True) as f:
+            with BoundedIO.get_new(io_base, SimpleSpan(pos, 1)).r_ctx(
+                force_entire_read=True,
+            ) as f:
                 val = f.read(1)
                 if val != b"\x00":
                     msg = f"Invalid padding byte: {val!r}, it has to be 0x00"
@@ -461,12 +509,12 @@ def find_strh_chunks_with_type(
     f.seek(0, 2)
     filesize = f.tell()
 
-    stack: list[tuple[int, int, list[FOURCC]]] = [(0, filesize, [])]
+    stack: list[tuple[SimpleSpan, list[FOURCC]]] = [(SimpleSpan(0, filesize), [])]
 
     while stack:
-        start, end, path = stack.pop()
+        span, path = stack.pop()
 
-        for chunk in avi_iter_chunks(f, start, end):
+        for chunk in avi_iter_chunks(f, span):
 
             if chunk.fourcc == STRH_FOURCC:
                 if not isinstance(chunk, AVIStreamHeader):
@@ -492,7 +540,7 @@ def find_strh_chunks_with_type(
                 typ = chunk.fourcc
                 if isinstance(chunk, AVIList):
                     typ = chunk.type
-                stack.append((chunk.span.payload_start, chunk.span.end, [*path, typ]))
+                stack.append((chunk.span.payload_span, [*path, typ]))
 
 
 def is_avi_file(
@@ -503,7 +551,7 @@ def is_avi_file(
     try:
         f.seek(0, 2)
         filesize = f.tell()
-        first_chunk = read_chunk(BoundedIO.get_new(f, 0, filesize))
+        first_chunk = read_chunk(BoundedIO.get_new(f, SimpleSpan(0, filesize)))
 
         if not isinstance(first_chunk, AVIList):
             return _("Not a valid RIFF / AVI file")
@@ -519,6 +567,8 @@ def is_avi_file(
             ).format(list_type=first_chunk.type)
 
         f.seek(0)
-    except (RuntimeError, ValueError) as err:
+    # TODO
+    # except (RuntimeError, ValueError) as err:
+    except FloatingPointError as err:
         return str(err)
     return None

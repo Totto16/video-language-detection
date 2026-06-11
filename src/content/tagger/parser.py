@@ -6,12 +6,45 @@ from contextlib import AbstractContextManager
 from enum import StrEnum
 from io import BufferedIOBase, UnsupportedOperation
 from types import TracebackType
-from typing import Literal, Optional, Protocol, Self, assert_never, cast, override
+from typing import (
+    Literal,
+    Optional,
+    Protocol,
+    Self,
+    assert_never,
+    cast,
+    final,
+    override,
+)
 from uuid import UUID
 
 from helper.translation import get_translator
 
 _ = get_translator()
+
+
+@final
+class SimpleSpan:
+    start: int
+    size: int
+
+    def __init__(
+        self: Self,
+        start: int,
+        size: int,
+    ) -> None:
+        self.start = start
+        self.size = size
+
+    @property
+    def end(self: Self) -> int:
+        return self.start + self.size
+
+    def __str__(self: Self) -> str:
+        return f"<SimpleSpan start: {self.start} size: {self.size}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class BoundedIOReadable(Protocol):
@@ -35,8 +68,8 @@ class ExclusiveIOBase:
 
     __holder: int
 
-    def __init__(self: Self, f: BufferedIOBase) -> None:
-        self.__f = f
+    def __init__(self: Self, io_base: BufferedIOBase) -> None:
+        self.__f = io_base
 
         self.__holder = id(None)
 
@@ -109,40 +142,36 @@ class ExclusiveIOBase:
 class BoundedIO:
     __io: ExclusiveIOBase
 
-    __start: int
-    __size: int
+    __span: SimpleSpan
 
-    def __init__(self: Self, io: ExclusiveIOBase, start: int, size: int) -> None:
+    def __init__(self: Self, io: ExclusiveIOBase, span: SimpleSpan) -> None:
 
-        if start < 0:
-            msg = f"Start negative: {start}"
+        if span.start < 0:
+            msg = f"Start negative: {span.start}"
             raise RuntimeError(msg)
 
-        if size < 0:
-            msg = f"Size negative: {size}"
+        if span.size < 0:
+            msg = f"Size negative: {span.size}"
             raise RuntimeError(msg)
 
         filesize = io.size()
 
-        if start > filesize:
-            msg = f"Start outside file size: {start} > {filesize}"
+        if span.start > filesize:
+            msg = f"Start outside file size: {span.start} > {filesize}"
             raise RuntimeError(msg)
 
-        end = start + size
-
-        if end > filesize:
-            msg = f"End outside file size: {end} > {filesize}"
+        if span.end > filesize:
+            msg = f"End outside file size: {span.end} > {filesize}"
             raise RuntimeError(msg)
 
         self.__io = io
-        self.__start = start
-        self.__size = size
+        self.__span = span
 
         self.__reset_seek()
 
     @staticmethod
-    def get_new(f: BufferedIOBase, start: int, size: int) -> "BoundedIO":
-        return BoundedIO(ExclusiveIOBase(f), start, size)
+    def get_new(io_base: BufferedIOBase, span: SimpleSpan) -> "BoundedIO":
+        return BoundedIO(ExclusiveIOBase(io_base), span)
 
     def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:
         if amount < 0:
@@ -150,8 +179,8 @@ class BoundedIO:
             raise ValueError(msg)
 
         current_end = self.__io.tell() + amount
-        if current_end > self.end:
-            msg = f"Read would overflow bounds [{self.__start}, {self.end}]: {current_end}"
+        if current_end > self.__span.end:
+            msg = f"Read would overflow bounds [{self.__span.start}, {self.__span.end}]: {current_end} ({current_end - amount}  + {amount})"
             raise RuntimeError(msg)
 
         value = self.__io.read(amount)
@@ -163,12 +192,12 @@ class BoundedIO:
 
     def __skip_exact_bounds_checked(self: Self, amount: int) -> None:
         if amount < 0:
-            msg = "Invalid checked read, read amount negative"
+            msg = "Invalid checked skip, skip amount negative"
             raise ValueError(msg)
 
         current_end = self.__io.tell() + amount
-        if current_end > self.end:
-            msg = f"Read would overflow bounds [{self.__start}, {self.end}]: {current_end}"
+        if current_end > self.__span.end:
+            msg = f"Skip would overflow bounds [{self.__span.start}, {self.__span.end}]: {current_end} ({current_end - amount}  + {amount})"
             raise RuntimeError(msg)
 
         self.__io.seek_abs(current_end)
@@ -176,8 +205,8 @@ class BoundedIO:
     def __write_exact_bounds_checked(self: Self, data: bytes) -> None:
 
         current_end = self.__io.tell() + len(data)
-        if current_end > self.end:
-            msg = f"Write would overflow bounds [{self.__start}, {self.end}]: {current_end}"
+        if current_end > self.__span.end:
+            msg = f"Write would overflow bounds [{self.__span.start}, {self.__span.end}]: {current_end}"
             raise RuntimeError(msg)
 
         amount = self.__io.write(data)
@@ -189,15 +218,11 @@ class BoundedIO:
         self.__io.flush()
 
     @property
-    def end(self: Self) -> int:
-        return self.__start + self.__size
-
-    @property
-    def start(self: Self) -> int:
-        return self.__start
+    def span(self: Self) -> SimpleSpan:
+        return self.__span
 
     def __position_at_start(self: Self) -> None:
-        self.__io.seek_abs(self.__start)
+        self.__io.seek_abs(self.__span.start)
 
     def __reset_seek(self: Self) -> None:
         self.__io.reset_seek()
@@ -208,21 +233,38 @@ class BoundedIO:
         force_entire_read: bool,
     ) -> AbstractContextManager[BoundedIOReadable]:
 
-        parent = self
+        def read_impl(amount: int) -> bytes:
+            return self.__read_exact_bounds_checked(amount)
+
+        def skip_impl(amount: int) -> None:
+            return self.__skip_exact_bounds_checked(amount)
+
+        def enter_impl() -> None:
+            self.__io.acquire(self)
+
+            self.__position_at_start()
+
+        def exit_impl() -> None:
+            if force_entire_read:
+                current_pos = self.__io.tell()
+                if current_pos != self.__span.end:
+                    msg = f"Not the entire data was read: {current_pos} != {self.__span.end}"
+                    raise RuntimeError(msg)
+
+            self.__io.release(self)
+            self.__reset_seek()
 
         class BoundedIOReadableCtx(AbstractContextManager[BoundedIOReadable]):
             @override
             def __enter__(self: Self) -> BoundedIOReadable:
                 class BoundedIOReadableImpl(BoundedIOReadable):
                     def read(self: Self, amount: int) -> bytes:
-                        return parent.__read_exact_bounds_checked(amount)
+                        return read_impl(amount)
 
                     def skip(self: Self, amount: int) -> None:
-                        parent.__skip_exact_bounds_checked(amount)
+                        skip_impl(amount)
 
-                parent.__io.acquire(self)
-
-                parent.__position_at_start()
+                enter_impl()
 
                 return BoundedIOReadableImpl()
 
@@ -234,15 +276,7 @@ class BoundedIO:
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
 
-                if force_entire_read:
-                    current_pos = parent.__io.tell()
-                    if current_pos != parent.end:
-                        msg = f"Not the entire data was read: {current_pos} != {parent.end}"
-                        raise RuntimeError(msg)
-
-                parent.__io.release(self)
-                parent.__reset_seek()
-
+                exit_impl()
                 return False
 
         return BoundedIOReadableCtx()
@@ -253,27 +287,50 @@ class BoundedIO:
         force_entire_read: bool,
     ) -> AbstractContextManager[BoundedIORW]:
 
-        parent = self
+        def read_impl(amount: int) -> bytes:
+            return self.__read_exact_bounds_checked(amount)
+
+        def skip_impl(amount: int) -> None:
+            return self.__skip_exact_bounds_checked(amount)
+
+        def write_impl(data: bytes) -> None:
+            return self.__write_exact_bounds_checked(data)
+
+        def flush_impl() -> None:
+            return self.__flush()
+
+        def enter_impl() -> None:
+            self.__io.acquire(self)
+
+            self.__position_at_start()
+
+        def exit_impl() -> None:
+            if force_entire_read:
+                current_pos = self.__io.tell()
+                if current_pos != self.__span.end:
+                    msg = f"Not the entire data was read: {current_pos} != {self.__span.end}"
+                    raise RuntimeError(msg)
+
+            self.__io.release(self)
+            self.__reset_seek()
 
         class BoundedIORWCtx(AbstractContextManager[BoundedIORW]):
             @override
             def __enter__(self: Self) -> BoundedIORW:
                 class BoundedIORWImpl(BoundedIORW):
                     def read(self: Self, amount: int) -> bytes:
-                        return parent.__read_exact_bounds_checked(amount)
+                        return read_impl(amount)
 
                     def skip(self: Self, amount: int) -> None:
-                        parent.__skip_exact_bounds_checked(amount)
+                        skip_impl(amount)
 
                     def write(self: Self, data: bytes) -> None:
-                        parent.__write_exact_bounds_checked(data)
+                        write_impl(data)
 
                     def flush(self: Self) -> None:
-                        parent.__flush()
+                        flush_impl()
 
-                parent.__io.acquire(self)
-
-                parent.__position_at_start()
+                enter_impl()
 
                 return BoundedIORWImpl()
 
@@ -285,15 +342,7 @@ class BoundedIO:
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
 
-                if force_entire_read:
-                    current_pos = parent.__io.tell()
-                    if current_pos != parent.end:
-                        msg = f"Not the entire data was read: {current_pos} != {parent.end}"
-                        raise RuntimeError(msg)
-
-                parent.__io.release(self)
-                parent.__reset_seek()
-
+                exit_impl()
                 return False
 
         return BoundedIORWCtx()
@@ -303,22 +352,22 @@ class BoundedIO:
     ) -> AbstractContextManager[BoundedIOWriteable]:
         return self.rw_ctx(force_entire_read=False)
 
-    def new_payload_io(self: Self, start: int, size: int) -> "BoundedIO":
-        if start < self.__start:
-            msg = f"Start of new payload io is before parent start: {start} <  {self.__start}"
+    def new_span_io(self: Self, span: SimpleSpan) -> "BoundedIO":
+        if span.start < self.__span.start:
+            msg = f"Start of new payload io is before parent start: {span.start} <  {self.__span.start}"
             raise RuntimeError(msg)
 
-        if start + size != self.end:
-            msg = f"New payload io isn't correctly sized, it doesn't reach the end of the parent: {start + size} != {self.end}"
+        if span.end > self.__span.end:
+            msg = f"New payload io end overflows parent: {span.end} > {self.__span.end}"
             raise RuntimeError(msg)
 
-        return BoundedIO(self.__io, start, size)
+        return BoundedIO(self.__io, span)
 
     def special_checked_filesize(self: Self) -> int:
         filesize = self.__io.size_no_seek()
 
-        if self.end != filesize:
-            msg = f"can only span to the filesize end, if the current bound also ends at the end: {self.end} != {filesize}"
+        if self.__span.end != filesize:
+            msg = f"can only span to the filesize end, if the current bound also ends at the end: {self.__span.end} != {filesize}"
             raise RuntimeError(msg)
 
         return filesize

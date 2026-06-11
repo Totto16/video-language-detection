@@ -315,7 +315,8 @@ class AVIChunkStructure(FancyEq):
 
                 chunks = list_all_chunks_recursively(f)
                 return Ok(AVIChunkStructure(chunks))
-        except RuntimeError as err:
+        #TODO: RuntimeError
+        except (FloatingPointError) as err:
             return Err(str(err))
 
     def __str__(self: Self) -> str:
