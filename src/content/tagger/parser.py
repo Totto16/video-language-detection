@@ -4,7 +4,7 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from enum import StrEnum
-from io import BufferedIOBase, BytesIO
+from io import BufferedIOBase
 from types import TracebackType
 from typing import Literal, Optional, Protocol, Self, assert_never, cast, override
 from uuid import UUID
@@ -18,6 +18,16 @@ class BoundedReaderReadable(Protocol):
     def read(self: Self, amount: int) -> bytes: ...
 
     def skip(self: Self, amount: int) -> None: ...
+
+
+class BoundedReaderWriteable(Protocol):
+    def write(self: Self, data: bytes) -> None: ...
+
+    def flush(self: Self) -> None: ...
+
+
+class BoundedReaderRW(BoundedReaderWriteable, BoundedReaderReadable):
+    pass
 
 
 class ExclusiveIOBase:
@@ -52,6 +62,14 @@ class ExclusiveIOBase:
     def read(self: Self, amount: int) -> bytes:
         self.__assert_holder()
         return self.__f.read(amount)
+
+    def write(self: Self, data: bytes) -> int:
+        self.__assert_holder()
+        return self.__f.write(data)
+
+    def flush(self: Self) -> None:
+        self.__assert_holder()
+        self.__f.flush()
 
     def reset_seek(self: Self) -> None:
         self.__assert_no_holder()
@@ -141,6 +159,21 @@ class BoundedReader:
 
         self.__io.seek_abs(current_end)
 
+    def __write_exact_bounds_checked(self: Self, data: bytes) -> None:
+
+        current_end = self.__io.tell() + len(data)
+        if current_end > self.end:
+            msg = f"Write would overflow bounds [{self.__start}, {self.end}]: {current_end}"
+            raise RuntimeError(msg)
+
+        amount = self.__io.write(data)
+        if amount != len(data):
+            msg = f"Write failed to write {len(data)} bytes, got {amount}"
+            raise RuntimeError(msg)
+
+    def __flush(self: Self) -> None:
+        self.__io.flush()
+
     @property
     def end(self: Self) -> int:
         return self.__start + self.__size
@@ -155,7 +188,7 @@ class BoundedReader:
     def __reset_seek(self: Self) -> None:
         self.__io.reset_seek()
 
-    def ctx(
+    def r_ctx(
         self: Self,
         *,
         force_entire_read: bool,
@@ -199,6 +232,54 @@ class BoundedReader:
                 return False
 
         return BoundedReaderReadableCtx()
+
+    def rw_ctx(
+        self: Self,
+    ) -> AbstractContextManager[BoundedReaderRW]:
+
+        parent = self
+
+        class BoundedReaderRWCtx(AbstractContextManager[BoundedReaderRW]):
+            @override
+            def __enter__(self: Self) -> BoundedReaderRW:
+                class BoundedReaderRWImpl(BoundedReaderRW):
+                    def read(self: Self, amount: int) -> bytes:
+                        return parent.__read_exact_bounds_checked(amount)
+
+                    def skip(self: Self, amount: int) -> None:
+                        parent.__skip_exact_bounds_checked(amount)
+
+                    def write(self: Self, data: bytes) -> None:
+                        parent.__write_exact_bounds_checked(data)
+
+                    def flush(self: Self) -> None:
+                        parent.__flush()
+
+                parent.__io.acquire(self)
+
+                parent.__position_at_start()
+
+                return BoundedReaderRWImpl()
+
+            @override
+            def __exit__(
+                self: Self,
+                _exc_type: Optional[type[BaseException]],
+                _exc_val: Optional[BaseException],
+                _exc_tb: Optional[TracebackType],
+            ) -> Literal[False]:  # actually bool
+
+                parent.__io.release(self)
+                parent.__reset_seek()
+
+                return False
+
+        return BoundedReaderRWCtx()
+
+    def w_ctx(
+        self: Self,
+    ) -> AbstractContextManager[BoundedReaderWriteable]:
+        return self.rw_ctx()
 
     def new_payload_reader(self: Self, start: int, size: int) -> "BoundedReader":
         if start < self.__start:

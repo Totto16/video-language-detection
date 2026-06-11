@@ -382,7 +382,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
 
         reader = self.payload_reader_from_io(io_base)
 
-        with reader.ctx(force_entire_read=False) as f:
+        with reader.rw_ctx() as f:
             f.skip(self.__language_offset)
 
             packed_bytes = Packer.pack_one(AVI_BYTE_ORDER, UnsignedShort(), packed, 2)
