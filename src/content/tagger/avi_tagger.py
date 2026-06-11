@@ -155,9 +155,7 @@ class AVIChunkSpan:
         interval_end = self.__total.end
 
         if depth != 0:
-            interval_start = self.__total.start + sum(self.__intervals[0 : depth - 1])
-
-        # a | b | c
+            interval_start = self.__total.start + sum(self.__intervals[0:depth])
 
         if depth != len(self.__intervals):
             interval_end = self.__total.start + sum(self.__intervals[0 : depth + 1])
@@ -412,7 +410,8 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
 
     @property
     def __language_offset(self: Self) -> int:
-        return 4 + 4 + 4 + 4 + 4 + 2
+        # offset from the own header start, not the start of the whole chunk!
+        return 4 + 4 + 4 + 2
 
     def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
         io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)

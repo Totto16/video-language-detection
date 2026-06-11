@@ -23,6 +23,7 @@ from content.tagger.avi_tagger import (
     find_strh_chunks_with_type,
     is_avi_file,
 )
+from content.tagger.parser import SimpleSpan
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
@@ -36,7 +37,9 @@ _ = get_translator()
 class PseudoAVIChunk(AVIChunk):
 
     def __init__(self: Self, fourcc: FOURCC, size: int) -> None:
-        super().__init__(fourcc, span=AVIChunkSpan(0, size, 8), is_list=False)
+        super().__init__(
+            fourcc, span=AVIChunkSpan(SimpleSpan(0, size), 8), is_list=False
+        )
 
 
 class PseudoAVIList(AVIList):
@@ -116,12 +119,12 @@ class RecursiveChunks:
                 ],
             )
 
-        if chunk1.span.size != chunk2.span.size:
+        if chunk1.span.total.size != chunk2.span.total.size:
             return Err[list[str]](
                 [
                     "Sizeof data is not eq:",
-                    str(chunk1.span.size),
-                    str(chunk2.span.size),
+                    str(chunk1.span.total.size),
+                    str(chunk2.span.total.size),
                     f"Depth {depth}",
                     str(chunk1),
                     str(chunk2),
@@ -278,12 +281,14 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
 
     result: RecursiveChunks = RecursiveChunks([])
 
-    stack: list[tuple[int, int, RecursiveChunks]] = [(0, filesize, result)]
+    stack: list[tuple[SimpleSpan, RecursiveChunks]] = [
+        (SimpleSpan(0, filesize), result)
+    ]
 
     while stack:
-        start, end, current_target = stack.pop()
+        span, current_target = stack.pop()
 
-        for chunk in avi_iter_chunks(f, start, end):
+        for chunk in avi_iter_chunks(f, span):
             if chunk.is_list:
                 if not isinstance(chunk, AVIList):
                     msg = "Invalid AVIList: type not dispatched to correct class"
@@ -291,7 +296,7 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
 
                 target: tuple[AVIList, RecursiveChunks] = (chunk, RecursiveChunks([]))
                 current_target.append(target)
-                stack.append((chunk.span.payload_start, chunk.span.end, target[1]))
+                stack.append((chunk.span.payload_span, target[1]))
             else:
                 current_target.append(chunk)
 
@@ -315,8 +320,8 @@ class AVIChunkStructure(FancyEq):
 
                 chunks = list_all_chunks_recursively(f)
                 return Ok(AVIChunkStructure(chunks))
-        #TODO: RuntimeError
-        except (FloatingPointError) as err:
+        # TODO: RuntimeError
+        except FloatingPointError as err:
             return Err(str(err))
 
     def __str__(self: Self) -> str:
@@ -447,15 +452,18 @@ def test_avi_tagger_parsing(
 
             structure = structure_res.as_ok()
 
+            filesize = file.stat().st_size
             # check chunk consistency
-            chunks_stack: list[tuple[int, int, RecursiveChunks.RecursiveChunkData]] = [
-                (0, file.stat().st_size, structure.chunks.data),
+            chunks_stack: list[
+                tuple[SimpleSpan, RecursiveChunks.RecursiveChunkData]
+            ] = [
+                (SimpleSpan(0, filesize), structure.chunks.data),
             ]
 
             while len(chunks_stack) != 0:
 
-                chunks_start, chunks_end, chunks = chunks_stack.pop()
-                start: int = chunks_start
+                chunks_span, chunks = chunks_stack.pop()
+                start: int = chunks_span.start
                 for chunk_data in chunks:
 
                     chunk: AVIChunk
@@ -465,22 +473,22 @@ def test_avi_tagger_parsing(
                         ].is_list, "chunks resulting in children have to be a list"
                         chunk = chunk_data[0]
                         chunks_stack.append(
-                            (chunk.span.payload_start, chunk.span.end, chunk_data[1]),
+                            (chunk.span.payload_span, chunk_data[1]),
                         )
                     else:
                         chunk = chunk_data
 
                     assert (
-                        chunk.span.start == start
+                        chunk.span.total.start == start
                     ), f"Next chunk start is invalid: {chunk!s}"
 
-                    start = chunk.span.end
+                    start = chunk.span.total.end
 
                     # adjust padding
                     if (start % 2) != 0:
                         start += 1
 
-                assert chunks_end == start, "chunks don't reach at the parent end"
+                assert chunks_span.end == start, "chunks don't reach at the parent end"
 
             assert structure == result, "Parsing was incorrect"
 
