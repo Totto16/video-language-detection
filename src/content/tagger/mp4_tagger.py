@@ -19,6 +19,7 @@ from uuid import UUID
 
 from content.language import ShortLanguageStr
 from content.tagger.parser import (
+    ISOM_BYTE_ORDER,
     ByteOrder,
     Packable,
     Packer,
@@ -148,6 +149,7 @@ IODS_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"iods")
 TKHD_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"tkhd")
 MDAT_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"mdat")
 PITM_ATOM_NAME: ISOMAtomName = ISOMAtomName(value=b"pitm")
+MDIR_ATOM_NAME: ISOMAtomName = ISOMAtomName(value=b"mdir")
 
 
 @final
@@ -197,9 +199,6 @@ class MP4BoxSpan:
 
     def __repr__(self: Self) -> str:
         return str(self)
-
-
-ISOM_BYTE_ORDER = ByteOrder.Big
 
 
 class FinalMp4Box:
@@ -417,8 +416,8 @@ class UserExtensionBox(MP4Box):
         return str(self)
 
 
-UUIDExtension_UUID = UUID("90e175d1-efdb-4144-a214-ebfab6258ae7")
-JSONExtension_UUID = UUID("90e175d1-efdb-4144-a214-ebfab6258ae8")
+UUIDExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae7")
+JSONExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae8")
 
 
 class UserExtensions:
@@ -602,6 +601,11 @@ class MP4FullBox(MP4Box):
             raise RuntimeError(msg)
 
         buf.write(bytes([version]))
+
+        if len(flags) != 3:
+            msg = f"Invalid flags, have to be 3 bytes long: {flags!r}"
+            raise RuntimeError(msg)
+
         buf.write(flags)
         buf.write(data)
 
@@ -1082,8 +1086,39 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
         *,
         reserved: Optional[bytes] = None,
     ) -> bytes:
-        # note: 1 0 byte for the name!
-        raise NotImplementedError("TODO")
+        buf = BytesIO()
+
+        buf.write(b"\x00" * 4)  # pre_defined
+
+        handler_type_bytes = Packer.pack_one(
+            ISOM_BYTE_ORDER,
+            PackableISOMAtomName(),
+            handler_type,
+            4,
+        )
+
+        buf.write(handler_type_bytes)
+
+        if reserved is not None:
+            if len(reserved) != (3 * 4):
+                msg = f"Invalid reserved, only {3*4} byte values allowed, but got: {reserved!r}"
+                raise RuntimeError(msg)
+            buf.write(reserved)
+        else:
+            buf.write(b"\x00" * (3 * 4))
+
+        buf.write(name.encode())
+        # note: 1 '\x00' byte for the name!
+        buf.write(b"\x00")
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            HDLR_ATOM_NAME,
+            0,
+            b"\x00" * 3,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<HandlerBox parent: {MP4FullBox.__str__(self)} handler_type: {self.handler_type} name: {self.name}>"
@@ -1258,6 +1293,26 @@ class PrimaryItemBox(MP4FullBox, FinalMp4Box):
         box = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return PrimaryItemBox.__read_from_stream_impl(f, box)
 
+    @staticmethod
+    def write_to_buffer(item_id: int) -> bytes:
+        buf = BytesIO()
+
+        if item_id < 0 or item_id > 0xFFFF:
+            msg = f"Invalid item_id, only 2 byte values allowed, but got: {item_id}"
+            raise RuntimeError(msg)
+
+        item_id_bytes = Packer.pack_one(ISOM_BYTE_ORDER, UnsignedShort(), item_id, 2)
+        buf.write(item_id_bytes)
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            PITM_ATOM_NAME,
+            0,
+            b"\x00" * 3,
+            final_data,
+        )
+
     def __str__(self: Self) -> str:
         return f"<PrimaryItemBox parent: {MP4FullBox.__str__(self)} item_id: {self.item_id}"
 
@@ -1267,7 +1322,9 @@ class PrimaryItemBox(MP4FullBox, FinalMp4Box):
 
 @dataclass
 class MetaBoxHandlerInformation:
-    todo: int
+    handler_type: ISOMAtomName
+    name: str
+    reserved: Optional[bytes] = None
 
 
 @dataclass
@@ -1444,7 +1501,32 @@ class MetaBox(MP4FullBox, FinalMp4Box):
         primary_item_info: Optional[PrimaryItemInformation],
         data: bytes,
     ) -> bytes:
-        raise NotImplementedError("TODO")
+        buf = BytesIO()
+
+        handler_bytes = HandlerBox.write_to_buffer(
+            handler_type=handler.handler_type,
+            name=handler.name,
+            reserved=handler.reserved,
+        )
+
+        buf.write(handler_bytes)
+
+        if primary_item_info is not None:
+            primary_item_bytes = PrimaryItemBox.write_to_buffer(
+                primary_item_info.item_id
+            )
+            buf.write(primary_item_bytes)
+
+        buf.write(data)
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            META_ATOM_NAME,
+            0,
+            b"\x00" * 3,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<MetaBox parent: {MP4FullBox.__str__(self)} handler_box: {self.handler_box}>"
@@ -1489,7 +1571,7 @@ class AppleItunesItemList(MP4Box, FinalMp4Box):
     def write_to_buffer(
         data: bytes,
     ) -> bytes:
-        raise NotImplementedError("TODO")
+        return MP4Box.write_to_buffer_mp4_box(ILST_ATOM_NAME, data)
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemList parent: {MP4Box.__str__(self)}>"
@@ -1556,7 +1638,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
             case AppleItunesItemDataType.UTF16:
                 return value.decode("utf-16")
             case AppleItunesItemDataType.UUID:
-                return UUID(bytes=value)
+                return uuid_from_bytes(ISOM_BYTE_ORDER, value)
             case (
                 AppleItunesItemDataType.BE_SIGNED_INTEGER_VAR
                 | AppleItunesItemDataType.INTEGER
@@ -1583,94 +1665,134 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         expected_type: Optional[AppleItunesItemDataType],
     ) -> AppleItunesItemDataContent:
 
+        if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
+            if expected_type is None:
+                msg = f"No implicit type known for value: {value!r}"
+                raise RuntimeError(msg)
+
+            return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
+
+        return AppleItunesItemDataBox.__decode_value_impl(
+            AppleItunesItemDataType(type_indicator), value
+        )
+
+    @staticmethod
+    def __encode_value_impl(
+        type_indicator: int,
+        value: AppleItunesItemDataContent,
+    ) -> Result[bytes, str]:
         match type_indicator:
             case AppleItunesItemDataType.IMPLICIT.value:
-                if expected_type is None:
-                    msg = f"No implicit type known for value: {value!r}"
-                    raise RuntimeError(msg)
-
-                return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
+                return Err("Can't encode implict value")
             case AppleItunesItemDataType.UTF8.value:
-                return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.UTF8,
-                    value,
-                )
+                if isinstance(value, str):
+                    return Ok(value.encode("utf-8"))
+
+                return Err(f"Can't encode value of type {type(value)} with UTF-8")
             case AppleItunesItemDataType.UTF16.value:
-                return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.UTF16,
-                    value,
-                )
+                if isinstance(value, str):
+                    return Ok(value.encode("utf-16"))
+
+                return Err(f"Can't encode value of type {type(value)} with UTF-16")
             case AppleItunesItemDataType.UUID.value:
-                return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.UUID,
-                    value,
-                )
-            case AppleItunesItemDataType.INTEGER.value:
-                return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.INTEGER,
-                    value,
-                )
+                if isinstance(value, UUID):
+                    return Ok(uuid_to_bytes(ISOM_BYTE_ORDER, value))
+
+                return Err(f"Can't encode value of type {type(value)} ass UUID")
+            case AppleItunesItemDataType.BE_SIGNED_INTEGER_VAR.value:
+                if isinstance(value, int):
+                    if value < -(1 << 63):
+                        return Err(
+                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+                        )
+
+                    if value > (1 << 63) - 1:
+                        return Err(
+                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+                        )
+
+                    length_s: int
+                    if value < 0:
+                        if value >= -(1 << 7):
+                            length_s = 1
+                        elif value >= -(1 << 15):
+                            length_s = 2
+                        elif value >= -(1 << 31):
+                            length_s = 4
+                        else:
+                            length_s = 8
+                    else:  # noqa: PLR5501
+                        if value <= (1 << 7) - 1:
+                            length_s = 1
+                        elif value <= (1 << 15) - 1:
+                            length_s = 2
+                        elif value <= (1 << 31) - 1:
+                            length_s = 4
+                        else:
+                            length_s = 8
+
+                    return Ok(
+                        value.to_bytes(length=length_s, byteorder="big", signed=True)
+                    )
+
+                return Err(f"Can't encode value of type {type(value)} as int")
+            case AppleItunesItemDataType.BE_UNSIGNED_INTEGER_VAR.value:
+                if isinstance(value, int):
+                    if value < 0:
+                        return Err(
+                            f"Can't encode negative int value as unsigned integer: {value}"
+                        )
+
+                    if value > (1 << 64) - 1:
+                        return Err(
+                            f"Can't encode int value as unsigned integer, value too big for 8 bytes: {value}"
+                        )
+
+                    length_u: int
+                    if value <= 0xFF:
+                        length_u = 1
+                    elif value <= 0xFFFF:
+                        length_u = 2
+                    elif value <= (1 << 32) - 1:
+                        length_u = 4
+                    else:
+                        length_u = 8
+
+                    return Ok(
+                        value.to_bytes(length=length_u, byteorder="big", signed=False),
+                    )
+
+                return Err(f"Can't encode value of type {type(value)} as int")
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
                 raise RuntimeError(msg)
 
     @staticmethod
-    def __can_encode_value_impl(
-        type_indicator: int,
+    def __encode_value(
+        type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
-    ) -> Optional[str]:
-        match type_indicator:
-            case AppleItunesItemDataType.IMPLICIT.value:
-                return "Can't encode implict value"
-            case AppleItunesItemDataType.UTF8.value:
-                if isinstance(value, str):
-                    return None
+    ) -> bytes:
+        encoded = AppleItunesItemDataBox.__encode_value_impl(
+            type_indicator.value,
+            value,
+        )
+        if encoded.err():
+            msg = f"Encoding error: {encoded.as_err()}"
+            raise RuntimeError(msg)
 
-                return f"Can't encode value of type {type(value)} with UTF-8"
-            case AppleItunesItemDataType.UTF16.value:
-                if isinstance(value, str):
-                    return None
-
-                return f"Can't encode value of type {type(value)} with UTF-16"
-            case AppleItunesItemDataType.UUID.value:
-                if isinstance(value, UUID):
-                    return None
-
-                return f"Can't encode value of type {type(value)} ass UUID"
-            case AppleItunesItemDataType.BE_SIGNED_INTEGER_VAR.value:
-                if isinstance(value, int):
-                    if value < -(1 << 63):
-                        return f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
-
-                    if value > (1 << 63) - 1:
-                        return f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
-
-                    return None
-
-                return f"Can't encode value of type {type(value)} as int"
-            case AppleItunesItemDataType.BE_UNSIGNED_INTEGER_VAR.value:
-                if isinstance(value, int):
-                    if value < 0:
-                        return f"Can't encode negative int value as unsigned integer: {value}"
-
-                    if value > 0xFFFFFFFFFFFFFFFF:
-                        return f"Can't encode int value as unsigned integer, value too big for 8 bytes: {value}"
-
-                    return None
-
-                return f"Can't encode value of type {type(value)} as int"
-            case _:
-                msg = f"Not implemented type_indicator conversion: {type_indicator}"
-                raise RuntimeError(msg)
+        return encoded.as_ok()
 
     @staticmethod
     def can_encode_value(
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> Optional[str]:
-        return AppleItunesItemDataBox.__can_encode_value_impl(
-            type_indicator.value, value
+        encoded = AppleItunesItemDataBox.__encode_value_impl(
+            type_indicator.value,
+            value,
         )
+
+        return encoded.err_or(None)
 
     @staticmethod
     def __read_from_stream_impl(
@@ -1757,6 +1879,48 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
     ) -> "AppleItunesItemDataBox":
         box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return AppleItunesItemDataBox.__read_from_stream_impl(f, box, expected_type)
+
+    @staticmethod
+    def write_to_buffer(
+        type_indicator: AppleItunesItemDataType,
+        value: AppleItunesItemDataContent,
+    ) -> bytes:
+
+        type_indicator_bytes_raw = Packer.pack_one(
+            ISOM_BYTE_ORDER, UnsignedInt(), type_indicator.value, 4
+        )
+        if type_indicator_bytes_raw[0] != 0:
+            msg = (
+                f"Implementation error: first byet not 0: {type_indicator_bytes_raw[0]}"
+            )
+            raise RuntimeError(msg)
+
+        type_indicator_bytes = type_indicator_bytes_raw[1:4]
+
+        buf = BytesIO()
+
+        # see: https://developer.apple.com/documentation/quicktime-file-format/locale_indicator
+        locale_indicator_bytes = Packer.pack_one(
+            ISOM_BYTE_ORDER,
+            UnsignedInt(),
+            0,
+            4,
+        )
+
+        buf.write(locale_indicator_bytes)
+
+        value_bytes = AppleItunesItemDataBox.__encode_value(type_indicator, value)
+
+        buf.write(value_bytes)
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            DATA_ATOM_NAME,
+            0,
+            type_indicator_bytes,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemDataBox parent: {MP4FullBox.__str__(self)} type_indicator: {self.type_indicator} value: {self.value}>"
@@ -1974,8 +2138,20 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> bytes:
+        buf = BytesIO()
 
-        raise NotImplementedError("TODO")
+        data_bytes = AppleItunesItemDataBox.write_to_buffer(
+            type_indicator,
+            value,
+        )
+
+        buf.write(data_bytes)
+        final_data = buf.getvalue()
+
+        return MP4Box.write_to_buffer_mp4_box(
+            name,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemBox parent: {MP4Box.__str__(self)} data: {self.data}>"
@@ -2153,7 +2329,11 @@ class AppleItunesMetaBoxBuilder:
         ilst_bytes = AppleItunesItemList.write_to_buffer(tags_rendered)
 
         return MetaBox.write_to_buffer(
-            MetaBoxHandlerInformation(todo=121),
+            MetaBoxHandlerInformation(
+                handler_type=MDIR_ATOM_NAME,
+                name="",
+                reserved=b"appl" + (b"\x00" * 8),
+            ),
             PrimaryItemInformation(item_id=META_BOX_VIDEO_LANGUAGE_DETECTION_ID),
             ilst_bytes,
         )
