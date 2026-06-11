@@ -5,7 +5,7 @@ from typing import Any, Optional, Self, final, override
 from content.language import ShortLanguageStr
 from content.tagger.lcid_languages import LCID
 from content.tagger.parser import (
-    BoundedReader,
+    BoundedIO,
     ByteOrder,
     Packable,
     Packer,
@@ -203,7 +203,7 @@ class AVIChunk(NonFinalAVIChunk):
         self.is_list = is_list
 
     @staticmethod
-    def read_avi_chunk(reader: BoundedReader) -> "AVIChunk":
+    def read_avi_chunk(io: BoundedIO) -> "AVIChunk":
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI Chunk structure:
         # fourcc | 4 bytes | char[4]
@@ -218,7 +218,7 @@ class AVIChunk(NonFinalAVIChunk):
         #     BYTE data[dwSize]
         # } CHUNK;
 
-        with reader.ctx(force_entire_read=False) as f:
+        with io.r_ctx(force_entire_read=False) as f:
             hdr = f.read(8)
 
             fourcc, size = Unpacker.unpack_two(
@@ -227,21 +227,19 @@ class AVIChunk(NonFinalAVIChunk):
                 hdr,
             )
 
-            span = AVIChunkSpan.from_avi_specified_size(
-                reader.start, size, header_size=8
-            )
+            span = AVIChunkSpan.from_avi_specified_size(io.start, size, header_size=8)
             return AVIChunk(fourcc, span, is_list=False)
 
     @final
-    def payload_reader(self: Self, reader: BoundedReader) -> BoundedReader:
-        return reader.new_payload_reader(
+    def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
+        return io.new_payload_io(
             self.span.payload_start,
             self.span.payload_size,
         )
 
     @final
-    def payload_reader_from_io(self: Self, f: BufferedIOBase) -> BoundedReader:
-        return BoundedReader.get_new(
+    def payload_io_from_base(self: Self, f: BufferedIOBase) -> BoundedIO:
+        return BoundedIO.get_new(
             f,
             self.span.payload_start,
             self.span.payload_size,
@@ -263,7 +261,7 @@ class AVIList(AVIChunk):
         self.type = typ
 
     @staticmethod
-    def __read_impl(reader: BoundedReader, parent: AVIChunk) -> "AVIList":
+    def __read_impl(io: BoundedIO, parent: AVIChunk) -> "AVIList":
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI List structure:
         # chunk    | <chunk size> bytes | parent chunk
@@ -276,7 +274,7 @@ class AVIList(AVIChunk):
         #     BYTE data[dwSize-4]
         # } LIST;
 
-        with reader.ctx(force_entire_read=False) as f:
+        with io.r_ctx(force_entire_read=False) as f:
             typ_raw = f.read(4)
 
             typ = FOURCC(typ_raw)
@@ -286,9 +284,13 @@ class AVIList(AVIChunk):
             return AVIList(parent, typ)
 
     @staticmethod
-    def read_avi_list(reader: BoundedReader) -> "AVIList":
-        chunk = AVIChunk.read_avi_chunk(reader)
-        return AVIList.__read_impl(chunk.payload_reader(reader), chunk)
+    def read_avi_list(io: BoundedIO) -> "AVIList":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return AVIList.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_avi_list_from_parent(io: BoundedIO, parent: AVIChunk) -> "AVIList":
+        return AVIList.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
         return f"<AVIList parent: {AVIChunk.__str__(self)} type {self.type}>"
@@ -308,7 +310,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
 
     @staticmethod
     def __read_impl(
-        reader: BoundedReader,
+        io: BoundedIO,
         parent: AVIChunk,
     ) -> "AVIStreamHeader":
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779638(v=vs.85)
@@ -340,7 +342,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
         #     }  rcFrame;
         # } AVISTREAMHEADER;
 
-        with reader.ctx(force_entire_read=True) as f:
+        with io.r_ctx(force_entire_read=True) as f:
             typ_raw = f.read(4)
 
             typ = FOURCC(typ_raw)
@@ -354,18 +356,23 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
             return AVIStreamHeader(parent, typ)
 
     @staticmethod
-    def read(reader: BoundedReader) -> "AVIStreamHeader":
-        chunk = AVIChunk.read_avi_chunk(reader)
-        return AVIStreamHeader.__read_impl(chunk.payload_reader(reader), chunk)
+    def read(io: BoundedIO) -> "AVIStreamHeader":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return AVIStreamHeader.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "AVIStreamHeader":
+        return AVIStreamHeader.__read_impl(io, parent)
+
 
     @property
     def __language_offset(self: Self) -> int:
         return 4 + 4 + 4 + 4 + 4 + 2
 
     def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
-        reader = self.payload_reader_from_io(io_base)
+        io = self.payload_io_from_base(io_base)
 
-        with reader.ctx(force_entire_read=False) as f:
+        with io.r_ctx(force_entire_read=False) as f:
             f.skip(self.__language_offset)
 
             lang_bytes = f.read(2)
@@ -380,9 +387,9 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
     ) -> None:
         packed = LCID.encode_language(new_language)
 
-        reader = self.payload_reader_from_io(io_base)
+        io = self.payload_io_from_base(io_base)
 
-        with reader.rw_ctx() as f:
+        with io.rw_ctx(force_entire_read=False) as f:
             f.skip(self.__language_offset)
 
             packed_bytes = Packer.pack_one(AVI_BYTE_ORDER, UnsignedShort(), packed, 2)
@@ -390,7 +397,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
             f.write(packed_bytes)
             f.flush()
 
-        with reader.ctx(force_entire_read=False) as f:
+        with io.r_ctx(force_entire_read=False) as f:
             f.skip(self.__language_offset)
             verify_bytes = f.read(2)
             verify = Unpacker.unpack_one(AVI_BYTE_ORDER, UnsignedShort(), verify_bytes)
@@ -406,16 +413,16 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
         return str(self)
 
 
-def read_chunk(reader: BoundedReader) -> AVIChunk:
-    chunk = AVIChunk.read_avi_chunk(reader)
+def read_chunk(io: BoundedIO) -> AVIChunk:
+    chunk = AVIChunk.read_avi_chunk(io)
 
     match chunk.fourcc.value:
         case b"RIFF":
-            return AVIList.read_from_parent(chunk.payload_reader(reader), chunk)
+            return AVIList.read_avi_list_from_parent(chunk.payload_io(io), chunk)
         case b"LIST":
-            return AVIList.read_from_parent(chunk.payload_reader(reader), chunk)
+            return AVIList.read_avi_list_from_parent(chunk.payload_io(io), chunk)
         case b"strh":
-            return AVIStreamHeader.read_from_parent(chunk.payload_reader(reader), chunk)
+            return AVIStreamHeader.read_from_parent(chunk.payload_io(io), chunk)
         case _:
             return chunk
 
@@ -426,7 +433,7 @@ def avi_iter_chunks(
     pos = start
 
     while pos < end:
-        reader = BoundedReader.get_new(io_base, pos, end - pos)
+        reader = BoundedIO.get_new(io_base, pos, end - pos)
         chunk = read_chunk(reader)
 
         if pos + chunk.span.size > end:
@@ -438,9 +445,7 @@ def avi_iter_chunks(
 
         # align by WORD (2 bytes)
         if (pos % 2) != 0:
-            with BoundedReader.get_new(io_base, pos, 1).ctx(
-                force_entire_read=True
-            ) as f:
+            with BoundedIO.get_new(io_base, pos, 1).r_ctx(force_entire_read=True) as f:
                 val = f.read(1)
                 if val != b"\x00":
                     msg = f"Invalid padding byte: {val!r}, it has to be 0x00"
@@ -498,7 +503,7 @@ def is_avi_file(
     try:
         f.seek(0, 2)
         filesize = f.tell()
-        first_chunk = read_chunk(BoundedReader.get_new(f, 0, filesize))
+        first_chunk = read_chunk(BoundedIO.get_new(f, 0, filesize))
 
         if not isinstance(first_chunk, AVIList):
             return _("Not a valid RIFF / AVI file")

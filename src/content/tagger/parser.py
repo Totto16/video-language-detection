@@ -14,19 +14,19 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-class BoundedReaderReadable(Protocol):
+class BoundedIOReadable(Protocol):
     def read(self: Self, amount: int) -> bytes: ...
 
     def skip(self: Self, amount: int) -> None: ...
 
 
-class BoundedReaderWriteable(Protocol):
+class BoundedIOWriteable(Protocol):
     def write(self: Self, data: bytes) -> None: ...
 
     def flush(self: Self) -> None: ...
 
 
-class BoundedReaderRW(BoundedReaderWriteable, BoundedReaderReadable):
+class BoundedIORW(BoundedIOWriteable, BoundedIOReadable):
     pass
 
 
@@ -92,7 +92,7 @@ class ExclusiveIOBase:
         self.__holder = id(None)
 
 
-class BoundedReader:
+class BoundedIO:
     __io: ExclusiveIOBase
 
     __start: int
@@ -127,8 +127,8 @@ class BoundedReader:
         self.__reset_seek()
 
     @staticmethod
-    def get_new(f: BufferedIOBase, start: int, size: int) -> "BoundedReader":
-        return BoundedReader(ExclusiveIOBase(f), start, size)
+    def get_new(f: BufferedIOBase, start: int, size: int) -> "BoundedIO":
+        return BoundedIO(ExclusiveIOBase(f), start, size)
 
     def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:
         if amount < 0:
@@ -192,14 +192,14 @@ class BoundedReader:
         self: Self,
         *,
         force_entire_read: bool,
-    ) -> AbstractContextManager[BoundedReaderReadable]:
+    ) -> AbstractContextManager[BoundedIOReadable]:
 
         parent = self
 
-        class BoundedReaderReadableCtx(AbstractContextManager[BoundedReaderReadable]):
+        class BoundedIOReadableCtx(AbstractContextManager[BoundedIOReadable]):
             @override
-            def __enter__(self: Self) -> BoundedReaderReadable:
-                class BoundedReaderReadableImpl(BoundedReaderReadable):
+            def __enter__(self: Self) -> BoundedIOReadable:
+                class BoundedIOReadableImpl(BoundedIOReadable):
                     def read(self: Self, amount: int) -> bytes:
                         return parent.__read_exact_bounds_checked(amount)
 
@@ -210,7 +210,7 @@ class BoundedReader:
 
                 parent.__position_at_start()
 
-                return BoundedReaderReadableImpl()
+                return BoundedIOReadableImpl()
 
             @override
             def __exit__(
@@ -231,18 +231,20 @@ class BoundedReader:
 
                 return False
 
-        return BoundedReaderReadableCtx()
+        return BoundedIOReadableCtx()
 
     def rw_ctx(
         self: Self,
-    ) -> AbstractContextManager[BoundedReaderRW]:
+        *,
+        force_entire_read: bool,
+    ) -> AbstractContextManager[BoundedIORW]:
 
         parent = self
 
-        class BoundedReaderRWCtx(AbstractContextManager[BoundedReaderRW]):
+        class BoundedIORWCtx(AbstractContextManager[BoundedIORW]):
             @override
-            def __enter__(self: Self) -> BoundedReaderRW:
-                class BoundedReaderRWImpl(BoundedReaderRW):
+            def __enter__(self: Self) -> BoundedIORW:
+                class BoundedIORWImpl(BoundedIORW):
                     def read(self: Self, amount: int) -> bytes:
                         return parent.__read_exact_bounds_checked(amount)
 
@@ -259,7 +261,7 @@ class BoundedReader:
 
                 parent.__position_at_start()
 
-                return BoundedReaderRWImpl()
+                return BoundedIORWImpl()
 
             @override
             def __exit__(
@@ -269,26 +271,34 @@ class BoundedReader:
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
 
+                if force_entire_read:
+                    current_pos = parent.__io.tell()
+                    if current_pos != parent.end:
+                        msg = f"Not the entire data was read: {current_pos} != {parent.end}"
+                        raise RuntimeError(msg)
+
                 parent.__io.release(self)
                 parent.__reset_seek()
 
                 return False
 
-        return BoundedReaderRWCtx()
+        return BoundedIORWCtx()
 
     def w_ctx(
         self: Self,
-    ) -> AbstractContextManager[BoundedReaderWriteable]:
-        return self.rw_ctx()
+    ) -> AbstractContextManager[BoundedIOWriteable]:
+        return self.rw_ctx(force_entire_read=False)
 
-    def new_payload_reader(self: Self, start: int, size: int) -> "BoundedReader":
+    def new_payload_io(self: Self, start: int, size: int) -> "BoundedIO":
         if start < self.__start:
-            raise NotImplementedError("S")
+            msg = f"Start of new payload io is before parent start: {start} <  {self.__start}"
+            raise RuntimeError(msg)
 
         if start + size != self.end:
-            raise NotImplementedError("S")
+            msg = f"New payload io isn't correctly sized, it doesnÄt rech the end of the üarentz: {start + size} != {self.end}"
+            raise RuntimeError(msg)
 
-        return BoundedReader(self.__io, start, size)
+        return BoundedIO(self.__io, start, size)
 
 
 class ByteOrder(StrEnum):
