@@ -3,7 +3,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from io import BufferedIOBase
-from typing import Any, Literal, Self, assert_never, override
+from typing import Any, Literal, Self, assert_never, cast, override
 from uuid import UUID
 
 from helper.translation import get_translator
@@ -76,7 +76,7 @@ def uuid_to_bytes(order: ByteOrder, uuid: UUID) -> bytes:
     return result
 
 
-class Packable[T](ABC):
+class Packable[Type, Underlying = Type](ABC):
     @property
     @abstractmethod
     def pack_str(self: Self) -> str: ...
@@ -84,6 +84,12 @@ class Packable[T](ABC):
     @property
     @abstractmethod
     def pack_size(self: Self) -> int: ...
+
+    @abstractmethod
+    def to_underlying(self: Self, value: Type) -> Underlying: ...
+
+    @abstractmethod
+    def from_underlying(self: Self, value: Underlying) -> Type: ...
 
 
 class UnsignedInt(Packable[int]):
@@ -97,6 +103,14 @@ class UnsignedInt(Packable[int]):
     def pack_size(self: Self) -> int:
         return 4
 
+    @override
+    def to_underlying(self: Self, value: int) -> int:
+        return value
+
+    @override
+    def from_underlying(self: Self, value: int) -> int:
+        return value
+
 
 class UnsignedLongLong(Packable[int]):
     @property
@@ -108,6 +122,14 @@ class UnsignedLongLong(Packable[int]):
     @override
     def pack_size(self: Self) -> int:
         return 8
+
+    @override
+    def to_underlying(self: Self, value: int) -> int:
+        return value
+
+    @override
+    def from_underlying(self: Self, value: int) -> int:
+        return value
 
 
 class UnsignedShort(Packable[int]):
@@ -121,15 +143,23 @@ class UnsignedShort(Packable[int]):
     def pack_size(self: Self) -> int:
         return 2
 
+    @override
+    def to_underlying(self: Self, value: int) -> int:
+        return value
+
+    @override
+    def from_underlying(self: Self, value: int) -> int:
+        return value
+
 
 class Unpacker:
 
     @staticmethod
-    def __unpack_impl(
+    def __unpack_impl[Type, Underlying](
         byte_order: ByteOrder,
-        packer: list[Packable[Any]],
+        packer: list[Packable[Type, Underlying]],
         value: bytes,
-    ) -> tuple[Any, ...]:
+    ) -> tuple[Type, ...]:
 
         fmts = "".join([pack.pack_str for pack in packer])
 
@@ -147,15 +177,19 @@ class Unpacker:
             msg = f"Unpacking implementation error: expected bytes with size {size} but got PACK {pack_size}"
             raise RuntimeError(msg)
 
-        return struct.unpack(fmt, value)
+        result: tuple[Underlying, ...] = struct.unpack(fmt, value)
+
+        return tuple(
+            p.from_underlying(value) for value, p in zip(result, packer, strict=True)
+        )
 
     @staticmethod
-    def unpack_sized(
+    def unpack_sized[Type, Underlying](
         byte_order: ByteOrder,
-        packer: list[Packable[Any]],
+        packer: list[Packable[Type, Underlying]],
         value: bytes,
         size: int,
-    ) -> tuple[Any, ...]:
+    ) -> tuple[Type, ...]:
 
         if len(packer) != size:
             msg = f"Expected unpack to produce {size} values, but got {len(packer)}"
@@ -170,31 +204,42 @@ class Unpacker:
         return result
 
     @staticmethod
-    def unpack_one[A](
+    def unpack_one[Type, Underlying](
         byte_order: ByteOrder,
-        packer: Packable[A],
+        packer: Packable[Type, Underlying],
         value: bytes,
-    ) -> A:
+    ) -> Type:
         result = Unpacker.unpack_sized(byte_order, [packer], value, size=1)
 
         return result[0]
 
     @staticmethod
-    def unpack_two[A, B](
+    def unpack_two[Type1, Underlying1, Type2, Underlying2](
         byte_order: ByteOrder,
-        packer: tuple[Packable[A], Packable[B]],
+        packer: tuple[Packable[Type1, Underlying1], Packable[Type2, Underlying2]],
         value: bytes,
-    ) -> tuple[A, B]:
-        return Unpacker.unpack_sized(byte_order, [*packer], value, size=2)
+    ) -> tuple[Type1, Type2]:
+        packers: list[Packable[Type1, Underlying1]] = cast(
+            list[Packable[Type1, Underlying1]],
+            [*packer],
+        )
+        result: tuple[Type1, ...] = Unpacker.unpack_sized(
+            byte_order,
+            packers,
+            value,
+            size=2,
+        )
+
+        return cast(tuple[Type1, Type2], result)
 
 
 class Packer:
 
     @staticmethod
-    def __pack_impl(
+    def __pack_impl[Type, Underlying](
         byte_order: ByteOrder,
-        packer: list[Packable[Any]],
-        values: list[Any],
+        packer: list[Packable[Type, Underlying]],
+        values: list[Type],
         size: int,
     ) -> bytes:
 
@@ -214,7 +259,11 @@ class Packer:
             msg = f"Packing implementation error: expected bytes with size {size} but got PACK {pack_size}"
             raise RuntimeError(msg)
 
-        value = struct.pack(fmt, *values)
+        value_underlying: list[Underlying] = [
+            p.to_underlying(v) for v, p in zip(values, packer, strict=True)
+        ]
+
+        value = struct.pack(fmt, *value_underlying)
 
         if len(value) != size:
             msg = f"Packing has wrong input: expected bytes with size {size} but got {len(value)}"
@@ -223,19 +272,26 @@ class Packer:
         return value
 
     @staticmethod
-    def pack_one[A](
+    def pack_one[Type, Underlying](
         byte_order: ByteOrder,
-        packer: Packable[A],
-        value: A,
+        packer: Packable[Type, Underlying],
+        value: Type,
         size: int,
     ) -> bytes:
         return Packer.__pack_impl(byte_order, [packer], [value], size=size)
 
     @staticmethod
-    def pack_two[A, B](
+    def pack_two[Type1, Underlying1, Type2, Underlying2](
         byte_order: ByteOrder,
-        packer: tuple[Packable[A], Packable[B]],
-        values: tuple[A, B],
+        packer: tuple[Packable[Type1, Underlying1], Packable[Type2, Underlying2]],
+        values: tuple[Type1, Type2],
         size: int,
     ) -> bytes:
-        return Packer.__pack_impl(byte_order, [*packer], [*values], size=size)
+        packers: list[Packable[Type1, Underlying1]] = cast(
+            list[Packable[Type1, Underlying1]],
+            [*packer],
+        )
+
+        values_typed: list[Type1] = cast(list[Type1], [*values])
+
+        return Packer.__pack_impl(byte_order, packers, values_typed, size=size)

@@ -72,7 +72,7 @@ class FOURCC:
         return False
 
 
-class PackableFOURCC(Packable[bytes]):
+class PackableFOURCC(Packable[FOURCC, bytes]):
     @property
     @override
     def pack_str(self: Self) -> str:
@@ -82,6 +82,14 @@ class PackableFOURCC(Packable[bytes]):
     @override
     def pack_size(self: Self) -> int:
         return 4
+
+    @override
+    def to_underlying(self: Self, value: FOURCC) -> bytes:
+        return value.value
+
+    @override
+    def from_underlying(self: Self, value: bytes) -> FOURCC:
+        return FOURCC(value)
 
 
 RIFF_FOURCC: FOURCC = FOURCC(b"RIFF")
@@ -187,13 +195,12 @@ class AVIChunk:
 
         hdr = read_checked(f, 8)
 
-        fourcc_raw, size = Unpacker.unpack_two(
+        fourcc, size = Unpacker.unpack_two(
             AVI_BYTE_ORDER,
             (PackableFOURCC(), UnsignedInt()),
             hdr,
         )
 
-        fourcc = FOURCC(fourcc_raw)
         span = AVIChunkSpan.from_avi_specified_size(offset, size, header_size=8)
         return AVIChunk(fourcc, span, is_list=False)
 

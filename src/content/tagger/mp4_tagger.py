@@ -107,7 +107,7 @@ class ISOMAtomName:
 
 
 @final
-class PackableISOMAtomName(Packable[bytes]):
+class PackableISOMAtomName(Packable[ISOMAtomName, bytes]):
     @property
     @override
     def pack_str(self: Self) -> str:
@@ -117,6 +117,14 @@ class PackableISOMAtomName(Packable[bytes]):
     @override
     def pack_size(self: Self) -> int:
         return 4
+
+    @override
+    def to_underlying(self: Self, value: ISOMAtomName) -> bytes:
+        return value.value
+
+    @override
+    def from_underlying(self: Self, value: bytes) -> ISOMAtomName:
+        return ISOMAtomName(value)
 
 
 CMOV_ATOM_NAME: ISOMAtomName = ISOMAtomName(b"cmov")
@@ -268,13 +276,11 @@ class MP4Box(NonFinalMP4Box):
 
         hdr = read_checked(f, 8)
 
-        size, typ_raw = Unpacker.unpack_two(
+        size, typ = Unpacker.unpack_two(
             ISOM_BYTE_ORDER,
             (UnsignedInt(), PackableISOMAtomName()),
             hdr,
         )
-
-        typ = ISOMAtomName(typ_raw)
 
         if typ == CMOV_ATOM_NAME:
             msg = f"Compressed movie box '{CMOV_ATOM_NAME}' not supported"
@@ -339,7 +345,7 @@ class MP4Box(NonFinalMP4Box):
             (UnsignedInt(), PackableISOMAtomName()),
             (
                 final_size,
-                typ.value,
+                typ,
             ),
             8,
         )
@@ -1043,8 +1049,11 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
             msg = f"HandlerBox: pre_defined has to be 0, but was: {pre_defined!r}"
             raise ValueError(msg)
 
-        handler_type_raw = read_checked(f, 4)
-        handler_type = ISOMAtomName(handler_type_raw)
+        handler_type = Unpacker.unpack_one(
+            ISOM_BYTE_ORDER,
+            PackableISOMAtomName(),
+            read_checked(f, 4),
+        )
 
         reserved = read_checked(f, 4 * 3)
 
@@ -1768,7 +1777,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                 raise RuntimeError(msg)
 
     @staticmethod
-    def __encode_value(
+    def encode_value(
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> bytes:
@@ -1908,7 +1917,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
 
         buf.write(locale_indicator_bytes)
 
-        value_bytes = AppleItunesItemDataBox.__encode_value(type_indicator, value)
+        value_bytes = AppleItunesItemDataBox.encode_value(type_indicator, value)
 
         buf.write(value_bytes)
 
@@ -2296,7 +2305,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
 
         buf.write(name_bytes)
 
-        value_bytes = AppleItunesItemDataBox.__encode_value(type_indicator, value)
+        value_bytes = AppleItunesItemDataBox.encode_value(type_indicator, value)
 
         buf.write(value_bytes)
 
