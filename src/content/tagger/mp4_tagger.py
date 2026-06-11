@@ -20,7 +20,6 @@ from uuid import UUID
 from content.language import ShortLanguageStr
 from content.tagger.parser import (
     ISOM_BYTE_ORDER,
-    ByteOrder,
     Packable,
     Packer,
     Unpacker,
