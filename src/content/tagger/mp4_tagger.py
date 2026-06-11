@@ -1885,7 +1885,6 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> bytes:
-
         type_indicator_bytes_raw = Packer.pack_one(
             ISOM_BYTE_ORDER, UnsignedInt(), type_indicator.value, 4
         )
@@ -1959,6 +1958,10 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
 
         f.seek(parent.span.payload_start)
 
+        if parent.version != 0:
+            msg = "Invalid mean version"
+            raise RuntimeError(msg)
+
         data = read_checked(f, parent.span.payload_size)
 
         value = data.decode()
@@ -1994,6 +1997,23 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
     ) -> "AppleItunesItemMeanBox":
         box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return AppleItunesItemMeanBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def write_to_buffer(
+        value: str,
+    ) -> bytes:
+        buf = BytesIO()
+
+        buf.write(value.encode())
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            MEAN_ATOM_NAME,
+            0,
+            b"\x00" * 3,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemMeanBox parent: {MP4FullBox.__str__(self)} value: {self.value}>"
@@ -2032,6 +2052,10 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
 
         f.seek(parent.span.payload_start)
 
+        if parent.version != 0:
+            msg = "Invalid name version"
+            raise RuntimeError(msg)
+
         data = read_checked(f, parent.span.payload_size)
 
         value = data.decode()
@@ -2067,6 +2091,23 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
     ) -> "AppleItunesItemNameBox":
         box: MP4FullBox = MP4FullBox.read_from_stream_parent_mp4_full_box(f, parent)
         return AppleItunesItemNameBox.__read_from_stream_impl(f, box)
+
+    @staticmethod
+    def write_to_buffer(
+        value: str,
+    ) -> bytes:
+        buf = BytesIO()
+
+        buf.write(value.encode())
+
+        final_data = buf.getvalue()
+
+        return MP4FullBox.write_to_buffer_mp4_full_box(
+            NAME_ATOM_NAME,
+            0,
+            b"\x00" * 3,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemNameBox parent: {MP4FullBox.__str__(self)} value: {self.value}>"
@@ -2181,7 +2222,8 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
 
     @staticmethod
     def __read_from_stream_impl(
-        f: BufferedIOBase, parent: MP4Box
+        f: BufferedIOBase,
+        parent: MP4Box,
     ) -> "AppleItunesItemFreeformBox":
         # spec: N/A
         # Apple Itunes Item Freeform Box structure:
@@ -2201,7 +2243,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
 
         parent.span.add_header_size(mean.span.size)
 
-        name = AppleItunesItemNameBox.read_from_stream_checked(
+        name: AppleItunesItemNameBox = AppleItunesItemNameBox.read_from_stream_checked(
             f,
             parent.span.payload_start,
         )
@@ -2244,8 +2286,26 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> bytes:
+        buf = BytesIO()
 
-        raise NotImplementedError("TODO")
+        mean_bytes = AppleItunesItemMeanBox.write_to_buffer(mean)
+
+        buf.write(mean_bytes)
+
+        name_bytes = AppleItunesItemNameBox.write_to_buffer(name)
+
+        buf.write(name_bytes)
+
+        value_bytes = AppleItunesItemDataBox.__encode_value(type_indicator, value)
+
+        buf.write(value_bytes)
+
+        final_data = buf.getvalue()
+
+        return MP4Box.write_to_buffer_mp4_box(
+            AppleItunesItemBoxAtomFreeform,
+            final_data,
+        )
 
     def __str__(self: Self) -> str:
         return f"<AppleItunesItemFreeformBox parent: {MP4Box.__str__(self)} mean: {self.mean} name: {self.name} data: {self.data}>"
