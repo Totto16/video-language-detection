@@ -32,6 +32,9 @@ class ByteOrder(StrEnum):
     Network = "!"
 
 
+ISOM_BYTE_ORDER = ByteOrder.Big
+
+
 def convert_byteorder(order: ByteOrder) -> Literal["little", "big"]:
     match order.value:
         case ByteOrder.NativeNative.value:

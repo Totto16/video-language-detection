@@ -13,6 +13,7 @@ import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
+from content.tagger.parser import ISOM_BYTE_ORDER, uuid_from_bytes, uuid_to_bytes
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     MetadataTags,
@@ -334,6 +335,14 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
+def uuid_from_str(value: str) -> UUID:
+    return UUID(hex=value)
+
+
+def uuid_to_str(value: UUID) -> str:
+    return value.hex
+
+
 class VideoTaggerWriterMutagen(VideoTaggerWriter):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
@@ -419,14 +428,18 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             if not previous_uuid_raw:
                 self.__instance[TaggerDomain.UUID_RAW_KEY] = [
-                    mp4.MP4FreeForm(tags.uuid.bytes, mp4.AtomDataType.UUID),
+                    mp4.MP4FreeForm(
+                        uuid_to_bytes(ISOM_BYTE_ORDER, tags.uuid), mp4.AtomDataType.UUID,
+                    ),
                 ]
 
             previous_uuid_hex = self.__instance.get(TaggerDomain.UUID_HEX_KEY)
 
             if not previous_uuid_hex:
                 self.__instance[TaggerDomain.UUID_HEX_KEY] = [
-                    mp4.MP4FreeForm(tags.uuid.hex.encode(), mp4.AtomDataType.UTF8),
+                    mp4.MP4FreeForm(
+                        uuid_to_str(tags.uuid).encode(), mp4.AtomDataType.UTF8,
+                    ),
                 ]
 
         else:
@@ -493,7 +506,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                             msg = f"Invalid AtomDataType for raw uuid tag: {value.dataformat}"
                             raise RuntimeError(msg)
 
-                        return UUID(bytes=bytes(value))
+                        return uuid_from_bytes(ISOM_BYTE_ORDER, bytes(value))
 
                     assert_never(value)
 
@@ -501,7 +514,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
 
             def impl_hex(value: str | mp4.MP4FreeForm) -> UUID:
                 if isinstance(value, str):
-                    return UUID(hex=value)
+                    return uuid_from_str(value)
 
                 if isinstance(value, mp4.MP4FreeForm):
                     if value.dataformat != mp4.AtomDataType.UTF8:
@@ -510,7 +523,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                         )
                         raise RuntimeError(msg)
 
-                    return UUID(hex=bytes(value).decode())
+                    return uuid_from_str(bytes(value).decode())
 
                 assert_never(value)
 
