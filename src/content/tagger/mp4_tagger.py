@@ -1895,7 +1895,10 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         value: AppleItunesItemDataContent,
     ) -> bytes:
         type_indicator_bytes_raw = Packer.pack_one(
-            ISOM_BYTE_ORDER, UnsignedInt(), type_indicator.value, 4,
+            ISOM_BYTE_ORDER,
+            UnsignedInt(),
+            type_indicator.value,
+            4,
         )
         if type_indicator_bytes_raw[0] != 0:
             msg = (
@@ -2634,18 +2637,12 @@ class Mp4MetadataHandler:
         if len(self.__our_boxes) != 0:
             f.truncate(self.__our_boxes[0].span.start)
 
-    def write_new_metadata(self: Self, f: BufferedIOBase, tags: MetadataTags) -> None:
+    def __write_metadata_toplevel_meta(
+        self: Self,
+        f: BufferedIOBase,
+        tags: MetadataTags,
+    ) -> None:
         f.seek(0, 2)
-
-        # note: can write 0 or more free space or user extension boxes, and there both allowed everywhere
-
-        if self.__uuid_box is not None:
-            buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
-            f.write(buffer)
-        else:
-            buffer = UUIDExtensionBox.write_to_buffer(tags.uuid)
-
-            f.write(buffer)
 
         if self.__meta_box.err():
             # ignore this and write no top level meta box
@@ -2721,6 +2718,23 @@ class Mp4MetadataHandler:
             buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
             f.write(buffer)
 
+        f.flush()
+
+    def __write_metadata_custom(
+        self: Self,
+        f: BufferedIOBase,
+        tags: MetadataTags,
+    ) -> None:
+        # note: can write 0 or more free space or user extension boxes, and there both allowed everywhere
+
+        if self.__uuid_box is not None:
+            buffer = UUIDExtensionBox.write_to_buffer(self.__uuid_box.uuid)
+            f.write(buffer)
+        else:
+            buffer = UUIDExtensionBox.write_to_buffer(tags.uuid)
+
+            f.write(buffer)
+
         metadata_dicts: list[SerializableDict] = [
             {
                 "comment": tags.comment,
@@ -2735,32 +2749,61 @@ class Mp4MetadataHandler:
 
         f.flush()
 
-    def read_metadata(
+    def write_new_metadata(self: Self, f: BufferedIOBase, tags: MetadataTags) -> None:
+        f.seek(0, 2)
+
+        self.__write_metadata_custom(f, tags)
+
+        self.__write_metadata_toplevel_meta(f, tags)
+
+        f.flush()
+
+    def __read_metadata_custom(
         self: Self,
+        boxes: list[JsonExtensionBox | UUIDExtensionBox],
     ) -> tuple[list[SerializableDict], Optional[UUID]]:
         uuid = None if self.__uuid_box is None else self.__uuid_box.uuid
         metadata: list[SerializableDict] = []
 
-        for box in self.__our_boxes:
+        for box in boxes:
             if isinstance(box, JsonExtensionBox):
                 metadata.append(box.data)
             elif isinstance(box, UUIDExtensionBox):
                 if uuid is None:
                     msg = f"Found uuid box manually, but constructor didn't find it: {box}"
                     raise RuntimeError(msg)
+            else:
+                assert_never(box)
+
+        return (metadata, uuid)
+
+    def __read_metadata_toplevel_meta(
+        self: Self,
+        box: MetaBox,
+    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+        raise NotImplementedError("TODO")
+
+    def read_metadata(
+        self: Self,
+    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+        custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
+
+        for box in self.__our_boxes:
+            if isinstance(box, (JsonExtensionBox, UUIDExtensionBox)):
+                custom_boxes.append(box)
             elif isinstance(box, MetaBox):
-                # TODO
-                pass
+                raise NotImplementedError("TODO")
             elif isinstance(box, FreeSpaceBox):
-                # TODO
-                pass
+                raise NotImplementedError("TODO")
             else:
                 msg = f"Invalid box for tags found: {type(box)}"
                 raise TypeError(msg)
 
-        # TODO: read top level meta box and merge values, they have to be the same!
+        # TODO: merge values, they have to be the same!
+        result_custom = self.__read_metadata_custom(custom_boxes)
+        result_toplevel_meta = self.__read_metadata_toplevel_meta("TODO")
 
-        return (metadata, uuid)
+        raise NotImplementedError("TODO")
 
     @staticmethod
     def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
