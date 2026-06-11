@@ -1,9 +1,12 @@
+import os
 import struct
 import sys
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
 from enum import StrEnum
-from io import BufferedIOBase
-from typing import Literal, Self, assert_never, cast, override
+from io import BufferedIOBase, BytesIO
+from types import TracebackType
+from typing import Literal, Optional, Protocol, Self, assert_never, cast, override
 from uuid import UUID
 
 from helper.translation import get_translator
@@ -11,17 +14,118 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-def read_checked(f: BufferedIOBase, amount: int) -> bytes:
-    if amount < 0:
-        msg = "Invalid checked read, read amount negative"
-        raise ValueError(msg)
+class BoundedReaderReadable(Protocol):
+    def read(self: Self, amount: int) -> bytes: ...
 
-    value = f.read(amount)
-    if len(value) != amount:
-        msg = f"Read failed to produce {amount} bytes, got {len(value)}"
-        raise RuntimeError(msg)
+    def skip(self: Self, amount: int) -> None: ...
 
-    return value
+
+class BoundedReader(
+    AbstractContextManager[BoundedReaderReadable],
+):
+    __f: BufferedIOBase
+
+    __start: int
+    __size: int
+
+    __can_read: bool
+
+    def __init__(self: Self, f: BufferedIOBase, start: int, size: int) -> None:
+        if f.writable():
+            msg = "Only readonly streams supported atm"
+            raise RuntimeError(msg)
+
+        if start < 0:
+            msg = f"Start negative: {start}"
+            raise RuntimeError(msg)
+
+        if size < 0:
+            msg = f"Size negative: {size}"
+            raise RuntimeError(msg)
+
+        filesize = os.fstat(f.fileno()).st_size
+
+        if start > filesize:
+            msg = f"Start outside file size: {start} > {filesize}"
+            raise RuntimeError(msg)
+
+        end = start + size
+
+        if end > filesize:
+            msg = f"End outside file size: {end} > {filesize}"
+            raise RuntimeError(msg)
+
+        self.__f = f
+        self.__start = start
+        self.__size = size
+        self.__can_read = False
+
+        self.__position_at_end()
+
+    def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:
+        if not self.__can_read:
+            msg = f"Implementation error: {self.__can_read} should be True"
+            raise RuntimeError(msg)
+
+        if amount < 0:
+            msg = "Invalid checked read, read amount negative"
+            raise ValueError(msg)
+
+        if self.__f.tell() + amount > self.__end:
+            msg = f"Read would overflow bounds [{self.__start}, {self.__end}]: {self.__f.tell() + amount}"
+            raise RuntimeError(msg)
+
+        value = self.__f.read(amount)
+        if len(value) != amount:
+            msg = f"Read failed to produce {amount} bytes, got {len(value)}"
+            raise RuntimeError(msg)
+
+        return value
+
+    @property
+    def __end(self: Self) -> int:
+        return self.__start + self.__size
+
+    def __position_at_end(self: Self) -> None:
+        self.__f.seek(0, 2)
+
+    @override
+    def __enter__(self: Self) -> BoundedReaderReadable:
+        self.__f.seek(self.__start)
+
+        parent = self
+
+        class BoundedReaderReadableImpl(BoundedReaderReadable):
+            def read(self: Self, amount: int) -> bytes:
+                return parent.__read_exact_bounds_checked(amount)
+
+            def skip(self: Self, amount: int) -> None:
+                parent.__read_exact_bounds_checked(amount)
+
+        if self.__can_read:
+            msg = f"Implementation error: {self.__can_read} should be False"
+            raise RuntimeError(msg)
+
+        self.__can_read = True
+
+        return BoundedReaderReadableImpl()
+
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        self.__position_at_end()
+
+        if not self.__can_read:
+            msg = f"Implementation error: {self.__can_read} should be True"
+            raise RuntimeError(msg)
+
+        self.__can_read = False
+
+        return False
 
 
 class ByteOrder(StrEnum):
