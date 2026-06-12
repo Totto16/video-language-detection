@@ -23,6 +23,7 @@ from content.tagger.parser import (
     BoundedIO,
     Packable,
     Packer,
+    SimpleSpan,
     Unpacker,
     UnsignedInt,
     UnsignedLongLong,
@@ -161,48 +162,85 @@ MDIR_ATOM_NAME: ISOMAtomName = ISOMAtomName(value=b"mdir")
 
 @final
 class MP4BoxSpan:
-    start: int
-    size: int
-    header_size: int
+    __total: SimpleSpan
+
+    __intervals: list[int]
 
     def __init__(
         self: Self,
-        start: int,
-        size: int,
+        span: SimpleSpan,
         header_size: int,
     ) -> None:
-        self.start = start
-        self.size = size
-        self.header_size = header_size
+        self.__total = span
+        self.__intervals = [header_size]
 
-        if self.size < 8:
-            msg = f"Invalid box: sitze too small: {self.size}"
+        if self.__total.size < 8:
+            msg = f"Invalid box: size too small: {self.__total.size}"
             raise RuntimeError(msg)
 
-        if self.size < self.header_size:
-            msg = f"Invalid box size {self.size} at {self.start}"
+        if self.__total.size < header_size:
+            msg = f"Invalid box size {self.__total.size} at {self.__total.start}"
+            raise RuntimeError(msg)
+
+    def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
+        if len(self.__intervals) == 0:
+            msg = "Implementation error: intervals list is empty"
+            raise RuntimeError(msg)
+
+        if depth < 0:
+            msg = f"Invalid depth, it is negative: {depth}"
+            raise RuntimeError(msg)
+
+        if depth > len(self.__intervals):
+            msg = f"Invalid depth of interval size: {depth}, max is {len(self.__intervals)}"
+            raise RuntimeError(msg)
+
+        interval_start = self.__total.start
+        interval_end = self.__total.end
+
+        if depth != 0:
+            interval_start = self.__total.start + sum(self.__intervals[0:depth])
+
+        if depth != len(self.__intervals):
+            interval_end = self.__total.start + sum(self.__intervals[0 : depth + 1])
+
+        interval_size = interval_end - interval_start
+
+        if interval_size > self.__total.size or interval_size < 0:
+            msg = f"Implementation error, interval_size out of bounds [0, {self.__total.size}]: {interval_size}"
+
+        return SimpleSpan(interval_start, interval_size)
+
+    def header_span(self: Self, depth: int = 0) -> SimpleSpan:
+        if depth == -1:
+            return self.header_span(len(self.__intervals) - 1)
+
+        if depth >= len(self.__intervals):
+            msg = f"Invalid depth of header size: {depth}, max is {len(self.__intervals) - 1}"
+            raise RuntimeError(msg)
+
+        return self.__interval_span_impl(depth)
+
+    @property
+    def payload_span(self: Self) -> SimpleSpan:
+        return self.__interval_span_impl(len(self.__intervals))
+
+    def add_header(self: Self, header_size: int) -> None:
+        self.__intervals.append(header_size)
+
+        if self.__total.size < sum(self.__intervals):
+            msg = f"Invalid total header size {self.__total.size} < {sum(self.__intervals)} at {self.__total.start}"
             raise RuntimeError(msg)
 
     @property
-    def end(self: Self) -> int:
-        return self.start + self.size
-
-    @property
-    def payload_start(self: Self) -> int:
-        return self.start + self.header_size
-
-    @property
-    def payload_size(self: Self) -> int:
-        return self.size - self.header_size
-
-    def add_header_size(self: Self, header_size: int) -> None:
-        self.header_size = self.header_size + header_size
-        if self.size < self.header_size:
-            msg = f"Invalid box size {self.size} at {self.start}"
-            raise RuntimeError(msg)
+    def total(self: Self) -> SimpleSpan:
+        return self.__total
 
     def __str__(self: Self) -> str:
-        return f"<MP4BoxSpan start: {self.start} size: {self.size} header: [0, {self.header_size}] payload: [{self.payload_start}, {self.payload_size}]>"
+        header_string = ", ".join(
+            str(self.header_span(i)) for i in range(0, len(self.__intervals))
+        )
+        return f"<MP4BoxSpan total: {self.__total} header: [ {header_string} ] payload: {self.payload_span}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -318,12 +356,18 @@ class MP4Box(NonFinalMP4Box):
 
                 header_size = header_size + 16
 
-                span = MP4BoxSpan(io.start, size=final_size, header_size=header_size)
+                span = MP4BoxSpan(
+                    SimpleSpan(io.span.start, size=final_size),
+                    header_size=header_size,
+                )
                 box = MP4Box(typ, span, is_container=False)
                 user_box = UserExtensionBox(box, usertype, is_container=False)
                 return user_extension_box_determine_correct_extension(io, user_box)
 
-            span = MP4BoxSpan(io.start, size=final_size, header_size=header_size)
+            span = MP4BoxSpan(
+                SimpleSpan(io.span.start, size=final_size),
+                header_size=header_size,
+            )
             return MP4Box(typ, span, is_container=False)
 
     @staticmethod
@@ -388,18 +432,14 @@ class MP4Box(NonFinalMP4Box):
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
-        return io.new_payload_io(
-            self.span.payload_start,
-            self.span.payload_size,
+        return io.new_span_io(
+            self.span.payload_span,
         )
 
     @final
-    def payload_io_from_base(self: Self, f: BufferedIOBase) -> BoundedIO:
-        raise NotImplementedError("TODO")
-        return BoundedIO.get_new(
-            f,
-            self.span.payload_start,
-            self.span.payload_size,
+    def header_io(self: Self, io: BoundedIO, depth: int = 0) -> BoundedIO:
+        return io.new_span_io(
+            self.span.header_span(depth),
         )
 
     def __str__(self: Self) -> str:
@@ -467,15 +507,19 @@ class UUIDExtensionBox(UserExtensionBox, FinalMp4Box):
 
         with io.r_ctx(force_entire_read=True) as f:
 
-            if parent.span.payload_size != 16:
-                msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_size}"
+            if parent.span.payload_span.size != 16:
+                msg = f"UUIDExtensionBox has not the correct payload size: {parent.span.payload_span.size}"
                 raise RuntimeError(msg)
 
             uuid_raw = f.read(16)
 
             uuid = uuid_from_bytes(ISOM_BYTE_ORDER, uuid_raw)
 
-            parent.span.add_header_size(16)
+            parent.span.add_header(16)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return UUIDExtensionBox(parent, uuid)
 
@@ -516,11 +560,15 @@ class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
 
         with io.r_ctx(force_entire_read=True) as f:
 
-            data_raw = f.read(parent.span.payload_size)
+            data_raw = f.read(parent.span.payload_span.size)
 
             data = json.loads(data_raw.decode())
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return JsonExtensionBox(parent, data)
 
@@ -591,7 +639,7 @@ class MP4FullBox(MP4Box):
 
             flags = f.read(3)
 
-            parent.span.add_header_size(4)
+            parent.span.add_header(4)
 
             return MP4FullBox(parent, version, flags, is_container=False)
 
@@ -695,17 +743,21 @@ class FileTypeBox(MP4Box, FinalMp4Box):
                 minor_version_bytes,
             )
 
-            compatible_brands_size = parent.span.payload_size - (4 + 4)
+            compatible_brands_size = parent.span.payload_span.size - (4 + 4)
 
             if compatible_brands_size < 0:
-                msg = f"Invalid box size: not enough data for complete FileTypeBox: have {parent.span.payload_size} but need at least {(4 + 4)}"
+                msg = f"Invalid box size: not enough data for complete FileTypeBox: have {parent.span.payload_span.size} but need at least {(4 + 4)}"
                 raise RuntimeError(msg)
 
             compatible_brands = f.read(compatible_brands_size)
 
             additional_header_size = 4 + 4 + compatible_brands_size
 
-            parent.span.add_header_size(additional_header_size)
+            parent.span.add_header(additional_header_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return FileTypeBox(parent, major_brand, minor_version, compatible_brands)
 
@@ -753,9 +805,13 @@ class FreeSpaceBox(MP4Box, FinalMp4Box):
         # }
 
         with io.r_ctx(force_entire_read=True) as f:
-            data = f.read(parent.span.payload_size)
+            data = f.read(parent.span.payload_span.size)
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return FreeSpaceBox(parent, data)
 
@@ -781,6 +837,7 @@ class FreeSpaceBox(MP4Box, FinalMp4Box):
 
 @final
 class MediaHeaderBox(MP4FullBox, FinalMp4Box):
+    # offset from the own header start, not the start of the whole chunk!
     language_offset: int
 
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
@@ -840,21 +897,28 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
 
             additional_header_size = version_dependend_size + (2 + 2)
 
-            if parent.span.payload_size < additional_header_size:
-                msg = f"Truncated mdhd header {parent.span.payload_size} < {additional_header_size}"
+            if parent.span.payload_span.size < additional_header_size:
+                msg = f"Truncated mdhd header {parent.span.payload_span.size} < {additional_header_size}"
                 raise RuntimeError(msg)
 
-            language_offset = parent.span.header_size + version_dependend_size
+            parent.span.add_header(additional_header_size)
 
-            if parent.span.start + language_offset + 2 > parent.span.end:
-                msg = "Language field outside mdhd bounds"
+            header_language_offset = version_dependend_size
+
+            if (
+                parent.span.header_span(-1).start + header_language_offset + 2
+                > parent.span.header_span(-1).end
+            ):
+                msg = "Language field outside mdhd header bounds"
                 raise RuntimeError(msg)
 
             f.skip(additional_header_size)
 
-            parent.span.add_header_size(additional_header_size)
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
-            return MediaHeaderBox(parent, language_offset)
+            return MediaHeaderBox(parent, header_language_offset)
 
     @staticmethod
     def read(io: BoundedIO) -> "MediaHeaderBox":
@@ -911,7 +975,7 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
         return value
 
     def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
-        io = self.payload_io_from_base(io_base)
+        io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.r_ctx(force_entire_read=False) as f:
             f.skip(self.language_offset)
@@ -928,7 +992,7 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
     ) -> None:
         packed = MediaHeaderBox.__encode_language_impl(new_language)
 
-        io = self.payload_io_from_base(io_base)
+        io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.rw_ctx(force_entire_read=False) as f:
             f.skip(self.language_offset)
@@ -971,7 +1035,7 @@ class MediaBox(MP4Box, FinalMp4Box):
         # }
 
         with io.r_ctx(force_entire_read=True) as f:
-            f.skip(parent.span.payload_size)
+            f.skip(parent.span.payload_span.size)
 
         return MediaBox(parent)
 
@@ -1008,7 +1072,7 @@ class MovieBox(MP4Box, FinalMp4Box):
         # }
 
         with io.r_ctx(force_entire_read=True) as f:
-            f.skip(parent.span.payload_size)
+            f.skip(parent.span.payload_span.size)
 
         return MovieBox(parent)
 
@@ -1097,13 +1161,17 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
             # omitting dynamic sized string "name"
             fixed_header_size = 4 + 4 + (4 * 3)
 
-            name_size = parent.span.payload_size - fixed_header_size
+            name_size = parent.span.payload_span.size - fixed_header_size
 
             name_raw = f.read(name_size)
 
             name = name_raw.decode()
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return HandlerBox(parent, handler_type, name)
 
@@ -1252,7 +1320,7 @@ class UserDataBox(MP4Box, FinalMp4Box):
         # }
 
         with io.rw_ctx(force_entire_read=True) as f:
-            f.skip(parent.span.payload_size)
+            f.skip(parent.span.payload_span.size)
 
         return UserDataBox(parent)
 
@@ -1318,7 +1386,11 @@ class PrimaryItemBox(MP4FullBox, FinalMp4Box):
 
             item_id = Unpacker.unpack_one(ISOM_BYTE_ORDER, UnsignedShort(), item_id_raw)
 
-            parent.span.add_header_size(2)
+            parent.span.add_header(2)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return PrimaryItemBox(parent, item_id)
 
@@ -1493,7 +1565,7 @@ class MetaBox(MP4FullBox, FinalMp4Box):
             raise RuntimeError(msg)
 
         handler_box = HandlerBox.read(parent.payload_io(io))
-        parent.span.add_header_size(handler_box.span.size)
+        parent.span.add_header(handler_box.span.total.size)
 
         optional_boxes = OptionalMetaBoxes.empty()
 
@@ -1515,14 +1587,14 @@ class MetaBox(MP4FullBox, FinalMp4Box):
                         simple_box.payload_io(io),
                         simple_box,
                     )
-                    parent.span.add_header_size(pitm_box.span.size)
+                    parent.span.add_header(pitm_box.span.total.size)
                     optional_boxes.pitm = pitm_box
                 case _:
                     msg = f"MetaBox: parsing of optional box {simple_box.type} not implemented yet"
                     raise RuntimeError(msg)
 
         # treat the box as container, if there is some payload left
-        is_container = parent.span.payload_size != 0
+        is_container = parent.span.payload_span.size != 0
 
         return MetaBox(parent, handler_box, optional_boxes, is_container=is_container)
 
@@ -1600,7 +1672,7 @@ class AppleItunesItemList(MP4Box, FinalMp4Box):
         # }
 
         with io.rw_ctx(force_entire_read=True) as f:
-            f.skip(parent.span.payload_size)
+            f.skip(parent.span.payload_span.size)
 
         return AppleItunesItemList(parent)
 
@@ -1719,7 +1791,8 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
             return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
 
         return AppleItunesItemDataBox.__decode_value_impl(
-            AppleItunesItemDataType(type_indicator), value
+            AppleItunesItemDataType(type_indicator),
+            value,
         )
 
     @staticmethod
@@ -1881,7 +1954,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
             # omitting dynamic sized string "value"
             fixed_header_size = 4
 
-            value_size = parent.span.payload_size - fixed_header_size
+            value_size = parent.span.payload_span.size - fixed_header_size
 
             value_raw = f.read(value_size)
 
@@ -1891,7 +1964,11 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                 expected_type,
             )
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return AppleItunesItemDataBox(
                 parent,
@@ -1923,7 +2000,9 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
             raise RuntimeError(msg)
 
         return AppleItunesItemDataBox.__read_impl(
-            box.payload_io(io), box, expected_type
+            box.payload_io(io),
+            box,
+            expected_type,
         )
 
     @staticmethod
@@ -1938,7 +2017,9 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
         else:
             box = MP4FullBox.read_from_parent_mp4_full_box(io, parent)
         return AppleItunesItemDataBox.__read_impl(
-            box.payload_io(io), box, expected_type
+            box.payload_io(io),
+            box,
+            expected_type,
         )
 
     @staticmethod
@@ -2026,11 +2107,15 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
                 msg = "Invalid mean version"
                 raise RuntimeError(msg)
 
-            data = f.read(parent.span.payload_size)
+            data = f.read(parent.span.payload_span.size)
 
             value = data.decode()
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return AppleItunesItemMeanBox(parent, value)
 
@@ -2122,11 +2207,15 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
                 msg = "Invalid name version"
                 raise RuntimeError(msg)
 
-            data = f.read(parent.span.payload_size)
+            data = f.read(parent.span.payload_span.size)
 
             value = data.decode()
 
-            parent.span.add_header_size(parent.span.payload_size)
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
 
             return AppleItunesItemNameBox(parent, value)
 
@@ -2213,10 +2302,10 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
             expected_type,
         )
 
-        parent.span.add_header_size(data.span.size)
+        parent.span.add_header(data.span.total.size)
 
-        if parent.span.payload_size != 0:
-            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_size} leftover data"
+        if parent.span.payload_span.size != 0:
+            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
             raise RuntimeError(msg)
 
         return AppleItunesItemBox(parent, data)
@@ -2302,23 +2391,23 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
             parent.payload_io(io),
         )
 
-        parent.span.add_header_size(mean.span.size)
+        parent.span.add_header(mean.span.total.size)
 
         name: AppleItunesItemNameBox = AppleItunesItemNameBox.read_checked(
             parent.payload_io(io),
         )
 
-        parent.span.add_header_size(name.span.size)
+        parent.span.add_header(name.span.total.size)
 
         data = AppleItunesItemDataBox.read_checked(
             parent.payload_io(io),
             None,
         )
 
-        parent.span.add_header_size(data.span.size)
+        parent.span.add_header(data.span.total.size)
 
-        if parent.span.payload_size != 0:
-            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_size} leftover data"
+        if parent.span.payload_span.size != 0:
+            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
             raise RuntimeError(msg)
 
         return AppleItunesItemFreeformBox(parent, mean, name, data)
@@ -2575,35 +2664,38 @@ def read_box(io: BoundedIO) -> MP4Box:
             return box
 
 
-def mp4_iter_boxes(io_base: BufferedIOBase, start: int, end: int) -> Generator[MP4Box]:
-    pos = start
+def mp4_iter_boxes(
+    io_base: BufferedIOBase,
+    span: SimpleSpan,
+) -> Generator[MP4Box]:
+    pos = span.start
 
-    while pos < end:
-        io = BoundedIO.get_new(io_base, pos, end - pos)
+    while pos < span.end:
+        io = BoundedIO.get_new(io_base, SimpleSpan(pos, span.end - pos))
         box = read_box(io)
 
-        if pos + box.span.size > end:
+        if pos + box.span.total.size > span.end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
             raise RuntimeError(msg)
 
         yield box
-        pos += box.span.size
+        pos += box.span.total.size
 
 
 def mp4_iter_boxes_io(io: BoundedIO) -> Generator[MP4Box]:
-    pos = io.start
-    end = io.end
+    pos = io.span.start
+    end = io.span.end
 
     while pos < end:
-        new_io = io.new_payload_io(pos, end - pos)
+        new_io = io.new_span_io(SimpleSpan(pos, end - pos))
         box = read_box(new_io)
 
-        if pos + box.span.size > end:
+        if pos + box.span.total.size > end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
             raise RuntimeError(msg)
 
         yield box
-        pos += box.span.size
+        pos += box.span.total.size
 
 
 def find_mdhd_boxes_with_type(
@@ -2613,12 +2705,12 @@ def find_mdhd_boxes_with_type(
     f.seek(0, 2)
     filesize = f.tell()
 
-    stack: list[tuple[int, int, list[ISOMAtomName]]] = [(0, filesize, [])]
+    stack: list[tuple[SimpleSpan, list[ISOMAtomName]]] = [(SimpleSpan(0, filesize), [])]
 
     while stack:
-        start, end, path = stack.pop()
+        span, path = stack.pop()
 
-        for box in mp4_iter_boxes(f, start, end):
+        for box in mp4_iter_boxes(f, span):
 
             if box.type == TRAK_ATOM_NAME:
                 if not isinstance(box, TrackBox):
@@ -2647,7 +2739,7 @@ def find_mdhd_boxes_with_type(
                 yield box
 
             if box.is_container:
-                stack.append((box.span.payload_start, box.span.end, [*path, box.type]))
+                stack.append((box.span.payload_span, [*path, box.type]))
 
 
 def is_mp4_file(
@@ -2658,7 +2750,7 @@ def is_mp4_file(
     try:
         f.seek(0, 2)
         filesize = f.tell()
-        first_box = read_box(BoundedIO.get_new(f, 0, filesize))
+        first_box = read_box(BoundedIO.get_new(f, SimpleSpan(0, filesize)))
 
         if not isinstance(first_box, FileTypeBox):
             return _("Not a valid ISOM / MP4 file")
@@ -2701,7 +2793,7 @@ class Mp4MetadataHandler:
     def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
         # delete old metadata
         if len(self.__our_boxes) != 0:
-            f.truncate(self.__our_boxes[0].span.start)
+            f.truncate(self.__our_boxes[0].span.total.start)
 
     def __write_metadata_toplevel_meta(
         self: Self,
@@ -2960,11 +3052,11 @@ class Mp4MetadataHandler:
             return False
 
         f.seek(0, 2)
-        end = f.tell()
+        filesize = f.tell()
 
         f.seek(0)
 
-        top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, 0, end=end))
+        top_boxes: list[MP4Box] = list(mp4_iter_boxes(f, SimpleSpan(0, filesize)))
 
         our_boxes_reversed: list[MP4Box] = []
         other_box_encountered = False

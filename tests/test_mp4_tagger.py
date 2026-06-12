@@ -8,6 +8,7 @@ from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
+from content.tagger.parser import SimpleSpan
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
@@ -62,7 +63,7 @@ _ = get_translator()
 class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
-        super().__init__(typ, span=MP4BoxSpan(0, size, 8), is_container=False)
+        super().__init__(typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False)
 
 
 class PseudoAppleItunesMP4Box(MP4Box):
@@ -76,7 +77,7 @@ class PseudoAppleItunesMP4Box(MP4Box):
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> None:
-        super().__init__(typ, span=MP4BoxSpan(0, size, 8), is_container=False)
+        super().__init__(typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False)
 
         self.type_indicator = type_indicator
         self.value = value
@@ -160,12 +161,12 @@ class RecursiveBoxes:
                 ],
             )
 
-        if box1.span.size != box2.span.size:
+        if box1.span.total.size != box2.span.total.size:
             return Err[list[str]](
                 [
                     "Sizeof data is not eq:",
-                    str(box1.span.size),
-                    str(box2.span.size),
+                    str(box1.span.total.size),
+                    str(box2.span.total.size),
                     f"Depth {depth}",
                     str(box1),
                     str(box2),
@@ -340,16 +341,16 @@ def list_all_boxes_recursively(f: BufferedIOBase) -> RecursiveBoxes:
 
     result: RecursiveBoxes = RecursiveBoxes([])
 
-    stack: list[tuple[int, int, RecursiveBoxes]] = [(0, filesize, result)]
+    stack: list[tuple[SimpleSpan, RecursiveBoxes]] = [(SimpleSpan(0, filesize), result)]
 
     while stack:
-        start, end, current_target = stack.pop()
+        span, current_target = stack.pop()
 
-        for box in mp4_iter_boxes(f, start, end):
+        for box in mp4_iter_boxes(f, span):
             if box.is_container:
                 target: tuple[MP4Box, RecursiveBoxes] = (box, RecursiveBoxes([]))
                 current_target.append(target)
-                stack.append((box.span.payload_start, box.span.end, target[1]))
+                stack.append((box.span.payload_span, target[1]))
             else:
                 current_target.append(box)
 
@@ -600,15 +601,17 @@ def test_mp4_tagger_parsing(
 
             structure = structure_res.as_ok()
 
+            filesize = file.stat().st_size
+            
             # check box consistency
-            boxes_stack: list[tuple[int, int, RecursiveBoxes.RecursiveBoxesData]] = [
-                (0, file.stat().st_size, structure.boxes.data),
+            boxes_stack: list[tuple[SimpleSpan, RecursiveBoxes.RecursiveBoxesData]] = [
+                (SimpleSpan(0, filesize), structure.boxes.data),
             ]
 
             while len(boxes_stack) != 0:
 
-                boxes_start, boxes_end, boxes = boxes_stack.pop()
-                start: int = boxes_start
+                boxes_span, boxes = boxes_stack.pop()
+                start: int = boxes_span.start
                 for box_data in boxes:
 
                     box: MP4Box
@@ -620,18 +623,18 @@ def test_mp4_tagger_parsing(
                         )
                         box = box_data[0]
                         boxes_stack.append(
-                            (box.span.payload_start, box.span.end, box_data[1]),
+                            (box.span.payload_span, box_data[1]),
                         )
                     else:
                         box = box_data
 
                     assert (
-                        box.span.start == start
+                        box.span.total.start == start
                     ), f"Next box start is invalid: {box!s}"
 
-                    start = box.span.end
+                    start = box.span.total.end
 
-                assert boxes_end == start, "boxes don't reach at the parent end"
+                assert boxes_span.start == start, "boxes don't reach at the parent end"
 
             assert structure == result, "Parsing was incorrect"
 
@@ -644,7 +647,7 @@ def test_mp4_invalid_bytes(
         (b"", "Read failed to produce 8 bytes, got 0"),
         (b"helloworld", _("Not a valid ISOM / MP4 file")),
         (b"ftyp    ", "Atom name not valid b'    '"),
-        (b"\x00\x00\x00\x04ftyp", "Invalid box: sitze too small: 4"),
+        (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
         (
             b"\x00\x00\x00\x0eftypabcddcba",
             "Invalid box size: not enough data for complete FileTypeBox: have 6 but need at least 8",

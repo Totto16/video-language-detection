@@ -124,7 +124,7 @@ class AVIChunkSpan:
         self.__intervals = [header_size]
 
         if self.__total.size < 8:
-            msg = f"Invalid chunk: sitze too small: {self.__total.size}"
+            msg = f"Invalid chunk: size too small: {self.__total.size}"
             raise RuntimeError(msg)
 
         if self.__total.size < header_size:
