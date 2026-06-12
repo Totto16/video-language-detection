@@ -8,7 +8,6 @@ from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
-from content.tagger.parser import SimpleSpan
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
@@ -47,6 +46,7 @@ from content.tagger.mp4_tagger import (
     mp4_iter_boxes,
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
+from content.tagger.parser import SimpleSpan
 from content.tagger.video_tagger import MetadataTags
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
@@ -63,7 +63,9 @@ _ = get_translator()
 class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
-        super().__init__(typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False)
+        super().__init__(
+            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False
+        )
 
 
 class PseudoAppleItunesMP4Box(MP4Box):
@@ -77,7 +79,9 @@ class PseudoAppleItunesMP4Box(MP4Box):
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
     ) -> None:
-        super().__init__(typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False)
+        super().__init__(
+            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False
+        )
 
         self.type_indicator = type_indicator
         self.value = value
@@ -602,7 +606,7 @@ def test_mp4_tagger_parsing(
             structure = structure_res.as_ok()
 
             filesize = file.stat().st_size
-            
+
             # check box consistency
             boxes_stack: list[tuple[SimpleSpan, RecursiveBoxes.RecursiveBoxesData]] = [
                 (SimpleSpan(0, filesize), structure.boxes.data),
@@ -644,13 +648,13 @@ def test_mp4_invalid_bytes(
 ) -> None:
 
     test_data: list[tuple[bytes, str]] = [
-        (b"", "Read failed to produce 8 bytes, got 0"),
+        (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
         (b"helloworld", _("Not a valid ISOM / MP4 file")),
         (b"ftyp    ", "Atom name not valid b'    '"),
         (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
         (
             b"\x00\x00\x00\x0eftypabcddcba",
-            "Invalid box size: not enough data for complete FileTypeBox: have 6 but need at least 8",
+            "Read would overflow bounds [8, 14]: 16 (12 + 4)",
         ),
         (
             b"\x00\x00\x00\x10ftypabcddcba",

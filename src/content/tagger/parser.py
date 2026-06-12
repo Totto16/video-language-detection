@@ -244,15 +244,21 @@ class BoundedIO:
 
             self.__position_at_start()
 
-        def exit_impl() -> None:
-            if force_entire_read:
-                current_pos = self.__io.tell()
-                if current_pos != self.__span.end:
-                    msg = f"Not the entire data was read: {current_pos} != {self.__span.end}"
-                    raise RuntimeError(msg)
+        def exit_impl(*, have_exception: bool) -> None:
+            current_pos = self.__io.tell()
 
             self.__io.release(self)
             self.__reset_seek()
+
+            if (
+                force_entire_read
+                and not have_exception
+                and current_pos != self.__span.end
+            ):
+                msg = (
+                    f"Not the entire data was read: {current_pos} != {self.__span.end}"
+                )
+                raise RuntimeError(msg)
 
         class BoundedIOReadableCtx(AbstractContextManager[BoundedIOReadable]):
             @override
@@ -272,11 +278,10 @@ class BoundedIO:
             def __exit__(
                 self: Self,
                 _exc_type: Optional[type[BaseException]],
-                _exc_val: Optional[BaseException],
+                exc_val: Optional[BaseException],
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
-
-                exit_impl()
+                exit_impl(have_exception=exc_val is not None)
                 return False
 
         return BoundedIOReadableCtx()
@@ -304,15 +309,21 @@ class BoundedIO:
 
             self.__position_at_start()
 
-        def exit_impl() -> None:
-            if force_entire_read:
-                current_pos = self.__io.tell()
-                if current_pos != self.__span.end:
-                    msg = f"Not the entire data was read: {current_pos} != {self.__span.end}"
-                    raise RuntimeError(msg)
+        def exit_impl(*, have_exception: bool) -> None:
+            current_pos = self.__io.tell()
 
             self.__io.release(self)
             self.__reset_seek()
+
+            if (
+                force_entire_read
+                and not have_exception
+                and current_pos != self.__span.end
+            ):
+                msg = (
+                    f"Not the entire data was read: {current_pos} != {self.__span.end}"
+                )
+                raise RuntimeError(msg)
 
         class BoundedIORWCtx(AbstractContextManager[BoundedIORW]):
             @override
@@ -338,11 +349,11 @@ class BoundedIO:
             def __exit__(
                 self: Self,
                 _exc_type: Optional[type[BaseException]],
-                _exc_val: Optional[BaseException],
+                exc_val: Optional[BaseException],
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
 
-                exit_impl()
+                exit_impl(have_exception=exc_val is not None)
                 return False
 
         return BoundedIORWCtx()
