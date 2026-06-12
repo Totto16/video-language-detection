@@ -2514,13 +2514,44 @@ class ApplItunesTags:
 
 
 class AppleItunesMetaBoxBuilder:
-    __tags: list[ApplItunesTags]
+    __tags: dict[str, ApplItunesTags]
 
     def __init__(self: Self) -> None:
-        self.__tags = []
+        self.__tags = {}
 
-    def add_tag(self: Self, tag: ApplItunesTags) -> None:
-        self.__tags.append(tag)
+    @staticmethod
+    def _key_str_impl(key: ISOMAtomName | AppleItunesFreeformKey) -> str:
+        # note: this is never serialized, it is only to detect duplicates in internal regeneration from an old meta box, so this doesn#t have to match the serialization beahviour, but it's close, as the string is unique then
+
+        if isinstance(key, ISOMAtomName):
+            return key.value.decode()
+
+        if isinstance(key, AppleItunesFreeformKey):
+            return f"----:{key.mean}:{key.name}"
+
+        assert_never(key)
+
+    def add_tag(
+        self: Self,
+        tag: ApplItunesTags,
+        duplicate_behaviour: Literal["overwrite", "error", "ignore"],
+    ) -> None:
+
+        key = AppleItunesMetaBoxBuilder._key_str_impl(tag.key)
+
+        if self.__tags.get(key, None) is not None:
+            if duplicate_behaviour == "error":
+                msg = f"Trying to add duplicate tag key: {key}"
+                raise RuntimeError(msg)
+
+            if duplicate_behaviour == "overwrite":
+                self.__tags[key] = tag
+            elif duplicate_behaviour == "ignore":
+                pass
+            else:
+                assert_never(duplicate_behaviour)
+        else:
+            self.__tags[key] = tag
 
     @staticmethod
     def __render_tag_impl(tag: ApplItunesTags) -> bytes:
@@ -2545,7 +2576,7 @@ class AppleItunesMetaBoxBuilder:
 
         tags_rendered: bytes = b""
 
-        for tag in self.__tags:
+        for tag in self.__tags.values():
             tags_rendered += self.__render_tag_impl(tag)
 
         ilst_bytes = AppleItunesItemList.write_to_buffer(tags_rendered)
@@ -2866,6 +2897,7 @@ class Mp4MetadataHandler:
             meta_box = AppleItunesMetaBoxBuilder()
 
             if old_meta_box is not None:
+                # restore the old tags
 
                 meta_child_boxes = list(
                     mp4_iter_boxes(f, old_meta_box.span.payload_span),
@@ -2886,7 +2918,8 @@ class Mp4MetadataHandler:
 
                 for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
                     if not isinstance(
-                        data_box, (AppleItunesItemFreeformBox, AppleItunesItemBox),
+                        data_box,
+                        (AppleItunesItemFreeformBox, AppleItunesItemBox),
                     ):
                         msg = f"Invalid data box in AppleItunesItemList: {data_box}"
                         raise TypeError(msg)
@@ -2895,10 +2928,12 @@ class Mp4MetadataHandler:
                         meta_box.add_tag(
                             ApplItunesTags.validate_init(
                                 AppleItunesFreeformKey(
-                                    mean=data_box.mean.value, name=data_box.name.value,
+                                    mean=data_box.mean.value,
+                                    name=data_box.name.value,
                                 ),
                                 ApplItunesTagsData.from_data_box(data_box.data),
                             ),
+                            "error",
                         )
                     elif isinstance(data_box, AppleItunesItemBox):
                         meta_box.add_tag(
@@ -2906,49 +2941,55 @@ class Mp4MetadataHandler:
                                 data_box.type,
                                 ApplItunesTagsData.from_data_box(data_box.data),
                             ),
+                            "error",
                         )
                     else:
                         assert_never(data_box)
 
-            else:
-                meta_box.add_tag(
-                    ApplItunesTags.from_known_atom(
-                        ISOMAtomName(b"\xa9cmt"),
-                        tags.comment,
-                    ),
-                )
+        # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
+        meta_box.add_tag(
+            ApplItunesTags.from_known_atom(
+                ISOMAtomName(b"\xa9cmt"),
+                tags.comment,
+            ),
+            duplicate_behaviour="overwrite",
+        )
 
-            for key, value in tags.metadata.items():
-                value_str = json.dumps(value)
-                meta_box.add_tag(
-                    ApplItunesTags.validate_init(
-                        key=TaggerDomain.get_freeform(key),
-                        data=ApplItunesTagsData(
-                            type=AppleItunesItemDataType.UTF8,
-                            value=value_str,
-                        ),
-                    ),
-                )
-
+        for key, value in tags.metadata.items():
+            value_str = json.dumps(value)
             meta_box.add_tag(
                 ApplItunesTags.validate_init(
-                    key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
-                    data=ApplItunesTagsData(
-                        type=AppleItunesItemDataType.UUID,
-                        value=tags.uuid,
-                    ),
-                ),
-            )
-
-            meta_box.add_tag(
-                ApplItunesTags.validate_init(
-                    key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
+                    key=TaggerDomain.get_freeform(key),
                     data=ApplItunesTagsData(
                         type=AppleItunesItemDataType.UTF8,
-                        value=tags.uuid.hex,
+                        value=value_str,
                     ),
                 ),
+                duplicate_behaviour="overwrite",
             )
+
+        #Note, these ar enot neccesraly in sync, which is bad, but that should never happen
+        meta_box.add_tag(
+            ApplItunesTags.validate_init(
+                key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
+                data=ApplItunesTagsData(
+                    type=AppleItunesItemDataType.UUID,
+                    value=tags.uuid,
+                ),
+            ),
+            "ignore",
+        )
+
+        meta_box.add_tag(
+            ApplItunesTags.validate_init(
+                key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
+                data=ApplItunesTagsData(
+                    type=AppleItunesItemDataType.UTF8,
+                    value=tags.uuid.hex,
+                ),
+            ),
+            "ignore",
+        )
 
         buffer = meta_box.build()
 
@@ -3061,7 +3102,8 @@ class Mp4MetadataHandler:
         )
 
         def is_value_eq(
-            val1: SerializableDictValue, val2: SerializableDictValue
+            val1: SerializableDictValue,
+            val2: SerializableDictValue,
         ) -> bool:
             return json.dumps(val1) == json.dumps(val2)
 

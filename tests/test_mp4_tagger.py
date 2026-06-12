@@ -65,7 +65,9 @@ class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
         super().__init__(
-            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False,
+            typ,
+            span=MP4BoxSpan(SimpleSpan(0, size), 8),
+            is_container=False,
         )
 
 
@@ -81,7 +83,9 @@ class PseudoAppleItunesMP4Box(MP4Box):
         value: AppleItunesItemDataContent,
     ) -> None:
         super().__init__(
-            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False,
+            typ,
+            span=MP4BoxSpan(SimpleSpan(0, size), 8),
+            is_container=False,
         )
 
         self.type_indicator = type_indicator
@@ -725,7 +729,6 @@ def test_mp4_tagger_language_patching(
                 assert stream.raw["tags"]["language"] == new_language.short
 
 
-
 def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
@@ -881,13 +884,15 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                             "error",
                         )
 
-                    # write again, test that the uuid doesn't get overwritten
+                    # write again, test that the uuid doesn't get overwritten and that the new data overwrites the old data
 
                     new_tags = MetadataTags(
-                        comment=tags.comment,
+                        comment=tags.comment + " - NEW",
                         uuid=uuid4(),
                         language=tags.language,
-                        metadata=tags.metadata,
+                        metadata=merge_dicts(
+                            tags.metadata, {"new": "a new tag"}, "error",
+                        ),
                     )
 
                     assert new_tags.uuid != tags.uuid, "UUID should be unique"
@@ -1011,13 +1016,15 @@ def test_mp4_tagger_metadata_tags_custom(
                         next_tags.metadata == tags.metadata
                     ), "Metadata was written correctly"
 
-                    # write again, test that the uuid doesn't get overwritten
+                    # write again, test that the uuid doesn't get overwritten and that the new data overwrites the old data
 
                     new_tags = MetadataTags(
-                        comment=tags.comment,
+                        comment=tags.comment + " - NEW",
                         uuid=uuid4(),
                         language=tags.language,
-                        metadata=tags.metadata,
+                        metadata=merge_dicts(
+                            tags.metadata, {"new": "a new tag"}, "error",
+                        ),
                     )
 
                     assert new_tags.uuid != tags.uuid, "UUID should be unique"
