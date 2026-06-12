@@ -1,11 +1,9 @@
-import json
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
 from pathlib import Path
 from typing import (
-    Any,
     Literal,
     Optional,
     Self,
@@ -160,7 +158,7 @@ class EpisodeContent(Content):
         return (handles[0], handles[1])
 
     def __reset_metadata_of_file(self: Self) -> None:
-        #TODO: remove
+        # TODO: remove
         print("RESET OF THE METADATA")
         self.__language = Language.get_default()
         self.scanned_file.reset_file_data()
@@ -205,7 +203,7 @@ class EpisodeContent(Content):
         def write_file_metadata() -> None:
             nonlocal changed_file
 
-            #TODO: remove
+            # TODO: remove
             # print(f"Try to tag file {self.scanned_file.path}")
 
             handle_result = get_tagger_for_file(self.scanned_file.path)
