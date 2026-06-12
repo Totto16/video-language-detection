@@ -634,7 +634,7 @@ def test_mp4_tagger_parsing(
 
                     start = box.span.total.end
 
-                assert boxes_span.start == start, "boxes don't reach at the parent end"
+                assert boxes_span.end == start, "boxes don't reach at the parent end"
 
             assert structure == result, "Parsing was incorrect"
 
