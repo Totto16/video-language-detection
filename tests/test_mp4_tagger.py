@@ -43,6 +43,7 @@ from content.tagger.mp4_tagger import (
     VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
+    merge_dicts,
     mp4_iter_boxes,
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
@@ -724,16 +725,6 @@ def test_mp4_tagger_language_patching(
                 assert stream.raw["tags"]["language"] == new_language.short
 
 
-def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
-    res: dict[str, Any] = {}
-    for key, value in dict1.items():
-        res[key] = value  # noqa: PERF403
-
-    for key, value in dict2.items():
-        res[key] = value  # noqa: PERF403
-
-    return res
-
 
 def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
@@ -887,6 +878,7 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                                 "video_language_detect_uuid:raw": mock.ANY,
                                 "video_language_detect_uuid:hex": tags.uuid.hex,
                             },
+                            "error",
                         )
 
                     # write again, test that the uuid doesn't get overwritten
@@ -950,6 +942,7 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                                 ]["video_language_detect_uuid:raw"],
                                 "video_language_detect_uuid:hex": tags.uuid.hex,
                             },
+                            "error",
                         )
 
 

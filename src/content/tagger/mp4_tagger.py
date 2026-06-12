@@ -37,6 +37,7 @@ from content.tagger.video_tagger import (
     MetadataTags,
     MetadataTagsRead,
     SerializableDict,
+    SerializableDictValue,
     TaggerDomain,
     VideoTagger,
     VideoTaggerWriter,
@@ -2787,6 +2788,39 @@ SIZE_OF_FREE_BOX_HEADER = 8
 MetaBoxState = Result[Optional[MetaBox], str]
 
 
+@dataclass
+class ReadMetadataImpl:
+    metadata: SerializableDict
+    uuid: Optional[UUID]
+
+
+def merge_dicts(
+    dict1: dict[str, Any],
+    dict2: dict[str, Any],
+    duplicate_behaviour: Literal["overwrite", "error", "ignore"],
+) -> dict[str, Any]:
+    res: dict[str, Any] = {}
+    for key, value in dict1.items():
+        res[key] = value  # noqa: PERF403
+
+    for key, value in dict2.items():
+        if res.get(key, None) is not None:  # noqa: SIM910
+            if duplicate_behaviour == "error":
+                msg = f"Trying to merge duplicate key: {key}"
+                raise RuntimeError(msg)
+
+            if duplicate_behaviour == "overwrite":
+                res[key] = value
+            elif duplicate_behaviour == "ignore":
+                pass
+            else:
+                assert_never(duplicate_behaviour)
+        else:
+            res[key] = value
+
+    return res
+
+
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
     __meta_box: MetaBoxState
@@ -2933,13 +2967,13 @@ class Mp4MetadataHandler:
     def __read_metadata_custom(
         self: Self,
         boxes: list[JsonExtensionBox | UUIDExtensionBox],
-    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+    ) -> ReadMetadataImpl:
         uuid = None if self.__uuid_box is None else self.__uuid_box.uuid
-        metadata: list[SerializableDict] = []
+        metadata: SerializableDict = {}
 
         for box in boxes:
             if isinstance(box, JsonExtensionBox):
-                metadata.append(box.data)
+                metadata = merge_dicts(metadata, box.data, "error")
             elif isinstance(box, UUIDExtensionBox):
                 if uuid is None:
                     msg = f"Found uuid box manually, but constructor didn't find it: {box}"
@@ -2947,35 +2981,89 @@ class Mp4MetadataHandler:
             else:
                 assert_never(box)
 
-        return (metadata, uuid)
+        return ReadMetadataImpl(metadata, uuid)
 
     def __read_metadata_toplevel_meta(
         self: Self,
         box: MetaBox,
-    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+    ) -> ReadMetadataImpl:
         raise NotImplementedError("TODO")
+
+    @staticmethod
+    def __merge_metadata(
+        mdt1: ReadMetadataImpl,
+        mdt2: ReadMetadataImpl,
+    ) -> ReadMetadataImpl:
+
+        metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
+
+        if mdt1.uuid is not None:
+            if mdt2.uuid is not None and mdt1.uuid != mdt2.uuid:
+                msg = f"UUID doesn't match: {mdt1.uuid} != {mdt2.uuid}"
+                raise RuntimeError(msg)
+
+            metadata_result.uuid = mdt1.uuid
+        elif mdt2.uuid is not None:
+            metadata_result.uuid = mdt2.uuid
+
+        metadata_result.metadata = merge_dicts(
+            metadata_result.metadata, mdt1.metadata, "error",
+        )
+
+        def is_value_eq(val1: SerializableDictValue, val2: SerializableDictValue) -> bool:
+            return json.dumps(val1) == json.dumps(val2)
+
+        for key, value in mdt2.metadata.items():
+            if metadata_result.metadata.get(key, None) is not None:
+                if not is_value_eq(metadata_result.metadata[key], value):
+                    msg = f"Duplicate key  {key} value doesn't match: {metadata_result.metadata[key], value}"
+                    raise RuntimeError(msg)
+            else:
+                metadata_result.metadata[key] = value
+
+        return metadata_result
 
     def read_metadata(
         self: Self,
-    ) -> tuple[list[SerializableDict], Optional[UUID]]:
+    ) -> ReadMetadataImpl:
         custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
+        meta_box: Optional[MetaBox] = None
 
         for box in self.__our_boxes:
             if isinstance(box, (JsonExtensionBox, UUIDExtensionBox)):
                 custom_boxes.append(box)
             elif isinstance(box, MetaBox):
-                raise NotImplementedError("TODO")
+                if meta_box is not None:
+                    msg = f"Duplicate 'meta' box at the top level, only one allowed: {box}"
+                    raise RuntimeError(msg)
+
+                if box.optional_boxes.pitm is None:
+                    msg = "Meta box not written by us: missing pitm box"
+                    raise RuntimeError(msg)
+
+                pitm = box.optional_boxes.pitm
+
+                if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
+                    msg = "Meta box not written by us: invalid item id"
+                    raise RuntimeError(msg)
+
+                meta_box = box
             elif isinstance(box, FreeSpaceBox):
-                raise NotImplementedError("TODO")
+                # just ignore free space boxs, if they are only zero
+                if not all(x == 0 for x in box.data):
+                    msg = f"Not all zeros in padding box: {box.data!r}"
+                    raise RuntimeError(msg)
             else:
                 msg = f"Invalid box for tags found: {type(box)}"
                 raise TypeError(msg)
 
-        # TODO: merge values, they have to be the same!
-        result_custom = self.__read_metadata_custom(custom_boxes)
-        result_toplevel_meta = self.__read_metadata_toplevel_meta("TODO")
+        if meta_box is None:
+            return self.__read_metadata_custom(custom_boxes)
 
-        raise NotImplementedError("TODO")
+        result_custom = self.__read_metadata_custom(custom_boxes)
+        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box)
+
+        return Mp4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
     @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
@@ -3028,13 +3116,13 @@ class Mp4MetadataHandler:
                 raise RuntimeError(msg)
 
             if box.optional_boxes.pitm is None:
-                meta_box = Err("Not written by us")
+                meta_box = Err("Not written by us: missing pitm box")
                 return False
 
             pitm = box.optional_boxes.pitm
 
             if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
-                meta_box = Err("Not written by us")
+                meta_box = Err("Not written by us: invalid item id")
                 return False
 
             meta_box = Ok(box)
@@ -3179,33 +3267,32 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             f=self.__writer,
         )
 
-        metadata, uuid = mp4_metadata_handler.read_metadata()
+        metadata_result = mp4_metadata_handler.read_metadata()
 
         result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
 
-        if uuid is not None:
-            result.uuid = uuid
+        if metadata_result.uuid is not None:
+            result.uuid = metadata_result.uuid
 
-        for mdt in metadata:
-            for key, value in mdt.items():
+        for key, value in metadata_result.metadata.items():
 
-                if key == "comment":
-                    if result.comment is not None:
-                        msg = f"Duplicate comment tag read: {value}"
-                        raise RuntimeError(msg)
+            if key == "comment":
+                if result.comment is not None:
+                    msg = f"Duplicate comment tag read: {value}"
+                    raise RuntimeError(msg)
 
-                    result.comment = decode_as_str(value)
+                result.comment = decode_as_str(value)
 
-                elif key == "metadata":
-                    if len(result.metadata.items()) != 0:
-                        msg = f"Duplicate metadata tag read: {value}"
-                        raise RuntimeError(msg)
+            elif key == "metadata":
+                if len(result.metadata.items()) != 0:
+                    msg = f"Duplicate metadata tag read: {value}"
+                    raise RuntimeError(msg)
 
-                    result.metadata = decode_as_dict(value)
-                else:
-                    result.unrecognized.append(
-                        (key, decode_as_str(value)),
-                    )
+                result.metadata = decode_as_dict(value)
+            else:
+                result.unrecognized.append(
+                    (key, decode_as_str(value)),
+                )
 
         return result
 

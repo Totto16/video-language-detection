@@ -22,7 +22,8 @@ VIDEO_FILE_TAG_UPDATE_BAR_FORMAT: str = (
 )
 
 
-SerializableDict = dict[str, str | int | dict[str, str | int] | dict[str, Any]]
+SerializableDictValue = str | int | dict[str, str | int] | dict[str, Any]
+SerializableDict = dict[str, SerializableDictValue]
 
 
 @dataclass
