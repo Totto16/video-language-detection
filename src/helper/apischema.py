@@ -103,7 +103,7 @@ def narrow_type(
 
             if defs is not None:
                 msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
-                raise NotImplementedError(msg)
+                raise ValueError(msg)
 
             if cast(dict[str, Any], schema["properties"]).get(name) is None:
                 msg = f"Narrowing type failed, type is not present. key '{name}'"
@@ -146,7 +146,7 @@ def replace_schema_with(
         resulting_type, defs = get_sub_schema(type_desc, **options)
         if defs is not None:
             msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
-            raise NotImplementedError(msg)
+            raise ValueError(msg)
 
         for key in [*schema.keys()]:
             del schema[key]

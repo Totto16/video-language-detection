@@ -129,8 +129,7 @@ class Timestamp(SupportsFloat):
         return False
 
     def __hash__(self: Self) -> int:
-        msg = "HashNotImplemented"
-        raise RuntimeError(msg)
+        return hash(self.__delta)
 
     def __ne__(self: Self, value: object) -> bool:
         return not self.__eq__(value)
