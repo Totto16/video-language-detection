@@ -197,11 +197,6 @@ class TMDBProvider(Provider):
         if isinstance(series_data, SeriesMetadata):
             return SeriesHandle(series_id=series_data.series_id)
 
-        print(
-            "__get_metadata_for_season",
-            series_data,
-            isinstance(series_data, SkipMetadata),
-        )
         if isinstance(series_data, SkipMetadata):
             return SkipHandle()
 
