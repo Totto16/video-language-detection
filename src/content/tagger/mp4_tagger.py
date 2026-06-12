@@ -32,6 +32,7 @@ from content.tagger.parser import (
     uuid_to_bytes,
 )
 from content.tagger.video_tagger import (
+    TAGGER_DOMAIN,
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     AppleItunesFreeformKey,
     MetadataTags,
@@ -2476,7 +2477,7 @@ class ApplItunesTagsData:
     @staticmethod
     def from_data_box(box: AppleItunesItemDataBox) -> "ApplItunesTagsData":
         return ApplItunesTagsData(
-            AppleItunesItemDataType(box.type_indicator), box.value
+            AppleItunesItemDataType(box.type_indicator), box.value,
         )
 
 
@@ -2968,7 +2969,7 @@ class Mp4MetadataHandler:
                 duplicate_behaviour="overwrite",
             )
 
-        #Note, these ar enot neccesraly in sync, which is bad, but that should never happen
+        # Note, these ar enot neccesraly in sync, which is bad, but that should never happen
         meta_box.add_tag(
             ApplItunesTags.validate_init(
                 key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
@@ -3057,26 +3058,109 @@ class Mp4MetadataHandler:
         self: Self,
         boxes: list[JsonExtensionBox | UUIDExtensionBox],
     ) -> ReadMetadataImpl:
-        uuid = None if self.__uuid_box is None else self.__uuid_box.uuid
-        metadata: SerializableDict = {}
+        metadata_result: ReadMetadataImpl = ReadMetadataImpl(
+            {},
+            None if self.__uuid_box is None else self.__uuid_box.uuid,
+        )
 
         for box in boxes:
             if isinstance(box, JsonExtensionBox):
-                metadata = merge_dicts(metadata, box.data, "error")
+                metadata_result.metadata = merge_dicts(
+                    metadata_result.metadata,
+                    box.data,
+                    "error",
+                )
             elif isinstance(box, UUIDExtensionBox):
-                if uuid is None:
+                if metadata_result.uuid is None:
                     msg = f"Found uuid box manually, but constructor didn't find it: {box}"
                     raise RuntimeError(msg)
             else:
                 assert_never(box)
 
-        return ReadMetadataImpl(metadata, uuid)
+        return metadata_result
 
     def __read_metadata_toplevel_meta(
         self: Self,
         box: MetaBox,
+        f: BufferedIOBase,
     ) -> ReadMetadataImpl:
-        raise NotImplementedError("TODO")
+        metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
+
+        meta_child_boxes = list(
+            mp4_iter_boxes(f, box.span.payload_span),
+        )
+
+        if len(meta_child_boxes) != 1:
+            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
+            raise RuntimeError(msg)
+
+        meta_child_box = meta_child_boxes[0]
+
+        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
+            meta_child_box,
+            AppleItunesItemList,
+        ):
+            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
+            raise RuntimeError(msg)
+
+        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
+            if not isinstance(
+                data_box,
+                (AppleItunesItemFreeformBox, AppleItunesItemBox),
+            ):
+                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                raise TypeError(msg)
+
+            if isinstance(data_box, AppleItunesItemFreeformBox):
+
+                mean = data_box.mean.value
+                name = data_box.name.value
+
+                if mean != TAGGER_DOMAIN:
+                    msg = f"Invalid AppleItunesItemFreeformBox mean in meta box: {mean} != {TAGGER_DOMAIN}"
+                    raise RuntimeError(msg)
+
+                if name in [
+                    TaggerDomain.UUID_RAW_KEY_FREEFORM.name,
+                    TaggerDomain.UUID_HEX_KEY_FREEFORM.name,
+                ]:
+                    if not isinstance(data_box.data.value, UUID):
+                        msg = f"Invalid uuid key type: {type(data_box.data.value)} {data_box.data.value}"
+                        raise RuntimeError(msg)
+
+                    uuid: UUID = data_box.data.value
+
+                    if metadata_result.uuid is not None:
+                        if metadata_result.uuid != uuid:
+                            msg = f"Duplicate uuid tag read, that are not the same: {uuid}"
+                            raise RuntimeError(msg)
+                    else:
+                        metadata_result.uuid = uuid
+
+                else:
+                    key = TaggerDomain.get_raw_name(name)
+
+                    metadata_result.metadata = merge_dicts(
+                        metadata_result.metadata,
+                        {key: data_box.data.value},
+                        "error",
+                    )
+
+            elif isinstance(data_box, AppleItunesItemBox):
+                key = data_box.type.value.decode()
+                if data_box.type == ISOMAtomName(b"\xa9cmt"):
+                    key = "comment"
+
+                metadata_result.metadata = merge_dicts(
+                    metadata_result.metadata,
+                    {key: data_box.data.value},
+                    "error",
+                )
+
+            else:
+                assert_never(data_box)
+
+        return metadata_result
 
     @staticmethod
     def __merge_metadata(
@@ -3119,6 +3203,7 @@ class Mp4MetadataHandler:
 
     def read_metadata(
         self: Self,
+                f: BufferedIOBase,
     ) -> ReadMetadataImpl:
         custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
         meta_box: Optional[MetaBox] = None
@@ -3155,7 +3240,7 @@ class Mp4MetadataHandler:
             return self.__read_metadata_custom(custom_boxes)
 
         result_custom = self.__read_metadata_custom(custom_boxes)
-        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box)
+        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box,f)
 
         return Mp4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
@@ -3361,7 +3446,7 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
             f=self.__writer,
         )
 
-        metadata_result = mp4_metadata_handler.read_metadata()
+        metadata_result = mp4_metadata_handler.read_metadata(self.__writer)
 
         result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
 

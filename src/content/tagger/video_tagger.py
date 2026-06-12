@@ -173,6 +173,10 @@ class TaggerDomain:
     def get_raw(key: str) -> str:
         return key.replace(f"----:{TAGGER_DOMAIN}:video_language_detect:", "")
 
+    @staticmethod
+    def get_raw_name(key: str) -> str:
+        return key.replace("video_language_detect:", "")
+
     UUID_RAW_KEY: str = f"----:{TAGGER_DOMAIN}:video_language_detect_uuid:raw"
 
     UUID_HEX_KEY: str = f"----:{TAGGER_DOMAIN}:video_language_detect_uuid:hex"

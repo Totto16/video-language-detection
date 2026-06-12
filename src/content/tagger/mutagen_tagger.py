@@ -557,7 +557,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                     mutagen_tag_as_json,
                 )
 
-            elif key in (TaggerDomain.UUID_HEX_KEY, TaggerDomain.UUID_RAW_KEY):
+            elif key in  [TaggerDomain.UUID_HEX_KEY, TaggerDomain.UUID_RAW_KEY]:
                 uuid = decode_mutagen_tag_value(
                     value,
                     mutagen_tag_as_uuid(is_hex=key == TaggerDomain.UUID_HEX_KEY),
