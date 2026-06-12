@@ -8106,7 +8106,8 @@ class LCID:
     @staticmethod
     def decode_language(value: int) -> ShortLanguageStr | str:
         return lcid_language_lookups[1].get(
-            value, ShortLanguageStr.from_str_unsafe("und")
+            value,
+            ShortLanguageStr.from_str_unsafe("und"),
         )
 
     @staticmethod

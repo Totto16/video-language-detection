@@ -194,7 +194,7 @@ class AVIChunkSpan:
 
     def __str__(self: Self) -> str:
         header_string = ", ".join(
-            str(self.header_span(i)) for i in range(0, len(self.__intervals))
+            str(self.header_span(i)) for i in range( len(self.__intervals))
         )
         return f"<AVIChunkSpan total: {self.__total} header: [ {header_string} ] payload: {self.payload_span}>"
 
@@ -557,12 +557,12 @@ def is_avi_file(
 
         if first_chunk.fourcc != RIFF_FOURCC:
             return _(
-                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}"
+                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}",
             ).format(first_chunk=first_chunk.fourcc)
 
         if first_chunk.type not in [AVI__FOURCC, AVIX_FOURCC]:
             return _(
-                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}"
+                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}",
             ).format(list_type=first_chunk.type)
 
         f.seek(0)

@@ -238,7 +238,7 @@ class MP4BoxSpan:
 
     def __str__(self: Self) -> str:
         header_string = ", ".join(
-            str(self.header_span(i)) for i in range(0, len(self.__intervals))
+            str(self.header_span(i)) for i in range(len(self.__intervals))
         )
         return f"<MP4BoxSpan total: {self.__total} header: [ {header_string} ] payload: {self.payload_span}>"
 
@@ -265,6 +265,9 @@ class NonFinalMP4Box:
                 if fn_name in cls.__dict__:
                     msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
                     raise TypeError(msg)
+
+
+# ruff: disable[ERA001]
 
 
 class MP4Box(NonFinalMP4Box):
@@ -1822,12 +1825,12 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                 if isinstance(value, int):
                     if value < -(1 << 63):
                         return Err(
-                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}",
                         )
 
                     if value > (1 << 63) - 1:
                         return Err(
-                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}"
+                            f"Can't encode int value as signed integer, value too big for 8 bytes: {value}",
                         )
 
                     length_s: int
@@ -1851,7 +1854,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                             length_s = 8
 
                     return Ok(
-                        value.to_bytes(length=length_s, byteorder="big", signed=True)
+                        value.to_bytes(length=length_s, byteorder="big", signed=True),
                     )
 
                 return Err(f"Can't encode value of type {type(value)} as int")
@@ -1859,12 +1862,12 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
                 if isinstance(value, int):
                     if value < 0:
                         return Err(
-                            f"Can't encode negative int value as unsigned integer: {value}"
+                            f"Can't encode negative int value as unsigned integer: {value}",
                         )
 
                     if value > (1 << 64) - 1:
                         return Err(
-                            f"Can't encode int value as unsigned integer, value too big for 8 bytes: {value}"
+                            f"Can't encode int value as unsigned integer, value too big for 8 bytes: {value}",
                         )
 
                     length_u: int
@@ -2461,6 +2464,9 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
         return str(self)
 
 
+# ruff: enable[ERA001]
+
+
 @dataclass
 class ApplItunesTagsData:
     type: AppleItunesItemDataType
@@ -2513,7 +2519,9 @@ class AppleItunesMetaBoxBuilder:
     def __render_tag_impl(tag: ApplItunesTags) -> bytes:
         if isinstance(tag.key, ISOMAtomName):
             return AppleItunesItemBox.write_to_buffer(
-                tag.key, tag.data.type, tag.data.value
+                tag.key,
+                tag.data.type,
+                tag.data.value,
             )
 
         if isinstance(tag.key, AppleItunesFreeformKey):
@@ -2656,7 +2664,9 @@ def read_box(io: BoundedIO) -> MP4Box:
             return AppleItunesItemFreeformBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.DATA:
             return AppleItunesItemDataBox.read_from_parent(
-                box.payload_io(io), box, None
+                box.payload_io(io),
+                box,
+                None,
             )
         case SupportedBoxes.MEAN:
             return AppleItunesItemMeanBox.read_from_parent(box.payload_io(io), box)
@@ -2968,7 +2978,9 @@ class Mp4MetadataHandler:
         raise NotImplementedError("TODO")
 
     @staticmethod
-    def get_metadata_handler(f: BufferedIOBase) -> "Mp4MetadataHandler":
+    def get_metadata_handler(  # noqa: PLR0915
+        f: BufferedIOBase,
+    ) -> "Mp4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
         meta_box: MetaBoxState = Ok(None)

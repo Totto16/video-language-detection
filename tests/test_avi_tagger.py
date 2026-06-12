@@ -38,7 +38,7 @@ class PseudoAVIChunk(AVIChunk):
 
     def __init__(self: Self, fourcc: FOURCC, size: int) -> None:
         super().__init__(
-            fourcc, span=AVIChunkSpan(SimpleSpan(0, size), 8), is_list=False
+            fourcc, span=AVIChunkSpan(SimpleSpan(0, size), 8), is_list=False,
         )
 
 
@@ -282,7 +282,7 @@ def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
     result: RecursiveChunks = RecursiveChunks([])
 
     stack: list[tuple[SimpleSpan, RecursiveChunks]] = [
-        (SimpleSpan(0, filesize), result)
+        (SimpleSpan(0, filesize), result),
     ]
 
     while stack:

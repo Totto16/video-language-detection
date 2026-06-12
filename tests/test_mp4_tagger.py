@@ -64,7 +64,7 @@ class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
         super().__init__(
-            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False
+            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False,
         )
 
 
@@ -80,7 +80,7 @@ class PseudoAppleItunesMP4Box(MP4Box):
         value: AppleItunesItemDataContent,
     ) -> None:
         super().__init__(
-            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False
+            typ, span=MP4BoxSpan(SimpleSpan(0, size), 8), is_container=False,
         )
 
         self.type_indicator = type_indicator
