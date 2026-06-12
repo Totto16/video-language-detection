@@ -2473,6 +2473,12 @@ class ApplItunesTagsData:
     type: AppleItunesItemDataType
     value: AppleItunesItemDataContent
 
+    @staticmethod
+    def from_data_box(box: AppleItunesItemDataBox) -> "ApplItunesTagsData":
+        return ApplItunesTagsData(
+            AppleItunesItemDataType(box.type_indicator), box.value
+        )
+
 
 @dataclass
 class ApplItunesTags:
@@ -2846,23 +2852,65 @@ class Mp4MetadataHandler:
         f: BufferedIOBase,
         tags: MetadataTags,
     ) -> None:
-        f.seek(0, 2)
-
         if self.__meta_box.err():
             # ignore this and write no top level meta box
             pass
         else:
-            meta_box = self.__meta_box.as_ok()
+            old_meta_box = self.__meta_box.as_ok()
 
             # NOTE: using top level meta box
 
             # meta:
             # location: file , amount: 0 or 1
 
-            if meta_box is not None:
-                raise NotImplementedError("TODO")
+            meta_box = AppleItunesMetaBoxBuilder()
+
+            if old_meta_box is not None:
+
+                meta_child_boxes = list(
+                    mp4_iter_boxes(f, old_meta_box.span.payload_span),
+                )
+
+                if len(meta_child_boxes) != 1:
+                    msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
+                    raise RuntimeError(msg)
+
+                meta_child_box = meta_child_boxes[0]
+
+                if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
+                    meta_child_box,
+                    AppleItunesItemList,
+                ):
+                    msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
+                    raise RuntimeError(msg)
+
+                for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
+                    if not isinstance(
+                        data_box, (AppleItunesItemFreeformBox, AppleItunesItemBox),
+                    ):
+                        msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                        raise TypeError(msg)
+
+                    if isinstance(data_box, AppleItunesItemFreeformBox):
+                        meta_box.add_tag(
+                            ApplItunesTags.validate_init(
+                                AppleItunesFreeformKey(
+                                    mean=data_box.mean.value, name=data_box.name.value,
+                                ),
+                                ApplItunesTagsData.from_data_box(data_box.data),
+                            ),
+                        )
+                    elif isinstance(data_box, AppleItunesItemBox):
+                        meta_box.add_tag(
+                            ApplItunesTags.validate_init(
+                                data_box.type,
+                                ApplItunesTagsData.from_data_box(data_box.data),
+                            ),
+                        )
+                    else:
+                        assert_never(data_box)
+
             else:
-                meta_box = AppleItunesMetaBoxBuilder()
                 meta_box.add_tag(
                     ApplItunesTags.from_known_atom(
                         ISOMAtomName(b"\xa9cmt"),
@@ -2902,25 +2950,25 @@ class Mp4MetadataHandler:
                 ),
             )
 
-            buffer = meta_box.build()
-            f.write(buffer)
+        buffer = meta_box.build()
 
-            # write padding
-            padding_size = META_PADDING_SIZE - (len(buffer) % META_PADDING_SIZE)
+        f.seek(0, 2)
+        f.write(buffer)
 
-            if padding_size < SIZE_OF_FREE_BOX_HEADER:
-                padding_size = (
-                    META_PADDING_SIZE + padding_size - SIZE_OF_FREE_BOX_HEADER
-                )
-            else:
-                padding_size = padding_size - SIZE_OF_FREE_BOX_HEADER
+        # write padding
+        padding_size = META_PADDING_SIZE - (len(buffer) % META_PADDING_SIZE)
 
-            if padding_size < 0:
-                msg = f"Implementation error: padding size negative: {padding_size}"
-                raise RuntimeError(msg)
+        if padding_size < SIZE_OF_FREE_BOX_HEADER:
+            padding_size = META_PADDING_SIZE + padding_size - SIZE_OF_FREE_BOX_HEADER
+        else:
+            padding_size = padding_size - SIZE_OF_FREE_BOX_HEADER
 
-            buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
-            f.write(buffer)
+        if padding_size < 0:
+            msg = f"Implementation error: padding size negative: {padding_size}"
+            raise RuntimeError(msg)
+
+        buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
+        f.write(buffer)
 
         f.flush()
 
@@ -3007,10 +3055,14 @@ class Mp4MetadataHandler:
             metadata_result.uuid = mdt2.uuid
 
         metadata_result.metadata = merge_dicts(
-            metadata_result.metadata, mdt1.metadata, "error",
+            metadata_result.metadata,
+            mdt1.metadata,
+            "error",
         )
 
-        def is_value_eq(val1: SerializableDictValue, val2: SerializableDictValue) -> bool:
+        def is_value_eq(
+            val1: SerializableDictValue, val2: SerializableDictValue
+        ) -> bool:
             return json.dumps(val1) == json.dumps(val2)
 
         for key, value in mdt2.metadata.items():
