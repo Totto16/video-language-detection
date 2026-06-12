@@ -2628,38 +2628,40 @@ def read_box(io: BoundedIO) -> MP4Box:
 
     match box.type:
         case SupportedBoxes.MDHD:
-            return MediaHeaderBox.read_from_parent(io, box)
+            return MediaHeaderBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.MDIA:
-            return MediaBox.read_from_parent(io, box)
+            return MediaBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.HDLR:
-            return HandlerBox.read_from_parent(io, box)
+            return HandlerBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.TRAK:
-            return TrackBox.read_from_parent(io, box)
+            return TrackBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.MOOV:
-            return MovieBox.read_from_parent(io, box)
+            return MovieBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.FTYP:
-            return FileTypeBox.read_from_parent(io, box)
+            return FileTypeBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.FREE:
-            return FreeSpaceBox.read_from_parent(io, box)
+            return FreeSpaceBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.SKIP:
-            return FreeSpaceBox.read_from_parent(io, box)
+            return FreeSpaceBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.UDTA:
-            return UserDataBox.read_from_parent(io, box)
+            return UserDataBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.META:
-            return MetaBox.read_from_parent(io, box)
+            return MetaBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.ILST:
-            return AppleItunesItemList.read_from_parent(io, box)
+            return AppleItunesItemList.read_from_parent(box.payload_io(io), box)
         case _ if box.type in SupportedBoxes.AppleItunesItemBox:
             value = SupportedBoxes.AppleItunesItemBox[box.type]
-            return AppleItunesItemBox.read_from_parent(io, box, value)
+            return AppleItunesItemBox.read_from_parent(box.payload_io(io), box, value)
         case SupportedBoxes.AppleItunesItemBoxAtomFreeform:
-            return AppleItunesItemFreeformBox.read_from_parent(io, box)
+            return AppleItunesItemFreeformBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.DATA:
-            return AppleItunesItemDataBox.read_from_parent(io, box, None)
+            return AppleItunesItemDataBox.read_from_parent(
+                box.payload_io(io), box, None
+            )
         case SupportedBoxes.MEAN:
-            return AppleItunesItemMeanBox.read_from_parent(io, box)
+            return AppleItunesItemMeanBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.NAME:
-            return AppleItunesItemNameBox.read_from_parent(io, box)
+            return AppleItunesItemNameBox.read_from_parent(box.payload_io(io), box)
         case _:
             return box
 
