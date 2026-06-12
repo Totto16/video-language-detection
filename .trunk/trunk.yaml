@@ -17,6 +17,11 @@ runtimes:
 # This is the section where you manage your linters. (https://docs.trunk.io/check/configuration)
 lint:
   enabled:
+    - gitleaks@8.29.0
+    - cspell@10.0.1
+    - snyk@1.1295.0
+    - stylelint@17.13.0
+    - pre-commit-hooks@6.0.0
     - actionlint@1.7.12
     - bandit@1.9.4
     - black@26.5.1
@@ -40,3 +45,16 @@ actions:
     - trunk-check-pre-push
     - trunk-fmt-pre-commit
     - trunk-upgrade-available
+tools:
+  enabled:
+    - stylelint@17.13.0
+    - snyk@1.1295.0
+    - gitleaks@8.29.0
+    - cspell@10.0.1
+    - tsc@6.0.3
+    - ts-node@10.9.2
+    - eslint@10.4.1
+    - pnpm@11.6.0
+  runtimes:
+    - python
+    - node

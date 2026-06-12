@@ -1,100 +1,113 @@
 name: Python Lints / Checks
 
 on:
-    pull_request:
-    push:
-        branches:
-            - main
+  pull_request:
+  push:
+    branches:
+      - main
 
 jobs:
-    mypy_lint:
-        name: Lint files
-        runs-on: ubuntu-24.04
-        container:
-            image: python:3.13-bookworm
-        steps:
-            - uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+  mypy_lint:
+    name: Lint files
+    runs-on: ubuntu-24.04
+    container:
+      image: python:3.13-bookworm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
-            - name: prepare environment
-              run: |
-                  apt-get update
-                  apt-get install cmake --no-install-recommends -y
-                  pip install pipenv -U --quiet
-                  apt-get update
-                  pipenv install --dev
+      - name: prepare environment
+        run: |
+          apt-get update
+          apt-get install cmake --no-install-recommends -y
+          pip install pipenv -U --quiet
+          apt-get update
+          pipenv install --dev
 
-            - name: run lint
-              run: |
-                  pipenv run mypy
-                  pipenv run ruff --output-format github
+      - name: run lint
+        run: |
+          pipenv run mypy
+          pipenv run ruff --output-format github
 
-    tests:
-        name: Run tests
-        runs-on: ubuntu-24.04
-        container:
-            image: python:3.13-bookworm
-        steps:
-            - uses: actions/checkout@v6
-              with:
-                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+  tests:
+    name: Run tests
+    runs-on: ubuntu-24.04
+    container:
+      image: python:3.13-bookworm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
-            - name: prepare environment
-              run: |
-                  apt-get update
-                  apt-get install ffmpeg cmake --no-install-recommends -y
-                  pip install pipenv -U --quiet
-                  pipenv install --dev
+      - name: prepare environment
+        run: |
+          apt-get update
+          apt-get install ffmpeg cmake --no-install-recommends -y
+          pip install pipenv -U --quiet
+          pipenv install --dev
 
-            - name: run tests
-              run: |
-                  pipenv run test
+      - name: run tests
+        run: |
+          pipenv run test
 
-    sonarqube_checks:
-        if: false
-        name: SonarQube Checks
-        runs-on: ubuntu-24.04
-        needs:
-            - mypy_lint
-            - tests
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-            - name: prepare environment
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install python3-setuptools python3.13 ffmpeg --no-install-recommends -y
-                  pip install pipenv -U --quiet
-                  pipenv install --dev
+  sonarqube_checks:
+    if: false
+    name: SonarQube Checks
+    runs-on: ubuntu-24.04
+    needs:
+      - mypy_lint
+      - tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+      - name: prepare environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-setuptools python3.13 ffmpeg --no-install-recommends -y
+          pip install pipenv -U --quiet
+          pipenv install --dev
 
-            - name: run coverage report
-              run: |
-                  pipenv run coverage
+      - name: run coverage report
+        run: |
+          pipenv run coverage
 
-            - name: generate requirements.txt
-              run: |
-                  pipenv requirements --dev > requirements.txt
+      - name: generate requirements.txt
+        run: |
+          pipenv requirements --dev > requirements.txt
 
-            - name: Dependency check
-              uses: dependency-check/Dependency-Check_Action@main
-              id: Dependency_check
-              with:
-                  project: "Video Language Detection"
-                  path: "."
-                  format: HTML
-                  out: "reports"
-                  args: >
-                      --failOnCVSS 7
-                      --enableRetired
-                      --enableExperimental
+      - name: Dependency check
+        uses: dependency-check/Dependency-Check_Action@main
+        id: Dependency_check
+        with:
+          project: "Video Language Detection"
+          path: "."
+          format: HTML
+          out: "reports"
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+            --enableExperimental
 
-            - uses: sonarsource/sonarqube-scan-action@master
-              env:
-                  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-                  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-            - uses: sonarsource/sonarqube-quality-gate-action@master
-              timeout-minutes: 5
-              env:
-                  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  trunk:
+    name: Use Trunk to scan repo
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: write # For trunk to post annotations
+      contents: read # For repo checkout
+    steps:
+      - uses: actions/checkout@v6
+      - name: Trunk Code Quality
+        uses: trunk-io/trunk-action@v1
+        with:
+          post-annotations: true
