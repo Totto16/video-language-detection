@@ -745,37 +745,38 @@ def mp4_has_already_udta_box(file: Path) -> bool:
     return len(udta_boxes) != 0
 
 
+def get_raw_ffprobe_tags(
+    result: FFProbeResult,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    val = deepcopy(result.file_info.raw)
+    # delete things that might change, but are insignificant for metadata
+    del val["size"]
+    del val["bit_rate"]
+
+    metadata: dict[str, Any] = {"comment": None, "metadata": None}
+
+    if val.get("tags", None) is not None:
+        tags: dict[str, Any] = val["tags"]
+        if tags.get("comment", None) is not None:  # noqa: SIM910
+            metadata["comment"] = tags["comment"]
+            del val["tags"]["comment"]
+
+        for key, value in [*tags.items()]:
+            if key.startswith("video_language_detect"):
+                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                    metadata["metadata"] = {}
+
+                metadata["metadata"][key] = value
+                del val["tags"][key]
+
+    return (val, metadata)
+
+
 def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
     test_manager: ManagerInterface,
 ) -> None:
-
-    def get_raw_ffprobe_tags(
-        result: FFProbeResult,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        val = deepcopy(result.file_info.raw)
-        # delete things that might change, but are insignificant for metadata
-        del val["size"]
-        del val["bit_rate"]
-
-        metadata: dict[str, Any] = {"comment": None, "metadata": None}
-
-        if val.get("tags", None) is not None:
-            tags: dict[str, Any] = val["tags"]
-            if tags.get("comment", None) is not None:  # noqa: SIM910
-                metadata["comment"] = tags["comment"]
-                del val["tags"]["comment"]
-
-            for key, value in [*tags.items()]:
-                if key.startswith("video_language_detect"):
-                    if metadata.get("metadata", None) is None:  # noqa: SIM910
-                        metadata["metadata"] = {}
-
-                    metadata["metadata"][key] = value
-                    del val["tags"][key]
-
-        return (val, metadata)
 
     with file_duplicates(mp4_test_parse_files.data) as data:
         test_files: list[tuple[Path, MetadataTags]] = list(
@@ -920,10 +921,6 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                         "error",
                     ), "Metadata was overwritten correctly"
 
-                    ffprobe_next_tags = ffprobe(file)
-
-                    assert ffprobe_next_tags == OkResult(), "FFProbe error"
-
                     ffprobe_again_tags = ffprobe(file)
 
                     assert ffprobe_again_tags == OkResult(), "FFProbe error"
@@ -1012,6 +1009,19 @@ def test_mp4_tagger_metadata_tags_custom(
                         *early_tags.metadata.items(),
                     ] == [], "no metadata tags can be found already"
 
+                    ffprobe_early_tags = ffprobe(file)
+
+                    assert ffprobe_early_tags == OkResult(), "FFProbe error"
+
+                    raw_early_tags, ffprobe_metadata_early = get_raw_ffprobe_tags(
+                        ffprobe_early_tags.as_ok(),
+                    )
+
+                    assert (
+                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
+                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                    ), "raw ffprobe metadata is empty at start"
+
                     w.write_tags(tags)
 
                     next_tags = w.get_tags()
@@ -1026,6 +1036,34 @@ def test_mp4_tagger_metadata_tags_custom(
                     assert (
                         next_tags.metadata == tags.metadata
                     ), "Metadata was written correctly"
+
+                    ffprobe_next_tags = ffprobe(file)
+
+                    assert ffprobe_next_tags == OkResult(), "FFProbe error"
+
+                    raw_next_tags, ffprobe_metadata_next = get_raw_ffprobe_tags(
+                        ffprobe_next_tags.as_ok(),
+                    )
+
+                    assert raw_next_tags == raw_early_tags
+
+                    assert ffprobe_metadata_next["comment"] == tags.comment
+
+                    assert ffprobe_metadata_next.get("metadata", None) is not None
+
+                    assert ffprobe_metadata_next["metadata"] == merge_dicts(
+                        {
+                            f"video_language_detect:{key}": json.dumps(value)
+                            for key, value in tags.metadata.items()
+                        },
+                        {
+                            "video_language_detect_uuid:raw": mock.ANY,
+                            "video_language_detect_uuid:hex": uuid_to_str(
+                                tags.uuid,
+                            ),
+                        },
+                        "error",
+                    )
 
                     # write again, test that the uuid doesn't get overwritten and that the new data overwrites the old data
 
@@ -1060,6 +1098,39 @@ def test_mp4_tagger_metadata_tags_custom(
                         {"new": "a new tag"},
                         "error",
                     ), "Metadata was overwritten correctly"
+
+                    ffprobe_again_tags = ffprobe(file)
+
+                    assert ffprobe_again_tags == OkResult(), "FFProbe error"
+
+                    raw_again_tags, ffprobe_metadata_again = get_raw_ffprobe_tags(
+                        ffprobe_again_tags.as_ok(),
+                    )
+
+                    assert raw_again_tags == raw_early_tags
+
+                    assert ffprobe_metadata_again["comment"] == (
+                        tags.comment + " - NEW"
+                    )
+
+                    assert ffprobe_metadata_again.get("metadata", None) is not None
+
+                    assert ffprobe_metadata_again["metadata"] == merge_dicts(
+                        {
+                            f"video_language_detect:{key}": json.dumps(value)
+                            for key, value in tags.metadata.items()
+                        },
+                        {
+                            "video_language_detect_uuid:raw": ffprobe_metadata_next[
+                                "metadata"
+                            ]["video_language_detect_uuid:raw"],
+                            "video_language_detect_uuid:hex": uuid_to_str(
+                                tags.uuid,
+                            ),
+                            "video_language_detect:new": '"a new tag"',
+                        },
+                        "error",
+                    )
 
 
 def test_mp4_metadata_tags_apple_custom(
