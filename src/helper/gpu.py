@@ -12,7 +12,7 @@ import pyopencl as opencl
 import torch
 
 from helper.result import Err, Ok, Result
-from helper.timestamp import parse_int_safely
+from helper.utils import parse_int_safely
 
 
 class GPUType(Enum):

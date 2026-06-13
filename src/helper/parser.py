@@ -3,7 +3,7 @@ from typing import Optional, Self, override
 
 from content.general import EpisodeName, NameParser
 from content.language import Language
-from helper.timestamp import parse_int_safely
+from helper.utils import parse_int_safely
 
 
 class CustomNameParser(NameParser):

@@ -6,14 +6,7 @@ import pydantic_core
 from apischema import deserializer, schema, serializer
 
 from helper.manager import SupportsFloat
-
-
-def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
-    try:
-        return int(inp, base)
-    except ValueError:
-        return None
-
+from helper.utils import parse_int_safely
 
 # TODO check for overflow of hours everywhere!
 

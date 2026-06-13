@@ -49,9 +49,9 @@ from helper.timestamp import (
     ConfigTimeStamp,
     Timestamp,
     TimestampCompat,
-    parse_int_safely,
 )
 from helper.translation import get_translator
+from helper.utils import parse_int_safely
 
 setup_global_logger()
 

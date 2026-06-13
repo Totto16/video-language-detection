@@ -15,20 +15,12 @@ from typing import (
     assert_never,
     cast,
 )
-from uuid import uuid4
-
-from apischema import serialize
 
 from helper.log import LogLevel, setup_custom_logger
-from helper.manager import NoopManager, TuiManager
-from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
 from helper.types import ConfigFilter, ConfigFilterItem
+from helper.utils import parse_int_safely
 from helper.version import PROGRAM_VERSION
-
-if TYPE_CHECKING:
-    from helper.manager import ConfigParameters
-
 
 _ = get_translator()
 
@@ -428,6 +420,9 @@ def subcommand_run(
     from helper.tui import launch_tui
     from main import AllContent
 
+    if TYPE_CHECKING:
+        from helper.manager import ConfigParameters
+
     parsed_config = AdvancedConfig.load_and_resolve(
         Path(args.config),
         args.template_to_use,
@@ -486,6 +481,8 @@ def subcommand_config_check(
     logger: Logger,
     args: ConfigCheckCommandParsedArgNamespace,
 ) -> ExitCode:
+    from apischema import serialize
+
     from helper.config import (
         AdvancedConfig,
         FinalConfig,
@@ -543,6 +540,7 @@ def subcommand_tagger_read(
     file: Path,
 ) -> ExitCode:
     from content.tagger.tagger import get_tagger_for_file
+    from helper.manager import NoopManager
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -585,8 +583,11 @@ def subcommand_tagger_write(
     file: Path,
     args: TaggerWriteCommandParsedArgNamespace,
 ) -> ExitCode:
+    from uuid import uuid4
+
     from content.tagger.tagger import get_tagger_for_file
     from content.tagger.video_tagger import MetadataTags
+    from helper.manager import NoopManager, TuiManager
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -629,7 +630,7 @@ def subcommand_tagger_write(
     with handle.context(manager=noop_manager) as w:
         tags = w.get_tags()
 
-        print("")  # noqa: FURB105
+        print()  # noqa: T201
         logger.info(_("Which resulted in these tags tags:"))
 
         logger.info(_("Comment: {comment}").format(comment=tags.comment))

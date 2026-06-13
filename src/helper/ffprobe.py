@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, cast
 
 from helper.result import Err, Ok, Result
-from helper.timestamp import parse_int_safely
+from helper.utils import parse_int_safely
 
 
 class FFprobeRawStream(TypedDict):
