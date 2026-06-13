@@ -520,7 +520,7 @@ def subcommand_tagger_read(
 
     manager = NoopManager()
 
-    with handle.writer(manager=manager) as w:
+    with handle.context(manager=manager) as w:
         tags = w.get_tags()
 
         logger.info(_("Read tags:"))

@@ -30,7 +30,6 @@ SerializableDict = dict[str, SerializableDictValue]
 class MetadataTags:
     comment: str
     uuid: UUID
-    language: Language
     metadata: SerializableDict
 
 
@@ -42,7 +41,7 @@ class MetadataTagsRead:
     unrecognized: list[tuple[str, str]]
 
 
-class VideoTaggerWriter(ABC):
+class VideoTaggerContext(ABC):
     __manager: ManagerInterface
 
     def __init__(
@@ -57,6 +56,12 @@ class VideoTaggerWriter(ABC):
         self: Self,
         tags: MetadataTags,
     ) -> None: ...
+
+    @abstractmethod
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool: ...
 
     @abstractmethod
     def get_tags(
@@ -76,23 +81,23 @@ class VideoTagger(ABC):
         self.__file = file
 
     @abstractmethod
-    def writer(
+    def context(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerWriter]: ...
+    ) -> AbstractContextManager[VideoTaggerContext]: ...
 
     @property
     def file(self: Self) -> Path:
         return self.__file
 
 
-class VideoTaggerWriterMultiple(VideoTaggerWriter):
-    __writer: list[AbstractContextManager[VideoTaggerWriter]]
+class VideoTaggerContextMultiple(VideoTaggerContext):
+    __writer: list[AbstractContextManager[VideoTaggerContext]]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        writer: list[AbstractContextManager[VideoTaggerWriter]],
+        writer: list[AbstractContextManager[VideoTaggerContext]],
     ) -> None:
         super().__init__(manager)
         self.__writer = writer
@@ -102,6 +107,19 @@ class VideoTaggerWriterMultiple(VideoTaggerWriter):
         for writer in self.__writer:
             with writer as w:
                 w.write_tags(tags)
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        for writer in self.__writer:
+            with writer as w:
+                result = w.write_language(language)
+                if result:
+                    return result
+
+        return False
 
     @override
     def get_tags(self: Self) -> MetadataTagsRead:
@@ -117,20 +135,20 @@ class VideoTaggerMultiple(VideoTagger):
         self.__tagger = tagger
 
     @override
-    def writer(
+    def context(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerWriter]:
-        writer = [tagger.writer(manager) for tagger in self.__tagger]
+    ) -> AbstractContextManager[VideoTaggerContext]:
+        writer = [tagger.context(manager) for tagger in self.__tagger]
 
-        class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
 
             def __init__(self: Self) -> None:
                 pass
 
             @override
-            def __enter__(self: Self) -> VideoTaggerWriter:
-                return VideoTaggerWriterMultiple(manager, writer)
+            def __enter__(self: Self) -> VideoTaggerContext:
+                return VideoTaggerContextMultiple(manager, writer)
 
             @override
             def __exit__(
@@ -141,7 +159,7 @@ class VideoTaggerMultiple(VideoTagger):
             ) -> Literal[False]:  # actually bool
                 return False
 
-        return VideoTaggerWriterCtx()
+        return VideoTaggerContextCtx()
 
 
 TAGGER_DOMAIN = "lt.totto.vld"

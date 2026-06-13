@@ -786,7 +786,6 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     MetadataTags(
                         comment="Test comment 1",
                         uuid=uuid4(),
-                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key1": "value1", "int1": 1414},
@@ -795,7 +794,6 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     MetadataTags(
                         comment="Test comment 2",
                         uuid=uuid4(),
-                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key2": "value2", "int2": 1321},
@@ -819,7 +817,7 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 
                 tagger = tagger_res.as_ok()
 
-                with tagger.writer(manager=test_manager) as w:
+                with tagger.context(manager=test_manager) as w:
                     early_tags = w.get_tags()
 
                     assert early_tags.uuid is None, "uuid can't be found yet"
@@ -892,7 +890,6 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     new_tags = MetadataTags(
                         comment=tags.comment + " - NEW",
                         uuid=uuid4(),
-                        language=tags.language,
                         metadata=merge_dicts(
                             tags.metadata,
                             {"new": "a new tag"},
@@ -973,7 +970,6 @@ def test_mp4_tagger_metadata_tags_custom(
                     MetadataTags(
                         comment="Test comment 1",
                         uuid=uuid4(),
-                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key1": "value1", "int1": 1414},
@@ -982,7 +978,6 @@ def test_mp4_tagger_metadata_tags_custom(
                     MetadataTags(
                         comment="Test comment 2",
                         uuid=uuid4(),
-                        language=Language.get_default(),
                         metadata={
                             "test": "str",
                             "dict": {"key2": "value2", "int2": 1321},
@@ -1001,7 +996,7 @@ def test_mp4_tagger_metadata_tags_custom(
 
                 tagger = tagger_res.as_ok()
 
-                with tagger.writer(manager=test_manager) as w:
+                with tagger.context(manager=test_manager) as w:
                     early_tags = w.get_tags()
 
                     assert early_tags.uuid is None, "uuid can't be found yet"
@@ -1070,7 +1065,6 @@ def test_mp4_tagger_metadata_tags_custom(
                     new_tags = MetadataTags(
                         comment=tags.comment + " - NEW",
                         uuid=uuid4(),
-                        language=tags.language,
                         metadata=merge_dicts(
                             tags.metadata,
                             {"new": "a new tag"},
@@ -1145,7 +1139,6 @@ def test_mp4_metadata_tags_apple_custom(
             MetadataTags(
                 comment="Test comment (1)",
                 uuid=uuid4(),
-                language=Language.get_default(),
                 metadata={
                     "test": "str value 1",
                     "dict": {"key1": "value1", "int1": 14141},
@@ -1154,7 +1147,6 @@ def test_mp4_metadata_tags_apple_custom(
             MetadataTags(
                 comment="Test comment (2)",
                 uuid=uuid4(),
-                language=Language.get_default(),
                 metadata={
                     "test": "str value 2",
                     "dict": {"key2": "value2", "int2": 13213},
@@ -1348,7 +1340,7 @@ def test_mp4_metadata_tags_apple_custom(
 
                 tagger = tagger_res.as_ok()
 
-                with tagger.writer(manager=test_manager) as w:
+                with tagger.context(manager=test_manager) as w:
                     early_tags = w.get_tags()
 
                     assert early_tags.uuid is None, "uuid can't be found yet"

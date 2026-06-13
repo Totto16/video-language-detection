@@ -13,6 +13,7 @@ import mutagen._file as mutagen
 from mutagen import mp4
 from mutagen._util import MutagenError
 
+from content.language import Language
 from content.tagger.parser import ISOM_BYTE_ORDER, uuid_from_bytes, uuid_to_bytes
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
@@ -21,7 +22,7 @@ from content.tagger.video_tagger import (
     SerializableDict,
     TaggerDomain,
     VideoTagger,
-    VideoTaggerWriter,
+    VideoTaggerContext,
     uuid_from_str,
     uuid_to_str,
 )
@@ -337,7 +338,7 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
-class VideoTaggerWriterMutagen(VideoTaggerWriter):
+class VideoTaggerContextMutagen(VideoTaggerContext):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
 
@@ -445,6 +446,13 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             raise TypeError(msg)
 
         self.__save_impl()
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        return False
 
     @override
     def get_tags(  # noqa: PLR0915
@@ -631,10 +639,10 @@ class VideoTaggerMutagen(VideoTagger):
         return Ok(VideoTaggerMutagen(file))
 
     @override
-    def writer(
+    def context(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerWriter]:
+    ) -> AbstractContextManager[VideoTaggerContext]:
 
         def get_things() -> tuple[MutagenFileWrapper, mutagen.FileType]:
             result = VideoTaggerMutagen.__get_handle_impl(self.__file, read_only=False)
@@ -647,18 +655,18 @@ class VideoTaggerMutagen(VideoTagger):
 
             return result.as_ok()
 
-        class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
             __filething: Optional[MutagenFileWrapper]
 
             def __init__(self: Self) -> None:
                 self.__filething = None
 
             @override
-            def __enter__(self: Self) -> VideoTaggerWriter:
+            def __enter__(self: Self) -> VideoTaggerContext:
                 filething, instance = get_things()
                 self.__filething = filething
 
-                return VideoTaggerWriterMutagen(
+                return VideoTaggerContextMutagen(
                     filething=filething,
                     instance=instance,
                     manager=manager,
@@ -675,4 +683,4 @@ class VideoTaggerMutagen(VideoTagger):
                     self.__filething.close()
                 return False
 
-        return VideoTaggerWriterCtx()
+        return VideoTaggerContextCtx()

@@ -18,7 +18,7 @@ from typing import (
 )
 from uuid import UUID
 
-from content.language import ShortLanguageStr
+from content.language import Language, ShortLanguageStr
 from content.tagger.parser import (
     ISOM_BYTE_ORDER,
     BoundedIO,
@@ -42,7 +42,7 @@ from content.tagger.video_tagger import (
     SerializableDictValue,
     TaggerDomain,
     VideoTagger,
-    VideoTaggerWriter,
+    VideoTaggerContext,
     uuid_from_str,
     uuid_to_str,
 )
@@ -3048,7 +3048,7 @@ class Mp4MetadataHandler:
 
         return metadata_result
 
-    def __read_metadata_toplevel_meta(
+    def __read_metadata_toplevel_meta(  # noqa: PLR0915
         self: Self,
         box: MetaBox,
         f: BufferedIOBase,
@@ -3407,7 +3407,7 @@ class Mp4MetadataHandler:
         )
 
 
-class VideoTaggerWriterMP4(VideoTaggerWriter):
+class VideoTaggerContextMP4(VideoTaggerContext):
     __writer: BufferedIOBase
     __streams: int
     __types: list[ISOMAtomName]
@@ -3430,7 +3430,45 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
         tags: MetadataTags,
     ) -> None:
 
-        new_language = tags.language.short
+        # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
+        bar: CounterInterface = self.manager.counter(
+            total=float(3),
+            desc="update mp4 metadata tags",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
+        try:
+            mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
+                f=self.__writer,
+            )
+
+            bar.update(1, force=True)
+
+            mp4_metadata_handler.remove_old_metadata(self.__writer)
+
+            bar.update(1, force=True)
+
+            mp4_metadata_handler.write_new_metadata(
+                self.__writer,
+                tags,
+            )
+
+            bar.update(1, force=True)
+
+            self.__writer.flush()
+        finally:
+            bar.close(clear=True)
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        new_language = language.short
 
         bar: CounterInterface = self.manager.counter(
             total=float(self.__streams + 1),
@@ -3457,20 +3495,11 @@ class VideoTaggerWriterMP4(VideoTaggerWriter):
 
                 bar.update(1, force=True)
 
-            mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
-                f=self.__writer,
-            )
-
-            mp4_metadata_handler.remove_old_metadata(self.__writer)
-
-            mp4_metadata_handler.write_new_metadata(
-                self.__writer,
-                tags,
-            )
-
             self.__writer.flush()
         finally:
             bar.close(clear=True)
+
+        return True
 
     @override
     def get_tags(
@@ -3575,16 +3604,16 @@ class VideoTaggerMP4(VideoTagger):
             return Err(str(err))
 
     @override
-    def writer(
+    def context(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerWriter]:
+    ) -> AbstractContextManager[VideoTaggerContext]:
 
         file = self.file
         streams = self.__streams
         types = self.__types
 
-        class VideoTaggerWriterCtx(AbstractContextManager[VideoTaggerWriter]):
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
             __writer: Optional[BufferedIOBase]
 
             def __init__(self: Self) -> None:
@@ -3592,10 +3621,10 @@ class VideoTaggerMP4(VideoTagger):
                 self.__writer = None
 
             @override
-            def __enter__(self: Self) -> VideoTaggerWriter:
+            def __enter__(self: Self) -> VideoTaggerContext:
                 self.__writer = file.open("rb+")
 
-                return VideoTaggerWriterMP4(manager, self.__writer, streams, types)
+                return VideoTaggerContextMP4(manager, self.__writer, streams, types)
 
             @override
             def __exit__(
@@ -3608,4 +3637,4 @@ class VideoTaggerMP4(VideoTagger):
                     self.__writer.close()
                 return False
 
-        return VideoTaggerWriterCtx()
+        return VideoTaggerContextCtx()

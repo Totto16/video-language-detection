@@ -240,7 +240,6 @@ class EpisodeContent(Content):
                 tags = MetadataTags(
                     comment=comment,
                     uuid=uuid4(),
-                    language=self.language,
                     metadata=metadata,
                 )
 
@@ -251,7 +250,9 @@ class EpisodeContent(Content):
                     global_counter_wip -= 1
                     print(f"Tagging file {self.scanned_file.path}")
 
-                    with handle.writer(manager=manager) as writer:
+                    with handle.context(manager=manager) as writer:
+                        language_write_ok = writer.write_language(self.language)
+                        print("language_write_ok: ", language_write_ok)
                         writer.write_tags(tags)
                         print(metadata)
                         self.scanned_file.reset_file_data()
