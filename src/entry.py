@@ -15,11 +15,13 @@ from typing import (
     assert_never,
     cast,
 )
+from uuid import uuid4
 
 from apischema import serialize
 
 from backend.backend import Address, BackendOptions, launch_api
 from content.tagger.tagger import get_tagger_for_file
+from content.tagger.video_tagger import MetadataTags
 from gui.gui import launch_gui
 from helper.config import (
     AdvancedConfig,
@@ -31,7 +33,7 @@ from helper.config import (
     parse_config_filter_string,
 )
 from helper.log import LogLevel, setup_custom_logger
-from helper.manager import NoopManager
+from helper.manager import NoopManager, TuiManager
 from helper.parser import CustomNameParser
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
@@ -87,6 +89,8 @@ class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
 class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["write"]
     file: str
+
+    comment: str
 
 
 AllTaggerCommandParsedArgNamespace = (
@@ -339,6 +343,14 @@ def parse_args() -> AllParsedNameSpaces:
         help=_("The file to write to"),
     )
 
+    tagger_write_parser.add_argument(
+        "-c",
+        "--comment",
+        dest="comment",
+        default="<No comment>",
+        help=_("The comment to write"),
+    )
+
     return cast(AllParsedNameSpaces, parser.parse_args())
 
 
@@ -543,10 +555,63 @@ def subcommand_tagger_read(
 
 
 def subcommand_tagger_write(
-    logger: Logger,
-    file: Path,
+    logger: Logger, file: Path, args: TaggerWriteCommandParsedArgNamespace
 ) -> ExitCode:
-    return 1
+
+    handle_result = get_tagger_for_file(file)
+    if handle_result.err():
+        logger.error(
+            _("Can't write tags from file '{file}': {reason}").format(
+                file=file,
+                reason=handle_result.as_err(),
+            ),
+        )
+        return 1
+
+    handle = handle_result.as_ok()
+
+    tui_manager = TuiManager()
+
+    write_tags: MetadataTags = MetadataTags(comment=args.comment, uuid=uuid4(), metadata={})
+
+    with handle.context(manager=tui_manager) as w:
+        w.write_tags(write_tags)
+
+        logger.info(_("Wrote tags:"))
+
+        logger.info(_("Comment: {comment}").format(comment=write_tags.comment))
+
+        logger.info(_("UUID: {uuid}").format(uuid=write_tags.uuid))
+
+        logger.info(_("Generic Metadata:"))
+        for key, value in write_tags.metadata.items():
+            msg = f"{key}: {value}"
+            logger.info(msg)
+
+    noop_manager = NoopManager()
+
+    with handle.context(manager=noop_manager) as w:
+        tags = w.get_tags()
+
+        print("")  # noqa: FURB105
+        logger.info(_("Which resulted in these tags tags:"))
+
+        logger.info(_("Comment: {comment}").format(comment=tags.comment))
+
+        logger.info(_("UUID: {uuid}").format(uuid=tags.uuid))
+
+        logger.info(_("Generic Metadata:"))
+        for key, value in tags.metadata.items():
+            msg = f"{key}: {value}"
+            logger.info(msg)
+
+        logger.info(_("Unrecognized tags:"))
+        for key, value in tags.unrecognized:
+            msg = f"{key}: {value}"
+            logger.info(msg)
+
+
+    return 0
 
 
 def subcommand_tagger(
@@ -563,7 +628,7 @@ def subcommand_tagger(
         return subcommand_tagger_read(logger, file)
 
     if args.tag_action == "write":
-        return subcommand_tagger_write(logger, file)
+        return subcommand_tagger_write(logger, file, args)
 
     assert_never(args.tag_action)
 
