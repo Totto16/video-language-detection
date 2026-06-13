@@ -22,6 +22,8 @@ from content.tagger.video_tagger import (
     TaggerDomain,
     VideoTagger,
     VideoTaggerWriter,
+    uuid_from_str,
+    uuid_to_str,
 )
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
@@ -335,14 +337,6 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
-def uuid_from_str(value: str) -> UUID:
-    return UUID(hex=value)
-
-
-def uuid_to_str(value: UUID) -> str:
-    return value.hex
-
-
 class VideoTaggerWriterMutagen(VideoTaggerWriter):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
@@ -429,7 +423,8 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             if not previous_uuid_raw:
                 self.__instance[TaggerDomain.UUID_RAW_KEY] = [
                     mp4.MP4FreeForm(
-                        uuid_to_bytes(ISOM_BYTE_ORDER, tags.uuid), mp4.AtomDataType.UUID,
+                        uuid_to_bytes(ISOM_BYTE_ORDER, tags.uuid),
+                        mp4.AtomDataType.UUID,
                     ),
                 ]
 
@@ -438,7 +433,8 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
             if not previous_uuid_hex:
                 self.__instance[TaggerDomain.UUID_HEX_KEY] = [
                     mp4.MP4FreeForm(
-                        uuid_to_str(tags.uuid).encode(), mp4.AtomDataType.UTF8,
+                        uuid_to_str(tags.uuid).encode(),
+                        mp4.AtomDataType.UTF8,
                     ),
                 ]
 
@@ -557,7 +553,7 @@ class VideoTaggerWriterMutagen(VideoTaggerWriter):
                     mutagen_tag_as_json,
                 )
 
-            elif key in  [TaggerDomain.UUID_HEX_KEY, TaggerDomain.UUID_RAW_KEY]:
+            elif key in [TaggerDomain.UUID_HEX_KEY, TaggerDomain.UUID_RAW_KEY]:
                 uuid = decode_mutagen_tag_value(
                     value,
                     mutagen_tag_as_uuid(is_hex=key == TaggerDomain.UUID_HEX_KEY),

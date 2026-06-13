@@ -48,7 +48,7 @@ from content.tagger.mp4_tagger import (
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.parser import SimpleSpan
-from content.tagger.video_tagger import MetadataTags
+from content.tagger.video_tagger import MetadataTags, uuid_to_str
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
@@ -879,7 +879,9 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                             },
                             {
                                 "video_language_detect_uuid:raw": mock.ANY,
-                                "video_language_detect_uuid:hex": tags.uuid.hex,
+                                "video_language_detect_uuid:hex": uuid_to_str(
+                                    tags.uuid,
+                                ),
                             },
                             "error",
                         )
@@ -951,7 +953,9 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                                 "video_language_detect_uuid:raw": ffprobe_metadata_next[
                                     "metadata"
                                 ]["video_language_detect_uuid:raw"],
-                                "video_language_detect_uuid:hex": tags.uuid.hex,
+                                "video_language_detect_uuid:hex": uuid_to_str(
+                                    tags.uuid,
+                                ),
                                 "video_language_detect:new": '"a new tag"',
                             },
                             "error",
@@ -1119,7 +1123,9 @@ def test_mp4_metadata_tags_apple_custom(
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
                                                             AppleItunesItemDataType.UTF8,
-                                                            metadatas[0].uuid.hex,
+                                                            uuid_to_str(
+                                                                metadatas[0].uuid,
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),
@@ -1216,7 +1222,9 @@ def test_mp4_metadata_tags_apple_custom(
                                                         PseudoAppleItunesMP4FreeformBox(
                                                             122,
                                                             AppleItunesItemDataType.UTF8,
-                                                            metadatas[1].uuid.hex,
+                                                            uuid_to_str(
+                                                                metadatas[1].uuid,
+                                                            ),
                                                             "lt.totto.vld",
                                                             "video_language_detect_uuid:hex",
                                                         ),

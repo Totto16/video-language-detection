@@ -42,6 +42,8 @@ from content.tagger.video_tagger import (
     TaggerDomain,
     VideoTagger,
     VideoTaggerWriter,
+    uuid_from_str,
+    uuid_to_str,
 )
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
@@ -2992,7 +2994,7 @@ class Mp4MetadataHandler:
                 key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
                 data=ApplItunesTagsData(
                     type=AppleItunesItemDataType.UTF8,
-                    value=tags.uuid.hex,
+                    value=uuid_to_str(tags.uuid),
                 ),
             ),
             "ignore",
@@ -3130,11 +3132,20 @@ class Mp4MetadataHandler:
                     TaggerDomain.UUID_RAW_KEY_FREEFORM.name,
                     TaggerDomain.UUID_HEX_KEY_FREEFORM.name,
                 ]:
-                    if not isinstance(data_box.data.value, UUID):
-                        msg = f"Invalid uuid key type: {type(data_box.data.value)} {data_box.data.value}"
-                        raise RuntimeError(msg)
+                    uuid: UUID
 
-                    uuid: UUID = data_box.data.value
+                    if name == TaggerDomain.UUID_RAW_KEY_FREEFORM.name:
+                        if not isinstance(data_box.data.value, UUID):
+                            msg = f"Invalid uuid (raw) key type: {type(data_box.data.value)} {data_box.data.value}"
+                            raise RuntimeError(msg)
+
+                        uuid = data_box.data.value
+                    else:
+                        if not isinstance(data_box.data.value, str):
+                            msg = f"Invalid uuid (str) key type: {type(data_box.data.value)} {data_box.data.value}"
+                            raise RuntimeError(msg)
+
+                        uuid = uuid_from_str(data_box.data.value)
 
                     if metadata_result.uuid is not None:
                         if metadata_result.uuid != uuid:

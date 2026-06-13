@@ -190,3 +190,11 @@ class TaggerDomain:
         mean=TAGGER_DOMAIN,
         name="video_language_detect_uuid:hex",
     )
+
+
+def uuid_from_str(value: str) -> UUID:
+    return UUID(hex=value)
+
+
+def uuid_to_str(value: UUID) -> str:
+    return value.hex
