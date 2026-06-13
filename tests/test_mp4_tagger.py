@@ -891,7 +891,9 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                         uuid=uuid4(),
                         language=tags.language,
                         metadata=merge_dicts(
-                            tags.metadata, {"new": "a new tag"}, "error",
+                            tags.metadata,
+                            {"new": "a new tag"},
+                            "error",
                         ),
                     )
 
@@ -904,15 +906,17 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     assert (
                         next_tags.uuid == write_again_tags.uuid
                     ), "UUID was not overwritten"
-                    assert (
-                        next_tags.comment == write_again_tags.comment
-                    ), "Comment was written correctly"
+                    assert write_again_tags.comment == (
+                        tags.comment + " - NEW"
+                    ), "Comment was overwritten correctly"
                     assert (
                         next_tags.unrecognized == write_again_tags.unrecognized
                     ), "no new unrecognized tags"
-                    assert (
-                        next_tags.metadata == write_again_tags.metadata
-                    ), "Metadata was written correctly"
+                    assert write_again_tags.metadata == merge_dicts(
+                        tags.metadata,
+                        {"new": "a new tag"},
+                        "error",
+                    ), "Metadata was overwritten correctly"
 
                     ffprobe_next_tags = ffprobe(file)
 
@@ -928,7 +932,9 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 
                     assert raw_again_tags == raw_early_tags
 
-                    assert ffprobe_metadata_again["comment"] == tags.comment
+                    assert ffprobe_metadata_again["comment"] == (
+                        tags.comment + " - NEW"
+                    )
 
                     if is_recognized_by_ffprobe:
                         assert ffprobe_metadata_again.get("metadata", None) is not None
@@ -946,6 +952,7 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                                     "metadata"
                                 ]["video_language_detect_uuid:raw"],
                                 "video_language_detect_uuid:hex": tags.uuid.hex,
+                                "video_language_detect:new": '"a new tag"',
                             },
                             "error",
                         )
@@ -1023,7 +1030,9 @@ def test_mp4_tagger_metadata_tags_custom(
                         uuid=uuid4(),
                         language=tags.language,
                         metadata=merge_dicts(
-                            tags.metadata, {"new": "a new tag"}, "error",
+                            tags.metadata,
+                            {"new": "a new tag"},
+                            "error",
                         ),
                     )
 
