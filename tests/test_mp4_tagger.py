@@ -906,13 +906,13 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     write_again_tags = w.get_tags()
 
                     assert (
-                        next_tags.uuid == write_again_tags.uuid
+                        write_again_tags.uuid == next_tags.uuid
                     ), "UUID was not overwritten"
                     assert write_again_tags.comment == (
                         tags.comment + " - NEW"
                     ), "Comment was overwritten correctly"
                     assert (
-                        next_tags.unrecognized == write_again_tags.unrecognized
+                        write_again_tags.unrecognized == next_tags.unrecognized
                     ), "no new unrecognized tags"
                     assert write_again_tags.metadata == merge_dicts(
                         tags.metadata,
@@ -1047,17 +1047,19 @@ def test_mp4_tagger_metadata_tags_custom(
                     write_again_tags = w.get_tags()
 
                     assert (
-                        next_tags.uuid == write_again_tags.uuid
+                        write_again_tags.uuid == next_tags.uuid
                     ), "UUID was not overwritten"
+                    assert write_again_tags.comment == (
+                        tags.comment + " - NEW"
+                    ), "Comment was overwritten correctly"
                     assert (
-                        next_tags.comment == write_again_tags.comment
-                    ), "Comment was written correctly"
-                    assert (
-                        next_tags.unrecognized == write_again_tags.unrecognized
+                        write_again_tags.unrecognized == next_tags.unrecognized
                     ), "no new unrecognized tags"
-                    assert (
-                        next_tags.metadata == write_again_tags.metadata
-                    ), "Metadata was written correctly"
+                    assert write_again_tags.metadata == merge_dicts(
+                        tags.metadata,
+                        {"new": "a new tag"},
+                        "error",
+                    ), "Metadata was overwritten correctly"
 
 
 def test_mp4_metadata_tags_apple_custom(
