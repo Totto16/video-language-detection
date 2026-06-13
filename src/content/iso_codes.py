@@ -69,7 +69,7 @@ def validate_iso_languages(ls: list[IsoLanguage]) -> None:
     for item in ls:
         keys = to_keys(item[0])
         for k in keys:
-            val = mappings.get(k, None)
+            val = mappings.get(k, None)  # noqa: SIM910
             if val is not None:
                 msg = f"Duplicate language entry: {k}: {val}"
                 raise RuntimeError(msg)

@@ -11,7 +11,12 @@ from requests import HTTPError
 from themoviedb.tmdb import TMDb
 
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import InternalMetadataType, SkipHandle, SkipMetadata, should_skip_metadata
+from content.metadata.metadata import (
+    InternalMetadataType,
+    SkipHandle,
+    SkipMetadata,
+    should_skip_metadata,
+)
 from content.shared import ScanType
 from helper.apischema import OneOf
 from helper.log import get_logger

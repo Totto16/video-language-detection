@@ -1,4 +1,3 @@
-from curses.ascii import isupper
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -485,7 +484,7 @@ def region_string_checked(region: str, total_string: str) -> RegionLanguageStr:
 
     if total_string not in valid_combinations:
         msg = _("Region Language String is invalid: '{string}'").format(
-            string=total_string
+            string=total_string,
         )
         raise RuntimeError(msg)
 
@@ -538,7 +537,7 @@ class Alpha2LanguageStrRegional:
         return Alpha2LanguageStrRegional(
             lang=lang_val,
             region=region_long,
-            sentinel=Alpha2LanguageStrRegional.__PrivateSentinel(True),
+            sentinel=Alpha2LanguageStrRegional.__PrivateSentinel(True),  # noqa: FBT003
         )
 
     @staticmethod
@@ -563,7 +562,7 @@ class Alpha2LanguageStrRegional:
 
     @staticmethod
     def __from_str_unsafe_impl(
-        inp: str, *, valid_check: bool
+        inp: str, *, valid_check: bool,
     ) -> "Alpha2LanguageStrRegional":
         lan: Optional[Alpha2LanguageStrRegional] = (
             Alpha2LanguageStrRegional.__from_str_impl(

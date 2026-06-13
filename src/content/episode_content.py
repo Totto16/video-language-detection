@@ -319,7 +319,7 @@ class EpisodeContent(Content):
         )
 
     @override
-    def scan(
+    def scan(  # noqa: PLR0915
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
