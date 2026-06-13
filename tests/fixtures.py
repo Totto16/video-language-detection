@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 
 import pytest
 import requests
-from test_helper import NoopManager
+
+from helper.manager import NoopManager
 
 
 @dataclass

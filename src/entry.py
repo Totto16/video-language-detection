@@ -19,6 +19,7 @@ from typing import (
 from apischema import serialize
 
 from backend.backend import Address, BackendOptions, launch_api
+from content.tagger.tagger import get_tagger_for_file
 from gui.gui import launch_gui
 from helper.config import (
     AdvancedConfig,
@@ -30,6 +31,7 @@ from helper.config import (
     parse_config_filter_string,
 )
 from helper.log import LogLevel, setup_custom_logger
+from helper.manager import NoopManager
 from helper.parser import CustomNameParser
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
@@ -40,7 +42,7 @@ from main import AllContent, generate_schemas
 if TYPE_CHECKING:
     from helper.manager import ConfigParameters
 
-type SubCommand = Literal["run", "schema", "gui", "config_check", "api"]
+type SubCommand = Literal["run", "schema", "gui", "config_check", "api", "tagger"]
 
 
 class ParsedArgNamespace:
@@ -68,6 +70,30 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     backend_port: int
 
 
+TagCommand = Literal["read", "write"]
+
+
+class TaggerCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["tagger"]
+
+    tag_action: TagCommand
+
+
+class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
+    tag_action: Literal["read"]
+    file: str
+
+
+class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
+    tag_action: Literal["write"]
+    file: str
+
+
+AllTaggerCommandParsedArgNamespace = (
+    TaggerReadCommandParsedArgNamespace | TaggerWriteCommandParsedArgNamespace
+)
+
+
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["api"]
     config: str
@@ -89,6 +115,7 @@ type AllParsedNameSpaces = (
     | GuiCommandParsedArgNamespace
     | ApiCommandParsedArgNamespace
     | ConfigCheckCommandParsedArgNamespace
+    | AllTaggerCommandParsedArgNamespace
 )
 
 _ = get_translator()
@@ -276,6 +303,42 @@ def parse_args() -> AllParsedNameSpaces:
         ),
     )
 
+    tagger_parser = subparsers.add_parser(
+        "tagger",
+        description=_("Invoke the tagger on a file"),
+    )
+
+    tagger_subparsers = tagger_parser.add_subparsers(
+        required=True,
+        dest="tag_action",
+    )
+
+    tagger_read_parser = tagger_subparsers.add_parser(
+        "read",
+        description=_("read tags from a file"),
+    )
+
+    tagger_read_parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        required=True,
+        help=_("The file to read from"),
+    )
+
+    tagger_write_parser = tagger_subparsers.add_parser(
+        "write",
+        description=_("write tags to a file"),
+    )
+
+    tagger_write_parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        required=True,
+        help=_("The file to write to"),
+    )
+
     return cast(AllParsedNameSpaces, parser.parse_args())
 
 
@@ -438,6 +501,73 @@ def subcommand_config_check(
     return 0
 
 
+def subcommand_tagger_read(
+    logger: Logger,
+    file: Path,
+) -> ExitCode:
+
+    handle_result = get_tagger_for_file(file)
+    if handle_result.err():
+        logger.error(
+            _("Can't read tags from file '{file}': {reason}").format(
+                file=file,
+                reason=handle_result.as_err(),
+            ),
+        )
+        return 1
+
+    handle = handle_result.as_ok()
+
+    manager = NoopManager()
+
+    with handle.writer(manager=manager) as w:
+        tags = w.get_tags()
+
+        logger.info(_("Read tags:"))
+
+        logger.info(_("Comment: {comment}").format(comment=tags.comment))
+
+        logger.info(_("UUID: {uuid}").format(uuid=tags.uuid))
+
+        logger.info(_("Generic Metadata:"))
+        for key, value in tags.metadata.items():
+            msg = f"{key}: {value}"
+            logger.info(msg)
+
+        logger.info(_("Unrecognized tags:"))
+        for key, value in tags.unrecognized:
+            msg = f"{key}: {value}"
+            logger.info(msg)
+
+    return 0
+
+
+def subcommand_tagger_write(
+    logger: Logger,
+    file: Path,
+) -> ExitCode:
+    return 1
+
+
+def subcommand_tagger(
+    logger: Logger,
+    args: AllTaggerCommandParsedArgNamespace,
+) -> ExitCode:
+    file = Path(args.file)
+
+    if not file.exists():
+        logger.error(_("File '{file}' doesn't exist").format(file=file))
+        return 1
+
+    if args.tag_action == "read":
+        return subcommand_tagger_read(logger, file)
+
+    if args.tag_action == "write":
+        return subcommand_tagger_write(logger, file)
+
+    assert_never(args.tag_action)
+
+
 def main() -> ExitCode:
     args = parse_args()
     logger: Logger = setup_custom_logger(args.level)
@@ -460,6 +590,11 @@ def main() -> ExitCode:
                 )
             case "config_check":
                 return subcommand_config_check(
+                    logger,
+                    args,
+                )
+            case "tagger":
+                return subcommand_tagger(
                     logger,
                     args,
                 )
