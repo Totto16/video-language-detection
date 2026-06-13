@@ -354,26 +354,31 @@ class MP4Box(NonFinalMP4Box):
                 final_size = io.special_checked_filesize()
                 header_size = 8
 
-            if typ == UUID_ATOM_NAME:
-                usertype_raw = f.read(16)
-
-                usertype = uuid_from_bytes(ISOM_BYTE_ORDER, usertype_raw)
-
-                header_size = header_size + 16
-
+            if typ != UUID_ATOM_NAME:
                 span = MP4BoxSpan(
                     SimpleSpan(io.span.start, size=final_size),
                     header_size=header_size,
                 )
-                box = MP4Box(typ, span, is_container=False)
-                user_box = UserExtensionBox(box, usertype, is_container=False)
-                return user_extension_box_determine_correct_extension(io, user_box)
+                return MP4Box(typ, span, is_container=False)
+
+            usertype_raw = f.read(16)
+
+            usertype = uuid_from_bytes(ISOM_BYTE_ORDER, usertype_raw)
+
+            header_size = header_size + 16
 
             span = MP4BoxSpan(
                 SimpleSpan(io.span.start, size=final_size),
                 header_size=header_size,
             )
-            return MP4Box(typ, span, is_container=False)
+            box = MP4Box(typ, span, is_container=False)
+            user_box = UserExtensionBox(box, usertype, is_container=False)
+
+        # out of the context manager, we can read again :)
+        return user_extension_box_determine_correct_extension(
+            user_box.payload_io(io),
+            user_box,
+        )
 
     @staticmethod
     def __impl_write_to_buffer_mp4_box(typ: ISOMAtomName, data: bytes) -> bytes:
@@ -2477,7 +2482,8 @@ class ApplItunesTagsData:
     @staticmethod
     def from_data_box(box: AppleItunesItemDataBox) -> "ApplItunesTagsData":
         return ApplItunesTagsData(
-            AppleItunesItemDataType(box.type_indicator), box.value,
+            AppleItunesItemDataType(box.type_indicator),
+            box.value,
         )
 
 
@@ -2525,7 +2531,7 @@ class AppleItunesMetaBoxBuilder:
         # note: this is never serialized, it is only to detect duplicates in internal regeneration from an old meta box, so this doesn#t have to match the serialization beahviour, but it's close, as the string is unique then
 
         if isinstance(key, ISOMAtomName):
-            return key.value.decode()
+            return key.value.decode("latin-1")
 
         if isinstance(key, AppleItunesFreeformKey):
             return f"----:{key.mean}:{key.name}"
@@ -3138,18 +3144,20 @@ class Mp4MetadataHandler:
                         metadata_result.uuid = uuid
 
                 else:
-                    key = TaggerDomain.get_raw_name(name)
+                    raw_name = TaggerDomain.get_raw_name(name)
 
                     metadata_result.metadata = merge_dicts(
                         metadata_result.metadata,
-                        {key: data_box.data.value},
+                        {raw_name: data_box.data.value},
                         "error",
                     )
 
             elif isinstance(data_box, AppleItunesItemBox):
-                key = data_box.type.value.decode()
+                key: str
                 if data_box.type == ISOMAtomName(b"\xa9cmt"):
                     key = "comment"
+                else:
+                    key = data_box.type.value.decode("latin-1")
 
                 metadata_result.metadata = merge_dicts(
                     metadata_result.metadata,
@@ -3203,7 +3211,7 @@ class Mp4MetadataHandler:
 
     def read_metadata(
         self: Self,
-                f: BufferedIOBase,
+        f: BufferedIOBase,
     ) -> ReadMetadataImpl:
         custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
         meta_box: Optional[MetaBox] = None
@@ -3240,7 +3248,7 @@ class Mp4MetadataHandler:
             return self.__read_metadata_custom(custom_boxes)
 
         result_custom = self.__read_metadata_custom(custom_boxes)
-        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box,f)
+        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box, f)
 
         return Mp4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
