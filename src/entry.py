@@ -19,30 +19,19 @@ from uuid import uuid4
 
 from apischema import serialize
 
-from backend.backend import Address, BackendOptions, launch_api
-from content.tagger.tagger import get_tagger_for_file
-from content.tagger.video_tagger import MetadataTags
-from gui.gui import launch_gui
-from helper.config import (
-    AdvancedConfig,
-    ConfigFilter,
-    FileLockError,
-    FinalConfig,
-    LockFile,
-    filter_configs,
-    parse_config_filter_string,
-)
 from helper.log import LogLevel, setup_custom_logger
 from helper.manager import NoopManager, TuiManager
-from helper.parser import CustomNameParser
 from helper.timestamp import parse_int_safely
 from helper.translation import get_translator
-from helper.tui import launch_tui
+from helper.types import ConfigFilter, ConfigFilterItem
 from helper.version import PROGRAM_VERSION
-from main import AllContent, generate_schemas
 
 if TYPE_CHECKING:
     from helper.manager import ConfigParameters
+
+
+_ = get_translator()
+
 
 type SubCommand = Literal["run", "schema", "gui", "config_check", "api", "tagger"]
 
@@ -122,7 +111,13 @@ type AllParsedNameSpaces = (
     | AllTaggerCommandParsedArgNamespace
 )
 
-_ = get_translator()
+
+def parse_config_filter_string(inp: str) -> ConfigFilterItem:
+    num = parse_int_safely(inp)
+    if num is not None:
+        return num
+
+    return inp
 
 
 def parse_port(arg: str) -> int:
@@ -356,11 +351,18 @@ def parse_args() -> AllParsedNameSpaces:
 
 type ExitCode = int
 
+# NOTE: no need to import these "heavy modules at top, so they are only imported when needed.
+# some imports take literally seconds (my large iso language list, torch, speechbrain)
+
+# ruff: disable[PLC0415]
+
 
 def subcommand_schema(
     logger: Logger,
     args: SchemaCommandParsedArgNamespace,
 ) -> ExitCode:
+    from main import generate_schemas
+
     generate_schemas(Path(args.schema_folder))
 
     logger.info(_("Successfully generated the schemas"))
@@ -371,6 +373,10 @@ def subcommand_gui(
     logger: Logger,
     args: GuiCommandParsedArgNamespace,
 ) -> ExitCode:
+    from backend.backend import Address, BackendOptions
+    from gui.gui import launch_gui
+    from helper.config import AdvancedConfig
+
     config_file_path = Path(args.config)
 
     raw_config = AdvancedConfig.load_raw(
@@ -390,6 +396,9 @@ def subcommand_api(
     logger: Logger,
     args: ApiCommandParsedArgNamespace,
 ) -> ExitCode:
+    from backend.backend import Address, BackendOptions, launch_api
+    from helper.config import AdvancedConfig
+
     config_file_path = Path(args.config)
 
     raw_config = AdvancedConfig.load_raw(
@@ -409,6 +418,16 @@ def subcommand_run(
     logger: Logger,
     args: RunCommandParsedArgNamespace,
 ) -> ExitCode:
+    from helper.config import (
+        AdvancedConfig,
+        FileLockError,
+        LockFile,
+        filter_configs,
+    )
+    from helper.parser import CustomNameParser
+    from helper.tui import launch_tui
+    from main import AllContent
+
     parsed_config = AdvancedConfig.load_and_resolve(
         Path(args.config),
         args.template_to_use,
@@ -467,6 +486,12 @@ def subcommand_config_check(
     logger: Logger,
     args: ConfigCheckCommandParsedArgNamespace,
 ) -> ExitCode:
+    from helper.config import (
+        AdvancedConfig,
+        FinalConfig,
+        filter_configs,
+    )
+
     config = Path(args.config)
     parsed_config = AdvancedConfig.load_and_resolve_with_info(
         config,
@@ -517,6 +542,7 @@ def subcommand_tagger_read(
     logger: Logger,
     file: Path,
 ) -> ExitCode:
+    from content.tagger.tagger import get_tagger_for_file
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -555,8 +581,12 @@ def subcommand_tagger_read(
 
 
 def subcommand_tagger_write(
-    logger: Logger, file: Path, args: TaggerWriteCommandParsedArgNamespace
+    logger: Logger,
+    file: Path,
+    args: TaggerWriteCommandParsedArgNamespace,
 ) -> ExitCode:
+    from content.tagger.tagger import get_tagger_for_file
+    from content.tagger.video_tagger import MetadataTags
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -572,7 +602,13 @@ def subcommand_tagger_write(
 
     tui_manager = TuiManager()
 
-    write_tags: MetadataTags = MetadataTags(comment=args.comment, uuid=uuid4(), metadata={})
+    # TODO: support nargs as metadata in form of key:value ?
+
+    write_tags: MetadataTags = MetadataTags(
+        comment=args.comment,
+        uuid=uuid4(),
+        metadata={},
+    )
 
     with handle.context(manager=tui_manager) as w:
         w.write_tags(write_tags)
@@ -609,7 +645,6 @@ def subcommand_tagger_write(
         for key, value in tags.unrecognized:
             msg = f"{key}: {value}"
             logger.info(msg)
-
 
     return 0
 
@@ -675,6 +710,8 @@ def main() -> ExitCode:
         atexit.register(exit_handler)
         return 0
 
+
+# ruff: enable[PLC0415]
 
 if __name__ == "__main__":
     exit_code = main()

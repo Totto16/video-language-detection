@@ -29,7 +29,7 @@ from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
-from helper.timestamp import parse_int_safely
+from helper.types import ConfigFilter
 
 
 @dataclass
@@ -650,18 +650,6 @@ class AdvancedConfig:
 
         return Ok(res.as_ok()[0])
 
-
-type ConfigFilterItem = str | int
-
-type ConfigFilter = list[ConfigFilterItem]
-
-
-def parse_config_filter_string(inp: str) -> ConfigFilterItem:
-    num = parse_int_safely(inp)
-    if num is not None:
-        return num
-
-    return inp
 
 
 def filter_configs(
