@@ -2832,7 +2832,9 @@ META_BOX_VIDEO_LANGUAGE_DETECTION_ID: int = 0x41DC
 META_PADDING_SIZE = 512
 SIZE_OF_FREE_BOX_HEADER = 8
 
-MetaBoxState = Result[Optional[MetaBox], str]
+ReadMetaBoxValues = list[ApplItunesTags]
+
+MetaValues = Result[Optional[ReadMetaBoxValues], str]
 
 
 @dataclass
@@ -2870,17 +2872,17 @@ def merge_dicts(
 
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
-    __meta_box: MetaBoxState
+    __meta_values: MetaValues
     __our_boxes: list[MP4Box]
 
     def __init__(
         self: Self,
         uuid_box: Optional[UUIDExtensionBox],
-        meta_box: MetaBoxState,
+        meta_values: MetaValues,
         our_boxes: list[MP4Box],
     ) -> None:
         self.__uuid_box = uuid_box
-        self.__meta_box = meta_box
+        self.__meta_values = meta_values
         self.__our_boxes = our_boxes
 
     def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
@@ -2893,11 +2895,11 @@ class Mp4MetadataHandler:
         f: BufferedIOBase,
         tags: MetadataTags,
     ) -> None:
-        if self.__meta_box.err():
+        if self.__meta_values.err():
             # ignore this and write no top level meta box
             pass
         else:
-            old_meta_box = self.__meta_box.as_ok()
+            meta_values = self.__meta_values.as_ok()
 
             # NOTE: using top level meta box
 
@@ -2906,55 +2908,13 @@ class Mp4MetadataHandler:
 
             meta_box = AppleItunesMetaBoxBuilder()
 
-            if old_meta_box is not None:
+            if meta_values is not None:
                 # restore the old tags
-
-                meta_child_boxes = list(
-                    mp4_iter_boxes(f, old_meta_box.span.payload_span),
-                )
-
-                if len(meta_child_boxes) != 1:
-                    msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
-                    raise RuntimeError(msg)
-
-                meta_child_box = meta_child_boxes[0]
-
-                if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
-                    meta_child_box,
-                    AppleItunesItemList,
-                ):
-                    msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
-                    raise RuntimeError(msg)
-
-                for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
-                    if not isinstance(
-                        data_box,
-                        (AppleItunesItemFreeformBox, AppleItunesItemBox),
-                    ):
-                        msg = f"Invalid data box in AppleItunesItemList: {data_box}"
-                        raise TypeError(msg)
-
-                    if isinstance(data_box, AppleItunesItemFreeformBox):
-                        meta_box.add_tag(
-                            ApplItunesTags.validate_init(
-                                AppleItunesFreeformKey(
-                                    mean=data_box.mean.value,
-                                    name=data_box.name.value,
-                                ),
-                                ApplItunesTagsData.from_data_box(data_box.data),
-                            ),
-                            "error",
-                        )
-                    elif isinstance(data_box, AppleItunesItemBox):
-                        meta_box.add_tag(
-                            ApplItunesTags.validate_init(
-                                data_box.type,
-                                ApplItunesTagsData.from_data_box(data_box.data),
-                            ),
-                            "error",
-                        )
-                    else:
-                        assert_never(data_box)
+                for meta_value in meta_values:
+                    meta_box.add_tag(
+                        meta_value,
+                        duplicate_behaviour="error",
+                    )
 
         # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
         meta_box.add_tag(
@@ -3057,9 +3017,9 @@ class Mp4MetadataHandler:
     def write_new_metadata(self: Self, f: BufferedIOBase, tags: MetadataTags) -> None:
         f.seek(0, 2)
 
-        self.__write_metadata_custom(f, tags)
-
         self.__write_metadata_toplevel_meta(f, tags)
+
+        self.__write_metadata_custom(f, tags)
 
         f.flush()
 
@@ -3280,12 +3240,66 @@ class Mp4MetadataHandler:
         return Mp4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
     @staticmethod
+    def __read_meta_box_info(
+        meta_box: MetaBox,
+        f: BufferedIOBase,
+    ) -> ReadMetaBoxValues:
+        meta_child_boxes = list(
+            mp4_iter_boxes(f, meta_box.span.payload_span),
+        )
+
+        if len(meta_child_boxes) != 1:
+            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
+            raise RuntimeError(msg)
+
+        meta_child_box = meta_child_boxes[0]
+
+        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
+            meta_child_box,
+            AppleItunesItemList,
+        ):
+            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
+            raise RuntimeError(msg)
+
+        result: ReadMetaBoxValues = []
+
+        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
+            if not isinstance(
+                data_box,
+                (AppleItunesItemFreeformBox, AppleItunesItemBox),
+            ):
+                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                raise TypeError(msg)
+
+            if isinstance(data_box, AppleItunesItemFreeformBox):
+                result.append(
+                    ApplItunesTags.validate_init(
+                        AppleItunesFreeformKey(
+                            mean=data_box.mean.value,
+                            name=data_box.name.value,
+                        ),
+                        ApplItunesTagsData.from_data_box(data_box.data),
+                    ),
+                )
+            elif isinstance(data_box, AppleItunesItemBox):
+                result.append(
+                    ApplItunesTags.validate_init(
+                        data_box.type,
+                        ApplItunesTagsData.from_data_box(data_box.data),
+                    ),
+                )
+            else:
+                assert_never(data_box)
+
+        return result
+
+    @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
         f: BufferedIOBase,
     ) -> "Mp4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
-        meta_box: MetaBoxState = Ok(None)
+        meta_values: MetaValues = Ok(None)
 
         def free_box_is_written_by_us(box: FreeSpaceBox) -> bool:
             # check if it's a padding box
@@ -3324,22 +3338,22 @@ class Mp4MetadataHandler:
                     return False
 
         def meta_box_is_written_by_us(box: MetaBox) -> bool:
-            nonlocal meta_box
-            if not (meta_box.ok() and meta_box.as_ok() is None):
+            nonlocal meta_values
+            if not (meta_values.ok() and meta_values.as_ok() is None):
                 msg = f"Duplicate 'meta' box at the top level, only one allowed: {box}"
                 raise RuntimeError(msg)
 
             if box.optional_boxes.pitm is None:
-                meta_box = Err("Not written by us: missing pitm box")
+                meta_values = Err("Not written by us: missing pitm box")
                 return False
 
             pitm = box.optional_boxes.pitm
 
             if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
-                meta_box = Err("Not written by us: invalid item id")
+                meta_values = Err("Not written by us: invalid item id")
                 return False
 
-            meta_box = Ok(box)
+            meta_values = Ok(Mp4MetadataHandler.__read_meta_box_info(box, f))
             return True
 
         def box_is_written_by_us(box: MP4Box) -> bool:
@@ -3388,7 +3402,7 @@ class Mp4MetadataHandler:
 
         return Mp4MetadataHandler(
             uuid_box,
-            meta_box,
+            meta_values,
             list(reversed(our_boxes_reversed)),
         )
 
