@@ -12,6 +12,7 @@ from typing import (
     Optional,
     Self,
     assert_never,
+    cast,
     final,
     override,
 )
@@ -3157,10 +3158,25 @@ class Mp4MetadataHandler:
                 else:
                     raw_name = TaggerDomain.get_raw_name(name)
 
+                    if not isinstance(data_box.data.value, str):
+                        msg = f"Invalid value for metadata: expected str type, got {type(data_box.data.value)}"
+                        raise RuntimeError(msg)
+
+                    raw_value = json.loads(data_box.data.value)
+
                     metadata_result.metadata = merge_dicts(
                         metadata_result.metadata,
-                        {raw_name: data_box.data.value},
-                        "error",
+                        {
+                            "metadata": merge_dicts(
+                                cast(
+                                    dict[str, Any],
+                                    metadata_result.metadata.get("metadata", {}),
+                                ),
+                                {raw_name: raw_value},
+                                "error",
+                            ),
+                        },
+                        "overwrite",
                     )
 
             elif isinstance(data_box, AppleItunesItemBox):
@@ -3213,7 +3229,7 @@ class Mp4MetadataHandler:
         for key, value in mdt2.metadata.items():
             if metadata_result.metadata.get(key, None) is not None:
                 if not is_value_eq(metadata_result.metadata[key], value):
-                    msg = f"Duplicate key  {key} value doesn't match: {metadata_result.metadata[key], value}"
+                    msg = f"Duplicate key '{key}' value doesn't match: {metadata_result.metadata[key]} != {value}"
                     raise RuntimeError(msg)
             else:
                 metadata_result.metadata[key] = value
