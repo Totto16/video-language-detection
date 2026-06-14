@@ -16,6 +16,8 @@ from typing import (
     cast,
 )
 
+from content.tagger.mp4_tagger import merge_dicts
+from content.tagger.video_tagger import SerializableDict, SerializableDictValue
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.types import ConfigFilter, ConfigFilterItem
@@ -72,6 +74,7 @@ class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     file: str
 
     comment: str
+    metadata: list[str]
 
 
 AllTaggerCommandParsedArgNamespace = (
@@ -336,6 +339,17 @@ def parse_args() -> AllParsedNameSpaces:
         dest="comment",
         default="<No comment>",
         help=_("The comment to write"),
+    )
+
+    tagger_write_parser.add_argument(
+        "-m",
+        "--metadata",
+        dest="metadata",
+        default=[],
+        action="append",
+        help=_(
+            "Add custom metadata to write, format: <key>:<value>, where key is a string, value can be a literal or a json encoded string",
+        ),
     )
 
     return cast(AllParsedNameSpaces, parser.parse_args())
@@ -603,12 +617,33 @@ def subcommand_tagger_write(
 
     tui_manager = TuiManager()
 
-    # TODO: support nargs as metadata in form of key:value ?
+    def get_key_value(value: str) -> tuple[str, SerializableDictValue | None]:
+        temp = value.split(":", 1)
+        if len(temp) == 1:
+            return (temp[0], None)
+
+        if len(temp) != 2:
+            msg = f"Implementation error, only two values expected, but got {len(temp)}"
+            raise RuntimeError(msg)
+
+        key, val = temp
+
+        try:
+            json_val = json.loads(val)
+            return (key, json_val)  # noqa: TRY300
+        except ValueError:
+            return (key, val)
+
+    metadata: SerializableDict = {}
+
+    for value in args.metadata:
+        key, val = get_key_value(value)
+        metadata = merge_dicts(metadata, {key: val},"error")
 
     write_tags: MetadataTags = MetadataTags(
         comment=args.comment,
         uuid=uuid4(),
-        metadata={},
+        metadata=metadata,
     )
 
     with handle.context(manager=tui_manager) as w:
