@@ -18,7 +18,7 @@ from typing import (
 
 from content.tagger.mp4_tagger import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
-from helper.filter import Filter, all_available_filter_factories
+from helper.filter import Filter, parse_filter
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
@@ -129,30 +129,12 @@ def parse_filter_string(arg: str) -> Filter:
         print_filter_help()
         raise SystemExit(0)
 
-    temp = arg.split(":", 1)
-    if len(temp) == 1:
-        msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
-        raise RuntimeError(msg)
+    filter_parsed = parse_filter(arg)
 
-    if len(temp) != 2:
-        msg = f"Implementation error, only two values expected, but got {len(temp)}"
-        raise RuntimeError(msg)
+    if filter_parsed.err():
+        raise RuntimeError(filter_parsed.as_err())
 
-    prefix, value = temp
-
-    factory = all_available_filter_factories.get(prefix, None)
-
-    if factory is None:
-        msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
-        raise RuntimeError(msg)
-
-    filter = factory.get_from_string(value)
-
-    if filter.err():
-        msg = f"Invalid filter value for filter {factory.name}: {filter.as_err()}"
-        raise RuntimeError(msg)
-
-    return filter.as_ok()
+    return filter_parsed.as_ok()
 
 
 def parse_args() -> AllParsedNameSpaces:
@@ -479,7 +461,7 @@ def subcommand_run(
         logger.error(_("parsing returned 0 configs"))
         return 1
 
-    configs = filter_configs(parsed_configs, args.config_filter)
+    configs = filter_configs(parsed_configs, args.filter)
 
     if len(configs) > len(parsed_configs):
         logger.error(
@@ -552,7 +534,7 @@ def subcommand_config_check(
         logger.error(_("parsing returned 0 configs"))
         return 1
 
-    configs = filter_configs(final_config, args.config_filter)
+    configs = filter_configs(final_config, args.filter)
 
     if len(configs) > len(final_config):
         logger.error(

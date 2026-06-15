@@ -27,7 +27,7 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
-from helper.filter import ConfigFilter
+from helper.filter import ConfigFilter, Filter
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
 
@@ -651,25 +651,25 @@ class AdvancedConfig:
         return Ok(res.as_ok()[0])
 
 
-
-def filter_configs(
+def __filter_configs_impl(
     configs: list[FinalConfig],
-    cfg_filter: Optional[ConfigFilter],
+    cfg_filter: list[ConfigFilter],
 ) -> list[FinalConfig]:
-    if cfg_filter is None:
+    if len(cfg_filter) == 0:
         return configs
 
     def is_included(cfg: FinalConfig, idx: int) -> bool:
         for filter_item in cfg_filter:
-            if isinstance(filter_item, int):
-                if idx == filter_item:
+            val = filter_item.value
+            if isinstance(val, int):
+                if idx == val:
                     return True
 
-            elif isinstance(filter_item, str):
-                if cfg.config_name == filter_item:
+            elif isinstance(val, str):
+                if cfg.config_name == val:
                     return True
             else:
-                assert_never(filter_item)
+                assert_never(val)
 
         return False
 
@@ -677,19 +677,31 @@ def filter_configs(
         return any(name == cfg.config_name for cfg in configs)
 
     for filter_item in cfg_filter:
-        if isinstance(filter_item, int):
-            if filter_item < 0 or filter_item >= len(configs):
-                msg = f"Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {filter_item}"
+        val = filter_item.value
+        if isinstance(val, int):
+            if val < 0 or val >= len(configs):
+                msg = f"Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {val}"
                 raise RuntimeError(msg)
-        elif isinstance(filter_item, str):
-            valid_name = is_valid_name(filter_item)
+        elif isinstance(val, str):
+            valid_name = is_valid_name(val)
             if not valid_name:
-                msg = f"Filter name is invalid: '{filter_item}'"
+                msg = f"Filter name is invalid: '{val}'"
                 raise RuntimeError(msg)
         else:
-            assert_never(filter_item)
+            assert_never(val)
 
     return [cfg for idx, cfg in enumerate(configs) if is_included(cfg, idx)]
+
+
+def filter_configs(
+    configs: list[FinalConfig],
+    filters: list[Filter],
+) -> list[FinalConfig]:
+    cfg_filter: list[ConfigFilter] = [
+        filter_val for filter_val in filters if isinstance(filter_val, ConfigFilter)
+    ]
+
+    return __filter_configs_impl(configs, cfg_filter)
 
 
 class FileLockError(RuntimeError):

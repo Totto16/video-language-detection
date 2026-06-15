@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Self, override
 
-from helper.result import Result
+from helper.result import Err, Ok, Result
 from helper.utils import parse_int_safely
 
 
 class Filter(ABC):
 
     @abstractmethod
-    def todo(self: Self) -> None: ...
+    def factory_name(self: Self) -> str: ...
 
 
 class FilterFactory(ABC):
@@ -26,24 +26,36 @@ class FilterFactory(ABC):
 
 
 class ConfigFilter(Filter):
+    type __Item = str | int
 
-    def __init__(self: Self) -> None:
+    __value: __Item
+
+    def __init__(self: Self, value: __Item) -> None:
         super().__init__()
+
+        self.__value = value
+
+    @property
+    def value(self: Self) -> __Item:
+        return self.__value
+
+    @staticmethod
+    def from_string(inp: str) -> "ConfigFilter":
+        num = parse_int_safely(inp)
+        if num is not None:
+            return ConfigFilter(num)
+
+        return ConfigFilter(inp)
+
+    @override
+    def factory_name(self: Self) -> str:
+        return "config"
 
 
 class ConfigFilterFactory(FilterFactory):
 
-    type __Item = str | int
-
     def __init__(self: Self) -> None:
         super().__init__()
-
-    def __parse_filter_string(self: Self, inp: str) -> __Item:
-        num = parse_int_safely(inp)
-        if num is not None:
-            return num
-
-        return inp
 
     @override
     @property
@@ -57,7 +69,7 @@ class ConfigFilterFactory(FilterFactory):
 
     @override
     def get_from_string(self: Self, value: str) -> Result[ConfigFilter, str]:
-        raise NotImplementedError("TODO")
+        return Ok(ConfigFilter.from_string(value))
 
 
 # TODO: support more complex args
@@ -86,3 +98,30 @@ def validate_all_filter_factories() -> dict[str, FilterFactory]:
 all_available_filter_factories: dict[str, FilterFactory] = (
     validate_all_filter_factories()
 )
+
+
+def parse_filter(arg: str) -> Result[Filter,str]:
+    temp = arg.split(":", 1)
+    if len(temp) == 1:
+        msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
+        return Err(msg)
+
+    if len(temp) != 2:
+        msg = f"Implementation error, only two values expected, but got {len(temp)}"
+        return Err(msg)
+
+    prefix, value = temp
+
+    factory = all_available_filter_factories.get(prefix, None)  # noqa: SIM910
+
+    if factory is None:
+        msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
+        return Err(msg)
+
+    filter_val = factory.get_from_string(value)
+
+    if filter_val.err():
+        msg = f"Invalid filter value for filter {factory.name}: {filter_val.as_err()}"
+        return Err(msg)
+
+    return Ok(filter_val.as_ok())

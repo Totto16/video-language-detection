@@ -76,6 +76,7 @@ from helper.config import (
 )
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
+from helper.filter import Filter, parse_filter
 from helper.log import get_logger
 from helper.manager import (
     ConfigParameters,
@@ -1002,27 +1003,46 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
 class ScanStartQuery(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
-    filter: Optional[list[ConfigFilterItem] | ConfigFilterItem] = None
+    filter: Optional[list[str] | str] = None
     template: Optional[str] = None
 
 
 @dataclass
 class StartOptions:
     template_to_use: Optional[str]
-    config_filter: Optional[ConfigFilter]
+    filter: list[Filter]
 
 
-def get_config_filters(
-    filter_inp: Optional[list[ConfigFilterItem] | ConfigFilterItem],
-) -> Optional[ConfigFilter]:
+def __get_filters_impl(
+    inputs: list[str],
+) -> list[Filter]:
+
+    filters: list[Filter] = []
+
+    for val in inputs:
+        filter_parsed = parse_filter(val)
+
+        if filter_parsed.err():
+            raise HTTPException(
+                status_code=400,
+                detail=filter_parsed.as_err(),
+            ) from None
+
+        filters.append(filter_parsed.as_ok())
+
+    return filters
+
+
+def get_filters(
+    filter_inp: Optional[list[str] | str],
+) -> list[Filter]:
     if filter_inp is None:
-        return None
+        return []
 
     if isinstance(filter_inp, list):
-        return filter_inp
+        return __get_filters_impl(filter_inp)
 
-    res: ConfigFilter = [filter_inp]
-    return res
+    return __get_filters_impl([filter_inp])
 
 
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
@@ -1058,13 +1078,13 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         background_tasks: BackgroundTasks,
         start_query: Annotated[ScanStartQuery, Query()],
     ) -> Response:
-        cfg_filter: Optional[ConfigFilter] = get_config_filters(start_query.filter)
+        filters = get_filters(start_query.filter)
 
         def run_in_background(fn: Callable[[], Coroutine[Any, Any, Any]]) -> None:
             background_tasks.add_task(fn)
 
         options: StartOptions = StartOptions(
-            config_filter=cfg_filter,
+            filter=filters,
             template_to_use=start_query.template,
         )
 
@@ -1733,7 +1753,7 @@ class BackendScanner:
             msg = "parsing returned 0 configs"
             raise HTTPException(status_code=400, detail=msg)
 
-        configs = filter_configs(parsed_configs, options.config_filter)
+        configs = filter_configs(parsed_configs, options.filter)
 
         if len(configs) > len(parsed_configs):
             msg = "filtering returned more configs than there are, at least one was used multiple times"
