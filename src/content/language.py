@@ -562,7 +562,9 @@ class Alpha2LanguageStrRegional:
 
     @staticmethod
     def __from_str_unsafe_impl(
-        inp: str, *, valid_check: bool,
+        inp: str,
+        *,
+        valid_check: bool,
     ) -> "Alpha2LanguageStrRegional":
         lan: Optional[Alpha2LanguageStrRegional] = (
             Alpha2LanguageStrRegional.__from_str_impl(
@@ -844,7 +846,9 @@ class Language:
     ) -> None:
         if sentinel is None:
             # NOTE: this is for apischema deserialization checks!
-            myself = self.deserialize(LanguageSchema(short.data, long))
+            myself = self.deserialize(
+                LanguageSchema(cast(Alpha2LanguageStr, short), long),
+            )
             self.__short = myself.__short  # noqa: SLF001
             self.__long = myself.__long  # noqa: SLF001
             return
