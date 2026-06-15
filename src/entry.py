@@ -37,19 +37,19 @@ class ParsedArgNamespace:
 
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["run"]
-    config: str
+    config: Path
     template_to_use: Optional[str]
     filter: list[Filter]
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["schema"]
-    schema_folder: str
+    schema_folder: Path
 
 
 class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["gui"]
-    config: str
+    config: Path
 
     backend_host: str
     backend_port: int
@@ -66,12 +66,12 @@ class TaggerCommandParsedArgNamespace(ParsedArgNamespace):
 
 class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["read"]
-    file: str
+    file: Path
 
 
 class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["write"]
-    file: str
+    file: Path
 
     comment: str
     metadata: list[str]
@@ -84,7 +84,7 @@ AllTaggerCommandParsedArgNamespace = (
 
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["api"]
-    config: str
+    config: Path
 
     host: str
     port: int
@@ -92,7 +92,7 @@ class ApiCommandParsedArgNamespace(ParsedArgNamespace):
 
 class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["config_check"]
-    config: str
+    config: Path
     template_to_use: Optional[str]
     filter: list[Filter]
 
@@ -119,6 +119,7 @@ def parse_port(arg: str) -> int:
 
     return value
 
+
 # ruff: disable[T201]
 def print_filter_help() -> None:
     print("Filter help:")
@@ -131,7 +132,10 @@ def print_filter_help() -> None:
         print()
 
     print()
+
+
 # ruff: enable[T201]
+
 
 def parse_filter_string(arg: str) -> Filter:
     if arg in ["help", "?", "h"]:
@@ -191,7 +195,8 @@ def parse_args() -> AllParsedNameSpaces:
         "-c",
         "--config",
         dest="config",
-        default="config.yaml",
+        default=Path("config.yaml"),
+        type=Path,
         help=_("The config to use"),
     )
     run_parser.add_argument(
@@ -224,7 +229,8 @@ def parse_args() -> AllParsedNameSpaces:
         "-s",
         "--schema-folder",
         dest="schema_folder",
-        default="schema/",
+        default=Path("schema/"),
+        type=Path,
         help=_("The folder where to put the schemas"),
     )
 
@@ -236,7 +242,8 @@ def parse_args() -> AllParsedNameSpaces:
         "-c",
         "--config",
         dest="config",
-        default="config.yaml",
+        default=Path("config.yaml"),
+        type=Path,
         help=_("The config to use"),
     )
     gui_parser.add_argument(
@@ -263,7 +270,8 @@ def parse_args() -> AllParsedNameSpaces:
         "-c",
         "--config",
         dest="config",
-        default="config.yaml",
+        default=Path("config.yaml"),
+        type=Path,
         help=_("The config to use"),
     )
     api_parser.add_argument(
@@ -290,7 +298,8 @@ def parse_args() -> AllParsedNameSpaces:
         "-c",
         "--config",
         dest="config",
-        default="config.yaml",
+        default=Path("config.yaml"),
+        type=Path,
         help=_("The config to check"),
     )
     config_check_parser.add_argument(
@@ -334,6 +343,7 @@ def parse_args() -> AllParsedNameSpaces:
         "--file",
         dest="file",
         required=True,
+        type=Path,
         help=_("The file to read from"),
     )
 
@@ -347,6 +357,7 @@ def parse_args() -> AllParsedNameSpaces:
         "--file",
         dest="file",
         required=True,
+        type=Path,
         help=_("The file to write to"),
     )
 
@@ -386,7 +397,7 @@ def subcommand_schema(
 ) -> ExitCode:
     from main import generate_schemas
 
-    generate_schemas(Path(args.schema_folder))
+    generate_schemas(args.schema_folder)
 
     logger.info(_("Successfully generated the schemas"))
     return 0
@@ -400,10 +411,8 @@ def subcommand_gui(
     from gui.gui import launch_gui
     from helper.config import AdvancedConfig
 
-    config_file_path = Path(args.config)
-
     raw_config = AdvancedConfig.load_raw(
-        config_file_path,
+        args.config,
     )
     if raw_config is None:
         logger.error(_("error while parsing config: can't load config"))
@@ -412,7 +421,7 @@ def subcommand_gui(
     address = Address(host=args.backend_host, port=args.backend_port)
     options = BackendOptions(address=address)
 
-    return launch_gui(options, raw_config, config_file_path)
+    return launch_gui(options, raw_config, args.config)
 
 
 def subcommand_api(
@@ -422,10 +431,8 @@ def subcommand_api(
     from backend.backend import Address, BackendOptions, launch_api
     from helper.config import AdvancedConfig
 
-    config_file_path = Path(args.config)
-
     raw_config = AdvancedConfig.load_raw(
-        config_file_path,
+        args.config,
     )
     if raw_config is None:
         logger.error(_("error while parsing config: can't load config"))
@@ -434,7 +441,7 @@ def subcommand_api(
     address = Address(host=args.host, port=args.port)
     options = BackendOptions(address=address)
 
-    return launch_api(options, raw_config, config_file_path)
+    return launch_api(options, raw_config, args.config)
 
 
 def subcommand_run(
@@ -455,7 +462,7 @@ def subcommand_run(
         from helper.manager import ConfigParameters
 
     parsed_config = AdvancedConfig.load_and_resolve(
-        Path(args.config),
+        args.config,
         args.template_to_use,
     )
     if parsed_config.err():
@@ -485,7 +492,7 @@ def subcommand_run(
         return 1
 
     try:
-        with LockFile.for_file(Path(args.config)):
+        with LockFile.for_file(args.config):
             for index, config in enumerate(configs):
                 name_parser = CustomNameParser(
                     season_special_names=config.parser.special,
@@ -521,15 +528,14 @@ def subcommand_config_check(
         filter_configs,
     )
 
-    config = Path(args.config)
     parsed_config = AdvancedConfig.load_and_resolve_with_info(
-        config,
+        args.config,
         args.template_to_use,
     )
     if parsed_config.err():
         logger.error(
             _("Config '{config}' is not valid: {err}").format(
-                config=config,
+                config=args.config,
                 err=parsed_config.as_err(),
             ),
         )
@@ -537,7 +543,7 @@ def subcommand_config_check(
 
     final_config, info = parsed_config.as_ok()
 
-    logger.info(_("Config '{config}' is valid!").format(config=config))
+    logger.info(_("Config '{config}' is valid!").format(config=args.config))
     logger.info(_("Info about config: {info}").format(info=info))
 
     if len(final_config) == 0:
@@ -707,17 +713,15 @@ def subcommand_tagger(
     logger: Logger,
     args: AllTaggerCommandParsedArgNamespace,
 ) -> ExitCode:
-    file = Path(args.file)
-
-    if not file.exists():
-        logger.error(_("File '{file}' doesn't exist").format(file=file))
+    if not args.file.exists():
+        logger.error(_("File '{file}' doesn't exist").format(file=args.file))
         return 1
 
     if args.tag_action == "read":
-        return subcommand_tagger_read(logger, file)
+        return subcommand_tagger_read(logger, args.file)
 
     if args.tag_action == "write":
-        return subcommand_tagger_write(logger, file, args)
+        return subcommand_tagger_write(logger, args.file, args)
 
     assert_never(args.tag_action)
 
