@@ -24,6 +24,9 @@ class FilterFactory(ABC):
     def prefix(self: Self) -> str: ...
 
     @abstractmethod
+    def help(self: Self) -> str: ...
+
+    @abstractmethod
     def get_from_string(self: Self, value: str) -> Result[Filter, str]: ...
 
 
@@ -68,6 +71,10 @@ class ConfigFilterFactory(FilterFactory):
     @property
     def prefix(self: Self) -> str:
         return "c"
+
+    @override
+    def help(self: Self) -> str:
+        return "the config to use, accepted values are: the name or the index"
 
     @override
     def get_from_string(self: Self, value: str) -> Result[ConfigFilter, str]:
@@ -121,6 +128,11 @@ class ExecuteFilterFactory(FilterFactory):
         return "e"
 
     @override
+    def help(self: Self) -> str:
+        values = ", ".join(f"'{step.value}'" for step in list(ExecuteStep))
+        return f"the steps to execute, accepted values are: {values}"
+
+    @override
     def get_from_string(self: Self, value: str) -> Result[ExecuteFilter, str]:
         return ExecuteFilter.from_string(value)
 
@@ -151,6 +163,7 @@ def __execute_steps_from_filter_impl(
                 assert_never(filter_val.step)
 
     return result
+
 
 def execute_steps_from_filter(
     filters: list[Filter],

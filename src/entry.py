@@ -18,7 +18,7 @@ from typing import (
 
 from content.tagger.mp4_tagger import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
-from helper.filter import Filter, parse_filter
+from helper.filter import Filter, all_available_filter_factories, parse_filter
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
@@ -119,13 +119,22 @@ def parse_port(arg: str) -> int:
 
     return value
 
-
+# ruff: disable[T201]
 def print_filter_help() -> None:
-    raise NotImplementedError("TODO")
+    print("Filter help:")
+    print()
 
+    for prefix, factory in all_available_filter_factories.items():
+        print(f"Filter '{factory.name}'")
+        print(f"\tprefix: '{prefix}'")
+        print(f"\tvalue: {factory.help()}")
+        print()
+
+    print()
+# ruff: enable[T201]
 
 def parse_filter_string(arg: str) -> Filter:
-    if arg in ["--help", "-?", "-h"]:
+    if arg in ["help", "?", "h"]:
         print_filter_help()
         raise SystemExit(0)
 
