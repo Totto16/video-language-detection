@@ -680,12 +680,12 @@ def __filter_configs_impl(
         val = filter_item.value
         if isinstance(val, int):
             if val < 0 or val >= len(configs):
-                msg = f"Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {val}"
+                msg = f"Config Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {val}"
                 raise RuntimeError(msg)
         elif isinstance(val, str):
             valid_name = is_valid_name(val)
             if not valid_name:
-                msg = f"Filter name is invalid: '{val}'"
+                msg = f"Config filter name is invalid: '{val}'"
                 raise RuntimeError(msg)
         else:
             assert_never(val)

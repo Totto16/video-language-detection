@@ -13,12 +13,12 @@ class Filter(ABC):
 
 class FilterFactory(ABC):
 
-    @abstractmethod
     @property
+    @abstractmethod
     def name(self: Self) -> str: ...
 
-    @abstractmethod
     @property
+    @abstractmethod
     def prefix(self: Self) -> str: ...
 
     @abstractmethod
