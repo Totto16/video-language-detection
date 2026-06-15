@@ -726,7 +726,7 @@ def test_mp4_tagger_language_patching(
 
             for stream in ffprobe_res.as_ok().audio_streams():
                 assert stream.is_audio()
-                assert stream.raw["tags"]["language"] == new_language.short
+                assert new_language.short == stream.raw["tags"]["language"]
 
 
 def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:

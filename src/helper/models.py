@@ -489,12 +489,14 @@ class ModelLanguageForList(ModelLanguage):
     @override
     def is_valid_language(self: Self, language: Language) -> Optional[str]:
         for short_str, long_str in self.__languages:
-            if short_str == language.short:
+            if language.short == short_str:
                 if language.long != long_str:
                     return _("Long language doesn't match")
                 return None
 
-        return _("This dataset has no such language")
+        return _("This dataset has no such language: {language}").format(
+            language=language,
+        )
 
 
 voxlingua107_ecapa_model: Model = Model(
