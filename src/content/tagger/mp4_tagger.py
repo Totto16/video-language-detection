@@ -3615,6 +3615,7 @@ class VideoTaggerMP4(VideoTagger):
 
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
             __writer: Optional[BufferedIOBase]
+            __backup: Optional[bytes]
 
             def __init__(self: Self) -> None:
                 super().__init__()
@@ -3622,19 +3623,53 @@ class VideoTaggerMP4(VideoTagger):
 
             @override
             def __enter__(self: Self) -> VideoTaggerContext:
-                self.__writer = file.open("rb+")
+                writer = file.open("rb+")
 
-                return VideoTaggerContextMP4(manager, self.__writer, streams, types)
+                writer.seek(0, 2)
+                filesize = writer.tell()
+                writer.seek(0)
+
+                backup = writer.read(-1)
+
+                writer.seek(0)
+
+                if len(backup) != filesize:
+                    writer.close()
+                    msg = f"Error: reading file bytes for backup failed. didn't get enough bytes: {len(backup)} != {filesize}"
+                    raise RuntimeError(msg)
+
+                self.__writer = writer
+                self.__backup = backup
+
+                return VideoTaggerContextMP4(manager, writer, streams, types)
 
             @override
             def __exit__(
                 self: Self,
                 _exc_type: Optional[type[BaseException]],
-                _exc_val: Optional[BaseException],
+                exc_val: Optional[BaseException],
                 _exc_tb: Optional[TracebackType],
             ) -> Literal[False]:  # actually bool
                 if self.__writer is not None:
                     self.__writer.close()
+                    self.__writer = None
+
+                if exc_val is not None:
+                    if self.__backup is None:
+                        msg = "Backup for file not present"
+                        raise RuntimeError(msg) from exc_val
+
+                    # restore file backup
+                    restore_writer = file.open("rb+")
+                    restore_writer.truncate()
+                    restore_writer.write(self.__backup)
+                    restore_writer.close()
+
+                    self.__backup = None
+
+                if self.__backup is not None:
+                    self.__backup = None
+
                 return False
 
         return VideoTaggerContextCtx()
