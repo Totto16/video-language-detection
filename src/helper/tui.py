@@ -20,6 +20,7 @@ from helper.base import AnyType, parse_contents
 from helper.classifier import Classifier, Model
 from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
+from helper.filter import Filter, execute_steps_from_filter
 from helper.manager import TuiManager
 from helper.models import voxlingua107_ecapa_model
 from helper.validator import (
@@ -66,7 +67,11 @@ def launch_tui(
     name_parser: NameParser,
     all_content_type: AnyType,
     config_paramaters: Optional[tuple[int, int]],
+    filters: list[Filter],
 ) -> None:
+
+    execute_steps = execute_steps_from_filter(filters)
+
     device_manager: DeviceManager = DeviceManager()
 
     model: Model = voxlingua107_ecapa_model
@@ -138,21 +143,24 @@ def launch_tui(
         config_type=config.config_type,
         manager=manager,
         error_mode=error_mode,
+        check=execute_steps.check,
     )
 
-    tui_reporter: ValidatorReporter = TuiValidatorReporter()
+    if execute_steps.validate:
+        tui_reporter: ValidatorReporter = TuiValidatorReporter()
 
-    validators = get_validators(tui_reporter, model.model_language)
+        validators = get_validators(tui_reporter, model.model_language)
 
-    Validator.validate_multiple(validators, contents)
+        Validator.validate_multiple(validators, contents)
 
-    language_summary, metadata_summary, video_metadata_summary = (
-        Summary.combine_summaries(content.summary() for content in contents)
-    )
+    if execute_steps.summary:
+        language_summary, metadata_summary, video_metadata_summary = (
+            Summary.combine_summaries(content.summary() for content in contents)
+        )
 
-    scan_summary = language_scanner.summary_manager.get_detailed_summary()
+        scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
-    logger.info(language_summary)
-    logger.info(metadata_summary)
-    logger.info(video_metadata_summary)
-    logger.info(scan_summary)
+        logger.info(language_summary)
+        logger.info(metadata_summary)
+        logger.info(video_metadata_summary)
+        logger.info(scan_summary)

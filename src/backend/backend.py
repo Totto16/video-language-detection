@@ -76,7 +76,7 @@ from helper.config import (
 )
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
-from helper.filter import Filter, parse_filter
+from helper.filter import Filter, execute_steps_from_filter, parse_filter
 from helper.log import get_logger
 from helper.manager import (
     ConfigParameters,
@@ -1237,14 +1237,14 @@ def summary_tuple_to_serializable_data(
 @dataclass
 class ScannerStateFinished:
     type: Literal["finished"]
-    result: list[SummaryData]
+    result: list[Optional[SummaryData]]
 
 
 class ScannerStateFinishedSerializable(pydantic.BaseModel):
     model_config = DEFAULT_MODEL_CONFIG
 
     type: Literal["finished"] = "finished"
-    result: list[SummaryDataSerializable]
+    result: list[Optional[SummaryDataSerializable]]
 
 
 @dataclass
@@ -1285,7 +1285,8 @@ def scanner_state_to_serializable_data(
         case "finished":
             return ScannerStateFinishedSerializable(
                 result=[
-                    summary_tuple_to_serializable_data(item) for item in state.result
+                    None if item is None else summary_tuple_to_serializable_data(item)
+                    for item in state.result
                 ],
             )
         case _:
@@ -1478,6 +1479,7 @@ def run_in_thread(
     event: asyncio.Event,
     backend: "Backend",
     config_file_path: Path,
+    filters: list[Filter],
 ) -> None:
 
     with backend.thread_logger():
@@ -1486,6 +1488,7 @@ def run_in_thread(
                 configs=configs,
                 backend=backend,
                 config_file_path=config_file_path,
+                filters=filters,
             ),
         )
 
@@ -1512,7 +1515,11 @@ class BackendScanner:
         all_content_type: AnyType,
         config_paramaters: Optional[ConfigParameters],
         manager: WsManager,
-    ) -> SummaryData:
+        filters: list[Filter],
+    ) -> Optional[SummaryData]:
+
+        execute_steps = execute_steps_from_filter(filters)
+
         device_manager: DeviceManager = DeviceManager()
 
         model: Model = voxlingua107_ecapa_model
@@ -1576,35 +1583,41 @@ class BackendScanner:
             config_type=config.config_type,
             manager=manager,
             error_mode=error_mode,
+            check=execute_steps.check,
         )
 
-        validators = get_validators(
-            reporter=manager,
-            model_language=model.model_language,
-        )
+        if execute_steps.validate:
+            validators = get_validators(
+                reporter=manager,
+                model_language=model.model_language,
+            )
 
-        Validator.validate_multiple(validators, contents)
+            Validator.validate_multiple(validators, contents)
 
-        language_summary, metadata_summary, video_metadata_summary = (
-            Summary.combine_summaries(content.summary() for content in contents)
-        )
+        if execute_steps.summary:
+            language_summary, metadata_summary, video_metadata_summary = (
+                Summary.combine_summaries(content.summary() for content in contents)
+            )
 
-        scan_summary = language_scanner.summary_manager.get_detailed_summary()
+            scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
-        return SummaryData(
-            language=language_summary,
-            metadata=metadata_summary,
-            video_metadata=video_metadata_summary,
-            details=scan_summary,
-        )
+            return SummaryData(
+                language=language_summary,
+                metadata=metadata_summary,
+                video_metadata=video_metadata_summary,
+                details=scan_summary,
+            )
+
+        return None
 
     async def __start_coroutine(
         self: Self,
         configs: list[FinalConfig],
         manager: WsManager,
         config_file_path: Path,
-    ) -> list[SummaryData]:
-        result: list[SummaryData] = []
+        filters: list[Filter],
+    ) -> list[Optional[SummaryData]]:
+        result: list[Optional[SummaryData]] = []
 
         try:
             with LockFile.for_file(config_file_path):
@@ -1624,6 +1637,7 @@ class BackendScanner:
                         all_content_type=AllContent,
                         config_paramaters=config_paramaters,
                         manager=manager,
+                        filters=filters,
                     )
 
                     result.append(summary)
@@ -1637,6 +1651,7 @@ class BackendScanner:
         configs: list[FinalConfig],
         backend: "Backend",
         config_file_path: Path,
+        filters: list[Filter],
     ) -> None:
 
         def on_status_change(previous: ScannersStateStr, new: ScannersStateStr) -> None:
@@ -1649,10 +1664,11 @@ class BackendScanner:
             backend.manager.send_data_sync(data)
 
         try:
-            result: list[SummaryData] = await self.__start_coroutine(
+            result: list[Optional[SummaryData]] = await self.__start_coroutine(
                 configs=configs,
                 manager=backend.manager,
                 config_file_path=config_file_path,
+                filters=filters,
             )
 
             def mod(d: ScannerThreadState) -> ScannerThreadState:
@@ -1686,6 +1702,7 @@ class BackendScanner:
         configs: list[FinalConfig],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
         backend: "Backend",
+        filters: list[Filter],
     ) -> Optional[str]:
 
         with self.__state.ctx() as ctx:
@@ -1697,7 +1714,14 @@ class BackendScanner:
 
             thread = threading.Thread(
                 target=run_in_thread,
-                args=(self, configs, event, backend.manager, self.__config_file_path),
+                args=(
+                    self,
+                    configs,
+                    event,
+                    backend.manager,
+                    self.__config_file_path,
+                    filters,
+                ),
             )
 
             new_state: ScannerThreadState = ScannerThreadState(
@@ -1770,6 +1794,7 @@ class BackendScanner:
                 configs=configs,
                 run_in_background=run_in_background,
                 backend=backend,
+                filters=options.filter,
             )
         except RuntimeError as err:
             raise HTTPException(status_code=400, detail=str(err)) from None

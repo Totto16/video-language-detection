@@ -132,7 +132,7 @@ def parse_filter_string(arg: str) -> Filter:
     filter_parsed = parse_filter(arg)
 
     if filter_parsed.err():
-        raise RuntimeError(filter_parsed.as_err())
+        raise argparse.ArgumentTypeError(filter_parsed.as_err())
 
     return filter_parsed.as_ok()
 
@@ -492,6 +492,7 @@ def subcommand_run(
                     name_parser=name_parser,
                     all_content_type=AllContent,
                     config_paramaters=config_paramaters,
+                    filters=args.filter,
                 )
     except FileLockError as err:
         logger.error(_("File lock error: {err}").format(err=str(err)))  # noqa: TRY400

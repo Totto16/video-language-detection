@@ -379,6 +379,8 @@ def parse_contents(
     config_type: ConfigType,
     manager: ManagerInterface,
     error_mode: ErrorMode,
+    *,
+    check: bool,
 ) -> list[Content]:
 
     callback: ContentCallback
@@ -442,6 +444,10 @@ def parse_contents(
         file_path=save_file,
         serialize_type=all_content_type,
     )
+
+    if not check:
+        return contents
+
     new_contents: list[Content] = process_folder(
         root_folder,
         callback=callback,
