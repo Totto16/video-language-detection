@@ -3664,6 +3664,7 @@ class VideoTaggerMP4(VideoTagger):
                     restore_writer.truncate()
                     restore_writer.write(self.__backup)
                     restore_writer.close()
+                    print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
 
                     self.__backup = None
 
