@@ -18,9 +18,9 @@ from typing import (
 
 from content.tagger.mp4_tagger import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
+from helper.filter import Filter, all_available_filter_factories
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
-from helper.types import ConfigFilter, ConfigFilterItem
 from helper.utils import parse_int_safely
 from helper.version import PROGRAM_VERSION
 
@@ -39,7 +39,7 @@ class RunCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["run"]
     config: str
     template_to_use: Optional[str]
-    config_filter: Optional[ConfigFilter]
+    filter: list[Filter]
 
 
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
@@ -94,7 +94,7 @@ class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["config_check"]
     config: str
     template_to_use: Optional[str]
-    config_filter: Optional[ConfigFilter]
+    filter: list[Filter]
 
 
 type AllParsedNameSpaces = (
@@ -105,14 +105,6 @@ type AllParsedNameSpaces = (
     | ConfigCheckCommandParsedArgNamespace
     | AllTaggerCommandParsedArgNamespace
 )
-
-
-def parse_config_filter_string(inp: str) -> ConfigFilterItem:
-    num = parse_int_safely(inp)
-    if num is not None:
-        return num
-
-    return inp
 
 
 def parse_port(arg: str) -> int:
@@ -126,6 +118,41 @@ def parse_port(arg: str) -> int:
         raise argparse.ArgumentTypeError(msg)
 
     return value
+
+
+def print_filter_help() -> None:
+    raise NotImplementedError("TODO")
+
+
+def parse_filter_string(arg: str) -> Filter:
+    if arg in ["--help", "-?", "-h"]:
+        print_filter_help()
+        raise SystemExit(0)
+
+    temp = arg.split(":", 1)
+    if len(temp) == 1:
+        msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
+        raise RuntimeError(msg)
+
+    if len(temp) != 2:
+        msg = f"Implementation error, only two values expected, but got {len(temp)}"
+        raise RuntimeError(msg)
+
+    prefix, value = temp
+
+    factory = all_available_filter_factories.get(prefix, None)
+
+    if factory is None:
+        msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
+        raise RuntimeError(msg)
+
+    filter = factory.get_from_string(value)
+
+    if filter.err():
+        msg = f"Invalid filter value for filter {factory.name}: {filter.as_err()}"
+        raise RuntimeError(msg)
+
+    return filter.as_ok()
 
 
 def parse_args() -> AllParsedNameSpaces:
@@ -185,17 +212,16 @@ def parse_args() -> AllParsedNameSpaces:
             "The config template to use, if the config specifies, to use the cli one"  # noqa: COM812
         ),
     )
-    # TODO: support more complex args
-    # "-t no -f "c:0" -f "s~:landman" -f "e:<id>" -f "p=:media" -e "check" -e "summary" -e "validate" -e "test"
+
     run_parser.add_argument(
         "-f",
         "--filter",
-        dest="config_filter",
-        default=None,
-        type=parse_config_filter_string,
+        dest="filter",
+        default=[],
+        type=parse_filter_string,
         action="append",
         help=_(
-            "Filter the provided configs, allowed are names or indices"  # noqa: COM812
+            "Generic filter, see '--filter help' for all available options"  # noqa: COM812
         ),
     )
 
@@ -288,12 +314,12 @@ def parse_args() -> AllParsedNameSpaces:
     config_check_parser.add_argument(
         "-f",
         "--filter",
-        dest="config_filter",
-        default=None,
-        type=parse_config_filter_string,
+        dest="filter",
+        default=[],
+        type=parse_filter_string,
         action="append",
         help=_(
-            "Filter the provided configs, allowed are names or indices"  # noqa: COM812
+            "Generic filter, see '--filter help' for all available options"  # noqa: COM812
         ),
     )
 

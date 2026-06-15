@@ -27,9 +27,9 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
+from helper.filter import ConfigFilter
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
-from helper.types import ConfigFilter
 
 
 @dataclass

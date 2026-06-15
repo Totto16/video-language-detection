@@ -92,7 +92,6 @@ from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.types import ConfigFilter, ConfigFilterItem
 from helper.validator import ReporterWhere, Validator, ValidatorReporter, get_validators
 from main import AllContent
 
