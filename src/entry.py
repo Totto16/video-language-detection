@@ -570,8 +570,8 @@ def subcommand_tagger_read(
 
     manager = NoopManager()
 
-    with handle.context(manager=manager) as w:
-        tags = w.get_tags()
+    with handle.context(manager=manager) as ctx:
+        tags = ctx.get_tags()
 
         logger.info(_("Read tags:"))
 
@@ -638,7 +638,7 @@ def subcommand_tagger_write(
 
     for value in args.metadata:
         key, val = get_key_value(value)
-        metadata = merge_dicts(metadata, {key: val},"error")
+        metadata = merge_dicts(metadata, {key: val}, "error")
 
     write_tags: MetadataTags = MetadataTags(
         comment=args.comment,
@@ -646,8 +646,8 @@ def subcommand_tagger_write(
         metadata=metadata,
     )
 
-    with handle.context(manager=tui_manager) as w:
-        w.write_tags(write_tags)
+    with handle.context(manager=tui_manager) as ctx:
+        ctx.write_tags(write_tags)
 
         logger.info(_("Wrote tags:"))
 
@@ -662,8 +662,8 @@ def subcommand_tagger_write(
 
     noop_manager = NoopManager()
 
-    with handle.context(manager=noop_manager) as w:
-        tags = w.get_tags()
+    with handle.context(manager=noop_manager) as ctx:
+        tags = ctx.get_tags()
 
         print()  # noqa: T201
         logger.info(_("Which resulted in these tags tags:"))

@@ -92,30 +92,30 @@ class VideoTagger(ABC):
 
 
 class VideoTaggerContextMultiple(VideoTaggerContext):
-    __writer: list[AbstractContextManager[VideoTaggerContext]]
+    __contexts: list[AbstractContextManager[VideoTaggerContext]]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        writer: list[AbstractContextManager[VideoTaggerContext]],
+        contexts: list[AbstractContextManager[VideoTaggerContext]],
     ) -> None:
         super().__init__(manager)
-        self.__writer = writer
+        self.__contexts = contexts
 
     @override
     def write_tags(self: Self, tags: MetadataTags) -> None:
-        for writer in self.__writer:
-            with writer as w:
-                w.write_tags(tags)
+        for context in self.__contexts:
+            with context as ctx:
+                ctx.write_tags(tags)
 
     @override
     def write_language(
         self: Self,
         language: Language,
     ) -> bool:
-        for writer in self.__writer:
-            with writer as w:
-                result = w.write_language(language)
+        for context in self.__contexts:
+            with context as ctx:
+                result = ctx.write_language(language)
                 if result:
                     return result
 
@@ -139,7 +139,7 @@ class VideoTaggerMultiple(VideoTagger):
         self: Self,
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerContext]:
-        writer = [tagger.context(manager) for tagger in self.__tagger]
+        contexts = [tagger.context(manager) for tagger in self.__tagger]
 
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
 
@@ -148,7 +148,7 @@ class VideoTaggerMultiple(VideoTagger):
 
             @override
             def __enter__(self: Self) -> VideoTaggerContext:
-                return VideoTaggerContextMultiple(manager, writer)
+                return VideoTaggerContextMultiple(manager, contexts)
 
             @override
             def __exit__(
