@@ -700,7 +700,8 @@ def __get_validators_impl(
 
     for filter_item in filters:
         if isinstance(filter_item, EmptyFilter):
-            result = {}
+            if filter_item.name == ValidatorFilter.factory_name():
+                result = {}
         elif isinstance(filter_item, ValidatorFilter):
             validator_cb = all_validators[filter_item.name]
             validator = validator_cb(params)

@@ -669,7 +669,8 @@ def __filter_configs_impl(
 
     for filter_item in cfg_filter:
         if isinstance(filter_item, EmptyFilter):
-            result = {}
+            if filter_item.name == ConfigFilter.factory_name():
+                result = {}
         elif isinstance(filter_item, ConfigFilter):
             val = filter_item.value
 

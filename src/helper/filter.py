@@ -10,19 +10,20 @@ from helper.utils import parse_int_safely
 
 class Filter(ABC):
 
+    @staticmethod
     @abstractmethod
-    def factory_name(self: Self) -> str: ...
+    def factory_name() -> str: ...
 
 
 class FilterFactory(ABC):
 
-    @property
+    @staticmethod
     @abstractmethod
-    def name(self: Self) -> str: ...
+    def name() -> str: ...
 
-    @property
+    @staticmethod
     @abstractmethod
-    def prefix(self: Self) -> str: ...
+    def prefix() -> str: ...
 
     @abstractmethod
     def help(self: Self) -> str: ...
@@ -32,13 +33,21 @@ class FilterFactory(ABC):
 
 
 class EmptyFilter(Filter):
+    __name: str
 
-    def __init__(self: Self) -> None:
+    def __init__(self: Self, name: str) -> None:
         super().__init__()
 
+        self.__name = name
+
+    @staticmethod
     @override
-    def factory_name(self: Self) -> str:
+    def factory_name() -> str:
         return "empty"
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
 
 
 class ConfigFilter(Filter):
@@ -63,9 +72,10 @@ class ConfigFilter(Filter):
 
         return ConfigFilter(inp)
 
+    @staticmethod
     @override
-    def factory_name(self: Self) -> str:
-        return "config"
+    def factory_name() -> str:
+        return ConfigFilterFactory.name()
 
 
 class ConfigFilterFactory(FilterFactory):
@@ -74,13 +84,13 @@ class ConfigFilterFactory(FilterFactory):
         super().__init__()
 
     @override
-    @property
-    def name(self: Self) -> str:
+    @staticmethod
+    def name() -> str:
         return "config"
 
     @override
-    @property
-    def prefix(self: Self) -> str:
+    @staticmethod
+    def prefix() -> str:
         return "c"
 
     @override
@@ -119,8 +129,9 @@ class ExecuteFilter(Filter):
             return Err(f"Invalid step value: {inp}")
 
     @override
-    def factory_name(self: Self) -> str:
-        return "execute"
+    @staticmethod
+    def factory_name() -> str:
+        return ExecuteFilterFactory.name()
 
 
 class ExecuteFilterFactory(FilterFactory):
@@ -129,13 +140,13 @@ class ExecuteFilterFactory(FilterFactory):
         super().__init__()
 
     @override
-    @property
-    def name(self: Self) -> str:
+    @staticmethod
+    def name() -> str:
         return "execute"
 
     @override
-    @property
-    def prefix(self: Self) -> str:
+    @staticmethod
+    def prefix() -> str:
         return "e"
 
     @override
@@ -172,7 +183,8 @@ def __execute_steps_from_filter_impl(
     result = ExecuteSteps.empty()
     for filter_val in execute_filter:
         if isinstance(filter_val, EmptyFilter):
-            result = ExecuteSteps.empty()
+            if filter_val.name == ExecuteFilter.factory_name():
+                result = ExecuteSteps.empty()
         elif isinstance(filter_val, ExecuteFilter):
             match filter_val.step:
                 case ExecuteStep.Check:
@@ -223,8 +235,9 @@ class ValidatorFilter(Filter):
         return self.__name
 
     @override
-    def factory_name(self: Self) -> str:
-        return "validator"
+    @staticmethod
+    def factory_name() -> str:
+        return ValidatorFilterFactory.name()
 
 
 class ValidatorFilterFactory(FilterFactory):
@@ -236,13 +249,13 @@ class ValidatorFilterFactory(FilterFactory):
         self.__available_validators = available_validators
 
     @override
-    @property
-    def name(self: Self) -> str:
+    @staticmethod
+    def name() -> str:
         return "validator"
 
     @override
-    @property
-    def prefix(self: Self) -> str:
+    @staticmethod
+    def prefix() -> str:
         return "v"
 
     @override
@@ -307,16 +320,24 @@ class FilterManager:
         all_available_filter_factories: list[FilterFactory],
     ) -> dict[str, FilterFactory]:
         factories: dict[str, FilterFactory] = {}
+        factory_names: set[str] = set()
         for factory in all_available_filter_factories:
-            if factory.prefix in factories:
-                msg = f"Duplicate filter prefix: {factory.prefix}"
+            factory_prefix = factory.prefix()
+            if factory_prefix in factories:
+                msg = f"Duplicate filter prefix: {factory_prefix}"
                 raise RuntimeError(msg)
 
-            if factory.prefix in special_values:
-                msg = f"invalid prefix '{factory.prefix}', it is a special prefix"
+            factory_name = factory.name()
+            if factory_name in factory_names:
+                msg = f"Duplicate filter name: {factory_name}"
                 raise RuntimeError(msg)
 
-            factories[factory.prefix] = factory
+            if factory_prefix in special_values:
+                msg = f"invalid prefix '{factory_prefix}', it is a special prefix"
+                raise RuntimeError(msg)
+
+            factories[factory_prefix] = factory
+            factory_names.add(factory_name)
 
         return factories
 
@@ -354,11 +375,11 @@ class FilterManager:
                 assert_never(res)
             else:
                 return Err(
-                    f"Got help arg for factory '{factory.name}', but help is not supported",
+                    f"Got help arg for factory '{factory.name()}', but help is not supported",
                 )
 
         if value in special_empty_values:
-            return Ok(EmptyFilter())
+            return Ok(EmptyFilter(factory.name()))
 
         filter_val = factory.get_from_string(value)
 
