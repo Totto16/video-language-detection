@@ -391,8 +391,8 @@ class FilterManager:
 
     # ruff: disable[T201]
     def __print_help_impl_for_factory(self: Self, factory: FilterFactory) -> None:
-        print(f"Filter '{factory.name}'")
-        print(f"\tprefix: '{factory.prefix}'")
+        print(f"Filter '{factory.name()}'")
+        print(f"\tprefix: '{factory.prefix()}'")
         print(f"\tvalue: {factory.help()}")
         print()
 
