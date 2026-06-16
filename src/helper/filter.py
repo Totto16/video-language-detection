@@ -238,59 +238,83 @@ class ValidatorFilterFactory(FilterFactory):
         return Err(f"Invalid validator: {value}")
 
 
-# TODO: support more complex args
-# series filter by name (regex)
-# episode filter by some id (video file uuid?)
-# path filter (regex)
-# file extension can be done with the path filter (regex)
+class FilterManager:
+    __factories: dict[str, FilterFactory]
 
-# -f "s~:landman" -f "e:<id>" -f "p=:media"
-__all_available_filter_factories: list[FilterFactory] = [
-    ConfigFilterFactory(),
-    ExecuteFilterFactory(),
-    ValidatorFilterFactory(),
-]
+    # TODO: support more complex args
+    # series filter by name (regex)
+    # episode filter by some id (video file uuid?)
+    # path filter (regex)
+    # file extension can be done with the path filter (regex)
 
+    # -f "s~:landman" -f "e:<id>" -f "p=:media"
 
-def validate_all_filter_factories() -> dict[str, FilterFactory]:
-    factories: dict[str, FilterFactory] = {}
-    for factory in __all_available_filter_factories:
-        if factory.prefix in factories:
-            msg = f"Duplicate filter prefix: {factory.prefix}"
-            raise RuntimeError(msg)
+    def __init__(self: Self, available_validators: set[str]) -> None:
+        __all_available_filter_factories: list[FilterFactory] = [
+            ConfigFilterFactory(),
+            ExecuteFilterFactory(),
+            ValidatorFilterFactory(available_validators),
+        ]
 
-        factories[factory.prefix] = factory
+        all_available_filter_factories: dict[str, FilterFactory] = (
+            FilterManager.__validate_all_filter_factories(
+                __all_available_filter_factories,
+            )
+        )
 
-    return factories
+        self.__factories = all_available_filter_factories
 
+    @staticmethod
+    def __validate_all_filter_factories(
+        all_available_filter_factories: list[FilterFactory],
+    ) -> dict[str, FilterFactory]:
+        factories: dict[str, FilterFactory] = {}
+        for factory in all_available_filter_factories:
+            if factory.prefix in factories:
+                msg = f"Duplicate filter prefix: {factory.prefix}"
+                raise RuntimeError(msg)
 
-all_available_filter_factories: dict[str, FilterFactory] = (
-    validate_all_filter_factories()
-)
+            factories[factory.prefix] = factory
 
+        return factories
 
-def parse_filter(arg: str) -> Result[Filter, str]:
-    temp = arg.split(":", 1)
-    if len(temp) == 1:
-        msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
-        return Err(msg)
+    def parse_filter(self: Self, arg: str) -> Result[Filter, str]:
+        temp = arg.split(":", 1)
+        if len(temp) == 1:
+            msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
+            return Err(msg)
 
-    if len(temp) != 2:
-        msg = f"Implementation error, only two values expected, but got {len(temp)}"
-        return Err(msg)
+        if len(temp) != 2:
+            msg = f"Implementation error, only two values expected, but got {len(temp)}"
+            return Err(msg)
 
-    prefix, value = temp
+        prefix, value = temp
 
-    factory = all_available_filter_factories.get(prefix, None)  # noqa: SIM910
+        factory = self.__factories.get(prefix, None)
 
-    if factory is None:
-        msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
-        return Err(msg)
+        if factory is None:
+            msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
+            return Err(msg)
 
-    filter_val = factory.get_from_string(value)
+        filter_val = factory.get_from_string(value)
 
-    if filter_val.err():
-        msg = f"Invalid filter value for filter '{factory.name}': {filter_val.as_err()}"
-        return Err(msg)
+        if filter_val.err():
+            msg = f"Invalid filter value for filter '{factory.name}': {filter_val.as_err()}"
+            return Err(msg)
 
-    return Ok(filter_val.as_ok())
+        return Ok(filter_val.as_ok())
+
+    # ruff: disable[T201]
+    def print_help(self: Self) -> None:
+        print("Filter help:")
+        print()
+
+        for prefix, factory in self.__factories.items():
+            print(f"Filter '{factory.name}'")
+            print(f"\tprefix: '{prefix}'")
+            print(f"\tvalue: {factory.help()}")
+            print()
+
+        print()
+
+    # ruff: enable[T201]

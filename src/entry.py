@@ -18,10 +18,11 @@ from typing import (
 
 from content.tagger.mp4_tagger import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
-from helper.filter import Filter, all_available_filter_factories, parse_filter
+from helper.filter import Filter, FilterManager
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
+from helper.validator import all_available_validators
 from helper.version import PROGRAM_VERSION
 
 _ = get_translator()
@@ -120,37 +121,22 @@ def parse_port(arg: str) -> int:
     return value
 
 
-# ruff: disable[T201]
-def print_filter_help() -> None:
-    print("Filter help:")
-    print()
-
-    for prefix, factory in all_available_filter_factories.items():
-        print(f"Filter '{factory.name}'")
-        print(f"\tprefix: '{prefix}'")
-        print(f"\tvalue: {factory.help()}")
-        print()
-
-    print()
-
-
-# ruff: enable[T201]
-
-
-def parse_filter_string(arg: str) -> Filter:
-    if arg in ["help", "?", "h"]:
-        print_filter_help()
-        raise SystemExit(0)
-
-    filter_parsed = parse_filter(arg)
-
-    if filter_parsed.err():
-        raise argparse.ArgumentTypeError(filter_parsed.as_err())
-
-    return filter_parsed.as_ok()
-
-
 def parse_args() -> AllParsedNameSpaces:
+
+    filter_manager = FilterManager(all_available_validators)
+
+    def parse_filter_string(arg: str) -> Filter:
+        if arg in ["help", "?", "h"]:
+            filter_manager.print_help()
+            raise SystemExit(0)
+
+        filter_parsed = filter_manager.parse_filter(arg)
+
+        if filter_parsed.err():
+            raise argparse.ArgumentTypeError(filter_parsed.as_err())
+
+        return filter_parsed.as_ok()
+
     parser = argparse.ArgumentParser(
         prog="video-language-detection",
         description=_("Detect video languages"),

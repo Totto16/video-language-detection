@@ -76,7 +76,7 @@ from helper.config import (
 )
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
-from helper.filter import Filter, execute_steps_from_filter, parse_filter
+from helper.filter import Filter, FilterManager, execute_steps_from_filter
 from helper.log import get_logger
 from helper.manager import (
     ConfigParameters,
@@ -93,7 +93,14 @@ from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.validator import ReporterWhere, Validator, ValidatorParams, ValidatorReporter, get_validators
+from helper.validator import (
+    ReporterWhere,
+    Validator,
+    ValidatorParams,
+    ValidatorReporter,
+    all_available_validators,
+    get_validators,
+)
 from main import AllContent
 
 if TYPE_CHECKING:
@@ -1013,39 +1020,39 @@ class StartOptions:
     filter: list[Filter]
 
 
-def __get_filters_impl(
-    inputs: list[str],
-) -> list[Filter]:
-
-    filters: list[Filter] = []
-
-    for val in inputs:
-        filter_parsed = parse_filter(val)
-
-        if filter_parsed.err():
-            raise HTTPException(
-                status_code=400,
-                detail=filter_parsed.as_err(),
-            ) from None
-
-        filters.append(filter_parsed.as_ok())
-
-    return filters
-
-
-def get_filters(
-    filter_inp: Optional[list[str] | str],
-) -> list[Filter]:
-    if filter_inp is None:
-        return []
-
-    if isinstance(filter_inp, list):
-        return __get_filters_impl(filter_inp)
-
-    return __get_filters_impl([filter_inp])
-
-
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
+
+    filter_manager = FilterManager(all_available_validators)
+
+    def __get_filters_impl(
+        inputs: list[str],
+    ) -> list[Filter]:
+
+        filters: list[Filter] = []
+
+        for val in inputs:
+            filter_parsed = filter_manager.parse_filter(val)
+
+            if filter_parsed.err():
+                raise HTTPException(
+                    status_code=400,
+                    detail=filter_parsed.as_err(),
+                ) from None
+
+            filters.append(filter_parsed.as_ok())
+
+        return filters
+
+    def get_filters(
+        filter_inp: Optional[list[str] | str],
+    ) -> list[Filter]:
+        if filter_inp is None:
+            return []
+
+        if isinstance(filter_inp, list):
+            return __get_filters_impl(filter_inp)
+
+        return __get_filters_impl([filter_inp])
 
     async def retreive_backend() -> "Backend":
         return await backend_ref.wait_for_ready()

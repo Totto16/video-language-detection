@@ -686,6 +686,9 @@ all_validators: dict[
 ] = get_all_validators()
 
 
+all_available_validators: set[str] = set(all_validators.keys())
+
+
 def __get_validators_impl(
     params: ValidatorParams,
     filters: list[ValidatorFilter],
