@@ -143,21 +143,34 @@ class ExecuteSteps:
     summary: bool
     validate: bool
 
+    @staticmethod
+    def default() -> "ExecuteSteps":
+        return ExecuteSteps(check=True, summary=True, validate=True)
+
 
 def __execute_steps_from_filter_impl(
     execute_filter: list[ExecuteFilter],
 ) -> ExecuteSteps:
     if len(execute_filter) == 0:
-        return ExecuteSteps(check=True, summary=True, validate=True)
+        return ExecuteSteps.default()
 
     result = ExecuteSteps(check=False, summary=False, validate=False)
     for filter_val in execute_filter:
         match filter_val.step:
             case ExecuteStep.Check:
+                if result.check:
+                    msg = "check is already true, duplicate step detected"
+                    raise RuntimeError(msg)
                 result.check = True
             case ExecuteStep.Summary:
+                if result.summary:
+                    msg = "summary is already true, duplicate step detected"
+                    raise RuntimeError(msg)
                 result.summary = True
             case ExecuteStep.Validate:
+                if result.validate:
+                    msg = "validate is already true, duplicate step detected"
+                    raise RuntimeError(msg)
                 result.validate = True
             case _:
                 assert_never(filter_val.step)
@@ -175,6 +188,56 @@ def execute_steps_from_filter(
     return __execute_steps_from_filter_impl(execute_filter)
 
 
+class ValidatorFilter(Filter):
+    __name: str
+
+    def __init__(self: Self, name: str) -> None:
+        super().__init__()
+
+        self.__name = name
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
+
+    @override
+    def factory_name(self: Self) -> str:
+        return "validator"
+
+
+class ValidatorFilterFactory(FilterFactory):
+    __available_validators: set[str]
+
+    def __init__(self: Self, available_validators: set[str]) -> None:
+        super().__init__()
+
+        self.__available_validators = available_validators
+
+    @override
+    @property
+    def name(self: Self) -> str:
+        return "validator"
+
+    @override
+    @property
+    def prefix(self: Self) -> str:
+        return "v"
+
+    @override
+    def help(self: Self) -> str:
+        values = ", ".join(
+            f"'{validator}'" for validator in self.__available_validators
+        )
+        return f"the validators to use, accepted values are: {values}"
+
+    @override
+    def get_from_string(self: Self, value: str) -> Result[ValidatorFilter, str]:
+        if value in self.__available_validators:
+            return Ok(ValidatorFilter(value))
+
+        return Err(f"Invalid validator: {value}")
+
+
 # TODO: support more complex args
 # series filter by name (regex)
 # episode filter by some id (video file uuid?)
@@ -185,6 +248,7 @@ def execute_steps_from_filter(
 __all_available_filter_factories: list[FilterFactory] = [
     ConfigFilterFactory(),
     ExecuteFilterFactory(),
+    ValidatorFilterFactory(),
 ]
 
 

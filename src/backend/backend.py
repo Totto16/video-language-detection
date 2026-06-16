@@ -93,7 +93,7 @@ from helper.models import voxlingua107_ecapa_model
 from helper.parser import CustomNameParser
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.validator import ReporterWhere, Validator, ValidatorReporter, get_validators
+from helper.validator import ReporterWhere, Validator, ValidatorParams, ValidatorReporter, get_validators
 from main import AllContent
 
 if TYPE_CHECKING:
@@ -1587,10 +1587,12 @@ class BackendScanner:
         )
 
         if execute_steps.validate:
-            validators = get_validators(
+            validator_params = ValidatorParams(
                 reporter=manager,
                 model_language=model.model_language,
             )
+
+            validators = get_validators(validator_params, filters)
 
             Validator.validate_multiple(validators, contents)
 

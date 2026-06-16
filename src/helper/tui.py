@@ -26,6 +26,7 @@ from helper.models import voxlingua107_ecapa_model
 from helper.validator import (
     TuiValidatorReporter,
     Validator,
+    ValidatorParams,
     ValidatorReporter,
     get_validators,
 )
@@ -149,7 +150,9 @@ def launch_tui(
     if execute_steps.validate:
         tui_reporter: ValidatorReporter = TuiValidatorReporter()
 
-        validators = get_validators(tui_reporter, model.model_language)
+        validator_params = ValidatorParams(tui_reporter, model.model_language)
+
+        validators = get_validators(validator_params, filters)
 
         Validator.validate_multiple(validators, contents)
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import reduce
 from logging import Logger
@@ -13,6 +13,7 @@ from content.language import Language
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.classifier import ModelLanguage
+from helper.filter import Filter, ValidatorFilter
 from helper.log import get_logger
 from helper.translation import get_translator
 
@@ -89,6 +90,12 @@ class TuiValidatorReporter(ValidatorReporter):
         )
 
 
+@dataclass
+class ValidatorParams:
+    reporter: ValidatorReporter
+    model_language: ModelLanguage
+
+
 class Validator[ED, SD, S2D, CD](ABC):
     __reporter: ValidatorReporter
     __name: str
@@ -97,6 +104,10 @@ class Validator[ED, SD, S2D, CD](ABC):
         super().__init__()
         self.__reporter = reporter
         self.__name = name
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
 
     def emit_error(
         self: Self,
@@ -392,6 +403,14 @@ class Validator[ED, SD, S2D, CD](ABC):
         result: list[S2D | CD],
     ) -> None: ...
 
+    @staticmethod
+    @abstractmethod
+    def names() -> list[str]: ...
+
+    @staticmethod
+    @abstractmethod
+    def from_params(params: ValidatorParams) -> "Validator[ED, SD, S2D, CD]": ...
+
 
 # language validators, check if the language is a correct one
 class LanguageValidator(Validator[None, None, None, None]):
@@ -457,6 +476,16 @@ class LanguageValidator(Validator[None, None, None, None]):
         result: list[None],
     ) -> None:
         pass
+
+    @staticmethod
+    @override
+    def names() -> list[str]:
+        return ["language", "language_check", "valid_language"]
+
+    @staticmethod
+    @override
+    def from_params(params: ValidatorParams) -> "LanguageValidator":
+        return LanguageValidator(params.reporter, params.model_language)
 
 
 # language validators, check if the language is a correct one
@@ -608,21 +637,83 @@ class LanguageConsistencyValidator(
     ) -> None:
         pass
 
+    @staticmethod
+    @override
+    def names() -> list[str]:
+        return ["language consistency", "language_consistency"]
 
-def get_validators(
-    reporter: ValidatorReporter,
-    model_language: ModelLanguage,
-) -> list[Validator[Any, Any, Any, Any]]:
+    @staticmethod
+    @override
+    def from_params(params: ValidatorParams) -> "LanguageConsistencyValidator":
+        return LanguageConsistencyValidator(params.reporter)
 
-    # TODO: metadata checks, check if no duplicates are found, missing episodes, missing seasons
-    # check langauge consistency
 
-    # TODO: find duplicates, e.g. simpson s32e10
-    # TODO: also display missing episodes / episodes with the "wrong" language etc
+# TODO: metadata checks, check if no duplicates are found, missing episodes, missing seasons
+# check language consistency
 
-    result: list[Validator[Any, Any, Any, Any]] = [
-        LanguageValidator(reporter=reporter, model_language=model_language),
-        LanguageConsistencyValidator(reporter=reporter),
+# TODO: find duplicates, e.g. simpson s32e10
+# TODO: also display missing episodes / episodes with the "wrong" language etc
+
+
+def get_all_validators() -> (
+    dict[str, Callable[[ValidatorParams], Validator[Any, Any, Any, Any]]]
+):
+    validators: dict[
+        str,
+        Callable[[ValidatorParams], Validator[Any, Any, Any, Any]],
+    ] = {}
+
+    validator_classes: list[type[Validator[Any, Any, Any, Any]]] = [
+        LanguageValidator,
+        LanguageConsistencyValidator,
     ]
 
-    return result
+    for validator_class in validator_classes:
+        names = validator_class.names()
+        for name in names:
+            if validators.get(name, None) is not None:  # noqa: SIM910
+                msg = f"Duplicate validator name: {name}"
+                raise RuntimeError(msg)
+
+            validators[name] = validator_class.from_params
+
+    return validators
+
+
+all_validators: dict[
+    str,
+    Callable[[ValidatorParams], Validator[Any, Any, Any, Any]],
+] = get_all_validators()
+
+
+def __get_validators_impl(
+    params: ValidatorParams,
+    filters: list[ValidatorFilter],
+) -> list[Validator[Any, Any, Any, Any]]:
+    if len(filters) == 0:
+        return [cb(params) for cb in all_validators.values()]
+
+    result: dict[str, Validator[Any, Any, Any, Any]] = {}
+
+    for filter_item in filters:
+        validator_cb = all_validators[filter_item.name]
+        validator = validator_cb(params)
+        validator_name = validator.name
+        if result.get(validator_name, None) is not None:  # noqa: SIM910
+            msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
+            raise RuntimeError(msg)
+
+        result[validator_name] = validator
+
+    return list(result.values())
+
+
+def get_validators(
+    params: ValidatorParams,
+    filters: list[Filter],
+) -> list[Validator[Any, Any, Any, Any]]:
+    validator_filter: list[ValidatorFilter] = [
+        filter_val for filter_val in filters if isinstance(filter_val, ValidatorFilter)
+    ]
+
+    return __get_validators_impl(params, validator_filter)
