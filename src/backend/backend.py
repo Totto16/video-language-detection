@@ -76,7 +76,12 @@ from helper.config import (
 )
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
-from helper.filter import Filter, FilterManager, execute_steps_from_filter
+from helper.filter import (
+    Filter,
+    FilterHelpOptions,
+    FilterManager,
+    execute_steps_from_filter,
+)
 from helper.log import get_logger
 from helper.manager import (
     ConfigParameters,
@@ -1022,7 +1027,10 @@ class StartOptions:
 
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
 
-    filter_manager = FilterManager(all_available_validators)
+    filter_manager = FilterManager(
+        all_available_validators,
+        help_options=FilterHelpOptions(cb=None),
+    )
 
     def __get_filters_impl(
         inputs: list[str],
@@ -1031,7 +1039,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         filters: list[Filter] = []
 
         for val in inputs:
-            filter_parsed = filter_manager.parse_filter(val)
+            filter_parsed: Result[Filter, str] = filter_manager.parse_filter(val)
 
             if filter_parsed.err():
                 raise HTTPException(

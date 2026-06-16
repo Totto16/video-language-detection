@@ -11,6 +11,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
+    Never,
     Optional,
     assert_never,
     cast,
@@ -18,7 +19,7 @@ from typing import (
 
 from content.tagger.mp4_tagger import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
-from helper.filter import Filter, FilterManager
+from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
@@ -123,13 +124,15 @@ def parse_port(arg: str) -> int:
 
 def parse_args() -> AllParsedNameSpaces:
 
-    filter_manager = FilterManager(all_available_validators)
+    def help_cb() -> Never:
+        raise SystemExit(0)
+
+    filter_manager = FilterManager(
+        all_available_validators,
+        help_options=FilterHelpOptions(cb=help_cb),
+    )
 
     def parse_filter_string(arg: str) -> Filter:
-        if arg in ["help", "?", "h"]:
-            filter_manager.print_help()
-            raise SystemExit(0)
-
         filter_parsed = filter_manager.parse_filter(arg)
 
         if filter_parsed.err():

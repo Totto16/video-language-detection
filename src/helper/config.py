@@ -27,7 +27,7 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
-from helper.filter import ConfigFilter, Filter
+from helper.filter import ConfigFilter, EmptyFilter, Filter
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
 
@@ -653,52 +653,61 @@ class AdvancedConfig:
 
 def __filter_configs_impl(
     configs: list[FinalConfig],
-    cfg_filter: list[ConfigFilter],
+    cfg_filter: list[ConfigFilter | EmptyFilter],
 ) -> list[FinalConfig]:
     if len(cfg_filter) == 0:
         return configs
 
-    def is_included(cfg: FinalConfig, idx: int) -> bool:
-        for filter_item in cfg_filter:
-            val = filter_item.value
-            if isinstance(val, int):
-                if idx == val:
-                    return True
+    def is_valid_name(name: str) -> tuple[bool, int]:
+        for idx, cfg in enumerate(configs):
+            if name == cfg.config_name:
+                return (True, idx)
 
+        return (False, -1)
+
+    result: dict[str, FinalConfig] = {}
+
+    for filter_item in cfg_filter:
+        if isinstance(filter_item, EmptyFilter):
+            result = {}
+        elif isinstance(filter_item, ConfigFilter):
+            val = filter_item.value
+
+            cfg: FinalConfig
+            if isinstance(val, int):
+                if val < 0 or val >= len(configs):
+                    msg = f"Config Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {val}"
+                    raise RuntimeError(msg)
+                cfg = configs[val]
             elif isinstance(val, str):
-                if cfg.config_name == val:
-                    return True
+                valid_name, idx = is_valid_name(val)
+                if not valid_name:
+                    msg = f"Config filter name is invalid: '{val}'"
+                    raise RuntimeError(msg)
+                cfg = configs[idx]
             else:
                 assert_never(val)
 
-        return False
-
-    def is_valid_name(name: str) -> bool:
-        return any(name == cfg.config_name for cfg in configs)
-
-    for filter_item in cfg_filter:
-        val = filter_item.value
-        if isinstance(val, int):
-            if val < 0 or val >= len(configs):
-                msg = f"Config Filter index is out of bounds, expected >= 0 and < {len(configs)} but got {val}"
+            cfg_name = cfg.config_name
+            if result.get(cfg_name, None) is not None:  # noqa: SIM910
+                msg = f"Config is already present, duplicate is not allowed: {cfg_name}"
                 raise RuntimeError(msg)
-        elif isinstance(val, str):
-            valid_name = is_valid_name(val)
-            if not valid_name:
-                msg = f"Config filter name is invalid: '{val}'"
-                raise RuntimeError(msg)
+
+            result[cfg_name] = cfg
         else:
-            assert_never(val)
+            assert_never(filter_item)
 
-    return [cfg for idx, cfg in enumerate(configs) if is_included(cfg, idx)]
+    return list(result.values())
 
 
 def filter_configs(
     configs: list[FinalConfig],
     filters: list[Filter],
 ) -> list[FinalConfig]:
-    cfg_filter: list[ConfigFilter] = [
-        filter_val for filter_val in filters if isinstance(filter_val, ConfigFilter)
+    cfg_filter: list[ConfigFilter | EmptyFilter] = [
+        filter_val
+        for filter_val in filters
+        if isinstance(filter_val, (ConfigFilter, EmptyFilter))
     ]
 
     return __filter_configs_impl(configs, cfg_filter)

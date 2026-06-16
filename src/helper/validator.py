@@ -13,7 +13,7 @@ from content.language import Language
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.classifier import ModelLanguage
-from helper.filter import Filter, ValidatorFilter
+from helper.filter import EmptyFilter, Filter, ValidatorFilter
 from helper.log import get_logger
 from helper.translation import get_translator
 
@@ -691,7 +691,7 @@ all_available_validators: set[str] = set(all_validators.keys())
 
 def __get_validators_impl(
     params: ValidatorParams,
-    filters: list[ValidatorFilter],
+    filters: list[ValidatorFilter | EmptyFilter],
 ) -> list[Validator[Any, Any, Any, Any]]:
     if len(filters) == 0:
         return [cb(params) for cb in all_validators.values()]
@@ -699,14 +699,19 @@ def __get_validators_impl(
     result: dict[str, Validator[Any, Any, Any, Any]] = {}
 
     for filter_item in filters:
-        validator_cb = all_validators[filter_item.name]
-        validator = validator_cb(params)
-        validator_name = validator.name
-        if result.get(validator_name, None) is not None:  # noqa: SIM910
-            msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
-            raise RuntimeError(msg)
+        if isinstance(filter_item, EmptyFilter):
+            result = {}
+        elif isinstance(filter_item, ValidatorFilter):
+            validator_cb = all_validators[filter_item.name]
+            validator = validator_cb(params)
+            validator_name = validator.name
+            if result.get(validator_name, None) is not None:  # noqa: SIM910
+                msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
+                raise RuntimeError(msg)
 
-        result[validator_name] = validator
+            result[validator_name] = validator
+        else:
+            assert_never(filter_item)
 
     return list(result.values())
 
@@ -715,8 +720,10 @@ def get_validators(
     params: ValidatorParams,
     filters: list[Filter],
 ) -> list[Validator[Any, Any, Any, Any]]:
-    validator_filter: list[ValidatorFilter] = [
-        filter_val for filter_val in filters if isinstance(filter_val, ValidatorFilter)
+    validator_filter: list[ValidatorFilter | EmptyFilter] = [
+        filter_val
+        for filter_val in filters
+        if isinstance(filter_val, (ValidatorFilter, EmptyFilter))
     ]
 
     return __get_validators_impl(params, validator_filter)

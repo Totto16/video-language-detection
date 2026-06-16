@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Self, assert_never, override
+from typing import Never, Optional, Self, assert_never, override
 
 from helper.result import Err, Ok, Result
 from helper.utils import parse_int_safely
@@ -28,6 +29,16 @@ class FilterFactory(ABC):
 
     @abstractmethod
     def get_from_string(self: Self, value: str) -> Result[Filter, str]: ...
+
+
+class EmptyFilter(Filter):
+
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def factory_name(self: Self) -> str:
+        return "empty"
 
 
 class ConfigFilter(Filter):
@@ -147,33 +158,42 @@ class ExecuteSteps:
     def default() -> "ExecuteSteps":
         return ExecuteSteps(check=True, summary=True, validate=True)
 
+    @staticmethod
+    def empty() -> "ExecuteSteps":
+        return ExecuteSteps(check=False, summary=False, validate=False)
+
 
 def __execute_steps_from_filter_impl(
-    execute_filter: list[ExecuteFilter],
+    execute_filter: list[ExecuteFilter | EmptyFilter],
 ) -> ExecuteSteps:
     if len(execute_filter) == 0:
         return ExecuteSteps.default()
 
-    result = ExecuteSteps(check=False, summary=False, validate=False)
+    result = ExecuteSteps.empty()
     for filter_val in execute_filter:
-        match filter_val.step:
-            case ExecuteStep.Check:
-                if result.check:
-                    msg = "check is already true, duplicate step detected"
-                    raise RuntimeError(msg)
-                result.check = True
-            case ExecuteStep.Summary:
-                if result.summary:
-                    msg = "summary is already true, duplicate step detected"
-                    raise RuntimeError(msg)
-                result.summary = True
-            case ExecuteStep.Validate:
-                if result.validate:
-                    msg = "validate is already true, duplicate step detected"
-                    raise RuntimeError(msg)
-                result.validate = True
-            case _:
-                assert_never(filter_val.step)
+        if isinstance(filter_val, EmptyFilter):
+            result = ExecuteSteps.empty()
+        elif isinstance(filter_val, ExecuteFilter):
+            match filter_val.step:
+                case ExecuteStep.Check:
+                    if result.check:
+                        msg = "check is already true, duplicate step detected"
+                        raise RuntimeError(msg)
+                    result.check = True
+                case ExecuteStep.Summary:
+                    if result.summary:
+                        msg = "summary is already true, duplicate step detected"
+                        raise RuntimeError(msg)
+                    result.summary = True
+                case ExecuteStep.Validate:
+                    if result.validate:
+                        msg = "validate is already true, duplicate step detected"
+                        raise RuntimeError(msg)
+                    result.validate = True
+                case _:
+                    assert_never(filter_val.step)
+        else:
+            assert_never(filter_val)
 
     return result
 
@@ -181,8 +201,10 @@ def __execute_steps_from_filter_impl(
 def execute_steps_from_filter(
     filters: list[Filter],
 ) -> ExecuteSteps:
-    execute_filter: list[ExecuteFilter] = [
-        filter_val for filter_val in filters if isinstance(filter_val, ExecuteFilter)
+    execute_filter: list[ExecuteFilter | EmptyFilter] = [
+        filter_val
+        for filter_val in filters
+        if isinstance(filter_val, (ExecuteFilter | EmptyFilter))
     ]
 
     return __execute_steps_from_filter_impl(execute_filter)
@@ -238,8 +260,19 @@ class ValidatorFilterFactory(FilterFactory):
         return Err(f"Invalid validator: {value}")
 
 
+special_help_values = ["help", "h", "?"]
+special_empty_values = "-", "~"
+special_values: list[str] = [*special_help_values, *special_empty_values]
+
+
+@dataclass
+class FilterHelpOptions:
+    cb: Optional[Callable[[], Never]]
+
+
 class FilterManager:
     __factories: dict[str, FilterFactory]
+    __help_options: FilterHelpOptions
 
     # TODO: support more complex args
     # series filter by name (regex)
@@ -249,7 +282,11 @@ class FilterManager:
 
     # -f "s~:landman" -f "e:<id>" -f "p=:media"
 
-    def __init__(self: Self, available_validators: set[str]) -> None:
+    def __init__(
+        self: Self,
+        available_validators: set[str],
+        help_options: FilterHelpOptions,
+    ) -> None:
         __all_available_filter_factories: list[FilterFactory] = [
             ConfigFilterFactory(),
             ExecuteFilterFactory(),
@@ -263,6 +300,7 @@ class FilterManager:
         )
 
         self.__factories = all_available_filter_factories
+        self.__help_options = help_options
 
     @staticmethod
     def __validate_all_filter_factories(
@@ -274,11 +312,24 @@ class FilterManager:
                 msg = f"Duplicate filter prefix: {factory.prefix}"
                 raise RuntimeError(msg)
 
+            if factory.prefix in special_values:
+                msg = f"invalid prefix '{factory.prefix}', it is a special prefix"
+                raise RuntimeError(msg)
+
             factories[factory.prefix] = factory
 
         return factories
 
     def parse_filter(self: Self, arg: str) -> Result[Filter, str]:
+
+        if arg in special_help_values:
+            if self.__help_options.cb is not None:
+                self.__print_help_impl()
+                res: Never = self.__help_options.cb()
+                assert_never(res)
+            else:
+                return Err("Got help arg, but help is not supported")
+
         temp = arg.split(":", 1)
         if len(temp) == 1:
             msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
@@ -296,6 +347,19 @@ class FilterManager:
             msg = f"Invalid config prefix '{prefix}', no filter factory has that prefix"
             return Err(msg)
 
+        if value in special_help_values:
+            if self.__help_options.cb is not None:
+                self.__print_help_impl_for_factory(factory)
+                res = self.__help_options.cb()
+                assert_never(res)
+            else:
+                return Err(
+                    f"Got help arg for factory '{factory.name}', but help is not supported",
+                )
+
+        if value in special_empty_values:
+            return Ok(EmptyFilter())
+
         filter_val = factory.get_from_string(value)
 
         if filter_val.err():
@@ -305,16 +369,26 @@ class FilterManager:
         return Ok(filter_val.as_ok())
 
     # ruff: disable[T201]
-    def print_help(self: Self) -> None:
+    def __print_help_impl_for_factory(self: Self, factory: FilterFactory) -> None:
+        print(f"Filter '{factory.name}'")
+        print(f"\tprefix: '{factory.prefix}'")
+        print(f"\tvalue: {factory.help()}")
+        print()
+
+    def __print_help_impl(self: Self) -> None:
         print("Filter help:")
         print()
 
-        for prefix, factory in self.__factories.items():
-            print(f"Filter '{factory.name}'")
-            print(f"\tprefix: '{prefix}'")
-            print(f"\tvalue: {factory.help()}")
-            print()
+        for factory in self.__factories.values():
+            self.__print_help_impl_for_factory(factory)
 
         print()
+        print("Special values:")
+        print(
+            "\t'~', '-': Only after the <prefix>. Reset to empty, this reset the filter to it's defintion of 'empty', which may mean different things per filter, but as the filter state can be default (no filter provided) and you can add one with <prefix>, there needs to be a method, to set it to empty",
+        )
+        print(
+            "\t'help', 'h', '?': As standalone or after prefix. Prints the helper either for all filters, or if it is found after a prefix, for the current one",
+        )
 
     # ruff: enable[T201]
