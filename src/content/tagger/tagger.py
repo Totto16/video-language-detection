@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from content.tagger.avi_tagger import VideoTaggerAVI
 from content.tagger.mp4_tagger import VideoTaggerMP4
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.video_tagger import (
@@ -65,6 +66,23 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
         )
 
 
+def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
+
+    try:
+
+        avi_handle = VideoTaggerAVI.get_handle(file)
+
+        if avi_handle.err():
+            return Err(avi_handle.as_err())
+
+        return Ok(avi_handle.as_ok())
+
+    except RuntimeError as err:
+        return Err(
+            _("get tagger {err}").format(err=err),
+        )
+
+
 def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
 
     ext = file.suffix
@@ -75,7 +93,7 @@ def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
         case ".mkv":
             return Err("TODO")
         case ".avi":
-            return Err("TODO")
+            return get_tagger_for_avi_file(file)
         case _:
             return Err(
                 _("Unsupported file extension {ext}").format(ext=ext),

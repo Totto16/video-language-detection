@@ -1,12 +1,16 @@
+import json
 from collections.abc import Callable
+from copy import deepcopy
 from io import BufferedIOBase, BytesIO
 from pathlib import Path
-from typing import Optional, Self, override
+from typing import Any, Optional, Self, override
+from unittest import mock
+from uuid import uuid4
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
 from pytest_subtests import SubTests
-from test_helper import OkResult
+from test_helper import OkResult, file_duplicates
 
 from content.language import Language
 from content.tagger.avi_tagger import (
@@ -19,11 +23,16 @@ from content.tagger.avi_tagger import (
     AVIChunk,
     AVIChunkSpan,
     AVIList,
+    VideoTaggerAVI,
     avi_iter_chunks,
     find_strh_chunks_with_type,
     is_avi_file,
 )
 from content.tagger.parser import SimpleSpan
+from content.tagger.utils import merge_dicts
+from content.tagger.video_tagger import MetadataTags, uuid_to_str
+from helper.ffprobe import FFProbeResult, ffprobe
+from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
@@ -38,7 +47,9 @@ class PseudoAVIChunk(AVIChunk):
 
     def __init__(self: Self, fourcc: FOURCC, size: int) -> None:
         super().__init__(
-            fourcc, span=AVIChunkSpan(SimpleSpan(0, size), 8), is_list=False,
+            fourcc,
+            span=AVIChunkSpan(SimpleSpan(0, size), 8),
+            is_list=False,
         )
 
 
@@ -559,3 +570,205 @@ def test_avi_tagger_language_patching(
                     assert (
                         new_language.short == old_file_lang
                     ), "New language should be written"
+
+
+def get_raw_ffprobe_tags(
+    result: FFProbeResult,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    val = deepcopy(result.file_info.raw)
+    # delete things that might change, but are insignificant for metadata
+    del val["size"]
+    del val["bit_rate"]
+
+    metadata: dict[str, Any] = {"comment": None, "metadata": None}
+
+    if val.get("tags", None) is not None:
+        tags: dict[str, Any] = val["tags"]
+        if tags.get("comment", None) is not None:  # noqa: SIM910
+            metadata["comment"] = tags["comment"]
+            del val["tags"]["comment"]
+
+        for key, value in [*tags.items()]:
+            if key.startswith("video_language_detect"):
+                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                    metadata["metadata"] = {}
+
+                metadata["metadata"][key] = value
+                del val["tags"][key]
+
+    return (val, metadata)
+
+
+def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
+    return [key for key, value in dict1.items() if value is not None]
+
+
+def test_mp4_tagger_metadata_tags_custom(
+    subtests: SubTests,
+    avi_test_parse_files: TempVideoFiles,
+    test_manager: ManagerInterface,
+) -> None:
+
+    with file_duplicates(avi_test_parse_files.data) as data:
+        test_files: list[tuple[Path, MetadataTags]] = list(
+            zip(
+                data,
+                [
+                    MetadataTags(
+                        comment="Test comment 1",
+                        uuid=uuid4(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key1": "value1", "int1": 1414},
+                        },
+                    ),
+                    MetadataTags(
+                        comment="Test comment 2",
+                        uuid=uuid4(),
+                        metadata={
+                            "test": "str",
+                            "dict": {"key2": "value2", "int2": 1321},
+                        },
+                    ),
+                ],
+                strict=True,
+            ),
+        )
+
+        for file, tags in test_files:
+            with subtests.test("video gets tagged correctly"):
+                tagger_res = VideoTaggerAVI.get_handle(file)
+
+                assert tagger_res == OkResult(), "video tagger handle err"
+
+                tagger = tagger_res.as_ok()
+
+                with tagger.context(manager=test_manager) as w:
+                    early_tags = w.get_tags()
+
+                    assert early_tags.uuid is None, "uuid can't be found yet"
+                    assert [
+                        *early_tags.metadata.items(),
+                    ] == [], "no metadata tags can be found already"
+
+                    ffprobe_early_tags = ffprobe(file)
+
+                    assert ffprobe_early_tags == OkResult(), "FFProbe error"
+
+                    raw_early_tags, ffprobe_metadata_early = get_raw_ffprobe_tags(
+                        ffprobe_early_tags.as_ok(),
+                    )
+
+                    assert (
+                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
+                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                    ), "raw ffprobe metadata is empty at start"
+
+                    w.write_tags(tags)
+
+                    next_tags = w.get_tags()
+
+                    assert next_tags.uuid == tags.uuid, "UUID was written correctly"
+                    assert (
+                        next_tags.comment == tags.comment
+                    ), "Comment was written correctly"
+                    assert (
+                        next_tags.unrecognized == early_tags.unrecognized
+                    ), "no new unrecognized tags"
+                    assert (
+                        next_tags.metadata == tags.metadata
+                    ), "Metadata was written correctly"
+
+                    ffprobe_next_tags = ffprobe(file)
+
+                    assert ffprobe_next_tags == OkResult(), "FFProbe error"
+
+                    raw_next_tags, ffprobe_metadata_next = get_raw_ffprobe_tags(
+                        ffprobe_next_tags.as_ok(),
+                    )
+
+                    assert raw_next_tags == raw_early_tags
+
+                    assert ffprobe_metadata_next["comment"] == tags.comment
+
+                    assert ffprobe_metadata_next.get("metadata", None) is not None
+
+                    assert ffprobe_metadata_next["metadata"] == merge_dicts(
+                        {
+                            f"video_language_detect:{key}": json.dumps(value)
+                            for key, value in tags.metadata.items()
+                        },
+                        {
+                            "video_language_detect_uuid:raw": mock.ANY,
+                            "video_language_detect_uuid:hex": uuid_to_str(
+                                tags.uuid,
+                            ),
+                        },
+                        "error",
+                    )
+
+                    # write again, test that the uuid doesn't get overwritten and that the new data overwrites the old data
+
+                    new_tags = MetadataTags(
+                        comment=tags.comment + " - NEW",
+                        uuid=uuid4(),
+                        metadata=merge_dicts(
+                            tags.metadata,
+                            {"new": "a new tag"},
+                            "error",
+                        ),
+                    )
+
+                    assert new_tags.uuid != tags.uuid, "UUID should be unique"
+
+                    w.write_tags(new_tags)
+
+                    write_again_tags = w.get_tags()
+
+                    assert (
+                        write_again_tags.uuid == next_tags.uuid
+                    ), "UUID was not overwritten"
+                    assert write_again_tags.comment == (
+                        tags.comment + " - NEW"
+                    ), "Comment was overwritten correctly"
+                    assert (
+                        write_again_tags.unrecognized == next_tags.unrecognized
+                    ), "no new unrecognized tags"
+                    assert write_again_tags.metadata == merge_dicts(
+                        tags.metadata,
+                        {"new": "a new tag"},
+                        "error",
+                    ), "Metadata was overwritten correctly"
+
+                    ffprobe_again_tags = ffprobe(file)
+
+                    assert ffprobe_again_tags == OkResult(), "FFProbe error"
+
+                    raw_again_tags, ffprobe_metadata_again = get_raw_ffprobe_tags(
+                        ffprobe_again_tags.as_ok(),
+                    )
+
+                    assert raw_again_tags == raw_early_tags
+
+                    assert ffprobe_metadata_again["comment"] == (
+                        tags.comment + " - NEW"
+                    )
+
+                    assert ffprobe_metadata_again.get("metadata", None) is not None
+
+                    assert ffprobe_metadata_again["metadata"] == merge_dicts(
+                        {
+                            f"video_language_detect:{key}": json.dumps(value)
+                            for key, value in tags.metadata.items()
+                        },
+                        {
+                            "video_language_detect_uuid:raw": ffprobe_metadata_next[
+                                "metadata"
+                            ]["video_language_detect_uuid:raw"],
+                            "video_language_detect_uuid:hex": uuid_to_str(
+                                tags.uuid,
+                            ),
+                            "video_language_detect:new": '"a new tag"',
+                        },
+                        "error",
+                    )

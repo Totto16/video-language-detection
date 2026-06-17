@@ -1,8 +1,11 @@
 from collections.abc import Generator
+from contextlib import AbstractContextManager
 from io import BufferedIOBase
-from typing import Any, Optional, Self, final, override
+from pathlib import Path
+from types import TracebackType
+from typing import Any, Literal, Optional, Self, final, override
 
-from content.language import ShortLanguageStr
+from content.language import Language, ShortLanguageStr
 from content.tagger.lcid_languages import LCID
 from content.tagger.parser import (
     BoundedIO,
@@ -14,6 +17,15 @@ from content.tagger.parser import (
     UnsignedInt,
     UnsignedShort,
 )
+from content.tagger.video_tagger import (
+    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    MetadataTags,
+    MetadataTagsRead,
+    VideoTagger,
+    VideoTaggerContext,
+)
+from helper.manager import CounterInterface, ManagerInterface
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -194,7 +206,7 @@ class AVIChunkSpan:
 
     def __str__(self: Self) -> str:
         header_string = ", ".join(
-            str(self.header_span(i)) for i in range( len(self.__intervals))
+            str(self.header_span(i)) for i in range(len(self.__intervals))
         )
         return f"<AVIChunkSpan total: {self.__total} header: [ {header_string} ] payload: {self.payload_span}>"
 
@@ -569,3 +581,195 @@ def is_avi_file(
     except (RuntimeError, ValueError) as err:
         return str(err)
     return None
+
+
+class VideoTaggerContextAVI(VideoTaggerContext):
+    __writer: BufferedIOBase
+    __streams: int
+    __types: list[FOURCC]
+
+    def __init__(
+        self: Self,
+        manager: ManagerInterface,
+        writer: BufferedIOBase,
+        streams: int,
+        types: list[FOURCC],
+    ) -> None:
+        super().__init__(manager)
+        self.__writer = writer
+        self.__streams = streams
+        self.__types = types
+
+    @override
+    def write_tags(
+        self: Self,
+        tags: MetadataTags,
+    ) -> None:
+        raise NotImplementedError("TODO")
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        new_language = language.short
+
+        # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
+        bar: CounterInterface = self.manager.counter(
+            total=float(self.__streams + 1),
+            desc="update avi language",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
+        try:
+            self.__writer.seek(0)
+            for strh in find_strh_chunks_with_type(self.__writer, self.__types):
+
+                should_write_language = True
+
+                lang = strh.read_language(self.__writer)
+                if isinstance(lang, ShortLanguageStr) and new_language == lang:
+                    should_write_language = False
+
+                if should_write_language:
+                    strh.patch_language(self.__writer, new_language)
+
+                bar.update(1, force=True)
+
+            self.__writer.flush()
+        finally:
+            bar.close(clear=True)
+
+        return True
+
+    @override
+    def get_tags(
+        self: Self,
+    ) -> MetadataTagsRead:
+        raise NotImplementedError("TODO")
+
+
+class VideoTaggerAVI(VideoTagger):
+    __streams: int
+    __types: list[FOURCC]
+
+    def __init__(
+        self: Self,
+        file: Path,
+        streams: int,
+        types: list[FOURCC],
+    ) -> None:
+        super().__init__(file)
+        self.__streams = streams
+        self.__types = types
+
+        streams = 0
+
+    @staticmethod
+    def get_handle(file: Path) -> Result["VideoTagger", str]:
+
+        try:
+
+            with file.open("rb") as f:
+                avi_res = is_avi_file(f)
+                if avi_res is not None:
+                    return Err(avi_res)
+
+                f.seek(0)
+
+                streams = 0
+                types: list[FOURCC] = [AUDS_FOURCC, VIDS_FOURCC]
+
+                # read the file, so that we check if we can parse it correctly and that it is an avi file
+                for strh in find_strh_chunks_with_type(f, types):
+                    streams = streams + 1
+                    lang = strh.read_language(f)
+                    # check if this lang is valid
+
+                    if isinstance(lang, str):
+                        msg = _("Invalid language in avi detected: {lang}").format(
+                            lang=lang,
+                        )
+                        return Err(msg)
+
+                return Ok(
+                    VideoTaggerAVI(file, streams, types),
+                )
+        except (RuntimeError, ValueError, TypeError) as err:
+            return Err(str(err))
+
+    @override
+    def context(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContext]:
+
+        file = self.file
+        streams = self.__streams
+        types = self.__types
+
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
+            __writer: Optional[BufferedIOBase]
+            __backup: Optional[bytes]
+
+            def __init__(self: Self) -> None:
+                super().__init__()
+                self.__writer = None
+
+            @override
+            def __enter__(self: Self) -> VideoTaggerContext:
+                writer = file.open("rb+")
+
+                writer.seek(0, 2)
+                filesize = writer.tell()
+                writer.seek(0)
+
+                backup = writer.read(-1)
+
+                writer.seek(0)
+
+                if len(backup) != filesize:
+                    writer.close()
+                    msg = f"Error: reading file bytes for backup failed. didn't get enough bytes: {len(backup)} != {filesize}"
+                    raise RuntimeError(msg)
+
+                self.__writer = writer
+                self.__backup = backup
+
+                return VideoTaggerContextAVI(manager, writer, streams, types)
+
+            @override
+            def __exit__(
+                self: Self,
+                _exc_type: Optional[type[BaseException]],
+                exc_val: Optional[BaseException],
+                _exc_tb: Optional[TracebackType],
+            ) -> Literal[False]:  # actually bool
+                if self.__writer is not None:
+                    self.__writer.close()
+                    self.__writer = None
+
+                if exc_val is not None:
+                    if self.__backup is None:
+                        msg = "Backup for file not present"
+                        raise RuntimeError(msg) from exc_val
+
+                    # restore file backup
+                    restore_writer = file.open("rb+")
+                    restore_writer.truncate()
+                    restore_writer.write(self.__backup)
+                    restore_writer.close()
+                    print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
+
+                    self.__backup = None
+
+                if self.__backup is not None:
+                    self.__backup = None
+
+                return False
+
+        return VideoTaggerContextCtx()

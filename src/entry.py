@@ -17,7 +17,7 @@ from typing import (
     cast,
 )
 
-from content.tagger.mp4_tagger import merge_dicts
+from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
 from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger

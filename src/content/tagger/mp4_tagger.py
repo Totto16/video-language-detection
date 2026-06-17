@@ -32,6 +32,7 @@ from content.tagger.parser import (
     uuid_from_bytes,
     uuid_to_bytes,
 )
+from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
     TAGGER_DOMAIN,
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
@@ -2842,34 +2843,6 @@ class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]
 
-
-def merge_dicts(
-    dict1: dict[str, Any],
-    dict2: dict[str, Any],
-    duplicate_behaviour: Literal["overwrite", "error", "ignore"],
-) -> dict[str, Any]:
-    res: dict[str, Any] = {}
-    for key, value in dict1.items():
-        res[key] = value  # noqa: PERF403
-
-    for key, value in dict2.items():
-        if res.get(key, None) is not None:  # noqa: SIM910
-            if duplicate_behaviour == "error":
-                msg = f"Trying to merge duplicate key: {key}"
-                raise RuntimeError(msg)
-
-            if duplicate_behaviour == "overwrite":
-                res[key] = value
-            elif duplicate_behaviour == "ignore":
-                pass
-            else:
-                assert_never(duplicate_behaviour)
-        else:
-            res[key] = value
-
-    return res
-
-
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
     __meta_values: MetaValues
@@ -3585,7 +3558,7 @@ class VideoTaggerMP4(VideoTagger):
                 streams = 0
                 types: list[ISOMAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
 
-                # read the file, so that we check if we can parse it correctly and that it is an mp4
+                # read the file, so that we check if we can parse it correctly and that it is an mp4 file
                 for mdhd in find_mdhd_boxes_with_type(f, types):
                     streams = streams + 1
                     lang = mdhd.read_language(f)

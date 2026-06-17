@@ -43,11 +43,11 @@ from content.tagger.mp4_tagger import (
     VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
-    merge_dicts,
     mp4_iter_boxes,
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.parser import SimpleSpan
+from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import MetadataTags, uuid_to_str
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface

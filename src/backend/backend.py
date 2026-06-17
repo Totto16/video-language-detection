@@ -1816,7 +1816,6 @@ class BackendScanner:
         except RuntimeError as err:
             raise HTTPException(status_code=400, detail=str(err)) from None
 
-    # TODO: type correctly
     def status(self: Self) -> ScanStatusSerializable:
         state = self.__state.get_data()
         return scanner_state_to_serializable_data(state.state)
