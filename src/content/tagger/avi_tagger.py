@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from contextlib import AbstractContextManager
+from io import BytesIO
 from pathlib import Path
 from types import TracebackType
 from typing import Any, BinaryIO, Literal, Optional, Self, final, override
@@ -351,6 +352,36 @@ class AVIChunk(NonFinalAVIChunk):
 
         return None
 
+    @staticmethod
+    def write_to_buffer_avi_chunk(
+        fourcc: FOURCC,
+        data: bytes,
+    ) -> bytes:
+        buf = BytesIO()
+
+        # Note: size is the size after it, so 8 bytes less then the whole size (but the exact size as the data)
+        final_size: int = len(data)
+
+        hdr = Packer.pack_two(
+            AVI_BYTE_ORDER,
+            (PackableFOURCC(), UnsignedInt()),
+            (
+                fourcc,
+                final_size,
+            ),
+            8,
+        )
+
+        buf.write(hdr)
+
+        buf.write(data)
+
+        # align by WORD (2 bytes)
+        if buf.tell() % 2 != 0:
+            buf.write(b"\x00")
+
+        return buf.getvalue()
+
     def __str__(self: Self) -> str:
         return f"<AVIChunk fourcc: {self.fourcc} span: {self.span} is_list: {self.is_list}>"
 
@@ -404,8 +435,40 @@ class AVIList(AVIChunk):
     def __repr__(self: Self) -> str:
         return str(self)
 
-    def add_content_bytes() -> None:
-        pass
+    def add_content_afterwards_avi_list(
+        self: Self,
+        f: BinaryIO,
+        data: bytes,
+    ) -> Optional[str]:
+        # the exact same as the avi chunk method, but it might be different, this is an implementation detail
+
+        return self.add_content_afterwards_avi_chunk(f, data)
+
+    @staticmethod
+    def write_to_buffer_avi_list(
+        fourcc: FOURCC,
+        typ: FOURCC,
+        data: list[bytes],
+    ) -> bytes:
+
+        if fourcc not in [LIST_FOURCC, RIFF_FOURCC]:
+            msg = f"Only {LIST_FOURCC} and {RIFF_FOURCC} as list fourcc supported atm, but got: {fourcc}"
+            raise RuntimeError(msg)
+
+        buf = BytesIO()
+
+        buf.write(typ.value)
+
+        for single_data in data:
+            buf.write(single_data)
+
+            # align by WORD (2 bytes)
+            if buf.tell() % 2 != 0:
+                buf.write(b"\x00")
+
+        final_data = buf.getvalue()
+
+        return AVIChunk.write_to_buffer_avi_chunk(fourcc, final_data)
 
 
 @final
@@ -664,7 +727,49 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         tags: MetadataTags,
     ) -> None:
 
-        print("TODO")
+        f = self.__writer
+
+        f.seek(0, 2)
+        filesize = f.tell()
+
+        span = SimpleSpan(0, filesize)
+
+        top_level_chunks = list(avi_iter_chunks(f, span))
+
+        if len(top_level_chunks) != 1:
+            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
+            raise RuntimeError(msg)
+
+        top_level_chunk = top_level_chunks[0]
+
+        if not isinstance(top_level_chunk, AVIList):
+            msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk}"
+            raise TypeError(msg)
+
+        if top_level_chunk.fourcc != RIFF_FOURCC:
+            msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk.fourcc}"
+            raise TypeError(msg)
+
+        icmt_data = AVIChunk.write_to_buffer_avi_chunk(
+            FOURCC(b"ICMT"),
+            b"Test Comment\x00",
+        )
+
+        # vldc stands for video language detector chunk
+        CUSTOM_FOURCC = FOURCC(b"vldc")
+
+        custom_data = AVIChunk.write_to_buffer_avi_chunk(
+            CUSTOM_FOURCC,
+            b"Test Custom data\x00",
+        )
+
+        info_list_data = AVIList.write_to_buffer_avi_list(
+            LIST_FOURCC,
+            FOURCC(b"INFO"),
+            [icmt_data, custom_data],
+        )
+
+        top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
 
     @override
     def write_language(
