@@ -17,12 +17,16 @@ from content.language import Language
 from content.tagger.parser import ISOM_BYTE_ORDER, uuid_from_bytes, uuid_to_bytes
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    ContextType,
     MetadataTags,
     MetadataTagsRead,
     SerializableDict,
     TaggerDomain,
     VideoTagger,
-    VideoTaggerContext,
+    VideoTaggerContextReadable,
+    VideoTaggerContextRW,
+    VideoTaggerContextWrapperGeneric,
+    VideoTaggerContextWriteable,
     uuid_from_str,
     uuid_to_str,
 )
@@ -190,12 +194,12 @@ class MutagenFileWrapper(IOInterface):
         file: Path,
         chunk_size: int,
         *,
-        read_only: bool = False,
+        ctx: ContextType,
     ) -> None:
         super().__init__()
 
         self.__file = file
-        self.__impl = self.__file.open(mode="rb" if read_only else "rb+")
+        self.__impl = self.__file.open(mode="rb" if ctx == "r" else "rb+")
         self.__callbacks = []
         self.__chunk_size = chunk_size
 
@@ -338,7 +342,7 @@ class MutagenFileWrapper(IOInterface):
         return CallbackCtx()
 
 
-class VideoTaggerContextMutagen(VideoTaggerContext):
+class VideoTaggerContextMutagen(VideoTaggerContextRW):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
 
@@ -595,7 +599,7 @@ class VideoTaggerMutagen(VideoTagger):
     def __get_handle_impl(
         file: Path,
         *,
-        read_only: bool,
+        ctx: ContextType,
     ) -> Result[
         tuple[MutagenFileWrapper, mutagen.FileType],
         str,
@@ -603,7 +607,7 @@ class VideoTaggerMutagen(VideoTagger):
         filething = MutagenFileWrapper(
             file=file,
             chunk_size=PROGRESS_CHUNK_SIZE,
-            read_only=read_only,
+            ctx=ctx,
         )
 
         try:
@@ -627,7 +631,7 @@ class VideoTaggerMutagen(VideoTagger):
 
     @staticmethod
     def get_handle(file: Path) -> Result["VideoTaggerMutagen", str]:
-        result = VideoTaggerMutagen.__get_handle_impl(file, read_only=True)
+        result = VideoTaggerMutagen.__get_handle_impl(file, ctx="r")
 
         if result.err():
             return Err(result.as_err())
@@ -638,14 +642,14 @@ class VideoTaggerMutagen(VideoTagger):
 
         return Ok(VideoTaggerMutagen(file))
 
-    @override
-    def context(
+    def __context_impl(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerContext]:
+        ctx: ContextType,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
 
         def get_things() -> tuple[MutagenFileWrapper, mutagen.FileType]:
-            result = VideoTaggerMutagen.__get_handle_impl(self.__file, read_only=False)
+            result = VideoTaggerMutagen.__get_handle_impl(self.__file, ctx=ctx)
 
             if result.err():
                 msg = _(
@@ -655,21 +659,25 @@ class VideoTaggerMutagen(VideoTagger):
 
             return result.as_ok()
 
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
             __filething: Optional[MutagenFileWrapper]
 
             def __init__(self: Self) -> None:
                 self.__filething = None
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContext:
+            def __enter__(self: Self) -> VideoTaggerContextRW:
                 filething, instance = get_things()
                 self.__filething = filething
 
-                return VideoTaggerContextMutagen(
-                    filething=filething,
-                    instance=instance,
-                    manager=manager,
+                return VideoTaggerContextWrapperGeneric(
+                    manager,
+                    VideoTaggerContextMutagen(
+                        filething=filething,
+                        instance=instance,
+                        manager=manager,
+                    ),
+                    ctx,
                 )
 
             @override
@@ -684,3 +692,24 @@ class VideoTaggerMutagen(VideoTagger):
                 return False
 
         return VideoTaggerContextCtx()
+
+    @override
+    def r_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextReadable]:
+        return self.__context_impl(manager, "r")
+
+    @override
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]:
+        return self.__context_impl(manager, "w")
+
+    @override
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
+        return self.__context_impl(manager, "rw")

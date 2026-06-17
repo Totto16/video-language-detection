@@ -250,7 +250,7 @@ class EpisodeContent(Content):
                     global_counter_wip -= 1
                     print(f"Tagging file {self.scanned_file.path}")
 
-                    with handle.context(manager=manager) as ctx:
+                    with handle.rw_ctx(manager=manager) as ctx:
                         # check if the file can be parsed
                         ctx.get_tags()
 

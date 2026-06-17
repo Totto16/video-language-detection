@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, override
+from typing import Any, Literal, Optional, Self, assert_never, cast, override
 from uuid import UUID
 
 from content.language import Language
@@ -41,7 +41,7 @@ class MetadataTagsRead:
     unrecognized: list[tuple[str, str]]
 
 
-class VideoTaggerContext(ABC):
+class VideoTaggerContextInterface(ABC):
     __manager: ManagerInterface
 
     def __init__(
@@ -51,6 +51,19 @@ class VideoTaggerContext(ABC):
         super().__init__()
         self.__manager = manager
 
+    @property
+    def manager(self: Self) -> ManagerInterface:
+        return self.__manager
+
+
+class VideoTaggerContextReadable(VideoTaggerContextInterface):
+    @abstractmethod
+    def get_tags(
+        self: Self,
+    ) -> MetadataTagsRead: ...
+
+
+class VideoTaggerContextWriteable(VideoTaggerContextInterface):
     @abstractmethod
     def write_tags(
         self: Self,
@@ -63,14 +76,9 @@ class VideoTaggerContext(ABC):
         language: Language,
     ) -> bool: ...
 
-    @abstractmethod
-    def get_tags(
-        self: Self,
-    ) -> MetadataTagsRead: ...
 
-    @property
-    def manager(self: Self) -> ManagerInterface:
-        return self.__manager
+class VideoTaggerContextRW(VideoTaggerContextReadable, VideoTaggerContextWriteable):
+    pass
 
 
 class VideoTagger(ABC):
@@ -81,23 +89,80 @@ class VideoTagger(ABC):
         self.__file = file
 
     @abstractmethod
-    def context(
+    def r_ctx(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerContext]: ...
+    ) -> AbstractContextManager[VideoTaggerContextReadable]: ...
+
+    @abstractmethod
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]: ...
+
+    @abstractmethod
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]: ...
 
     @property
     def file(self: Self) -> Path:
         return self.__file
 
 
-class VideoTaggerContextMultiple(VideoTaggerContext):
-    __contexts: list[AbstractContextManager[VideoTaggerContext]]
+ContextType = Literal["r", "w", "rw"]
+
+
+class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
+    __impl: VideoTaggerContextRW
+    __ctx: ContextType
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        contexts: list[AbstractContextManager[VideoTaggerContext]],
+        impl: VideoTaggerContextRW,
+        ctx: ContextType,
+    ) -> None:
+        super().__init__(manager)
+        self.__impl = impl
+        self.__ctx = ctx
+
+    @override
+    def write_tags(self: Self, tags: MetadataTags) -> None:
+        if self.__ctx not in ["w", "rw"]:
+            msg = f"Invalid context: can't write with the type '{self.__ctx}'"
+            raise RuntimeError(msg)
+
+        return self.__impl.write_tags(tags)
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        if self.__ctx not in ["w", "rw"]:
+            msg = f"Invalid context: can't write with the type '{self.__ctx}'"
+            raise RuntimeError(msg)
+
+        return self.__impl.write_language(language)
+
+    @override
+    def get_tags(self: Self) -> MetadataTagsRead:
+        if self.__ctx not in ["r", "rw"]:
+            msg = f"Invalid context: can't read with the type '{self.__ctx}'"
+            raise RuntimeError(msg)
+
+        return self.__impl.get_tags()
+
+
+class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
+    __contexts: list[AbstractContextManager[VideoTaggerContextRW]]
+
+    def __init__(
+        self: Self,
+        manager: ManagerInterface,
+        contexts: list[AbstractContextManager[VideoTaggerContextRW]],
     ) -> None:
         super().__init__(manager)
         self.__contexts = contexts
@@ -134,21 +199,44 @@ class VideoTaggerMultiple(VideoTagger):
         super().__init__(file)
         self.__tagger = tagger
 
-    @override
-    def context(
+    def __context_impl(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerContext]:
-        contexts = [tagger.context(manager) for tagger in self.__tagger]
+        ctx: ContextType,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
 
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
+        def get_context(
+            tgr: VideoTagger,
+        ) -> AbstractContextManager[VideoTaggerContextInterface]:
+            match ctx:
+                case "r":
+                    return tgr.r_ctx(manager)
+                case "w":
+                    return tgr.w_ctx(manager)
+                case "rw":
+                    return tgr.rw_ctx(manager)
+                case _:
+                    assert_never(ctx)
+
+        contexts = [get_context(tagger) for tagger in self.__tagger]
+
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
 
             def __init__(self: Self) -> None:
                 pass
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContext:
-                return VideoTaggerContextMultiple(manager, contexts)
+            def __enter__(self: Self) -> VideoTaggerContextRW:
+                return VideoTaggerContextWrapperGeneric(
+                    manager,
+                    VideoTaggerContextMultipleRW(
+                        manager,
+                        cast(
+                            list[AbstractContextManager[VideoTaggerContextRW]], contexts,
+                        ),
+                    ),
+                    ctx,
+                )
 
             @override
             def __exit__(
@@ -160,6 +248,27 @@ class VideoTaggerMultiple(VideoTagger):
                 return False
 
         return VideoTaggerContextCtx()
+
+    @override
+    def r_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextReadable]:
+        return self.__context_impl(manager, "r")
+
+    @override
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]:
+        return self.__context_impl(manager, "w")
+
+    @override
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
+        return self.__context_impl(manager, "rw")
 
 
 TAGGER_DOMAIN = "lt.totto.vld"

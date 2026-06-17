@@ -1,9 +1,9 @@
 import json
 from collections.abc import Callable
 from copy import deepcopy
-from io import BufferedIOBase, BytesIO
+from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional, Self, override
+from typing import Any, BinaryIO, Optional, Self, override
 from unittest import mock
 from uuid import uuid4
 
@@ -286,7 +286,7 @@ class RecursiveChunks:
         return hash(*self.__data)
 
 
-def list_all_chunks_recursively(f: BufferedIOBase) -> RecursiveChunks:
+def list_all_chunks_recursively(f: BinaryIO) -> RecursiveChunks:
     f.seek(0, 2)
     filesize = f.tell()
 
@@ -643,8 +643,8 @@ def test_mp4_tagger_metadata_tags_custom(
 
                 tagger = tagger_res.as_ok()
 
-                with tagger.context(manager=test_manager) as w:
-                    early_tags = w.get_tags()
+                with tagger.rw_ctx(manager=test_manager) as ctx:
+                    early_tags = ctx.get_tags()
 
                     assert early_tags.uuid is None, "uuid can't be found yet"
                     assert [
@@ -664,9 +664,9 @@ def test_mp4_tagger_metadata_tags_custom(
                         or keys_that_are_not_none(ffprobe_metadata_early) == []
                     ), "raw ffprobe metadata is empty at start"
 
-                    w.write_tags(tags)
+                    ctx.write_tags(tags)
 
-                    next_tags = w.get_tags()
+                    next_tags = ctx.get_tags()
 
                     assert next_tags.uuid == tags.uuid, "UUID was written correctly"
                     assert (
@@ -721,9 +721,9 @@ def test_mp4_tagger_metadata_tags_custom(
 
                     assert new_tags.uuid != tags.uuid, "UUID should be unique"
 
-                    w.write_tags(new_tags)
+                    ctx.write_tags(new_tags)
 
-                    write_again_tags = w.get_tags()
+                    write_again_tags = ctx.get_tags()
 
                     assert (
                         write_again_tags.uuid == next_tags.uuid

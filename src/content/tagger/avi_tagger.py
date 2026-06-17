@@ -1,9 +1,8 @@
 from collections.abc import Generator
 from contextlib import AbstractContextManager
-from io import BufferedIOBase
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, final, override
 
 from content.language import Language, ShortLanguageStr
 from content.tagger.lcid_languages import LCID
@@ -19,10 +18,14 @@ from content.tagger.parser import (
 )
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+    ContextType,
     MetadataTags,
     MetadataTagsRead,
     VideoTagger,
-    VideoTaggerContext,
+    VideoTaggerContextReadable,
+    VideoTaggerContextRW,
+    VideoTaggerContextWrapperGeneric,
+    VideoTaggerContextWriteable,
 )
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
@@ -425,7 +428,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
         # offset from the own header start, not the start of the whole chunk!
         return 4 + 4 + 4 + 2
 
-    def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
+    def read_language(self: Self, io_base: BinaryIO) -> ShortLanguageStr | str:
         io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.r_ctx(force_entire_read=False) as f:
@@ -438,7 +441,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
 
     def patch_language(
         self: Self,
-        io_base: BufferedIOBase,
+        io_base: BinaryIO,
         new_language: ShortLanguageStr,
     ) -> None:
         packed = LCID.encode_language(new_language)
@@ -484,7 +487,7 @@ def read_chunk(io: BoundedIO) -> AVIChunk:
 
 
 def avi_iter_chunks(
-    io_base: BufferedIOBase,
+    io_base: BinaryIO,
     span: SimpleSpan,
 ) -> Generator[AVIChunk]:
     pos = span.start
@@ -514,7 +517,7 @@ def avi_iter_chunks(
 
 
 def find_strh_chunks_with_type(
-    f: BufferedIOBase,
+    f: BinaryIO,
     types: list[FOURCC],
 ) -> Generator[AVIStreamHeader]:
     f.seek(0, 2)
@@ -555,7 +558,7 @@ def find_strh_chunks_with_type(
 
 
 def is_avi_file(
-    f: BufferedIOBase,
+    f: BinaryIO,
 ) -> Optional[str]:
     f.seek(0)
 
@@ -583,15 +586,15 @@ def is_avi_file(
     return None
 
 
-class VideoTaggerContextAVI(VideoTaggerContext):
-    __writer: BufferedIOBase
+class VideoTaggerContextAVI(VideoTaggerContextRW):
+    __writer: BinaryIO
     __streams: int
     __types: list[FOURCC]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        writer: BufferedIOBase,
+        writer: BinaryIO,
         streams: int,
         types: list[FOURCC],
     ) -> None:
@@ -702,18 +705,18 @@ class VideoTaggerAVI(VideoTagger):
         except (RuntimeError, ValueError, TypeError) as err:
             return Err(str(err))
 
-    @override
-    def context(
+    def __context_impl(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerContext]:
+        ctx: ContextType,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
 
         file = self.file
         streams = self.__streams
         types = self.__types
 
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
-            __writer: Optional[BufferedIOBase]
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
+            __writer: Optional[BinaryIO]
             __backup: Optional[bytes]
 
             def __init__(self: Self) -> None:
@@ -721,8 +724,8 @@ class VideoTaggerAVI(VideoTagger):
                 self.__writer = None
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContext:
-                writer = file.open("rb+")
+            def __enter__(self: Self) -> VideoTaggerContextRW:
+                writer = file.open(mode="rb" if ctx == "r" else "rb+")
 
                 writer.seek(0, 2)
                 filesize = writer.tell()
@@ -740,7 +743,11 @@ class VideoTaggerAVI(VideoTagger):
                 self.__writer = writer
                 self.__backup = backup
 
-                return VideoTaggerContextAVI(manager, writer, streams, types)
+                return VideoTaggerContextWrapperGeneric(
+                    manager,
+                    VideoTaggerContextAVI(manager, writer, streams, types),
+                    ctx,
+                )
 
             @override
             def __exit__(
@@ -773,3 +780,24 @@ class VideoTaggerAVI(VideoTagger):
                 return False
 
         return VideoTaggerContextCtx()
+
+    @override
+    def r_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextReadable]:
+        return self.__context_impl(manager, "r")
+
+    @override
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]:
+        return self.__context_impl(manager, "w")
+
+    @override
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
+        return self.__context_impl(manager, "rw")

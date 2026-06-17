@@ -4,9 +4,10 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from enum import StrEnum
-from io import BufferedIOBase, UnsupportedOperation
+from io import UnsupportedOperation
 from types import TracebackType
 from typing import (
+    BinaryIO,
     Literal,
     Optional,
     Protocol,
@@ -59,16 +60,16 @@ class BoundedIOWriteable(Protocol):
     def flush(self: Self) -> None: ...
 
 
-class BoundedIORW(BoundedIOWriteable, BoundedIOReadable):
+class BoundedIORW(BoundedIOReadable, BoundedIOWriteable):
     pass
 
 
 class ExclusiveIOBase:
-    __f: BufferedIOBase
+    __f: BinaryIO
 
     __holder: int
 
-    def __init__(self: Self, io_base: BufferedIOBase) -> None:
+    def __init__(self: Self, io_base: BinaryIO) -> None:
         self.__f = io_base
 
         self.__holder = id(None)
@@ -170,7 +171,7 @@ class BoundedIO:
         self.__reset_seek()
 
     @staticmethod
-    def get_new(io_base: BufferedIOBase, span: SimpleSpan) -> "BoundedIO":
+    def get_new(io_base: BinaryIO, span: SimpleSpan) -> "BoundedIO":
         return BoundedIO(ExclusiveIOBase(io_base), span)
 
     def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:

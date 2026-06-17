@@ -3,11 +3,12 @@ from collections.abc import Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
-from io import BufferedIOBase, BytesIO
+from io import BytesIO
 from pathlib import Path
 from types import TracebackType
 from typing import (
     Any,
+    BinaryIO,
     Literal,
     Optional,
     Self,
@@ -37,13 +38,17 @@ from content.tagger.video_tagger import (
     TAGGER_DOMAIN,
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     AppleItunesFreeformKey,
+    ContextType,
     MetadataTags,
     MetadataTagsRead,
     SerializableDict,
     SerializableDictValue,
     TaggerDomain,
     VideoTagger,
-    VideoTaggerContext,
+    VideoTaggerContextReadable,
+    VideoTaggerContextRW,
+    VideoTaggerContextWrapperGeneric,
+    VideoTaggerContextWriteable,
     uuid_from_str,
     uuid_to_str,
 )
@@ -988,7 +993,7 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
 
         return value
 
-    def read_language(self: Self, io_base: BufferedIOBase) -> ShortLanguageStr | str:
+    def read_language(self: Self, io_base: BinaryIO) -> ShortLanguageStr | str:
         io = self.header_io(BoundedIO.get_new(io_base, self.span.total), -1)
 
         with io.r_ctx(force_entire_read=False) as f:
@@ -1001,7 +1006,7 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
 
     def patch_language(
         self: Self,
-        io_base: BufferedIOBase,
+        io_base: BinaryIO,
         new_language: ShortLanguageStr,
     ) -> None:
         packed = MediaHeaderBox.__encode_language_impl(new_language)
@@ -2726,7 +2731,7 @@ def read_box(io: BoundedIO) -> MP4Box:
 
 
 def mp4_iter_boxes(
-    io_base: BufferedIOBase,
+    io_base: BinaryIO,
     span: SimpleSpan,
 ) -> Generator[MP4Box]:
     pos = span.start
@@ -2760,7 +2765,7 @@ def mp4_iter_boxes_io(io: BoundedIO) -> Generator[MP4Box]:
 
 
 def find_mdhd_boxes_with_type(
-    f: BufferedIOBase,
+    f: BinaryIO,
     types: list[ISOMAtomName],
 ) -> Generator[MediaHeaderBox]:
     f.seek(0, 2)
@@ -2804,7 +2809,7 @@ def find_mdhd_boxes_with_type(
 
 
 def is_mp4_file(
-    f: BufferedIOBase,
+    f: BinaryIO,
 ) -> Optional[str]:
     f.seek(0)
 
@@ -2843,6 +2848,7 @@ class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]
 
+
 class Mp4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
     __meta_values: MetaValues
@@ -2858,14 +2864,14 @@ class Mp4MetadataHandler:
         self.__meta_values = meta_values
         self.__our_boxes = our_boxes
 
-    def remove_old_metadata(self: Self, f: BufferedIOBase) -> None:
+    def remove_old_metadata(self: Self, f: BinaryIO) -> None:
         # delete old metadata
         if len(self.__our_boxes) != 0:
             f.truncate(self.__our_boxes[0].span.total.start)
 
     def __write_metadata_toplevel_meta(
         self: Self,
-        f: BufferedIOBase,
+        f: BinaryIO,
         tags: MetadataTags,
     ) -> None:
         if self.__meta_values.err():
@@ -2958,7 +2964,7 @@ class Mp4MetadataHandler:
 
     def __write_metadata_custom(
         self: Self,
-        f: BufferedIOBase,
+        f: BinaryIO,
         tags: MetadataTags,
     ) -> None:
         # note: can write 0 or more free space or user extension boxes, and there both allowed everywhere
@@ -2987,7 +2993,7 @@ class Mp4MetadataHandler:
 
         f.flush()
 
-    def write_new_metadata(self: Self, f: BufferedIOBase, tags: MetadataTags) -> None:
+    def write_new_metadata(self: Self, f: BinaryIO, tags: MetadataTags) -> None:
         f.seek(0, 2)
 
         self.__write_metadata_toplevel_meta(f, tags)
@@ -3024,7 +3030,7 @@ class Mp4MetadataHandler:
     def __read_metadata_toplevel_meta(  # noqa: PLR0915
         self: Self,
         box: MetaBox,
-        f: BufferedIOBase,
+        f: BinaryIO,
     ) -> ReadMetadataImpl:
         metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
 
@@ -3171,7 +3177,7 @@ class Mp4MetadataHandler:
 
     def read_metadata(
         self: Self,
-        f: BufferedIOBase,
+        f: BinaryIO,
     ) -> ReadMetadataImpl:
         custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
         meta_box: Optional[MetaBox] = None
@@ -3215,7 +3221,7 @@ class Mp4MetadataHandler:
     @staticmethod
     def __read_meta_box_info(
         meta_box: MetaBox,
-        f: BufferedIOBase,
+        f: BinaryIO,
     ) -> ReadMetaBoxValues:
         meta_child_boxes = list(
             mp4_iter_boxes(f, meta_box.span.payload_span),
@@ -3268,7 +3274,7 @@ class Mp4MetadataHandler:
 
     @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
-        f: BufferedIOBase,
+        f: BinaryIO,
     ) -> "Mp4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
@@ -3380,15 +3386,15 @@ class Mp4MetadataHandler:
         )
 
 
-class VideoTaggerContextMP4(VideoTaggerContext):
-    __writer: BufferedIOBase
+class VideoTaggerContextMP4(VideoTaggerContextRW):
+    __writer: BinaryIO
     __streams: int
     __types: list[ISOMAtomName]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        writer: BufferedIOBase,
+        writer: BinaryIO,
         streams: int,
         types: list[ISOMAtomName],
     ) -> None:
@@ -3576,18 +3582,18 @@ class VideoTaggerMP4(VideoTagger):
         except (RuntimeError, ValueError, TypeError) as err:
             return Err(str(err))
 
-    @override
-    def context(
+    def __context_impl(
         self: Self,
         manager: ManagerInterface,
-    ) -> AbstractContextManager[VideoTaggerContext]:
+        ctx: ContextType,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
 
         file = self.file
         streams = self.__streams
         types = self.__types
 
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContext]):
-            __writer: Optional[BufferedIOBase]
+        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
+            __writer: Optional[BinaryIO]
             __backup: Optional[bytes]
 
             def __init__(self: Self) -> None:
@@ -3595,8 +3601,8 @@ class VideoTaggerMP4(VideoTagger):
                 self.__writer = None
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContext:
-                writer = file.open("rb+")
+            def __enter__(self: Self) -> VideoTaggerContextRW:
+                writer = file.open(mode="rb" if ctx == "r" else "rb+")
 
                 writer.seek(0, 2)
                 filesize = writer.tell()
@@ -3614,7 +3620,11 @@ class VideoTaggerMP4(VideoTagger):
                 self.__writer = writer
                 self.__backup = backup
 
-                return VideoTaggerContextMP4(manager, writer, streams, types)
+                return VideoTaggerContextWrapperGeneric(
+                    manager,
+                    VideoTaggerContextMP4(manager, writer, streams, types),
+                    ctx,
+                )
 
             @override
             def __exit__(
@@ -3647,3 +3657,24 @@ class VideoTaggerMP4(VideoTagger):
                 return False
 
         return VideoTaggerContextCtx()
+
+    @override
+    def r_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextReadable]:
+        return self.__context_impl(manager, "r")
+
+    @override
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]:
+        return self.__context_impl(manager, "w")
+
+    @override
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
+        return self.__context_impl(manager, "rw")

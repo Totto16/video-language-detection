@@ -583,7 +583,7 @@ def subcommand_tagger_read(
 
     manager = NoopManager()
 
-    with handle.context(manager=manager) as ctx:
+    with handle.r_ctx(manager=manager) as ctx:
         tags = ctx.get_tags()
 
         logger.info(_("Read tags:"))
@@ -659,7 +659,7 @@ def subcommand_tagger_write(
         metadata=metadata,
     )
 
-    with handle.context(manager=tui_manager) as ctx:
+    with handle.w_ctx(manager=tui_manager) as ctx:
         ctx.write_tags(write_tags)
 
         logger.info(_("Wrote tags:"))
@@ -675,7 +675,7 @@ def subcommand_tagger_write(
 
     noop_manager = NoopManager()
 
-    with handle.context(manager=noop_manager) as ctx:
+    with handle.r_ctx(manager=noop_manager) as ctx:
         tags = ctx.get_tags()
 
         print()  # noqa: T201
