@@ -299,6 +299,58 @@ class AVIChunk(NonFinalAVIChunk):
             self.span.header_span(depth),
         )
 
+    def add_content_afterwards_avi_chunk(
+        self: Self,
+        f: BinaryIO,
+        data: bytes,
+    ) -> Optional[str]:
+        # TODO: check, that we are the top level chunk, otherwise we might need some data changes, alias relocation
+
+        f.seek(0, 2)
+        filesize = f.tell()
+        f.seek(0)
+
+        if self.span.total.start != 0 and self.span.total.end != filesize:
+            return f"Can't add content to a non toplevel AVI chunk: {self.span}"
+
+        old_size = self.span.total.size
+        new_size = old_size + len(data)
+
+        # align by WORD (2 bytes)
+        if (old_size % 2) != 0:
+            new_size = new_size + 1
+            data = b"\x00" + data
+
+        # Note: size is the size after it, so 8 bytes less then the whole size
+        if (new_size - 8) >= 0xFFFFFFFF:
+            return f"Size is too big, can't fit in the AVI chunk size: {new_size - 8}"
+
+        io = BoundedIO.get_new(io_base=f, span=self.span.total)
+
+        # write the new size
+        with self.header_io(io).rw_ctx(force_entire_read=True) as ctx:
+            ctx.skip(4)
+
+            size_bytes = Packer.pack_one(
+                AVI_BYTE_ORDER,
+                UnsignedInt(),
+                new_size,
+                4,
+            )
+
+            ctx.write(size_bytes)
+            ctx.flush()
+
+        f.seek(old_size)
+
+        if filesize != f.tell():
+            return "can't write over other chunks atm"
+
+        f.write(data)
+        f.flush()
+
+        return None
+
     def __str__(self: Self) -> str:
         return f"<AVIChunk fourcc: {self.fourcc} span: {self.span} is_list: {self.is_list}>"
 
@@ -351,6 +403,9 @@ class AVIList(AVIChunk):
 
     def __repr__(self: Self) -> str:
         return str(self)
+
+    def add_content_bytes() -> None:
+        pass
 
 
 @final
@@ -608,7 +663,8 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         self: Self,
         tags: MetadataTags,
     ) -> None:
-        raise NotImplementedError("TODO")
+
+        print("TODO")
 
     @override
     def write_language(
@@ -649,11 +705,48 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
 
         return True
 
+    def __impl(
+        self: Self,
+        f: BinaryIO,
+        span: SimpleSpan,
+        depth: int,
+    ) -> None:
+        for chunk in avi_iter_chunks(f, span):
+            if chunk.is_list:
+                if not isinstance(chunk, AVIList):
+                    msg = "Invalid AVIList: type not dispatched to correct class"
+                    raise ValueError(msg)
+
+                msg = ("  " * depth) + f"{chunk.fourcc} - {chunk.type}"
+                print(msg)
+                self.__impl(f, chunk.span.payload_span, depth + 1)
+
+                # if chunk.type == b"INFO":
+                #     print("             INFO chunk: ")
+                #     f.seek(chunk.span.total.start)
+                #     c = f.read(chunk.span.total.size)
+                #     print(c)
+
+                continue
+
+            msg = ("  " * depth) + f"{chunk.fourcc}"
+            print(msg)
+
     @override
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead:
-        raise NotImplementedError("TODO")
+        f = self.__writer
+
+        f.seek(0, 2)
+        filesize = f.tell()
+
+        span = SimpleSpan(0, filesize)
+
+        self.__impl(f, span, 0)
+
+        return MetadataTagsRead(None, None, {}, [])
+        # raise NotImplementedError("TODO")
 
 
 class VideoTaggerAVI(VideoTagger):
