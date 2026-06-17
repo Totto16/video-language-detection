@@ -335,7 +335,7 @@ class AVIChunk(NonFinalAVIChunk):
             size_bytes = Packer.pack_one(
                 AVI_BYTE_ORDER,
                 UnsignedInt(),
-                new_size,
+                new_size - 8,
                 4,
             )
 
