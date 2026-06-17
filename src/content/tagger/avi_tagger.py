@@ -762,11 +762,27 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
             CUSTOM_FOURCC,
             b"Test Custom data\x00",
         )
+        
+        custom_data3 = AVIChunk.write_to_buffer_avi_chunk(
+            FOURCC(b"icop"),
+            b"ICOP DATA\x00",
+        )
+
+        custom_data4 = AVIChunk.write_to_buffer_avi_chunk(
+            FOURCC(b"IGNR"),
+            b"IGNR DATA\x00",
+        )
+
+        custom_data2 = AVIList.write_to_buffer_avi_list(
+            LIST_FOURCC,
+            FOURCC(b"vldl"),
+            [custom_data],
+        )
 
         info_list_data = AVIList.write_to_buffer_avi_list(
             LIST_FOURCC,
             FOURCC(b"INFO"),
-            [icmt_data, custom_data],
+            [icmt_data, custom_data, custom_data2,custom_data3,custom_data4],
         )
 
         top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
