@@ -766,11 +766,12 @@ class VideoTaggerAVI(VideoTagger):
                         raise RuntimeError(msg) from exc_val
 
                     # restore file backup
-                    restore_writer = file.open("rb+")
-                    restore_writer.truncate()
-                    restore_writer.write(self.__backup)
-                    restore_writer.close()
-                    print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
+                    if ctx != "r":
+                        restore_writer = file.open("rb+")
+                        restore_writer.truncate()
+                        restore_writer.write(self.__backup)
+                        restore_writer.close()
+                        print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
 
                     self.__backup = None
 
