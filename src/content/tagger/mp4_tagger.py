@@ -2868,11 +2868,6 @@ class MP4MetadataHandler:
         self.__meta_values = meta_values
         self.__our_boxes = our_boxes
 
-    def remove_old_metadata(self: Self, f: BinaryIO) -> None:
-        # delete old metadata
-        if len(self.__our_boxes) != 0:
-            f.truncate(self.__our_boxes[0].span.total.start)
-
     def __write_metadata_toplevel_meta(
         self: Self,
         f: BinaryIO,
@@ -2998,6 +2993,11 @@ class MP4MetadataHandler:
         f.flush()
 
     def write_new_metadata(self: Self, f: BinaryIO, tags: MetadataTags) -> None:
+
+        # delete old metadata, this can be done, as the top level consists of multiple boxes, and no sizes need to be changed
+        if len(self.__our_boxes) != 0:
+            f.truncate(self.__our_boxes[0].span.total.start)
+
         f.seek(0, 2)
 
         self.__write_metadata_toplevel_meta(f, tags)
@@ -3422,7 +3422,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
         # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
         bar: CounterInterface = self.manager.counter(
-            total=float(3),
+            total=float(2),
             desc="update mp4 metadata tags",
             unit="B",
             leave=False,
@@ -3435,10 +3435,6 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
             mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
                 f=self.__writer,
             )
-
-            bar.update(1, force=True)
-
-            mp4_metadata_handler.remove_old_metadata(self.__writer)
 
             bar.update(1, force=True)
 

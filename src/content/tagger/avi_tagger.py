@@ -249,6 +249,20 @@ class AVIChunkSpan:
     def total(self: Self) -> SimpleSpan:
         return self.__total
 
+    def validate_truncation(self: Self, new_total_size: int) -> None:
+        # NOTE: ATM only supported for filelevel spans, alias starting at 0!
+        if self.__total.start != 0:
+            msg = f"validate_truncation only supported for spans starting at 0, but this starts at {self.__total.start }"
+            raise RuntimeError(msg)
+
+        last_span = self.__interval_span_impl(len(self.__intervals))
+
+        if last_span.start > new_total_size:
+            msg = f"truncation would remove too much of the size: {last_span.start} > {new_total_size}"
+            raise RuntimeError(msg)
+
+        self.__total = self.__total.sub_span(new_total_size)
+
     def __str__(self: Self) -> str:
         header_string = ", ".join(
             str(self.header_span(i)) for i in range(len(self.__intervals))
@@ -345,31 +359,27 @@ class AVIChunk(NonFinalAVIChunk):
             self.span.header_span(depth),
         )
 
-    def add_content_afterwards_avi_chunk(
-        self: Self,
-        f: BinaryIO,
-        data: bytes,
-    ) -> Optional[str]:
+    def adjust_size(self: Self, f: BinaryIO, new_size: int) -> Optional[str]:
         # TODO: check, that we are the top level chunk, otherwise we might need some data changes, alias relocation
 
         f.seek(0, 2)
         filesize = f.tell()
         f.seek(0)
 
-        if self.span.total.start != 0 and self.span.total.end != filesize:
+        if self.span.total.start != 0 or self.span.total.end < filesize:
             return f"Can't add content to a non toplevel AVI chunk: {self.span}"
 
-        old_size = self.span.total.size
-        new_size = old_size + len(data)
+        if self.span.total.end > filesize:
+            # need to adjust the span, as we just truncated the file
+            self.span.validate_truncation(filesize)
 
-        # align by WORD (2 bytes)
-        if (old_size % 2) != 0:
-            new_size = new_size + 1
-            data = b"\x00" + data
+        old_size = self.span.total.size
+
+        new_avi_size = new_size - 8
 
         # Note: size is the size after it, so 8 bytes less then the whole size
-        if (new_size - 8) >= 0xFFFFFFFF:
-            return f"Size is too big, can't fit in the AVI chunk size: {new_size - 8}"
+        if new_avi_size >= 0xFFFFFFFF:
+            return f"Size is too big, can't fit in the AVI chunk size: {new_avi_size}"
 
         io = BoundedIO.get_new(io_base=f, span=self.span.total)
 
@@ -380,7 +390,7 @@ class AVIChunk(NonFinalAVIChunk):
             size_bytes = Packer.pack_one(
                 AVI_BYTE_ORDER,
                 UnsignedInt(),
-                new_size - 8,
+                new_avi_size,
                 4,
             )
 
@@ -391,6 +401,27 @@ class AVIChunk(NonFinalAVIChunk):
 
         if filesize != f.tell():
             return "can't write over other chunks atm"
+
+        return None
+
+    def add_content_after_avi_chunk(
+        self: Self,
+        f: BinaryIO,
+        data: bytes,
+    ) -> Optional[str]:
+
+        old_size = self.span.total.size
+
+        new_size = old_size + len(data)
+
+        # align by WORD (2 bytes)
+        if (old_size % 2) != 0:
+            new_size = new_size + 1
+            data = b"\x00" + data
+
+        res = self.adjust_size(f, new_size)
+        if res is not None:
+            return res
 
         f.write(data)
         f.flush()
@@ -483,14 +514,14 @@ class AVIList(AVIChunk):
     def __repr__(self: Self) -> str:
         return str(self)
 
-    def add_content_afterwards_avi_list(
+    def add_content_after_avi_list(
         self: Self,
         f: BinaryIO,
         data: bytes,
     ) -> Optional[str]:
         # the exact same as the avi chunk method, but it might be different, this is an implementation detail
 
-        return self.add_content_afterwards_avi_chunk(f, data)
+        return self.add_content_after_avi_chunk(f, data)
 
     @staticmethod
     def write_to_buffer_avi_list(
@@ -1288,16 +1319,49 @@ class AVIMetadataHandler:
         self.__info_values = info_values
         self.__our_chunks = our_chunks
 
-    def remove_old_metadata(self: Self, f: BinaryIO) -> None:
-        # delete old metadata
-        if len(self.__our_chunks) != 0:
-            f.truncate(self.__our_chunks[0].span.total.start)
-
     def __write_metadata_toplevel_info(
         self: Self,
         f: BinaryIO,
         tags: MetadataTags,
     ) -> None:
+        f.seek(0, 2)
+        filesize = f.tell()
+        f.seek(0)
+
+        top_level_chunks = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
+
+        if len(top_level_chunks) != 1:
+            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
+            raise RuntimeError(msg)
+
+        top_level_chunk = top_level_chunks[0]
+
+        if not isinstance(top_level_chunk, AVIList):
+            msg = f"Expected one LIST chunk at the top level, but got {top_level_chunk}"
+            raise TypeError(msg)
+
+        if top_level_chunk.fourcc != RIFF_FOURCC:
+            msg = f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
+            raise TypeError(msg)
+
+        if top_level_chunk.span.total.size != filesize:
+            msg = f"Expected the RIFF top level chunk, to fill the entire file, but the size is too small: {top_level_chunk.span.total.size} != {filesize}"
+            raise TypeError(msg)
+
+        # delete old metadata, this can be done, as the top level consists of one single box, but wee need to adjust that boes inner length, so that the next parser and patcher / writer will work
+        if len(self.__our_chunks) != 0:
+            f.truncate(self.__our_chunks[0].span.total.start)
+
+            f.seek(0, 2)
+            new_filesize = f.tell()
+            f.seek(0)
+
+            result = top_level_chunk.adjust_size(f, new_filesize)
+
+            if result is not None:
+                msg = f"Adjusting size failed: {result}"
+                raise RuntimeError(msg)
+
         # NOTE: using top level INFO chunks
 
         # they can appear unlimited times, mots readers just use values from sub-chunks, and then the last one they encounter
@@ -1372,28 +1436,12 @@ class AVIMetadataHandler:
             duplicate_behavior="ignore",
         )
 
-        f.seek(0, 2)
-        filesize = f.tell()
-        f.seek(0)
-
-        top_level_chunks = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
-
-        if len(top_level_chunks) != 1:
-            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
-            raise RuntimeError(msg)
-
-        top_level_chunk = top_level_chunks[0]
-
-        if not isinstance(top_level_chunk, AVIList):
-            msg = f"Expected one LIST chunk at the top level, but got {top_level_chunk}"
-            raise TypeError(msg)
-
-        if top_level_chunk.fourcc != RIFF_FOURCC:
-            msg = f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
-            raise TypeError(msg)
-
         info_list_data = info_chunk.build()
-        top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
+        result = top_level_chunk.add_content_after_avi_list(f, info_list_data)
+
+        if result is not None:
+            msg = f"Adding content failed: {result}"
+            raise RuntimeError(msg)
 
         f.flush()
 
@@ -1404,7 +1452,7 @@ class AVIMetadataHandler:
 
         f.flush()
 
-    def read_metadata(
+    def read_metadata(  # noqa: PLR0915
         self: Self,
         f: BinaryIO,
     ) -> ReadMetadataImpl:
@@ -1593,7 +1641,7 @@ class AVIMetadataHandler:
         return result
 
     @staticmethod
-    def get_metadata_handler(
+    def get_metadata_handler(  # noqa: PLR0915
         f: BinaryIO,
     ) -> "AVIMetadataHandler":
 
@@ -1666,6 +1714,10 @@ class AVIMetadataHandler:
             msg = f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
             raise TypeError(msg)
 
+        if top_level_chunk.span.total.size != filesize:
+            msg = f"Expected the RIFF top level chunk, to fill the entire file, but the size is too small: {top_level_chunk.span.total.size} != {filesize}"
+            raise TypeError(msg)
+
         top_children_chunks: list[AVIChunk] = list(
             avi_iter_chunks(f, top_level_chunk.span.payload_span),
         )
@@ -1713,7 +1765,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
 
         # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
         bar: CounterInterface = self.manager.counter(
-            total=float(3),
+            total=float(2),
             desc="update avi metadata tags",
             unit="B",
             leave=False,
@@ -1726,10 +1778,6 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
             avi_metadata_handler = AVIMetadataHandler.get_metadata_handler(
                 f=self.__writer,
             )
-
-            bar.update(1, force=True)
-
-            avi_metadata_handler.remove_old_metadata(self.__writer)
 
             bar.update(1, force=True)
 
