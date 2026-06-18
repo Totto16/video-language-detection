@@ -22,17 +22,21 @@ from content.tagger.parser import (
     uuid_from_bytes,
     uuid_to_bytes,
 )
+from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
     MetadataTags,
     MetadataTagsRead,
     SerializableDict,
+    SerializableDictValue,
+    TaggerDomain,
     VideoTagger,
     VideoTaggerContextReadable,
     VideoTaggerContextRW,
     VideoTaggerContextWrapperGeneric,
     VideoTaggerContextWriteable,
+    uuid_to_str,
 )
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
@@ -668,14 +672,17 @@ class VLDStrChunk(AVIChunk, FinalAVIChunk):
         return str(self)
 
 
+ChunkJsonValue = SerializableDict | SerializableDictValue
+
+
 @final
 class VLDJsonChunk(AVIChunk, FinalAVIChunk):
-    data: SerializableDict
+    data: ChunkJsonValue
 
     def __init__(
         self: Self,
         parent: AVIChunk,
-        data: SerializableDict,
+        data: ChunkJsonValue,
     ) -> None:
         super().__init__(parent.fourcc, parent.span, is_list=False)
 
@@ -713,7 +720,7 @@ class VLDJsonChunk(AVIChunk, FinalAVIChunk):
 
     @staticmethod
     def write_to_buffer(
-        data: SerializableDict,
+        data: ChunkJsonValue,
     ) -> bytes:
         byte_data: bytes = json.dumps(data).encode()
 
@@ -795,7 +802,7 @@ class VLDKeyValueValueUUID:
 
 @dataclass
 class VLDKeyValueValueJSON:
-    data: SerializableDict
+    data: ChunkJsonValue
 
 
 VLDKeyValueValue = VLDKeyValueValueStr | VLDKeyValueValueUUID | VLDKeyValueValueJSON
@@ -1049,75 +1056,154 @@ def is_avi_file(
     return None
 
 
-def t():
-    span = SimpleSpan(0, filesize)
-
-    top_level_chunks = list(avi_iter_chunks(f, span))
-
-    if len(top_level_chunks) != 1:
-        msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
-        raise RuntimeError(msg)
-
-    top_level_chunk = top_level_chunks[0]
-
-    if not isinstance(top_level_chunk, AVIList):
-        msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk}"
-        raise TypeError(msg)
-
-    if top_level_chunk.fourcc != RIFF_FOURCC:
-        msg = (
-            f"Expected only one RIFF top level chunk, but got {top_level_chunk.fourcc}"
-        )
-        raise TypeError(msg)
-
-    icmt_data = AVIChunk.write_to_buffer_avi_chunk(
-        FOURCC(b"ICMT"),
-        b"Test Comment\x00",
-    )
-
-    # vldc stands for video language detector chunk
-    CUSTOM_FOURCC = FOURCC(b"vldc")
-
-    custom_data = AVIChunk.write_to_buffer_avi_chunk(
-        CUSTOM_FOURCC,
-        b"Test Custom data\x00",
-    )
-
-    custom_data3 = AVIChunk.write_to_buffer_avi_chunk(
-        FOURCC(b"icop"),
-        b"ICOP DATA\x00",
-    )
-
-    custom_data4 = AVIChunk.write_to_buffer_avi_chunk(
-        FOURCC(b"IGNR"),
-        b"IGNR DATA\x00",
-    )
-
-    custom_data2 = AVIList.write_to_buffer_avi_list(
-        LIST_FOURCC,
-        FOURCC(b"vldl"),
-        [custom_data],
-    )
-
-    info_list_data = AVIList.write_to_buffer_avi_list(
-        LIST_FOURCC,
-        FOURCC(b"INFO"),
-        [icmt_data, custom_data, custom_data2, custom_data3, custom_data4],
-    )
-
-    top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
+@dataclass
+class VLDCustomSubChunk:
+    data: VLDKeyValueValue
 
 
 @dataclass
-class ReadInfoChunkValueRaw:
+class VLDKnownStrSubChunk:
     fourcc: FOURCC
     value: str
 
 
-# TODO
 @dataclass
-class ReadInfoChunkValueRawCustom:
-    todo: int
+class VLDCustomKeyValueEntry:
+    key: str
+    data: VLDKeyValueValue
+
+
+@dataclass
+class VLDUnknownStrSubChunk:
+    fourcc: FOURCC
+    data: bytes
+
+
+VLDSubChunkType = (
+    VLDCustomSubChunk
+    | VLDKnownStrSubChunk
+    | VLDUnknownStrSubChunk
+    | VLDCustomKeyValueEntry
+)
+
+
+class INFOChunkBuilder:
+    __sub_chunks: dict[FOURCC | str, VLDSubChunkType]
+
+    def __init__(self: Self) -> None:
+        self.__sub_chunks = {}
+
+    @staticmethod
+    def _key_str_impl(sub_chunk: VLDSubChunkType) -> FOURCC | str:
+        # note: this is never serialized, it is only to detect duplicates in internal regeneration from an old info chunk, so this doesn't have to match the serialization behavior, but it's close, as the string is unique then
+
+        if isinstance(sub_chunk, VLDKnownStrSubChunk):
+            return sub_chunk.fourcc
+
+        if isinstance(sub_chunk, VLDUnknownStrSubChunk):
+            return sub_chunk.fourcc
+
+        if isinstance(sub_chunk, VLDCustomSubChunk):
+            if isinstance(sub_chunk.data, VLDKeyValueValueStr):
+                return VLD_STR_CHUNK_FOURCC
+            if isinstance(sub_chunk.data, VLDKeyValueValueUUID):
+                return VLD_UUID_FOURCC
+            if isinstance(sub_chunk.data, VLDKeyValueValueJSON):
+                return VLD_JSON_CHUNK_FOURCC
+
+            assert_never(sub_chunk.data)
+
+        if isinstance(sub_chunk, VLDCustomKeyValueEntry):
+            return sub_chunk.key
+
+        assert_never(sub_chunk)
+
+    def add_sub_chunk(
+        self: Self,
+        sub_chunk: VLDSubChunkType,
+        duplicate_behavior: Literal["overwrite", "error", "ignore"],
+    ) -> None:
+
+        key = INFOChunkBuilder._key_str_impl(sub_chunk)
+
+        if self.__sub_chunks.get(key, None) is not None:
+            if duplicate_behavior == "error":
+                msg: str = f"Trying to add duplicate sub chunk key: {key}"
+                raise RuntimeError(msg)
+
+            if duplicate_behavior == "overwrite":
+                self.__sub_chunks[key] = sub_chunk
+            elif duplicate_behavior == "ignore":
+                pass
+            else:
+                assert_never(duplicate_behavior)
+        else:
+            self.__sub_chunks[key] = sub_chunk
+
+    @staticmethod
+    def __render_sub_chunk_impl(
+        sub_chunk: VLDCustomSubChunk | VLDKnownStrSubChunk | VLDUnknownStrSubChunk,
+    ) -> bytes:
+        if isinstance(sub_chunk, VLDKnownStrSubChunk):
+            return AVIChunk.write_to_buffer_avi_chunk(
+                sub_chunk.fourcc,
+                sub_chunk.value.encode(),
+            )
+        if isinstance(sub_chunk, VLDUnknownStrSubChunk):
+            return AVIChunk.write_to_buffer_avi_chunk(
+                sub_chunk.fourcc,
+                sub_chunk.data,
+            )
+
+        if isinstance(sub_chunk, VLDCustomSubChunk):
+            if isinstance(sub_chunk.data, VLDKeyValueValueStr):
+                return VLDStrChunk.write_to_buffer(sub_chunk.data.value)
+            if isinstance(sub_chunk.data, VLDKeyValueValueUUID):
+                return VLDUUIDChunk.write_to_buffer(sub_chunk.data.uuid)
+            if isinstance(sub_chunk.data, VLDKeyValueValueJSON):
+                return VLDJsonChunk.write_to_buffer(sub_chunk.data.data)
+
+            assert_never(sub_chunk.data)
+
+        assert_never(sub_chunk)
+
+    def build(self: Self) -> bytes:
+
+        sub_chunk_data: list[bytes] = [
+            VLDKeyValueChunk.write_to_buffer(
+                INFO_LIST_ID_NAME,
+                VLDKeyValueValueUUID(INFO_LIST_ID_NAME_ID),
+            ),
+        ]
+
+        list_data: dict[str, VLDKeyValueValue] = {}
+
+        for sub_chunk in self.__sub_chunks.values():
+            if isinstance(sub_chunk, VLDCustomKeyValueEntry):
+                list_data = merge_dicts(
+                    list_data, {sub_chunk.key: sub_chunk.data}, "error"
+                )
+            else:
+                sub_chunk_data.append(self.__render_sub_chunk_impl(sub_chunk))
+
+        if len(list_data) != 0:
+            sub_chunk_data.append(
+                AVIList.write_to_buffer_avi_list(
+                    LIST_FOURCC,
+                    VLD_LIST_FOURCC,
+                    [
+                        VLDKeyValueChunk.write_to_buffer(key=key, value=value)
+                        for key, value in list_data.items()
+                    ],
+                ),
+            )
+
+        return AVIList.write_to_buffer_avi_list(
+            LIST_FOURCC,
+            FOURCC(b"INFO"),
+            sub_chunk_data,
+        )
+
 
 
 INFO_LIST_ID_NAME: str = "id:video_language_detect:info_list_name"
@@ -1125,7 +1211,9 @@ INFO_LIST_ID_NAME: str = "id:video_language_detect:info_list_name"
 INFO_LIST_ID_NAME_ID: UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258be0")
 
 
-ReadInfoChunkValue = ReadInfoChunkValueRaw | ReadInfoChunkValueRawCustom
+ReadInfoChunkValue = (
+    VLDKnownStrSubChunk | VLDCustomKeyValueEntry | VLDUnknownStrSubChunk
+)
 
 ReadInfoChunkValues = list[ReadInfoChunkValue]
 
@@ -1154,91 +1242,82 @@ class AVIMetadataHandler:
         f: BinaryIO,
         tags: MetadataTags,
     ) -> None:
-        if self.__meta_values.err():
-            # ignore this and write no top level meta box
-            pass
-        else:
-            meta_values = self.__meta_values.as_ok()
+        # NOTE: using top level INFO chunks
 
-            # NOTE: using top level meta box
+        # they can appear unlimited times, mots readers just use values from sub-chunks, and then the last one they encounter
 
-            # meta:
-            # location: file , amount: 0 or 1
+        info_chunk = INFOChunkBuilder()
 
-            meta_box = AppleItunesMetaBoxBuilder()
+        if self.__info_values is not None:
+            # restore the old chunks
+            for info_value in self.__info_values:
+                info_chunk.add_sub_chunk(
+                    info_value,
+                    duplicate_behavior="error",
+                )
 
-            if meta_values is not None:
-                # restore the old tags
-                for meta_value in meta_values:
-                    meta_box.add_tag(
-                        meta_value,
-                        duplicate_behaviour="error",
-                    )
-
-        # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
-        meta_box.add_tag(
-            ApplItunesTags.from_known_atom(
-                ISOMAtomName(b"\xa9cmt"),
-                tags.comment,
+        # add or overwrite chunks, if not present, so that the new data gets written all the time, except uuid, that is never replaced
+        info_chunk.add_sub_chunk(
+            VLDKnownStrSubChunk(
+                fourcc=FOURCC(b"ICMT"),
+                value=tags.comment,
             ),
-            duplicate_behaviour="overwrite",
+            duplicate_behavior="overwrite",
         )
 
         for key, value in tags.metadata.items():
-            value_str = json.dumps(value)
-            meta_box.add_tag(
-                ApplItunesTags.validate_init(
-                    key=TaggerDomain.get_freeform(key),
-                    data=ApplItunesTagsData(
-                        type=AppleItunesItemDataType.UTF8,
-                        value=value_str,
-                    ),
+            info_chunk.add_sub_chunk(
+                VLDCustomKeyValueEntry(
+                    key=key,
+                    data=VLDKeyValueValueJSON(data=value),
                 ),
-                duplicate_behaviour="overwrite",
+                duplicate_behavior="overwrite",
             )
 
-        # Note, these ar enot neccesraly in sync, which is bad, but that should never happen
-        meta_box.add_tag(
-            ApplItunesTags.validate_init(
-                key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
-                data=ApplItunesTagsData(
-                    type=AppleItunesItemDataType.UUID,
-                    value=tags.uuid,
-                ),
+        # Note, these are not necessary in sync, which is bad, but that should never happen
+        info_chunk.add_sub_chunk(
+            VLDCustomKeyValueEntry(
+                key=TaggerDomain.UUID_RAW_KEY_FREEFORM.name,
+                data=VLDKeyValueValueUUID(uuid=tags.uuid),
             ),
-            "ignore",
+            duplicate_behavior="ignore",
         )
 
-        meta_box.add_tag(
-            ApplItunesTags.validate_init(
-                key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
-                data=ApplItunesTagsData(
-                    type=AppleItunesItemDataType.UTF8,
-                    value=uuid_to_str(tags.uuid),
-                ),
+        info_chunk.add_sub_chunk(
+            VLDCustomKeyValueEntry(
+                key=TaggerDomain.UUID_HEX_KEY_FREEFORM.name,
+                data=VLDKeyValueValueStr(value=uuid_to_str(tags.uuid)),
             ),
-            "ignore",
+            duplicate_behavior="ignore",
         )
 
-        buffer = meta_box.build()
 
         f.seek(0, 2)
-        f.write(buffer)
+        filesize = f.tell()
+        f.seek(0)
 
-        # write padding
-        padding_size = META_PADDING_SIZE - (len(buffer) % META_PADDING_SIZE)
+        span = SimpleSpan(0, filesize)
 
-        if padding_size < SIZE_OF_FREE_BOX_HEADER:
-            padding_size = META_PADDING_SIZE + padding_size - SIZE_OF_FREE_BOX_HEADER
-        else:
-            padding_size = padding_size - SIZE_OF_FREE_BOX_HEADER
+        top_level_chunks = list(avi_iter_chunks(f, span))
 
-        if padding_size < 0:
-            msg = f"Implementation error: padding size negative: {padding_size}"
+        if len(top_level_chunks) != 1:
+            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
             raise RuntimeError(msg)
 
-        buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
-        f.write(buffer)
+        top_level_chunk = top_level_chunks[0]
+
+        if not isinstance(top_level_chunk, AVIList):
+            msg = f"Expected one LIST chunk at the top level, but got {top_level_chunk}"
+            raise TypeError(msg)
+
+        if top_level_chunk.fourcc != RIFF_FOURCC:
+            msg = (
+                f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
+            )
+            raise TypeError(msg)
+
+        info_list_data = info_chunk.build()
+        top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
 
         f.flush()
 
@@ -1474,13 +1553,14 @@ class AVIMetadataHandler:
                     break
 
                 if children_chunk.fourcc == VLD_KEY_VALUE_FOURCC:
-                    if not isinstance(chunk, VLDKeyValueChunk):
+                    if not isinstance(children_chunk, VLDKeyValueChunk):
                         msg = "Invalid VLDKeyValueChunk: type not dispatched to correct class"
                         raise TypeError(msg)
 
                     if (
-                        chunk.key == INFO_LIST_ID_NAME
-                        and chunk.value == INFO_LIST_ID_NAME_ID
+                        children_chunk.key == INFO_LIST_ID_NAME
+                        and children_chunk.value
+                        == VLDKeyValueValueUUID(INFO_LIST_ID_NAME_ID)
                     ):
                         is_our_chunk = True
 
