@@ -1575,6 +1575,9 @@ class AVIMetadataHandler:
                             value=data_raw.decode(),
                         ),
                     )
+                elif chunk.fourcc == VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC:
+                    # ignore
+                    pass
                 else:
                     result.append(
                         VLDUnknownStrSubChunk(fourcc=chunk.fourcc, data=data_raw),
