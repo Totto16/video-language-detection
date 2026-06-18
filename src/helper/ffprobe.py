@@ -113,6 +113,9 @@ class FFprobeStream:
 
         return None
 
+    def __str__(self: Self) -> str:
+        return f"<FFprobeStream stream: {self.__stream}>"
+
     def __repr__(self: Self) -> str:
         return json.dumps(self.__stream)
 
@@ -137,7 +140,7 @@ def optional_float(val: Any) -> Optional[float]:
     return None
 
 
-class FormatInfo:
+class FFProbeFormatInfo:
     __raw: dict[str, Any]
 
     def __init__(self: Self, raw: dict[str, Any]) -> None:
@@ -163,6 +166,12 @@ class FormatInfo:
         val: Optional[Any] = self.__raw.get("bit_rate", None)
         return optional_float(val)
 
+    def __str__(self: Self) -> str:
+        return f"<FFProbeFormatInfo raw: {self.__raw}>"
+
+    def __repr__(self: Self) -> str:
+        return json.dumps(self.__raw)
+
 
 class FFProbeRawResult(TypedDict):
     streams: list[FFprobeRawStream]
@@ -180,8 +189,8 @@ class FFProbeResult:
         return [FFprobeStream(stream) for stream in self.__raw["streams"]]
 
     @property
-    def file_info(self: Self) -> FormatInfo:
-        return FormatInfo(self.__raw["format"])
+    def file_info(self: Self) -> FFProbeFormatInfo:
+        return FFProbeFormatInfo(self.__raw["format"])
 
     def video_streams(self: Self) -> list[FFprobeStream]:
         """
@@ -206,6 +215,12 @@ class FFProbeResult:
         Is the file a audio alias has it at least one audio stream
         """
         return len(self.audio_streams()) != 0
+
+    def __str__(self: Self) -> str:
+        return f"<FFProbeResult raw: {self.__raw}>"
+
+    def __repr__(self: Self) -> str:
+        return json.dumps(self.__raw)
 
 
 def ffprobe_check() -> bool:

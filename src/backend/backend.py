@@ -1133,6 +1133,9 @@ class Address:
     def __str__(self) -> str:
         return f"http://{self.host}:{self.port}"
 
+    def __repr__(self: Self) -> str:
+        return f"<Address host: {self.host} port: {self.port}>"
+
 
 @dataclass
 class BackendOptions:
