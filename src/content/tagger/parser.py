@@ -41,6 +41,13 @@ class SimpleSpan:
     def end(self: Self) -> int:
         return self.start + self.size
 
+    def sub_span(self: Self, new_size: int) -> "SimpleSpan":
+        if new_size > self.size:
+            msg = f"New span size overflows parent: {new_size} > {self.size}"
+            raise RuntimeError(msg)
+
+        return SimpleSpan(self.start, new_size)
+
     def __str__(self: Self) -> str:
         return f"<SimpleSpan start: {self.start} size: {self.size}>"
 

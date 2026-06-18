@@ -654,7 +654,7 @@ def test_mp4_invalid_bytes(
 
     test_data: list[tuple[bytes, str]] = [
         (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
-        (b"helloworld", _("Not a valid ISOM / MP4 file")),
+        (b"helloworld", _("Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10")),
         (b"ftyp    ", "Atom name not valid b'    '"),
         (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
         (

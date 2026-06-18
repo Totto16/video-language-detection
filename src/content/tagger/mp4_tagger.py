@@ -363,9 +363,13 @@ class MP4Box(NonFinalMP4Box):
                 final_size = io.special_checked_filesize()
                 header_size = 8
 
+            if final_size > io.span.size:
+                msg = f"Invalid MP4 Box size: It overflows the parent box: {final_size} > {io.span.size}"
+                raise RuntimeError(msg)
+
             if typ != UUID_ATOM_NAME:
                 span = MP4BoxSpan(
-                    SimpleSpan(io.span.start, size=final_size),
+                    io.span.sub_span(final_size),
                     header_size=header_size,
                 )
                 return MP4Box(typ, span, is_container=False)
@@ -377,7 +381,7 @@ class MP4Box(NonFinalMP4Box):
             header_size = header_size + 16
 
             span = MP4BoxSpan(
-                SimpleSpan(io.span.start, size=final_size),
+                io.span.sub_span(final_size),
                 header_size=header_size,
             )
             box = MP4Box(typ, span, is_container=False)
