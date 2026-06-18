@@ -3,7 +3,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Optional, Self, override
+from typing import Any, BinaryIO, Optional, Self, cast, override
 from unittest import mock
 from uuid import uuid4
 
@@ -694,10 +694,13 @@ def test_mp4_tagger_metadata_tags_custom(
                     assert ffprobe_metadata_next.get("metadata", None) is not None
 
                     assert ffprobe_metadata_next["metadata"] == merge_dicts(
-                        {
-                            f"video_language_detect:{key}": json.dumps(value)
-                            for key, value in tags.metadata.items()
-                        },
+                        cast(
+                            dict[str, Any],
+                            {
+                                f"video_language_detect:{key}": json.dumps(value)
+                                for key, value in tags.metadata.items()
+                            },
+                        ),
                         {
                             "video_language_detect_uuid:raw": mock.ANY,
                             "video_language_detect_uuid:hex": uuid_to_str(
@@ -736,7 +739,7 @@ def test_mp4_tagger_metadata_tags_custom(
                     ), "no new unrecognized tags"
                     assert write_again_tags.metadata == merge_dicts(
                         tags.metadata,
-                        {"new": "a new tag"},
+                        cast(dict[str, Any], {"new": "a new tag"}),
                         "error",
                     ), "Metadata was overwritten correctly"
 

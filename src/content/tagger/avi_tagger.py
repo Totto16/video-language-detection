@@ -5,7 +5,17 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from types import TracebackType
-from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, cast, final, override
+from typing import (
+    Any,
+    BinaryIO,
+    Literal,
+    Optional,
+    Self,
+    assert_never,
+    cast,
+    final,
+    override,
+)
 from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
@@ -1371,8 +1381,9 @@ class AVIMetadataHandler:
         for value in result_toplevel_info:
             if isinstance(value, VLDKnownStrSubChunk):
                 if (
-                    KNOWN_INFO_SUBCHUNK_FOURCCS.get(value.fourcc, None) is None
-                ):  # noqa: SIM910
+                    KNOWN_INFO_SUBCHUNK_FOURCCS.get(value.fourcc, None)  # noqa: SIM910
+                    is None
+                ):
                     msg = f"Invalid VLDKnownStrSubChunk chunk, can't be transformed to a string key: {value.fourcc}"
                     raise RuntimeError(msg)
 

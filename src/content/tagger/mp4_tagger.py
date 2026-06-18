@@ -3125,6 +3125,10 @@ class MP4MetadataHandler:
                 else:
                     key = data_box.type.value.decode("latin-1")
 
+                if isinstance(data_box.data.value, UUID):
+                    msg = f"UUID currently not allowed in freeform boxes outsaide of the expected ones: {data_box.data.value}"
+                    raise TypeError(msg)
+
                 metadata_result.metadata = merge_dicts(
                     metadata_result.metadata,
                     {key: data_box.data.value},

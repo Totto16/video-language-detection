@@ -572,7 +572,9 @@ def subcommand_tagger_read(
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
         logger.error(
-            _("Can't read tags from file '{file}': Opening a handle failed: {reason}").format(
+            _(
+                "Can't read tags from file '{file}': Opening a handle failed: {reason}"  # noqa: COM812
+            ).format(
                 file=file,
                 reason=handle_result.as_err(),
             ),
@@ -619,7 +621,9 @@ def subcommand_tagger_write(
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
         logger.error(
-            _("Can't write tags to file '{file}': Opening a handle failed: {reason}").format(
+            _(
+                "Can't write tags to file '{file}': Opening a handle failed: {reason}"  # noqa: COM812
+            ).format(
                 file=file,
                 reason=handle_result.as_err(),
             ),
@@ -651,6 +655,11 @@ def subcommand_tagger_write(
 
     for value in args.metadata:
         key, val = get_key_value(value)
+
+        if val is None:
+            metadata = merge_dicts(metadata, {key: ""}, "error")
+            continue
+
         metadata = merge_dicts(metadata, {key: val}, "error")
 
     write_tags: MetadataTags = MetadataTags(
