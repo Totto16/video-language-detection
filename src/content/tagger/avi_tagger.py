@@ -1822,6 +1822,16 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
                     (key, decode_as_str(value)),
                 )
 
+        for unrecognized in metadata_result.unrecognized:
+            str_value: str
+            try:
+                str_value = unrecognized.data.decode()
+            except (UnicodeDecodeError, ValueError):
+                str_value = unrecognized.data.decode(errors="replace")
+
+            data: tuple[str, str] = (unrecognized.fourcc.value.decode(), str_value)
+            result.unrecognized.append(data)
+
         return result
 
 

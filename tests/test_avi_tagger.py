@@ -4,7 +4,6 @@ from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from typing import Any, BinaryIO, Optional, Self, cast, override
-from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
@@ -801,11 +800,14 @@ def test_avi_tagger_metadata_tags_custom(
                             f"video_language_detect:{key}": value
                             for key, value in tags.metadata.items()
                         },
-                        {
-                            "video_language_detect_uuid:hex": uuid_to_str(
-                                tags.uuid,
-                            ),
-                            "video_language_detect:new": '"a new tag"',
-                        },
+                        cast(
+                            dict[str, Any],
+                            {
+                                "video_language_detect_uuid:hex": uuid_to_str(
+                                    tags.uuid,
+                                ),
+                                "video_language_detect:new": '"a new tag"',
+                            },
+                        ),
                         "error",
                     )
