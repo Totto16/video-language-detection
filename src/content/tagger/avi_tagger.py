@@ -1401,6 +1401,16 @@ class AVIMetadataHandler:
 
         result = ReadMetadataImpl({}, None, [])
 
+        def raw_vld_data(data: VLDKeyValueValue) -> ChunkJsonValue | str | UUID:
+            if isinstance(data, VLDKeyValueValueStr):
+                return data.value
+            if isinstance(data, VLDKeyValueValueJSON):
+                return data.data
+            if isinstance(data, VLDKeyValueValueUUID):
+                return data.uuid
+
+            assert_never(data)
+
         for value in result_toplevel_info:
             if isinstance(value, VLDKnownStrSubChunk):
                 if (
@@ -1444,15 +1454,25 @@ class AVIMetadataHandler:
                     else:
                         result.uuid = uuid
                 else:
+
+                    mdt1: SerializableDict = cast(
+                        SerializableDict,
+                        result.metadata.get("metadata", {}),
+                    )
+
+                    mdt2_data = raw_vld_data(value.data)
+                    if isinstance(mdt2_data, UUID):
+                        msg = f"UUID currently not allowed in key value chunks outsaide of the expected ones: {mdt2_data}"
+                        raise TypeError(msg)
+
+                    mdt2: SerializableDict = {value.key: mdt2_data}
+
                     result.metadata = merge_dicts(
                         result.metadata,
                         {
                             "metadata": merge_dicts(
-                                cast(
-                                    dict[str, Any],
-                                    result.metadata.get("metadata", {}),
-                                ),
-                                {value.key: value.data},
+                                mdt1,
+                                mdt2,
                                 "error",
                             ),
                         },

@@ -659,7 +659,6 @@ def test_avi_tagger_metadata_tags_custom(
                     ctx.write_tags(tags)
 
                     next_tags = ctx.get_tags()
-                    print(next_tags)
 
                     assert next_tags.uuid == tags.uuid, "UUID was written correctly"
                     assert (

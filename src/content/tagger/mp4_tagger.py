@@ -3103,15 +3103,18 @@ class MP4MetadataHandler:
 
                     raw_value = json.loads(data_box.data.value)
 
+                    mdt1: SerializableDict = cast(
+                        SerializableDict,
+                        metadata_result.metadata.get("metadata", {}),
+                    )
+                    mdt2: SerializableDict = {raw_name: raw_value}
+
                     metadata_result.metadata = merge_dicts(
                         metadata_result.metadata,
                         {
                             "metadata": merge_dicts(
-                                cast(
-                                    dict[str, Any],
-                                    metadata_result.metadata.get("metadata", {}),
-                                ),
-                                {raw_name: raw_value},
+                                mdt1,
+                                mdt2,
                                 "error",
                             ),
                         },
