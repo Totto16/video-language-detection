@@ -323,8 +323,12 @@ class AVIChunk(NonFinalAVIChunk):
                 hdr,
             )
 
+            if size + 8 > io.span.size:
+                msg = f"Invalid AVI Chunk size: It overflows the parent chunk: {size+ 8} > {io.span.size}"
+                raise RuntimeError(msg)
+
             span = AVIChunkSpan.from_avi_specified_size(
-                SimpleSpan(io.span.start, size),
+                io.span.sub_span(size),
                 header_size=8,
             )
             return AVIChunk(fourcc, span, is_list=False)
@@ -390,6 +394,9 @@ class AVIChunk(NonFinalAVIChunk):
 
         f.write(data)
         f.flush()
+
+        if new_size != f.tell():
+            return "somehow the write failed"
 
         return None
 
@@ -904,7 +911,7 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
         parent.span.add_header(value_size)
 
         if parent.span.payload_span.size != 0:
-            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
+            msg = f"VLDKeyValueChunk isn't fully filled by the value chunk: {parent.span.payload_span.size} leftover data"
             raise RuntimeError(msg)
 
         return VLDKeyValueChunk(parent, key_chunk.value, value)
@@ -1707,7 +1714,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
         bar: CounterInterface = self.manager.counter(
             total=float(3),
-            desc="update mp4 metadata tags",
+            desc="update avi metadata tags",
             unit="B",
             leave=False,
             bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
