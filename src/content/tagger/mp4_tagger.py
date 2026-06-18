@@ -2537,7 +2537,7 @@ class AppleItunesMetaBoxBuilder:
 
     @staticmethod
     def _key_str_impl(key: ISOMAtomName | AppleItunesFreeformKey) -> str:
-        # note: this is never serialized, it is only to detect duplicates in internal regeneration from an old meta box, so this doesn#t have to match the serialization beahviour, but it's close, as the string is unique then
+        # note: this is never serialized, it is only to detect duplicates in internal regeneration from an old meta box, so this doesn#t have to match the serialization behavior, but it's close, as the string is unique then
 
         if isinstance(key, ISOMAtomName):
             return key.value.decode("latin-1")
@@ -2895,7 +2895,7 @@ class MP4MetadataHandler:
                         duplicate_behavior="error",
                     )
 
-        # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
+        # add or overwrite tags, if not present, so that the new data gets written all the time, except uuid, that is never replaced
         meta_box.add_tag(
             ApplItunesTags.from_known_atom(
                 ISOMAtomName(b"\xa9cmt"),
@@ -2917,7 +2917,7 @@ class MP4MetadataHandler:
                 duplicate_behavior="overwrite",
             )
 
-        # Note, these ar enot neccesraly in sync, which is bad, but that should never happen
+        # Note, these are not necessary in sync, which is bad, but that should never happen
         meta_box.add_tag(
             ApplItunesTags.validate_init(
                 key=TaggerDomain.UUID_RAW_KEY_FREEFORM,

@@ -1,12 +1,12 @@
-from typing import Any, Literal, assert_never
+from typing import Literal, assert_never
 
 
-def merge_dicts(
-    dict1: dict[str, Any],
-    dict2: dict[str, Any],
+def merge_dicts[A](
+    dict1: dict[str, A],
+    dict2: dict[str, A],
     duplicate_behavior: Literal["overwrite", "error", "ignore"],
-) -> dict[str, Any]:
-    res: dict[str, Any] = {}
+) -> dict[str, A]:
+    res: dict[str, A] = {}
     for key, value in dict1.items():
         res[key] = value  # noqa: PERF403
 
