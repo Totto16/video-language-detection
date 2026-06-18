@@ -1,11 +1,11 @@
+import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from io import BytesIO
-import json
 from pathlib import Path
 from types import TracebackType
-from typing import Any, BinaryIO, Literal, Optional, Self, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
 from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
@@ -783,23 +783,39 @@ class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
         return str(self)
 
 
-VLDKeyValueValue = str | UUID | SerializableDict
+@dataclass
+class VLDKeyValueValueStr:
+    value: str
+
+
+@dataclass
+class VLDKeyValueValueUUID:
+    uuid: UUID
+
+
+@dataclass
+class VLDKeyValueValueJSON:
+    data: SerializableDict
+
+
+VLDKeyValueValue = VLDKeyValueValueStr | VLDKeyValueValueUUID | VLDKeyValueValueJSON
+
 
 @final
 class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
     key: str
-    value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk
+    value: VLDKeyValueValue
 
     def __init__(
         self: Self,
         parent: AVIChunk,
         key: str,
-        value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk,
+        value: VLDKeyValueValue,
     ) -> None:
         super().__init__(parent.fourcc, parent.span, is_list=False)
 
         self.key = key
-        self.value_chunk = value_chunk
+        self.value = value
 
     @staticmethod
     def __read_impl(
@@ -819,7 +835,8 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
 
         sub_chunk = AVIChunk.read_avi_chunk(parent.payload_io(io))
 
-        value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk
+        value: VLDKeyValueValue
+        value_chunk: AVIChunk
 
         match sub_chunk.fourcc.value:
             case SupportedChunks.VLD_STR:
@@ -827,21 +844,30 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
                     sub_chunk.payload_io(io),
                     sub_chunk,
                 )
+                value = VLDKeyValueValueStr(value_chunk.value)
             case SupportedChunks.VLD_JSON:
                 value_chunk = VLDJsonChunk.read_from_parent(
                     sub_chunk.payload_io(io),
                     sub_chunk,
                 )
+                value = VLDKeyValueValueJSON(value_chunk.data)
             case SupportedChunks.VLD_UUID:
                 value_chunk = VLDUUIDChunk.read_from_parent(
                     sub_chunk.payload_io(io),
                     sub_chunk,
                 )
+                value = VLDKeyValueValueUUID(value_chunk.uuid)
             case _:
                 msg = f"Invalid sub chunk in VLDKeyValueChunk: {sub_chunk.fourcc}"
                 raise RuntimeError(msg)
 
-        return VLDKeyValueChunk(parent, key_chunk.value, value_chunk)
+        parent.span.add_header(value_chunk.span.total.size)
+
+        if parent.span.payload_span.size != 0:
+            msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
+            raise RuntimeError(msg)
+
+        return VLDKeyValueChunk(parent, key_chunk.value, value)
 
     @staticmethod
     def read(io: BoundedIO) -> "VLDKeyValueChunk":
@@ -854,14 +880,36 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
 
     @staticmethod
     def write_to_buffer(
+        key: str,
         value: VLDKeyValueValue,
     ) -> bytes:
-        data: bytes = uuid_to_bytes(AVI_BYTE_ORDER, uuid)
+        buf = BytesIO()
 
-        return AVIChunk.write_to_buffer_avi_chunk(VLD_UUID_FOURCC, data)
+        key_bytes = VLDStrChunk.write_to_buffer(
+            key,
+        )
+
+        buf.write(key_bytes)
+
+        data_bytes: bytes
+
+        if isinstance(value, VLDKeyValueValueStr):
+            data_bytes = VLDStrChunk.write_to_buffer(value.value)
+        elif isinstance(value, VLDKeyValueValueJSON):
+            data_bytes = VLDJsonChunk.write_to_buffer(value.data)
+        elif isinstance(value, VLDKeyValueValueUUID):
+            data_bytes = VLDUUIDChunk.write_to_buffer(value.uuid)
+        else:
+            assert_never(value)
+
+        buf.write(data_bytes)
+
+        final_data = buf.getvalue()
+
+        return AVIChunk.write_to_buffer_avi_chunk(VLD_KEY_VALUE_FOURCC, final_data)
 
     def __str__(self: Self) -> str:
-        return f"<VLDUUIDChunk parent: {AVIChunk.__str__(self)} uuid: {self.uuid}>"
+        return f"<VLDKeyValueChunk parent: {AVIChunk.__str__(self)} key: {self.key} value: {self.value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
