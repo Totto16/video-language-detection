@@ -257,7 +257,7 @@ class MP4BoxSpan:
         return str(self)
 
 
-class FinalMp4Box:
+class FinalMP4Box:
     __final__mp4_box__ = True
 
 
@@ -504,7 +504,7 @@ class UserExtensions:
 
 
 @final
-class UUIDExtensionBox(UserExtensionBox, FinalMp4Box):
+class UUIDExtensionBox(UserExtensionBox, FinalMP4Box):
     uuid: UUID
 
     def __init__(
@@ -557,7 +557,7 @@ class UUIDExtensionBox(UserExtensionBox, FinalMp4Box):
 
 
 @final
-class JsonExtensionBox(UserExtensionBox, FinalMp4Box):
+class JsonExtensionBox(UserExtensionBox, FinalMP4Box):
     data: SerializableDict
 
     def __init__(
@@ -714,7 +714,7 @@ class MP4FullBox(MP4Box):
 
 
 @final
-class FileTypeBox(MP4Box, FinalMp4Box):
+class FileTypeBox(MP4Box, FinalMP4Box):
     major_brand: ISOMAtomName
     minor_version: int
     compatible_brands: bytes
@@ -797,7 +797,7 @@ class FileTypeBox(MP4Box, FinalMp4Box):
 
 
 @final
-class FreeSpaceBox(MP4Box, FinalMp4Box):
+class FreeSpaceBox(MP4Box, FinalMP4Box):
     data: bytes
 
     def __init__(
@@ -855,7 +855,7 @@ class FreeSpaceBox(MP4Box, FinalMp4Box):
 
 
 @final
-class MediaHeaderBox(MP4FullBox, FinalMp4Box):
+class MediaHeaderBox(MP4FullBox, FinalMP4Box):
     # offset from the own header start, not the start of the whole chunk!
     language_offset: int
 
@@ -1038,7 +1038,7 @@ class MediaHeaderBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class MediaBox(MP4Box, FinalMp4Box):
+class MediaBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1075,7 +1075,7 @@ class MediaBox(MP4Box, FinalMp4Box):
 
 
 @final
-class MovieBox(MP4Box, FinalMp4Box):
+class MovieBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1112,7 +1112,7 @@ class MovieBox(MP4Box, FinalMp4Box):
 
 
 @final
-class HandlerBox(MP4FullBox, FinalMp4Box):
+class HandlerBox(MP4FullBox, FinalMP4Box):
     handler_type: ISOMAtomName
     name: str
 
@@ -1257,7 +1257,7 @@ class HandlerBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class TrackBox(MP4Box, FinalMp4Box):
+class TrackBox(MP4Box, FinalMP4Box):
     hdlr: HandlerBox
 
     def __init__(self: Self, parent: MP4Box, hdlr: HandlerBox) -> None:
@@ -1323,7 +1323,7 @@ class TrackBox(MP4Box, FinalMp4Box):
 
 
 @final
-class UserDataBox(MP4Box, FinalMp4Box):
+class UserDataBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1360,7 +1360,7 @@ class UserDataBox(MP4Box, FinalMp4Box):
 
 
 @final
-class PrimaryItemBox(MP4FullBox, FinalMp4Box):
+class PrimaryItemBox(MP4FullBox, FinalMP4Box):
     item_id: int
 
     def __init__(
@@ -1529,7 +1529,7 @@ class MetaOptionalBoxes:
 
 
 @final
-class MetaBox(MP4FullBox, FinalMp4Box):
+class MetaBox(MP4FullBox, FinalMP4Box):
     handler_box: HandlerBox
     optional_boxes: OptionalMetaBoxes
 
@@ -1672,7 +1672,7 @@ class MetaBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class AppleItunesItemList(MP4Box, FinalMp4Box):
+class AppleItunesItemList(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
 
@@ -1742,7 +1742,7 @@ class AppleItunesItemDataType(Enum):
 
 
 @final
-class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
+class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
     type_indicator: int
     locale_indicator: int
     value: AppleItunesItemDataContent
@@ -2093,7 +2093,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
+class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
     value: str
 
     def __init__(
@@ -2193,7 +2193,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
+class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
     value: str
 
     def __init__(
@@ -2293,7 +2293,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMp4Box):
 
 
 @final
-class AppleItunesItemBox(MP4Box, FinalMp4Box):
+class AppleItunesItemBox(MP4Box, FinalMP4Box):
     data: AppleItunesItemDataBox
 
     def __init__(self: Self, parent: MP4Box, data: AppleItunesItemDataBox) -> None:
@@ -2374,7 +2374,7 @@ class AppleItunesItemBox(MP4Box, FinalMp4Box):
 
 
 @final
-class AppleItunesItemFreeformBox(MP4Box, FinalMp4Box):
+class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
     mean: AppleItunesItemMeanBox
     name: AppleItunesItemNameBox
     data: AppleItunesItemDataBox
@@ -2849,7 +2849,7 @@ class ReadMetadataImpl:
     uuid: Optional[UUID]
 
 
-class Mp4MetadataHandler:
+class MP4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
     __meta_values: MetaValues
     __our_boxes: list[MP4Box]
@@ -3216,7 +3216,7 @@ class Mp4MetadataHandler:
         result_custom = self.__read_metadata_custom(custom_boxes)
         result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box, f)
 
-        return Mp4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
+        return MP4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
     @staticmethod
     def __read_meta_box_info(
@@ -3275,7 +3275,7 @@ class Mp4MetadataHandler:
     @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
         f: BinaryIO,
-    ) -> "Mp4MetadataHandler":
+    ) -> "MP4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
         meta_values: MetaValues = Ok(None)
@@ -3332,7 +3332,7 @@ class Mp4MetadataHandler:
                 meta_values = Err("Not written by us: invalid item id")
                 return False
 
-            meta_values = Ok(Mp4MetadataHandler.__read_meta_box_info(box, f))
+            meta_values = Ok(MP4MetadataHandler.__read_meta_box_info(box, f))
             return True
 
         def box_is_written_by_us(box: MP4Box) -> bool:
@@ -3379,7 +3379,7 @@ class Mp4MetadataHandler:
                 other_box_encountered = True
                 break
 
-        return Mp4MetadataHandler(
+        return MP4MetadataHandler(
             uuid_box,
             meta_values,
             list(reversed(our_boxes_reversed)),
@@ -3421,7 +3421,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         bar.update(0, force=True)
 
         try:
-            mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
+            mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
                 f=self.__writer,
             )
 
@@ -3499,7 +3499,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
             return value
 
-        mp4_metadata_handler = Mp4MetadataHandler.get_metadata_handler(
+        mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
             f=self.__writer,
         )
 
