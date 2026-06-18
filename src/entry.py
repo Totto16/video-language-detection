@@ -71,12 +71,16 @@ class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     file: Path
 
 
+type ShortLanguageStrWrapper = Any
+
+
 class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["write"]
     file: Path
 
     comment: str
     metadata: list[str]
+    language: Optional[ShortLanguageStrWrapper]
 
 
 AllTaggerCommandParsedArgNamespace = (
@@ -120,6 +124,12 @@ def parse_port(arg: str) -> int:
         raise argparse.ArgumentTypeError(msg)
 
     return value
+
+
+def parse_short_language(arg: str) -> ShortLanguageStrWrapper:
+    from content.language import ShortLanguageStr  # noqa: PLC0415
+
+    return ShortLanguageStr.from_str_unsafe(arg)
 
 
 def parse_args() -> AllParsedNameSpaces:
@@ -369,6 +379,17 @@ def parse_args() -> AllParsedNameSpaces:
         ),
     )
 
+    tagger_write_parser.add_argument(
+        "-l",
+        "--language",
+        dest="language",
+        default=None,
+        type=parse_short_language,
+        help=_(
+            "Add a language to all streams",
+        ),
+    )
+
     return cast(AllParsedNameSpaces, parser.parse_args())
 
 
@@ -607,13 +628,14 @@ def subcommand_tagger_read(
     return 0
 
 
-def subcommand_tagger_write(
+def subcommand_tagger_write(  # noqa: PLR0915
     logger: Logger,
     file: Path,
     args: TaggerWriteCommandParsedArgNamespace,
 ) -> ExitCode:
     from uuid import uuid4
 
+    from content.language import Language, ShortLanguageStr
     from content.tagger.tagger import get_tagger_for_file
     from content.tagger.video_tagger import MetadataTags
     from helper.manager import NoopManager, TuiManager
@@ -681,6 +703,16 @@ def subcommand_tagger_write(
         for key, value in write_tags.metadata.items():
             msg = f"{key}: {value}"
             logger.info(msg)
+
+        if args.language is not None:
+            if not isinstance(args.language, ShortLanguageStr):
+                msg = f"Implementation error: language is wrong type: {type(args.language)}"
+                raise RuntimeError(msg)
+
+            language = Language.from_values_unsafe(str(args.language), "Not applicable")
+            ctx.write_language(language)
+
+            logger.info(_("Wrote language: {lang}").format(lang=str(language.short)))
 
     noop_manager = NoopManager()
 
