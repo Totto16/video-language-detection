@@ -216,7 +216,12 @@ class AVIChunkSpan:
         if interval_size > self.__total.size or interval_size < 0:
             msg = f"Implementation error, interval_size out of bounds [0, {self.__total.size}]: {interval_size}"
 
-        return SimpleSpan(interval_start, interval_size)
+        span = SimpleSpan(interval_start, interval_size)
+        if (span.start % 2) != 0 and span.size != 0:
+            msg = f"SimpleSpan for AVI is not aligned by the WORD (16 bit): {span}"
+            raise RuntimeError(msg)
+
+        return span
 
     def header_span(self: Self, depth: int = 0) -> SimpleSpan:
         if depth == -1:
@@ -853,7 +858,13 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
 
         key_chunk = VLDStrChunk.read_checked(parent.payload_io(io))
 
-        parent.span.add_header(key_chunk.span.total.size)
+        key_size = key_chunk.span.total.size
+
+        # align by WORD (2 bytes), as we also write it by 2 bytes aligned
+        if (key_size % 2) != 0:
+            key_size = key_size + 1
+
+        parent.span.add_header(key_size)
 
         sub_chunk = AVIChunk.read_avi_chunk(parent.payload_io(io))
 
@@ -883,7 +894,13 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
                 msg = f"Invalid sub chunk in VLDKeyValueChunk: {sub_chunk.fourcc}"
                 raise RuntimeError(msg)
 
-        parent.span.add_header(value_chunk.span.total.size)
+        value_size = value_chunk.span.total.size
+
+        # align by WORD (2 bytes), as we also write it by 2 bytes aligned
+        if (value_size % 2) != 0:
+            value_size = value_size + 1
+
+        parent.span.add_header(value_size)
 
         if parent.span.payload_span.size != 0:
             msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
@@ -913,6 +930,10 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
 
         buf.write(key_bytes)
 
+        if (len(key_bytes) % 2) != 0:
+            msg = f"Implementation error: writing avi chunks should align to 2 bytes: {len(key_bytes)}"
+            raise RuntimeError(msg)
+
         data_bytes: bytes
 
         if isinstance(value, VLDKeyValueValueStr):
@@ -925,6 +946,10 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
             assert_never(value)
 
         buf.write(data_bytes)
+
+        if (len(data_bytes) % 2) != 0:
+            msg = f"Implementation error: writing avi chunks should align to 2 bytes: {len(data_bytes)}"
+            raise RuntimeError(msg)
 
         final_data = buf.getvalue()
 
