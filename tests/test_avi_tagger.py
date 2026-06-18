@@ -20,6 +20,8 @@ from content.tagger.avi_tagger import (
     LIST_FOURCC,
     RIFF_FOURCC,
     VIDS_FOURCC,
+    VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC,
+    VLD_KEY_VALUE_FOURCC,
     AVIChunk,
     AVIChunkSpan,
     AVIList,
@@ -596,6 +598,53 @@ def get_raw_ffprobe_tags(
                 metadata["metadata"][key] = value
                 del val["tags"][key]
 
+            if key in [LIST_FOURCC.value.decode(), VLD_KEY_VALUE_FOURCC.value.decode()]:
+                if metadata.get("artifacts", None) is None:  # noqa: SIM910
+                    metadata["artifacts"] = {}
+
+                metadata["artifacts"][key] = value
+                del val["tags"][key]
+
+            if key == VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC.value.decode():
+                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                    metadata["metadata"] = {}
+
+                if metadata.get("errors", None) is None:  # noqa: SIM910
+                    metadata["errors"] = []
+
+                raw_value = json.loads(value)
+
+                if isinstance(raw_value, dict):
+                    for d_key, d_val in raw_value.items():
+                        if d_key == "metadata":
+                            if not isinstance(d_val, dict):
+                                msg = f"Implementation error: not a dict: {d_val}"
+                                raise RuntimeError(msg)
+                            metadata["metadata"] = merge_dicts(
+                                metadata["metadata"],
+                                {
+                                    f"video_language_detect:{i_k}": i_v
+                                    for i_k, i_v in d_val.items()
+                                },
+                                "error",
+                            )
+                        elif d_key == "comment":
+                            # ignore
+                            pass
+                        elif d_key == "uuid_hex":
+                            metadata["metadata"] = merge_dicts(
+                                metadata["metadata"],
+                                {"video_language_detect_uuid:hex": d_val},
+                                "error",
+                            )
+                        else:
+                            metadata["errors"].append({d_key: d_val})
+
+                else:
+                    metadata["errors"].append(raw_value)
+
+                del val["tags"][key]
+
     return (val, metadata)
 
 
@@ -689,12 +738,11 @@ def test_avi_tagger_metadata_tags_custom(
                         cast(
                             dict[str, Any],
                             {
-                                f"video_language_detect:{key}": json.dumps(value)
+                                f"video_language_detect:{key}": value
                                 for key, value in tags.metadata.items()
                             },
                         ),
                         {
-                            "video_language_detect_uuid:raw": mock.ANY,
                             "video_language_detect_uuid:hex": uuid_to_str(
                                 tags.uuid,
                             ),
@@ -753,13 +801,10 @@ def test_avi_tagger_metadata_tags_custom(
 
                     assert ffprobe_metadata_again["metadata"] == merge_dicts(
                         {
-                            f"video_language_detect:{key}": json.dumps(value)
+                            f"video_language_detect:{key}": value
                             for key, value in tags.metadata.items()
                         },
                         {
-                            "video_language_detect_uuid:raw": ffprobe_metadata_next[
-                                "metadata"
-                            ]["video_language_detect_uuid:raw"],
                             "video_language_detect_uuid:hex": uuid_to_str(
                                 tags.uuid,
                             ),

@@ -158,6 +158,7 @@ VLD_JSON_CHUNK_FOURCC = FOURCC(b"vldj")
 VLD_LIST_FOURCC = FOURCC(b"vldl")
 VLD_UUID_FOURCC = FOURCC(b"vldu")
 VLD_KEY_VALUE_FOURCC = FOURCC(b"vldk")
+VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC = FOURCC(b"vldf")
 
 
 @final
@@ -1296,6 +1297,8 @@ class AVIMetadataHandler:
 
         info_chunk = INFOChunkBuilder()
 
+        first_uuid: UUID = tags.uuid
+
         if self.__info_values is not None:
             # restore the old chunks
             for info_value in self.__info_values:
@@ -1304,11 +1307,35 @@ class AVIMetadataHandler:
                     duplicate_behavior="error",
                 )
 
+                if (
+                    isinstance(info_value, VLDCustomKeyValueEntry)
+                    and info_value.key == TaggerDomain.UUID_RAW_KEY_FREEFORM.name
+                ):
+                    if not isinstance(info_value.data, VLDKeyValueValueUUID):
+                        msg = f"Implementation error, wrong uuid key value: {info_value.data}"
+                        raise RuntimeError(msg)
+                    first_uuid = info_value.data.uuid
+
         # add or overwrite chunks, if not present, so that the new data gets written all the time, except uuid, that is never replaced
         info_chunk.add_sub_chunk(
             VLDKnownStrSubChunk(
                 fourcc=ICMT_FOURCC,
                 value=tags.comment,
+            ),
+            duplicate_behavior="overwrite",
+        )
+
+        # for ffmpeg, so that it has all the data as a string format
+        info_chunk.add_sub_chunk(
+            VLDUnknownStrSubChunk(
+                fourcc=VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC,
+                data=json.dumps(
+                    {
+                        "comment": tags.comment,
+                        "metadata": tags.metadata,
+                        "uuid_hex": uuid_to_str(first_uuid),
+                    },
+                ).encode(),
             ),
             duplicate_behavior="overwrite",
         )
