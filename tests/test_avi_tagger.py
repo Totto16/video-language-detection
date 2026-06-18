@@ -510,8 +510,14 @@ def test_avi_invalid_bytes(
 
     test_data: list[tuple[bytes, str]] = [
         (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
-        (b"HELLO WORLD", "Not a valid RIFF / AVI file"),
-        (b"LIST\x22\x00\x00\x00WORLD", "New payload io end overflows parent: 42 > 13"),
+        (
+            b"HELLO WORLD",
+            "Invalid AVI Chunk size: It overflows the parent chunk: 1331109975 > 11",
+        ),
+        (
+            b"LIST\x22\x00\x00\x00WORLD",
+            "Invalid AVI Chunk size: It overflows the parent chunk: 42 > 13",
+        ),
         (b"LIST\x02\x00\x00\x00WO", "Read would overflow bounds [8, 10]: 12 (8 + 4)"),
         (
             b"LIST\x04\x00\x00\x00HELO",
@@ -726,7 +732,21 @@ def test_avi_tagger_metadata_tags_custom(
 
                     assert raw_next_tags == raw_early_tags
 
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                        "artifacts",
+                        "errors",
+                    ], "raw ffprobe metadata is correct later on"
+
                     assert ffprobe_metadata_next["comment"] == tags.comment
+
+                    assert ffprobe_metadata_next["artifacts"] == {
+                        "LIST": "vldlvldk\x1a",
+                        "vldk": "vlds'",
+                    }
+
+                    assert ffprobe_metadata_next["errors"] == []
 
                     assert ffprobe_metadata_next.get("metadata", None) is not None
 
@@ -789,9 +809,23 @@ def test_avi_tagger_metadata_tags_custom(
 
                     assert raw_again_tags == raw_early_tags
 
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                        "artifacts",
+                        "errors",
+                    ], "raw ffprobe metadata is correct later on"
+
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
                     )
+
+                    assert ffprobe_metadata_next["artifacts"] == {
+                        "LIST": "vldlvldk\x1a",
+                        "vldk": "vlds'",
+                    }
+
+                    assert ffprobe_metadata_next["errors"] == []
 
                     assert ffprobe_metadata_again.get("metadata", None) is not None
 
@@ -806,7 +840,7 @@ def test_avi_tagger_metadata_tags_custom(
                                 "video_language_detect_uuid:hex": uuid_to_str(
                                     tags.uuid,
                                 ),
-                                "video_language_detect:new": '"a new tag"',
+                                "video_language_detect:new": "a new tag",
                             },
                         ),
                         "error",
