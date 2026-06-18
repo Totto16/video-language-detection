@@ -130,10 +130,14 @@ STRL_FOURCC: FOURCC = FOURCC(b"strl")
 HDRL_FOURCC: FOURCC = FOURCC(b"hdrl")
 INFO_FOURCC: FOURCC = FOURCC(b"INFO")
 
-AUDS_FOURCC = FOURCC(b"auds")
-MIDS_FOURCC = FOURCC(b"mids")
-TXTS_FOURCC = FOURCC(b"txts")
-VIDS_FOURCC = FOURCC(b"vids")
+AUDS_FOURCC: FOURCC = FOURCC(b"auds")
+MIDS_FOURCC: FOURCC = FOURCC(b"mids")
+TXTS_FOURCC: FOURCC = FOURCC(b"txts")
+VIDS_FOURCC: FOURCC = FOURCC(b"vids")
+
+ICMT_FOURCC: FOURCC = FOURCC(b"ICMT")
+
+KNOWN_INFO_SUBCHUNK_FOURCCS: list[FOURCC] = [ICMT_FOURCC]
 
 # custom fourcc's
 
@@ -1181,7 +1185,9 @@ class INFOChunkBuilder:
         for sub_chunk in self.__sub_chunks.values():
             if isinstance(sub_chunk, VLDCustomKeyValueEntry):
                 list_data = merge_dicts(
-                    list_data, {sub_chunk.key: sub_chunk.data}, "error"
+                    list_data,
+                    {sub_chunk.key: sub_chunk.data},
+                    "error",
                 )
             else:
                 sub_chunk_data.append(self.__render_sub_chunk_impl(sub_chunk))
@@ -1203,7 +1209,6 @@ class INFOChunkBuilder:
             FOURCC(b"INFO"),
             sub_chunk_data,
         )
-
 
 
 INFO_LIST_ID_NAME: str = "id:video_language_detect:info_list_name"
@@ -1259,7 +1264,7 @@ class AVIMetadataHandler:
         # add or overwrite chunks, if not present, so that the new data gets written all the time, except uuid, that is never replaced
         info_chunk.add_sub_chunk(
             VLDKnownStrSubChunk(
-                fourcc=FOURCC(b"ICMT"),
+                fourcc=ICMT_FOURCC,
                 value=tags.comment,
             ),
             duplicate_behavior="overwrite",
@@ -1291,7 +1296,6 @@ class AVIMetadataHandler:
             duplicate_behavior="ignore",
         )
 
-
         f.seek(0, 2)
         filesize = f.tell()
         f.seek(0)
@@ -1311,9 +1315,7 @@ class AVIMetadataHandler:
             raise TypeError(msg)
 
         if top_level_chunk.fourcc != RIFF_FOURCC:
-            msg = (
-                f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
-            )
+            msg = f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
             raise TypeError(msg)
 
         info_list_data = info_chunk.build()
@@ -1481,56 +1483,72 @@ class AVIMetadataHandler:
         return MP4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
 
     @staticmethod
-    def __read_meta_box_info(
-        meta_box: MetaBox,
+    def __read_info_chunk_info(
+        info_chunk: AVIList,
         f: BinaryIO,
-    ) -> ReadMetaBoxValues:
-        meta_child_boxes = list(
-            mp4_iter_boxes(f, meta_box.span.payload_span),
-        )
+    ) -> ReadInfoChunkValues:
 
-        if len(meta_child_boxes) != 1:
-            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
-            raise RuntimeError(msg)
+        result: ReadInfoChunkValues = []
 
-        meta_child_box = meta_child_boxes[0]
+        for chunk in avi_iter_chunks(f, info_chunk.span.payload_span):
+            if isinstance(chunk, VLDKeyValueChunk):
+                if chunk.key == INFO_LIST_ID_NAME:
+                    if chunk.value != VLDKeyValueValueUUID(INFO_LIST_ID_NAME_ID):
+                        msg = f"Invalid list id name for our INFO list identifier: {chunk.value}"
+                        raise RuntimeError(msg)
 
-        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
-            meta_child_box,
-            AppleItunesItemList,
-        ):
-            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
-            raise RuntimeError(msg)
+                    continue
 
-        result: ReadMetaBoxValues = []
-
-        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
-            if not isinstance(
-                data_box,
-                (AppleItunesItemFreeformBox, AppleItunesItemBox),
+                msg = f"Invalid VLDKeyValueChunk: not allowed at the top level: {chunk}"
+                raise RuntimeError(msg)
+            elif isinstance(  # noqa: RET506
+                chunk,
+                (VLDStrChunk, VLDJsonChunk, VLDUUIDChunk),
             ):
-                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                msg = f"Invalid Vld<Value>Chunk: not allowed at the top level: {chunk}"
                 raise TypeError(msg)
+            elif isinstance(chunk, AVIList):
+                if chunk.fourcc != LIST_FOURCC or chunk.type != VLD_LIST_FOURCC:
+                    msg = f"Invalid list inside INFO list: {chunk}"
+                    raise RuntimeError(msg)
 
-            if isinstance(data_box, AppleItunesItemFreeformBox):
-                result.append(
-                    ApplItunesTags.validate_init(
-                        AppleItunesFreeformKey(
-                            mean=data_box.mean.value,
-                            name=data_box.name.value,
-                        ),
-                        ApplItunesTagsData.from_data_box(data_box.data),
-                    ),
-                )
-            elif isinstance(data_box, AppleItunesItemBox):
-                result.append(
-                    ApplItunesTags.validate_init(
-                        data_box.type,
-                        ApplItunesTagsData.from_data_box(data_box.data),
-                    ),
-                )
+                for sub_chunk in avi_iter_chunks(f, chunk.span.payload_span):
+                    if isinstance(sub_chunk, VLDKeyValueChunk):
+                        result.append(
+                            VLDCustomKeyValueEntry(
+                                key=sub_chunk.key,
+                                data=sub_chunk.value,
+                            ),
+                        )
+                    elif isinstance(
+                        sub_chunk, (VLDStrChunk, VLDJsonChunk, VLDUUIDChunk),
+                    ):
+                        msg = f"Invalid Vld<Value>Chunk: not allowed at the vld list level: {sub_chunk}"
+                        raise TypeError(msg)
+                    elif isinstance(sub_chunk, AVIList):
+                        msg = f"Invalid AVI list: not allowed at the vld list level: {sub_chunk}"
+                        raise TypeError(msg)
+                    else:
+                        msg = f"Invalid Normal AVI chunk: not allowed at the vld list level: {sub_chunk}"
+                        raise TypeError(msg)
+
             else:
-                assert_never(data_box)
+                data_raw: bytes
+                with BoundedIO.get_new(f, chunk.span.payload_span).r_ctx(
+                    force_entire_read=True,
+                ):
+                    data_raw = f.read(chunk.span.payload_span.size)
+
+                if chunk.fourcc in KNOWN_INFO_SUBCHUNK_FOURCCS:
+                    result.append(
+                        VLDKnownStrSubChunk(
+                            fourcc=chunk.fourcc, value=data_raw.decode()
+                        ),
+                    )
+                else:
+                    result.append(
+                        VLDUnknownStrSubChunk(fourcc=chunk.fourcc, data=data_raw),
+                    )
 
         return result
 
@@ -1607,8 +1625,7 @@ class AVIMetadataHandler:
                 break
 
         return AVIMetadataHandler(
-            uuid_box,
-            meta_values,
+            info_values,
             list(reversed(our_chunks_reversed)),
         )
 
