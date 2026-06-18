@@ -2550,22 +2550,22 @@ class AppleItunesMetaBoxBuilder:
     def add_tag(
         self: Self,
         tag: ApplItunesTags,
-        duplicate_behaviour: Literal["overwrite", "error", "ignore"],
+        duplicate_behavior: Literal["overwrite", "error", "ignore"],
     ) -> None:
 
         key = AppleItunesMetaBoxBuilder._key_str_impl(tag.key)
 
         if self.__tags.get(key, None) is not None:
-            if duplicate_behaviour == "error":
+            if duplicate_behavior == "error":
                 msg = f"Trying to add duplicate tag key: {key}"
                 raise RuntimeError(msg)
 
-            if duplicate_behaviour == "overwrite":
+            if duplicate_behavior == "overwrite":
                 self.__tags[key] = tag
-            elif duplicate_behaviour == "ignore":
+            elif duplicate_behavior == "ignore":
                 pass
             else:
-                assert_never(duplicate_behaviour)
+                assert_never(duplicate_behavior)
         else:
             self.__tags[key] = tag
 
@@ -2892,7 +2892,7 @@ class MP4MetadataHandler:
                 for meta_value in meta_values:
                     meta_box.add_tag(
                         meta_value,
-                        duplicate_behaviour="error",
+                        duplicate_behavior="error",
                     )
 
         # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
@@ -2901,7 +2901,7 @@ class MP4MetadataHandler:
                 ISOMAtomName(b"\xa9cmt"),
                 tags.comment,
             ),
-            duplicate_behaviour="overwrite",
+            duplicate_behavior="overwrite",
         )
 
         for key, value in tags.metadata.items():
@@ -2914,7 +2914,7 @@ class MP4MetadataHandler:
                         value=value_str,
                     ),
                 ),
-                duplicate_behaviour="overwrite",
+                duplicate_behavior="overwrite",
             )
 
         # Note, these ar enot neccesraly in sync, which is bad, but that should never happen
