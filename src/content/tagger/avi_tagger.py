@@ -1,9 +1,12 @@
 from collections.abc import Generator
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from io import BytesIO
+import json
 from pathlib import Path
 from types import TracebackType
 from typing import Any, BinaryIO, Literal, Optional, Self, final, override
+from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
 from content.tagger.lcid_languages import LCID
@@ -16,12 +19,15 @@ from content.tagger.parser import (
     Unpacker,
     UnsignedInt,
     UnsignedShort,
+    uuid_from_bytes,
+    uuid_to_bytes,
 )
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
     MetadataTags,
     MetadataTagsRead,
+    SerializableDict,
     VideoTagger,
     VideoTaggerContextReadable,
     VideoTaggerContextRW,
@@ -118,11 +124,21 @@ LIST_FOURCC: FOURCC = FOURCC(b"LIST")
 STRH_FOURCC: FOURCC = FOURCC(b"strh")
 STRL_FOURCC: FOURCC = FOURCC(b"strl")
 HDRL_FOURCC: FOURCC = FOURCC(b"hdrl")
+INFO_FOURCC: FOURCC = FOURCC(b"INFO")
 
 AUDS_FOURCC = FOURCC(b"auds")
 MIDS_FOURCC = FOURCC(b"mids")
 TXTS_FOURCC = FOURCC(b"txts")
 VIDS_FOURCC = FOURCC(b"vids")
+
+# custom fourcc's
+
+# vld<t> stands for video language detector <type>
+VLD_STR_CHUNK_FOURCC = FOURCC(b"vlds")
+VLD_JSON_CHUNK_FOURCC = FOURCC(b"vldj")
+VLD_LIST_FOURCC = FOURCC(b"vldl")
+VLD_UUID_FOURCC = FOURCC(b"vldu")
+VLD_KEY_VALUE_FOURCC = FOURCC(b"vldk")
 
 
 @final
@@ -430,7 +446,7 @@ class AVIList(AVIChunk):
         return AVIList.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
-        return f"<AVIList parent: {AVIChunk.__str__(self)} type {self.type}>"
+        return f"<AVIList parent: {AVIChunk.__str__(self)} type: {self.type}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -584,22 +600,303 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
                 raise RuntimeError(msg)
 
     def __str__(self: Self) -> str:
-        return f"<AVIStreamHeader parent: {AVIChunk.__str__(self)} type {self.type}>"
+        return f"<AVIStreamHeader parent: {AVIChunk.__str__(self)} type: {self.type}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
+
+
+@final
+class VLDStrChunk(AVIChunk, FinalAVIChunk):
+    value: str
+
+    def __init__(self: Self, parent: AVIChunk, value: str) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=False)
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        parent: AVIChunk,
+    ) -> "VLDStrChunk":
+        # custom chunk
+        # just contains some string data
+
+        with io.r_ctx(force_entire_read=True) as f:
+            value_raw = f.read(parent.span.payload_span.size)
+
+            value = value_raw.decode()
+
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return VLDStrChunk(parent, value)
+
+    @staticmethod
+    def read(io: BoundedIO) -> "VLDStrChunk":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return VLDStrChunk.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_checked(io: BoundedIO) -> "VLDStrChunk":
+        chunk = AVIChunk.read_avi_chunk(io)
+        if chunk.fourcc != VLD_STR_CHUNK_FOURCC:
+            msg = f"Invalid VLDStrChunk fourcc: {chunk.fourcc}"
+            raise RuntimeError(msg)
+        return VLDStrChunk.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDStrChunk":
+        return VLDStrChunk.__read_impl(io, parent)
+
+    @staticmethod
+    def write_to_buffer(
+        value: str,
+    ) -> bytes:
+        final_data: bytes = value.encode()
+
+        return AVIChunk.write_to_buffer_avi_chunk(VLD_STR_CHUNK_FOURCC, final_data)
+
+    def __str__(self: Self) -> str:
+        return f"<VLDStrChunk parent: {AVIChunk.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+class VLDJsonChunk(AVIChunk, FinalAVIChunk):
+    data: SerializableDict
+
+    def __init__(
+        self: Self,
+        parent: AVIChunk,
+        data: SerializableDict,
+    ) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=False)
+
+        self.data = data
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        parent: AVIChunk,
+    ) -> "VLDJsonChunk":
+        # custom chunk
+        # just contains a json payload
+
+        with io.r_ctx(force_entire_read=True) as f:
+            data_raw = f.read(parent.span.payload_span.size)
+
+            data = json.loads(data_raw.decode())
+
+            parent.span.add_header(parent.span.payload_span.size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return VLDJsonChunk(parent, data)
+
+    @staticmethod
+    def read(io: BoundedIO) -> "VLDJsonChunk":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return VLDJsonChunk.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDJsonChunk":
+        return VLDJsonChunk.__read_impl(io, parent)
+
+    @staticmethod
+    def write_to_buffer(
+        data: SerializableDict,
+    ) -> bytes:
+        byte_data: bytes = json.dumps(data).encode()
+
+        return AVIChunk.write_to_buffer_avi_chunk(VLD_JSON_CHUNK_FOURCC, byte_data)
+
+    def __str__(self: Self) -> str:
+        return f"<VLDJsonChunk parent: {AVIChunk.__str__(self)} data: {self.data}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
+    uuid: UUID
+
+    def __init__(self: Self, parent: AVIChunk, uuid: UUID) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=False)
+
+        self.uuid = uuid
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        parent: AVIChunk,
+    ) -> "VLDUUIDChunk":
+        # custom chunk
+        # just contains an UUID
+
+        with io.r_ctx(force_entire_read=True) as f:
+            if parent.span.payload_span.size != 16:
+                msg = f"VLDUUIDChunk has not the correct payload size: {parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            uuid_raw = f.read(16)
+
+            uuid = uuid_from_bytes(AVI_BYTE_ORDER, uuid_raw)
+
+            parent.span.add_header(16)
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return VLDUUIDChunk(parent, uuid)
+
+    @staticmethod
+    def read(io: BoundedIO) -> "VLDUUIDChunk":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return VLDUUIDChunk.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDUUIDChunk":
+        return VLDUUIDChunk.__read_impl(io, parent)
+
+    @staticmethod
+    def write_to_buffer(
+        uuid: UUID,
+    ) -> bytes:
+        data: bytes = uuid_to_bytes(AVI_BYTE_ORDER, uuid)
+
+        return AVIChunk.write_to_buffer_avi_chunk(VLD_UUID_FOURCC, data)
+
+    def __str__(self: Self) -> str:
+        return f"<VLDUUIDChunk parent: {AVIChunk.__str__(self)} uuid: {self.uuid}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+VLDKeyValueValue = str | UUID | SerializableDict
+
+@final
+class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
+    key: str
+    value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk
+
+    def __init__(
+        self: Self,
+        parent: AVIChunk,
+        key: str,
+        value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk,
+    ) -> None:
+        super().__init__(parent.fourcc, parent.span, is_list=False)
+
+        self.key = key
+        self.value_chunk = value_chunk
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        parent: AVIChunk,
+    ) -> "VLDKeyValueChunk":
+        # custom chunk
+        # contains a key and a value
+
+        # format:
+        # one VLDStrChunk
+        # the sub chunk, can be any of the available chunk types
+
+        key_chunk = VLDStrChunk.read_checked(parent.payload_io(io))
+
+        parent.span.add_header(key_chunk.span.total.size)
+
+        sub_chunk = AVIChunk.read_avi_chunk(parent.payload_io(io))
+
+        value_chunk: VLDStrChunk | VLDJsonChunk | VLDUUIDChunk
+
+        match sub_chunk.fourcc.value:
+            case SupportedChunks.VLD_STR:
+                value_chunk = VLDStrChunk.read_from_parent(
+                    sub_chunk.payload_io(io),
+                    sub_chunk,
+                )
+            case SupportedChunks.VLD_JSON:
+                value_chunk = VLDJsonChunk.read_from_parent(
+                    sub_chunk.payload_io(io),
+                    sub_chunk,
+                )
+            case SupportedChunks.VLD_UUID:
+                value_chunk = VLDUUIDChunk.read_from_parent(
+                    sub_chunk.payload_io(io),
+                    sub_chunk,
+                )
+            case _:
+                msg = f"Invalid sub chunk in VLDKeyValueChunk: {sub_chunk.fourcc}"
+                raise RuntimeError(msg)
+
+        return VLDKeyValueChunk(parent, key_chunk.value, value_chunk)
+
+    @staticmethod
+    def read(io: BoundedIO) -> "VLDKeyValueChunk":
+        chunk = AVIChunk.read_avi_chunk(io)
+        return VLDKeyValueChunk.__read_impl(chunk.payload_io(io), chunk)
+
+    @staticmethod
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDKeyValueChunk":
+        return VLDKeyValueChunk.__read_impl(io, parent)
+
+    @staticmethod
+    def write_to_buffer(
+        value: VLDKeyValueValue,
+    ) -> bytes:
+        data: bytes = uuid_to_bytes(AVI_BYTE_ORDER, uuid)
+
+        return AVIChunk.write_to_buffer_avi_chunk(VLD_UUID_FOURCC, data)
+
+    def __str__(self: Self) -> str:
+        return f"<VLDUUIDChunk parent: {AVIChunk.__str__(self)} uuid: {self.uuid}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+class SupportedChunks:
+    RIFF = RIFF_FOURCC
+    LIST = LIST_FOURCC
+
+    STRH = STRH_FOURCC
+
+    VLD_STR = VLD_STR_CHUNK_FOURCC
+    VLD_JSON = VLD_JSON_CHUNK_FOURCC
+    VLD_UUID = VLD_UUID_FOURCC
+    VLD_KEY_VALUE = VLD_KEY_VALUE_FOURCC
 
 
 def read_chunk(io: BoundedIO) -> AVIChunk:
     chunk = AVIChunk.read_avi_chunk(io)
 
     match chunk.fourcc.value:
-        case b"RIFF":
+        case SupportedChunks.RIFF:
             return AVIList.read_avi_list_from_parent(chunk.payload_io(io), chunk)
-        case b"LIST":
+        case SupportedChunks.LIST:
             return AVIList.read_avi_list_from_parent(chunk.payload_io(io), chunk)
-        case b"strh":
+        case SupportedChunks.STRH:
             return AVIStreamHeader.read_from_parent(chunk.payload_io(io), chunk)
+        case SupportedChunks.VLD_STR:
+            return VLDStrChunk.read_from_parent(chunk.payload_io(io), chunk)
+        case SupportedChunks.VLD_JSON:
+            return VLDJsonChunk.read_from_parent(chunk.payload_io(io), chunk)
+        case SupportedChunks.VLD_UUID:
+            return VLDUUIDChunk.read_from_parent(chunk.payload_io(io), chunk)
+        case SupportedChunks.VLD_KEY_VALUE:
+            return VLDKeyValueChunk.read_from_parent(chunk.payload_io(io), chunk)
         case _:
             return chunk
 
@@ -704,6 +1001,490 @@ def is_avi_file(
     return None
 
 
+def t():
+    span = SimpleSpan(0, filesize)
+
+    top_level_chunks = list(avi_iter_chunks(f, span))
+
+    if len(top_level_chunks) != 1:
+        msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
+        raise RuntimeError(msg)
+
+    top_level_chunk = top_level_chunks[0]
+
+    if not isinstance(top_level_chunk, AVIList):
+        msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk}"
+        raise TypeError(msg)
+
+    if top_level_chunk.fourcc != RIFF_FOURCC:
+        msg = (
+            f"Expected only one RIFF top level chunk, but got {top_level_chunk.fourcc}"
+        )
+        raise TypeError(msg)
+
+    icmt_data = AVIChunk.write_to_buffer_avi_chunk(
+        FOURCC(b"ICMT"),
+        b"Test Comment\x00",
+    )
+
+    # vldc stands for video language detector chunk
+    CUSTOM_FOURCC = FOURCC(b"vldc")
+
+    custom_data = AVIChunk.write_to_buffer_avi_chunk(
+        CUSTOM_FOURCC,
+        b"Test Custom data\x00",
+    )
+
+    custom_data3 = AVIChunk.write_to_buffer_avi_chunk(
+        FOURCC(b"icop"),
+        b"ICOP DATA\x00",
+    )
+
+    custom_data4 = AVIChunk.write_to_buffer_avi_chunk(
+        FOURCC(b"IGNR"),
+        b"IGNR DATA\x00",
+    )
+
+    custom_data2 = AVIList.write_to_buffer_avi_list(
+        LIST_FOURCC,
+        FOURCC(b"vldl"),
+        [custom_data],
+    )
+
+    info_list_data = AVIList.write_to_buffer_avi_list(
+        LIST_FOURCC,
+        FOURCC(b"INFO"),
+        [icmt_data, custom_data, custom_data2, custom_data3, custom_data4],
+    )
+
+    top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
+
+
+@dataclass
+class ReadInfoChunkValueRaw:
+    fourcc: FOURCC
+    value: str
+
+
+# TODO
+@dataclass
+class ReadInfoChunkValueRawCustom:
+    todo: int
+
+
+INFO_LIST_ID_NAME: str = "id:video_language_detect:info_list_name"
+
+INFO_LIST_ID_NAME_ID: UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258be0")
+
+
+ReadInfoChunkValue = ReadInfoChunkValueRaw | ReadInfoChunkValueRawCustom
+
+ReadInfoChunkValues = list[ReadInfoChunkValue]
+
+InfoValues = Optional[ReadInfoChunkValues]
+
+
+class AVIMetadataHandler:
+    __info_values: InfoValues
+    __our_chunks: list[AVIChunk]
+
+    def __init__(
+        self: Self,
+        info_values: InfoValues,
+        our_chunks: list[AVIChunk],
+    ) -> None:
+        self.__info_values = info_values
+        self.__our_chunks = our_chunks
+
+    def remove_old_metadata(self: Self, f: BinaryIO) -> None:
+        # delete old metadata
+        if len(self.__our_chunks) != 0:
+            f.truncate(self.__our_chunks[0].span.total.start)
+
+    def __write_metadata_toplevel_info(
+        self: Self,
+        f: BinaryIO,
+        tags: MetadataTags,
+    ) -> None:
+        if self.__meta_values.err():
+            # ignore this and write no top level meta box
+            pass
+        else:
+            meta_values = self.__meta_values.as_ok()
+
+            # NOTE: using top level meta box
+
+            # meta:
+            # location: file , amount: 0 or 1
+
+            meta_box = AppleItunesMetaBoxBuilder()
+
+            if meta_values is not None:
+                # restore the old tags
+                for meta_value in meta_values:
+                    meta_box.add_tag(
+                        meta_value,
+                        duplicate_behaviour="error",
+                    )
+
+        # add or overwritetags, if not present, so that the new data gets written all the time, ecept uuid, that is never replaced
+        meta_box.add_tag(
+            ApplItunesTags.from_known_atom(
+                ISOMAtomName(b"\xa9cmt"),
+                tags.comment,
+            ),
+            duplicate_behaviour="overwrite",
+        )
+
+        for key, value in tags.metadata.items():
+            value_str = json.dumps(value)
+            meta_box.add_tag(
+                ApplItunesTags.validate_init(
+                    key=TaggerDomain.get_freeform(key),
+                    data=ApplItunesTagsData(
+                        type=AppleItunesItemDataType.UTF8,
+                        value=value_str,
+                    ),
+                ),
+                duplicate_behaviour="overwrite",
+            )
+
+        # Note, these ar enot neccesraly in sync, which is bad, but that should never happen
+        meta_box.add_tag(
+            ApplItunesTags.validate_init(
+                key=TaggerDomain.UUID_RAW_KEY_FREEFORM,
+                data=ApplItunesTagsData(
+                    type=AppleItunesItemDataType.UUID,
+                    value=tags.uuid,
+                ),
+            ),
+            "ignore",
+        )
+
+        meta_box.add_tag(
+            ApplItunesTags.validate_init(
+                key=TaggerDomain.UUID_HEX_KEY_FREEFORM,
+                data=ApplItunesTagsData(
+                    type=AppleItunesItemDataType.UTF8,
+                    value=uuid_to_str(tags.uuid),
+                ),
+            ),
+            "ignore",
+        )
+
+        buffer = meta_box.build()
+
+        f.seek(0, 2)
+        f.write(buffer)
+
+        # write padding
+        padding_size = META_PADDING_SIZE - (len(buffer) % META_PADDING_SIZE)
+
+        if padding_size < SIZE_OF_FREE_BOX_HEADER:
+            padding_size = META_PADDING_SIZE + padding_size - SIZE_OF_FREE_BOX_HEADER
+        else:
+            padding_size = padding_size - SIZE_OF_FREE_BOX_HEADER
+
+        if padding_size < 0:
+            msg = f"Implementation error: padding size negative: {padding_size}"
+            raise RuntimeError(msg)
+
+        buffer = FreeSpaceBox.write_to_buffer(data=b"\x00" * padding_size)
+        f.write(buffer)
+
+        f.flush()
+
+    def write_new_metadata(self: Self, f: BinaryIO, tags: MetadataTags) -> None:
+        f.seek(0, 2)
+
+        self.__write_metadata_toplevel_info(f, tags)
+
+        f.flush()
+
+    def __read_metadata_toplevel_info(  # noqa: PLR0915
+        self: Self,
+        box: MetaBox,
+        f: BinaryIO,
+    ) -> ReadMetadataImpl:
+        metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
+
+        meta_child_boxes = list(
+            mp4_iter_boxes(f, box.span.payload_span),
+        )
+
+        if len(meta_child_boxes) != 1:
+            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
+            raise RuntimeError(msg)
+
+        meta_child_box = meta_child_boxes[0]
+
+        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
+            meta_child_box,
+            AppleItunesItemList,
+        ):
+            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
+            raise RuntimeError(msg)
+
+        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
+            if not isinstance(
+                data_box,
+                (AppleItunesItemFreeformBox, AppleItunesItemBox),
+            ):
+                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                raise TypeError(msg)
+
+            if isinstance(data_box, AppleItunesItemFreeformBox):
+
+                mean = data_box.mean.value
+                name = data_box.name.value
+
+                if mean != TAGGER_DOMAIN:
+                    msg = f"Invalid AppleItunesItemFreeformBox mean in meta box: {mean} != {TAGGER_DOMAIN}"
+                    raise RuntimeError(msg)
+
+                if name in [
+                    TaggerDomain.UUID_RAW_KEY_FREEFORM.name,
+                    TaggerDomain.UUID_HEX_KEY_FREEFORM.name,
+                ]:
+                    uuid: UUID
+
+                    if name == TaggerDomain.UUID_RAW_KEY_FREEFORM.name:
+                        if not isinstance(data_box.data.value, UUID):
+                            msg = f"Invalid uuid (raw) key type: {type(data_box.data.value)} {data_box.data.value}"
+                            raise RuntimeError(msg)
+
+                        uuid = data_box.data.value
+                    else:
+                        if not isinstance(data_box.data.value, str):
+                            msg = f"Invalid uuid (str) key type: {type(data_box.data.value)} {data_box.data.value}"
+                            raise RuntimeError(msg)
+
+                        uuid = uuid_from_str(data_box.data.value)
+
+                    if metadata_result.uuid is not None:
+                        if metadata_result.uuid != uuid:
+                            msg = f"Duplicate uuid tag read, that are not the same: {uuid}"
+                            raise RuntimeError(msg)
+                    else:
+                        metadata_result.uuid = uuid
+
+                else:
+                    raw_name = TaggerDomain.get_raw_name(name)
+
+                    if not isinstance(data_box.data.value, str):
+                        msg = f"Invalid value for metadata: expected str type, got {type(data_box.data.value)}"
+                        raise RuntimeError(msg)
+
+                    raw_value = json.loads(data_box.data.value)
+
+                    metadata_result.metadata = merge_dicts(
+                        metadata_result.metadata,
+                        {
+                            "metadata": merge_dicts(
+                                cast(
+                                    dict[str, Any],
+                                    metadata_result.metadata.get("metadata", {}),
+                                ),
+                                {raw_name: raw_value},
+                                "error",
+                            ),
+                        },
+                        "overwrite",
+                    )
+
+            elif isinstance(data_box, AppleItunesItemBox):
+                key: str
+                if data_box.type == ISOMAtomName(b"\xa9cmt"):
+                    key = "comment"
+                else:
+                    key = data_box.type.value.decode("latin-1")
+
+                metadata_result.metadata = merge_dicts(
+                    metadata_result.metadata,
+                    {key: data_box.data.value},
+                    "error",
+                )
+
+            else:
+                assert_never(data_box)
+
+        return metadata_result
+
+    def read_metadata(
+        self: Self,
+        f: BinaryIO,
+    ) -> ReadMetadataImpl:
+        custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
+        meta_box: Optional[MetaBox] = None
+
+        for box in self.__our_boxes:
+            if isinstance(box, (JsonExtensionBox, UUIDExtensionBox)):
+                custom_boxes.append(box)
+            elif isinstance(box, MetaBox):
+                if meta_box is not None:
+                    msg = f"Duplicate 'meta' box at the top level, only one allowed: {box}"
+                    raise RuntimeError(msg)
+
+                if box.optional_boxes.pitm is None:
+                    msg = "Meta box not written by us: missing pitm box"
+                    raise RuntimeError(msg)
+
+                pitm = box.optional_boxes.pitm
+
+                if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
+                    msg = "Meta box not written by us: invalid item id"
+                    raise RuntimeError(msg)
+
+                meta_box = box
+            elif isinstance(box, FreeSpaceBox):
+                # just ignore free space boxs, if they are only zero
+                if not all(x == 0 for x in box.data):
+                    msg = f"Not all zeros in padding box: {box.data!r}"
+                    raise RuntimeError(msg)
+            else:
+                msg = f"Invalid box for tags found: {type(box)}"
+                raise TypeError(msg)
+
+        if meta_box is None:
+            return self.__read_metadata_custom(custom_boxes)
+
+        result_custom = self.__read_metadata_custom(custom_boxes)
+        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box, f)
+
+        return MP4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
+
+    @staticmethod
+    def __read_meta_box_info(
+        meta_box: MetaBox,
+        f: BinaryIO,
+    ) -> ReadMetaBoxValues:
+        meta_child_boxes = list(
+            mp4_iter_boxes(f, meta_box.span.payload_span),
+        )
+
+        if len(meta_child_boxes) != 1:
+            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
+            raise RuntimeError(msg)
+
+        meta_child_box = meta_child_boxes[0]
+
+        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
+            meta_child_box,
+            AppleItunesItemList,
+        ):
+            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
+            raise RuntimeError(msg)
+
+        result: ReadMetaBoxValues = []
+
+        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
+            if not isinstance(
+                data_box,
+                (AppleItunesItemFreeformBox, AppleItunesItemBox),
+            ):
+                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
+                raise TypeError(msg)
+
+            if isinstance(data_box, AppleItunesItemFreeformBox):
+                result.append(
+                    ApplItunesTags.validate_init(
+                        AppleItunesFreeformKey(
+                            mean=data_box.mean.value,
+                            name=data_box.name.value,
+                        ),
+                        ApplItunesTagsData.from_data_box(data_box.data),
+                    ),
+                )
+            elif isinstance(data_box, AppleItunesItemBox):
+                result.append(
+                    ApplItunesTags.validate_init(
+                        data_box.type,
+                        ApplItunesTagsData.from_data_box(data_box.data),
+                    ),
+                )
+            else:
+                assert_never(data_box)
+
+        return result
+
+    @staticmethod
+    def get_metadata_handler(
+        f: BinaryIO,
+    ) -> "AVIMetadataHandler":
+
+        info_values: InfoValues = None
+
+        def info_chunk_is_written_by_us(chunk: AVIList) -> bool:
+            nonlocal info_values
+
+            children_chunks = list(avi_iter_chunks(f, chunk.span.total))
+
+            is_our_chunk = False
+
+            for children_chunk in children_chunks:
+                if is_our_chunk:
+                    break
+
+                if children_chunk.fourcc == VLD_KEY_VALUE_FOURCC:
+                    if not isinstance(chunk, VLDKeyValueChunk):
+                        msg = "Invalid VLDKeyValueChunk: type not dispatched to correct class"
+                        raise TypeError(msg)
+
+                    if (
+                        chunk.key == INFO_LIST_ID_NAME
+                        and chunk.value == INFO_LIST_ID_NAME_ID
+                    ):
+                        is_our_chunk = True
+
+            if not is_our_chunk:
+                return False
+
+            if info_values is not None:
+                msg = f"Duplicate 'INFO' chunk from us at the top level, only one allowed: {chunk}"
+                raise RuntimeError(msg)
+
+            info_values = AVIMetadataHandler.__read_info_chunk_info(chunk, f)
+            return True
+
+        def chunk_is_written_by_us(chunk: AVIChunk) -> bool:
+            if chunk.fourcc == LIST_FOURCC:
+                if not isinstance(chunk, AVIList):
+                    msg = "Invalid AVIList: type not dispatched to correct class"
+                    raise TypeError(msg)
+
+                if chunk.type == INFO_FOURCC:
+                    return info_chunk_is_written_by_us(chunk)
+
+                return False
+
+            return False
+
+        f.seek(0, 2)
+        filesize = f.tell()
+
+        f.seek(0)
+
+        top_chunks: list[AVIChunk] = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
+
+        our_chunks_reversed: list[AVIChunk] = []
+        other_chunk_encountered = False
+        for chunk in reversed(top_chunks):
+            if other_chunk_encountered:
+                break
+
+            if chunk_is_written_by_us(chunk):
+                our_chunks_reversed.append(chunk)
+            else:
+                other_chunk_encountered = True
+                break
+
+        return AVIMetadataHandler(
+            uuid_box,
+            meta_values,
+            list(reversed(our_chunks_reversed)),
+        )
+
+
 class VideoTaggerContextAVI(VideoTaggerContextRW):
     __writer: BinaryIO
     __streams: int
@@ -727,65 +1508,38 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         tags: MetadataTags,
     ) -> None:
 
-        f = self.__writer
-
-        f.seek(0, 2)
-        filesize = f.tell()
-
-        span = SimpleSpan(0, filesize)
-
-        top_level_chunks = list(avi_iter_chunks(f, span))
-
-        if len(top_level_chunks) != 1:
-            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
-            raise RuntimeError(msg)
-
-        top_level_chunk = top_level_chunks[0]
-
-        if not isinstance(top_level_chunk, AVIList):
-            msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk}"
-            raise TypeError(msg)
-
-        if top_level_chunk.fourcc != RIFF_FOURCC:
-            msg = f"Expected only one RIFF top level chunk, but got {top_level_chunk.fourcc}"
-            raise TypeError(msg)
-
-        icmt_data = AVIChunk.write_to_buffer_avi_chunk(
-            FOURCC(b"ICMT"),
-            b"Test Comment\x00",
+        # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
+        bar: CounterInterface = self.manager.counter(
+            total=float(3),
+            desc="update mp4 metadata tags",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
         )
+        bar.update(0, force=True)
 
-        # vldc stands for video language detector chunk
-        CUSTOM_FOURCC = FOURCC(b"vldc")
+        try:
+            mp4_metadata_handler = AVIMetadataHandler.get_metadata_handler(
+                f=self.__writer,
+            )
 
-        custom_data = AVIChunk.write_to_buffer_avi_chunk(
-            CUSTOM_FOURCC,
-            b"Test Custom data\x00",
-        )
-        
-        custom_data3 = AVIChunk.write_to_buffer_avi_chunk(
-            FOURCC(b"icop"),
-            b"ICOP DATA\x00",
-        )
+            bar.update(1, force=True)
 
-        custom_data4 = AVIChunk.write_to_buffer_avi_chunk(
-            FOURCC(b"IGNR"),
-            b"IGNR DATA\x00",
-        )
+            mp4_metadata_handler.remove_old_metadata(self.__writer)
 
-        custom_data2 = AVIList.write_to_buffer_avi_list(
-            LIST_FOURCC,
-            FOURCC(b"vldl"),
-            [custom_data],
-        )
+            bar.update(1, force=True)
 
-        info_list_data = AVIList.write_to_buffer_avi_list(
-            LIST_FOURCC,
-            FOURCC(b"INFO"),
-            [icmt_data, custom_data, custom_data2,custom_data3,custom_data4],
-        )
+            mp4_metadata_handler.write_new_metadata(
+                self.__writer,
+                tags,
+            )
 
-        top_level_chunk.add_content_afterwards_avi_list(f, info_list_data)
+            bar.update(1, force=True)
+
+            self.__writer.flush()
+        finally:
+            bar.close(clear=True)
 
     @override
     def write_language(
@@ -826,33 +1580,6 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
 
         return True
 
-    def __impl(
-        self: Self,
-        f: BinaryIO,
-        span: SimpleSpan,
-        depth: int,
-    ) -> None:
-        for chunk in avi_iter_chunks(f, span):
-            if chunk.is_list:
-                if not isinstance(chunk, AVIList):
-                    msg = "Invalid AVIList: type not dispatched to correct class"
-                    raise ValueError(msg)
-
-                msg = ("  " * depth) + f"{chunk.fourcc} - {chunk.type}"
-                print(msg)
-                self.__impl(f, chunk.span.payload_span, depth + 1)
-
-                # if chunk.type == b"INFO":
-                #     print("             INFO chunk: ")
-                #     f.seek(chunk.span.total.start)
-                #     c = f.read(chunk.span.total.size)
-                #     print(c)
-
-                continue
-
-            msg = ("  " * depth) + f"{chunk.fourcc}"
-            print(msg)
-
     @override
     def get_tags(
         self: Self,
@@ -867,7 +1594,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         self.__impl(f, span, 0)
 
         return MetadataTagsRead(None, None, {}, [])
-        # raise NotImplementedError("TODO")
+        raise NotImplementedError("TODO")
 
 
 class VideoTaggerAVI(VideoTagger):
