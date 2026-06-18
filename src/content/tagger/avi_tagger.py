@@ -1217,7 +1217,7 @@ class INFOChunkBuilder:
 
         return AVIList.write_to_buffer_avi_list(
             LIST_FOURCC,
-            FOURCC(b"INFO"),
+            INFO_FOURCC,
             sub_chunk_data,
         )
 
@@ -1318,9 +1318,7 @@ class AVIMetadataHandler:
         filesize = f.tell()
         f.seek(0)
 
-        span = SimpleSpan(0, filesize)
-
-        top_level_chunks = list(avi_iter_chunks(f, span))
+        top_level_chunks = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
 
         if len(top_level_chunks) != 1:
             msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
@@ -1438,6 +1436,7 @@ class AVIMetadataHandler:
 
             else:
                 assert_never(value)
+
         return result
 
     @staticmethod
@@ -1522,7 +1521,7 @@ class AVIMetadataHandler:
         def info_chunk_is_written_by_us(chunk: AVIList) -> bool:
             nonlocal info_values
 
-            children_chunks = list(avi_iter_chunks(f, chunk.span.total))
+            children_chunks = list(avi_iter_chunks(f, chunk.span.payload_span))
 
             is_our_chunk = False
 
@@ -1570,11 +1569,29 @@ class AVIMetadataHandler:
 
         f.seek(0)
 
-        top_chunks: list[AVIChunk] = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
+        top_level_chunks = list(avi_iter_chunks(f, SimpleSpan(0, filesize)))
+
+        if len(top_level_chunks) != 1:
+            msg = f"Expected only one RIFF top level chunk, but got {len(top_level_chunks)}"
+            raise RuntimeError(msg)
+
+        top_level_chunk = top_level_chunks[0]
+
+        if not isinstance(top_level_chunk, AVIList):
+            msg = f"Expected one LIST chunk at the top level, but got {top_level_chunk}"
+            raise TypeError(msg)
+
+        if top_level_chunk.fourcc != RIFF_FOURCC:
+            msg = f"Expected a RIFF top level chunk, but got {top_level_chunk.fourcc}"
+            raise TypeError(msg)
+
+        top_children_chunks: list[AVIChunk] = list(
+            avi_iter_chunks(f, top_level_chunk.span.payload_span),
+        )
 
         our_chunks_reversed: list[AVIChunk] = []
         other_chunk_encountered = False
-        for chunk in reversed(top_chunks):
+        for chunk in reversed(top_children_chunks):
             if other_chunk_encountered:
                 break
 

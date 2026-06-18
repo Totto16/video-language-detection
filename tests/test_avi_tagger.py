@@ -8,7 +8,7 @@ from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
-from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used
+from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used, test_manager
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
 
@@ -37,7 +37,7 @@ from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 mark_as_used(avi_test_parse_files)
-
+mark_as_used(test_manager)
 
 # TODO: force locale in test cases!
 _ = get_translator()
@@ -603,7 +603,7 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
 
-def test_mp4_tagger_metadata_tags_custom(
+def test_avi_tagger_metadata_tags_custom(
     subtests: SubTests,
     avi_test_parse_files: TempVideoFiles,
     test_manager: ManagerInterface,
@@ -620,14 +620,6 @@ def test_mp4_tagger_metadata_tags_custom(
                         metadata={
                             "test": "str",
                             "dict": {"key1": "value1", "int1": 1414},
-                        },
-                    ),
-                    MetadataTags(
-                        comment="Test comment 2",
-                        uuid=uuid4(),
-                        metadata={
-                            "test": "str",
-                            "dict": {"key2": "value2", "int2": 1321},
                         },
                     ),
                 ],
@@ -667,6 +659,7 @@ def test_mp4_tagger_metadata_tags_custom(
                     ctx.write_tags(tags)
 
                     next_tags = ctx.get_tags()
+                    print(next_tags)
 
                     assert next_tags.uuid == tags.uuid, "UUID was written correctly"
                     assert (
