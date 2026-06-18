@@ -654,7 +654,10 @@ def test_mp4_invalid_bytes(
 
     test_data: list[tuple[bytes, str]] = [
         (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
-        (b"helloworld", _("Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10")),
+        (
+            b"helloworld",
+            _("Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10"),
+        ),
         (b"ftyp    ", "Atom name not valid b'    '"),
         (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
         (
@@ -863,6 +866,13 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 
                     assert raw_next_tags == raw_early_tags
 
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                    ], "raw ffprobe metadata is correct later on"
+
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
                     if is_recognized_by_ffprobe:
@@ -930,6 +940,13 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     )
 
                     assert raw_again_tags == raw_early_tags
+
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                    ], "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
@@ -1045,6 +1062,13 @@ def test_mp4_tagger_metadata_tags_custom(
 
                     assert raw_next_tags == raw_early_tags
 
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                    ], "raw ffprobe metadata is correct later on"
+
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
                     assert ffprobe_metadata_next.get("metadata", None) is not None
@@ -1108,6 +1132,13 @@ def test_mp4_tagger_metadata_tags_custom(
                     )
 
                     assert raw_again_tags == raw_early_tags
+
+                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                        "metadata",
+                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                        "comment",
+                    ], "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
