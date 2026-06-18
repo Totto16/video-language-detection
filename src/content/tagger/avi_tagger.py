@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from types import TracebackType
-from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, cast, final, override
 from uuid import UUID
 
 from content.language import Language, ShortLanguageStr
@@ -36,6 +36,7 @@ from content.tagger.video_tagger import (
     VideoTaggerContextRW,
     VideoTaggerContextWrapperGeneric,
     VideoTaggerContextWriteable,
+    uuid_from_str,
     uuid_to_str,
 )
 from helper.manager import CounterInterface, ManagerInterface
@@ -137,7 +138,7 @@ VIDS_FOURCC: FOURCC = FOURCC(b"vids")
 
 ICMT_FOURCC: FOURCC = FOURCC(b"ICMT")
 
-KNOWN_INFO_SUBCHUNK_FOURCCS: list[FOURCC] = [ICMT_FOURCC]
+KNOWN_INFO_SUBCHUNK_FOURCCS: dict[FOURCC, str] = {ICMT_FOURCC: "comment"}
 
 # custom fourcc's
 
@@ -1225,6 +1226,13 @@ ReadInfoChunkValues = list[ReadInfoChunkValue]
 InfoValues = Optional[ReadInfoChunkValues]
 
 
+@dataclass
+class ReadMetadataImpl:
+    metadata: SerializableDict
+    uuid: Optional[UUID]
+    unrecognized: list[VLDUnknownStrSubChunk]
+
+
 class AVIMetadataHandler:
     __info_values: InfoValues
     __our_chunks: list[AVIChunk]
@@ -1330,157 +1338,96 @@ class AVIMetadataHandler:
 
         f.flush()
 
-    def __read_metadata_toplevel_info(  # noqa: PLR0915
+    def read_metadata(
         self: Self,
-        box: MetaBox,
         f: BinaryIO,
     ) -> ReadMetadataImpl:
-        metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
+        info_chunk: Optional[AVIList] = None
 
-        meta_child_boxes = list(
-            mp4_iter_boxes(f, box.span.payload_span),
-        )
+        for chunk in self.__our_chunks:
+            if chunk.fourcc == LIST_FOURCC:
+                if not isinstance(chunk, AVIList):
+                    msg = "Invalid AVIList: type not dispatched to correct class"
+                    raise TypeError(msg)
 
-        if len(meta_child_boxes) != 1:
-            msg = f"Invalid meta box: expected only one child, but got {len(meta_child_boxes)}"
-            raise RuntimeError(msg)
+                if chunk.type == INFO_FOURCC:
+                    if info_chunk is not None:
+                        msg = f"Duplicate 'INFO' chunk from us at the top level, only one allowed: {chunk}"
+                        raise RuntimeError(msg)
 
-        meta_child_box = meta_child_boxes[0]
+                    info_chunk = chunk
+                    continue
 
-        if meta_child_box.type != ILST_ATOM_NAME or not isinstance(
-            meta_child_box,
-            AppleItunesItemList,
-        ):
-            msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
-            raise RuntimeError(msg)
+            msg = f"Invalid chunk for metadata found: {type(chunk)} {chunk}"
+            raise TypeError(msg)
 
-        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span):
-            if not isinstance(
-                data_box,
-                (AppleItunesItemFreeformBox, AppleItunesItemBox),
-            ):
-                msg = f"Invalid data box in AppleItunesItemList: {data_box}"
-                raise TypeError(msg)
+        if info_chunk is None:
+            return ReadMetadataImpl({}, None, [])
 
-            if isinstance(data_box, AppleItunesItemFreeformBox):
+        result_toplevel_info = self.__read_info_chunk_info(info_chunk, f)
 
-                mean = data_box.mean.value
-                name = data_box.name.value
+        result = ReadMetadataImpl({}, None, [])
 
-                if mean != TAGGER_DOMAIN:
-                    msg = f"Invalid AppleItunesItemFreeformBox mean in meta box: {mean} != {TAGGER_DOMAIN}"
+        for value in result_toplevel_info:
+            if isinstance(value, VLDKnownStrSubChunk):
+                if (
+                    KNOWN_INFO_SUBCHUNK_FOURCCS.get(value.fourcc, None) is None
+                ):  # noqa: SIM910
+                    msg = f"Invalid VLDKnownStrSubChunk chunk, can't be transformed to a string key: {value.fourcc}"
                     raise RuntimeError(msg)
 
-                if name in [
+                result.metadata = merge_dicts(
+                    result.metadata,
+                    {KNOWN_INFO_SUBCHUNK_FOURCCS[value.fourcc]: value.value},
+                    "error",
+                )
+            elif isinstance(value, VLDUnknownStrSubChunk):
+                result.unrecognized.append(value)
+            elif isinstance(value, VLDCustomKeyValueEntry):
+                if value.key in [
                     TaggerDomain.UUID_RAW_KEY_FREEFORM.name,
                     TaggerDomain.UUID_HEX_KEY_FREEFORM.name,
                 ]:
                     uuid: UUID
 
-                    if name == TaggerDomain.UUID_RAW_KEY_FREEFORM.name:
-                        if not isinstance(data_box.data.value, UUID):
-                            msg = f"Invalid uuid (raw) key type: {type(data_box.data.value)} {data_box.data.value}"
+                    if value.key == TaggerDomain.UUID_RAW_KEY_FREEFORM.name:
+                        if not isinstance(value.data, VLDKeyValueValueUUID):
+                            msg = f"Invalid uuid (raw) key type: {type(value.data)} {value.data}"
                             raise RuntimeError(msg)
 
-                        uuid = data_box.data.value
+                        uuid = value.data.uuid
                     else:
-                        if not isinstance(data_box.data.value, str):
-                            msg = f"Invalid uuid (str) key type: {type(data_box.data.value)} {data_box.data.value}"
+                        if not isinstance(value.data, VLDKeyValueValueStr):
+                            msg = f"Invalid uuid (str) key type: {type(value.data)} {value.data}"
                             raise RuntimeError(msg)
 
-                        uuid = uuid_from_str(data_box.data.value)
+                        uuid = uuid_from_str(value.data.value)
 
-                    if metadata_result.uuid is not None:
-                        if metadata_result.uuid != uuid:
+                    if result.uuid is not None:
+                        if result.uuid != uuid:
                             msg = f"Duplicate uuid tag read, that are not the same: {uuid}"
                             raise RuntimeError(msg)
                     else:
-                        metadata_result.uuid = uuid
-
+                        result.uuid = uuid
                 else:
-                    raw_name = TaggerDomain.get_raw_name(name)
-
-                    if not isinstance(data_box.data.value, str):
-                        msg = f"Invalid value for metadata: expected str type, got {type(data_box.data.value)}"
-                        raise RuntimeError(msg)
-
-                    raw_value = json.loads(data_box.data.value)
-
-                    metadata_result.metadata = merge_dicts(
-                        metadata_result.metadata,
+                    result.metadata = merge_dicts(
+                        result.metadata,
                         {
                             "metadata": merge_dicts(
                                 cast(
                                     dict[str, Any],
-                                    metadata_result.metadata.get("metadata", {}),
+                                    result.metadata.get("metadata", {}),
                                 ),
-                                {raw_name: raw_value},
+                                {value.key: value.data},
                                 "error",
                             ),
                         },
                         "overwrite",
                     )
 
-            elif isinstance(data_box, AppleItunesItemBox):
-                key: str
-                if data_box.type == ISOMAtomName(b"\xa9cmt"):
-                    key = "comment"
-                else:
-                    key = data_box.type.value.decode("latin-1")
-
-                metadata_result.metadata = merge_dicts(
-                    metadata_result.metadata,
-                    {key: data_box.data.value},
-                    "error",
-                )
-
             else:
-                assert_never(data_box)
-
-        return metadata_result
-
-    def read_metadata(
-        self: Self,
-        f: BinaryIO,
-    ) -> ReadMetadataImpl:
-        custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
-        meta_box: Optional[MetaBox] = None
-
-        for box in self.__our_boxes:
-            if isinstance(box, (JsonExtensionBox, UUIDExtensionBox)):
-                custom_boxes.append(box)
-            elif isinstance(box, MetaBox):
-                if meta_box is not None:
-                    msg = f"Duplicate 'meta' box at the top level, only one allowed: {box}"
-                    raise RuntimeError(msg)
-
-                if box.optional_boxes.pitm is None:
-                    msg = "Meta box not written by us: missing pitm box"
-                    raise RuntimeError(msg)
-
-                pitm = box.optional_boxes.pitm
-
-                if pitm.item_id != META_BOX_VIDEO_LANGUAGE_DETECTION_ID:
-                    msg = "Meta box not written by us: invalid item id"
-                    raise RuntimeError(msg)
-
-                meta_box = box
-            elif isinstance(box, FreeSpaceBox):
-                # just ignore free space boxs, if they are only zero
-                if not all(x == 0 for x in box.data):
-                    msg = f"Not all zeros in padding box: {box.data!r}"
-                    raise RuntimeError(msg)
-            else:
-                msg = f"Invalid box for tags found: {type(box)}"
-                raise TypeError(msg)
-
-        if meta_box is None:
-            return self.__read_metadata_custom(custom_boxes)
-
-        result_custom = self.__read_metadata_custom(custom_boxes)
-        result_toplevel_meta = self.__read_metadata_toplevel_meta(meta_box, f)
-
-        return MP4MetadataHandler.__merge_metadata(result_custom, result_toplevel_meta)
+                assert_never(value)
+        return result
 
     @staticmethod
     def __read_info_chunk_info(
@@ -1521,7 +1468,8 @@ class AVIMetadataHandler:
                             ),
                         )
                     elif isinstance(
-                        sub_chunk, (VLDStrChunk, VLDJsonChunk, VLDUUIDChunk),
+                        sub_chunk,
+                        (VLDStrChunk, VLDJsonChunk, VLDUUIDChunk),
                     ):
                         msg = f"Invalid Vld<Value>Chunk: not allowed at the vld list level: {sub_chunk}"
                         raise TypeError(msg)
@@ -1542,7 +1490,8 @@ class AVIMetadataHandler:
                 if chunk.fourcc in KNOWN_INFO_SUBCHUNK_FOURCCS:
                     result.append(
                         VLDKnownStrSubChunk(
-                            fourcc=chunk.fourcc, value=data_raw.decode()
+                            fourcc=chunk.fourcc,
+                            value=data_raw.decode(),
                         ),
                     )
                 else:
@@ -1665,17 +1614,17 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         bar.update(0, force=True)
 
         try:
-            mp4_metadata_handler = AVIMetadataHandler.get_metadata_handler(
+            avi_metadata_handler = AVIMetadataHandler.get_metadata_handler(
                 f=self.__writer,
             )
 
             bar.update(1, force=True)
 
-            mp4_metadata_handler.remove_old_metadata(self.__writer)
+            avi_metadata_handler.remove_old_metadata(self.__writer)
 
             bar.update(1, force=True)
 
-            mp4_metadata_handler.write_new_metadata(
+            avi_metadata_handler.write_new_metadata(
                 self.__writer,
                 tags,
             )
@@ -1729,17 +1678,52 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead:
-        f = self.__writer
+        def decode_as_str(value: Any) -> str:
+            if not isinstance(value, str):
+                msg = f"Invalid type in decode_as_str: {type(value)}"
+                raise TypeError(msg)
 
-        f.seek(0, 2)
-        filesize = f.tell()
+            return value
 
-        span = SimpleSpan(0, filesize)
+        def decode_as_dict(value: Any) -> SerializableDict:
+            if not isinstance(value, dict):
+                msg = f"Invalid type in decode_as_dict: {type(value)}"
+                raise TypeError(msg)
 
-        self.__impl(f, span, 0)
+            return value
 
-        return MetadataTagsRead(None, None, {}, [])
-        raise NotImplementedError("TODO")
+        avi_metadata_handler = AVIMetadataHandler.get_metadata_handler(
+            f=self.__writer,
+        )
+
+        metadata_result = avi_metadata_handler.read_metadata(self.__writer)
+
+        result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
+
+        if metadata_result.uuid is not None:
+            result.uuid = metadata_result.uuid
+
+        for key, value in metadata_result.metadata.items():
+
+            if key == "comment":
+                if result.comment is not None:
+                    msg = f"Duplicate comment tag read: {value}"
+                    raise RuntimeError(msg)
+
+                result.comment = decode_as_str(value)
+
+            elif key == "metadata":
+                if len(result.metadata.items()) != 0:
+                    msg = f"Duplicate metadata tag read: {value}"
+                    raise RuntimeError(msg)
+
+                result.metadata = decode_as_dict(value)
+            else:
+                result.unrecognized.append(
+                    (key, decode_as_str(value)),
+                )
+
+        return result
 
 
 class VideoTaggerAVI(VideoTagger):
