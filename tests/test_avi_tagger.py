@@ -628,9 +628,6 @@ def get_raw_ffprobe_tags(
                                 },
                                 "error",
                             )
-                        elif d_key == "comment":
-                            # ignore
-                            pass
                         elif d_key == "uuid_hex":
                             metadata["metadata"] = merge_dicts(
                                 metadata["metadata"],

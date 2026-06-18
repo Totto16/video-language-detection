@@ -1331,7 +1331,6 @@ class AVIMetadataHandler:
                 fourcc=VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC,
                 data=json.dumps(
                     {
-                        "comment": tags.comment,
                         "metadata": tags.metadata,
                         "uuid_hex": uuid_to_str(first_uuid),
                     },
