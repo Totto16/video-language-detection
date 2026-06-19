@@ -841,7 +841,7 @@ def get_validators(
     params: ValidatorParams,
     filters: list[Filter],
 ) -> list[Validator[Any, Any, Any, Any]]:
-    validator_filter: list[ValidatorFilter | EmptyFilter] = [
+    validator_filter: list[ValidatorFilter | SpecialFilter] = [
         filter_val
         for filter_val in filters
         if isinstance(filter_val, (ValidatorFilter, EmptyFilter))

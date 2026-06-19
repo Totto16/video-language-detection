@@ -27,7 +27,7 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
-from helper.filter import ConfigFilter, EmptyFilter, Filter
+from helper.filter import AllFilter, ConfigFilter, DefaultFilter, EmptyFilter, Filter, SpecialFilter
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
 
@@ -651,12 +651,18 @@ class AdvancedConfig:
         return Ok(res.as_ok()[0])
 
 
+def __get_default_configs_impl(configs: list[FinalConfig]) -> list[FinalConfig]:
+    # TODO: once numerated configs are fully implemented, use them here too
+
+    return [cfg for cfg in configs if cfg.config_type == ConfigType.normal]
+
+
 def __filter_configs_impl(
     configs: list[FinalConfig],
-    cfg_filter: list[ConfigFilter | EmptyFilter],
+    cfg_filter: list[ConfigFilter | SpecialFilter],
 ) -> list[FinalConfig]:
     if len(cfg_filter) == 0:
-        return configs
+        return __get_default_configs_impl(configs)
 
     def is_valid_name(name: str) -> tuple[bool, int]:
         for idx, cfg in enumerate(configs):
@@ -665,12 +671,25 @@ def __filter_configs_impl(
 
         return (False, -1)
 
+    def to_dict(lst: list[FinalConfig]) -> dict[str, FinalConfig]:
+        return {cfg.config_name: cfg for cfg in lst}
+
     result: dict[str, FinalConfig] = {}
 
     for filter_item in cfg_filter:
-        if isinstance(filter_item, EmptyFilter):
+        if isinstance(filter_item, (EmptyFilter, DefaultFilter, AllFilter)):
             if filter_item.name == ConfigFilter.factory_name():
-                result = {}
+                factory_name = filter_item.factory_name()
+                match factory_name:
+                    case "all":
+                        result = to_dict(configs)
+                    case "empty":
+                        result = {}
+                    case "default":
+                        result = to_dict(__get_default_configs_impl(configs))
+                    case _:
+                        msg = f"Invalid special filter factory name: {factory_name}"
+                        raise RuntimeError(msg)
         elif isinstance(filter_item, ConfigFilter):
             val = filter_item.value
 
@@ -705,10 +724,10 @@ def filter_configs(
     configs: list[FinalConfig],
     filters: list[Filter],
 ) -> list[FinalConfig]:
-    cfg_filter: list[ConfigFilter | EmptyFilter] = [
+    cfg_filter: list[ConfigFilter | SpecialFilter] = [
         filter_val
         for filter_val in filters
-        if isinstance(filter_val, (ConfigFilter, EmptyFilter))
+        if isinstance(filter_val, (ConfigFilter, EmptyFilter, DefaultFilter))
     ]
 
     return __filter_configs_impl(configs, cfg_filter)

@@ -50,6 +50,45 @@ class EmptyFilter(Filter):
         return self.__name
 
 
+class AllFilter(Filter):
+    __name: str
+
+    def __init__(self: Self, name: str) -> None:
+        super().__init__()
+
+        self.__name = name
+
+    @staticmethod
+    @override
+    def factory_name() -> str:
+        return "all"
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
+
+
+class DefaultFilter(Filter):
+    __name: str
+
+    def __init__(self: Self, name: str) -> None:
+        super().__init__()
+
+        self.__name = name
+
+    @staticmethod
+    @override
+    def factory_name() -> str:
+        return "default"
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
+
+
+SpecialFilter = EmptyFilter | AllFilter | DefaultFilter
+
+
 class ConfigFilter(Filter):
     type __Item = str | int
 
