@@ -1,38 +1,52 @@
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 
-def fix_chapters(to_process: list[Path]) -> None:
-    for input_file in to_process:
-        try:
-            output: Path = input_file.parent / (
-                input_file.stem + "_output" + input_file.suffix
-            )
+def fix_chapters(files: list[Path]) -> list[str]:
+    results: list[str] = []
+    for file in files:
+        res = fix_chapter(file)
+        if res is not None:
+            results.append(res)
 
-            launch_args: list[str] = [
-                "ffmpeg",
-                "-i",
-                str(input_file),
-                "-vcodec",
-                "copy",
-                "-acodec",
-                "copy",
-                "-map_chapters",
-                "-1",
-                "-y",
-                str(output),
-            ]
+    return results
 
-            subprocess.call(launch_args)  # noqa: S603
 
-            temp_result = (
-                Path(__file__).parent
-                / (input_file.parent.parent.name)
-                / input_file.name
-            )
+def fix_chapter(input_file: Path) -> Optional[str]:
+    try:
+        output: Path = input_file.parent / (
+            input_file.stem + "_output" + input_file.suffix
+        )
 
-            shutil.move(input_file, temp_result)
-            shutil.move(output, input_file)
-        except Exception:  # noqa: S110, BLE001
-            pass
+        launch_args: list[str] = [
+            "ffmpeg",
+            "-i",
+            str(input_file),
+            "-vcodec",
+            "copy",
+            "-acodec",
+            "copy",
+            "-map_chapters",
+            "-1",
+            "-y",
+            str(output),
+        ]
+
+        ret_code = subprocess.call(launch_args)  # noqa: S603
+
+        if ret_code != 0:
+            output.unlink(missing_ok=True)
+            return f"Process exited with status code: {ret_code}"
+
+        temp_result = (
+            Path(__file__).parent / (input_file.parent.parent.name) / input_file.name
+        )
+
+        shutil.move(input_file, temp_result)
+        shutil.move(output, input_file)
+    except (RuntimeError, ValueError, TypeError) as error:
+        return str(error)
+    else:
+        return None

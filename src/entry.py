@@ -836,17 +836,23 @@ def subcommand_ffmpeg(
     from ffmpeg_helper.fix_chapters import fix_chapters
     from ffmpeg_helper.scan_files import scan_files
 
-
-
-
     match args.ffmpeg_command:
         case "scan":
-            scan_files(files)
+            errors = scan_files(files)
+            if len(errors) == 0:
+                return 0
+            for err in errors:
+                logger.error(err)
+            return 1
         case "fix-chapter":
-            fix_chapters(files)
+            errors = fix_chapters(files)
+            if len(errors) == 0:
+                return 0
+            for err in errors:
+                logger.error(err)
+            return 1
         case _:
             assert_never(args.ffmpeg_command)
-
 
 
 def main() -> ExitCode:
