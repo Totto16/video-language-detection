@@ -128,6 +128,18 @@ def test_decorator_edge_cases(
         ):
             declare_test()
 
+    with subtests.test("empty class works"):
+
+        @decorate_class(slots=True, allow_defaults=False, weakref_slot=False)
+        class TestEmpty:
+            pass
+
+        test_empty: Any = TestEmpty()
+
+        assert not hasattr(test_empty, "__dict__")
+
+        assert test_empty.__slots__ == ()
+
     with subtests.test("parent class has invalid __slots__: case 1"):
 
         def declare_test() -> None:
@@ -695,5 +707,3 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
                 return super().foo(value)
 
         assert A15().foo == "bar"
-
-#TODO: test empty class!

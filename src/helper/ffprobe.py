@@ -174,7 +174,6 @@ class FFProbeFormatInfo:
     def __repr__(self: Self) -> str:
         return json.dumps(self.__raw)
 
-@decorate_class(slots=True)
 class FFProbeRawResult(TypedDict):
     streams: list[FFprobeRawStream]
     format: dict[str, Any]

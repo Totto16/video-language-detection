@@ -281,7 +281,6 @@ class AppleItunesFreeformKey:
     mean: str
     name: str
 
-@decorate_class(slots=True)
 class TaggerDomain:
     @staticmethod
     def get(key: str) -> str:
