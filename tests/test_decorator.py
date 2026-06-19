@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from functools import wraps
+from functools import partial, update_wrapper, wraps
 import re
 from types import FunctionType
 from typing import Any, Optional, Self
@@ -366,102 +366,297 @@ def test_decorator_slots_with_super_calls(
         a.foo = 4
         del a.foo
 
-        with subtests.test("test_dunder_class_with_new_property"):
+    with subtests.test("test_dunder_class_with_new_property"):
 
-            @decorate_class(slots=True)
-            class A3:
-                @property
-                def foo(self: Self) -> type[Self]:
-                    return self.__class__
+        @decorate_class(slots=True)
+        class A3:
+            @property
+            def foo(self: Self) -> type[Self]:
+                return self.__class__
 
-                @foo.setter
-                def foo(self: Self, value) -> None:
-                    assert __class__ is type(self)
+            @foo.setter
+            def foo(self: Self, value) -> None:
+                assert __class__ is type(self)
 
-                @foo.deleter
-                def foo(self: Self) -> None:
-                    assert __class__ is type(self)
+            @foo.deleter
+            def foo(self: Self) -> None:
+                assert __class__ is type(self)
 
-            a = A3()
-            assert a.foo is A3
-            a.foo = 4
-            del a.foo
+        a = A3()
+        assert a.foo is A3
+        a.foo = 4
+        del a.foo
 
-        # Test the parts of a property individually.
-        with subtests.test("test_slots_dunder_class_property_getter"):
+    # Test the parts of a property individually.
+    with subtests.test("test_slots_dunder_class_property_getter"):
 
-            @decorate_class(slots=True)
-            class A4:
-                @property
-                def foo(self: Self) -> type["A4"]:
-                    return __class__
+        @decorate_class(slots=True)
+        class A4:
+            @property
+            def foo(self: Self) -> type["A4"]:
+                return __class__
 
-            a = A4()
-            assert a.foo is A4
+        a = A4()
+        assert a.foo is A4
 
-        with subtests.test("test_slots_dunder_class_property_setter"):
+    with subtests.test("test_slots_dunder_class_property_setter"):
 
-            @decorate_class(slots=True)
-            class A5:
-                foo = property()
+        @decorate_class(slots=True)
+        class A5:
+            foo = property()
 
-                @foo.setter
-                def foo(self: Self, val) -> None:
-                    assert __class__ is type(self)
+            @foo.setter
+            def foo(self: Self, val) -> None:
+                assert __class__ is type(self)
 
-            a = A5()
-            a.foo = 4
+        a = A5()
+        a.foo = 4
 
-        with subtests.test("test_slots_dunder_class_property_deleter"):
+    with subtests.test("test_slots_dunder_class_property_deleter"):
 
-            @decorate_class(slots=True)
-            class A6:
-                foo = property()
+        @decorate_class(slots=True)
+        class A6:
+            foo = property()
 
-                @foo.deleter
-                def foo(self: Self) -> None:
-                    assert __class__ is type(self)
+            @foo.deleter
+            def foo(self: Self) -> None:
+                assert __class__ is type(self)
 
-            a = A6()
-            del a.foo
+        a = A6()
+        del a.foo
 
-        with subtests.test("test_wrapped"):
+    with subtests.test("test_wrapped"):
 
-            def mydecorator(f):
-                @wraps(f)
-                def wrapper(*args, **kwargs):
-                    return f(*args, **kwargs)
+        def mydecorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                return f(*args, **kwargs)
 
-                return wrapper
+            return wrapper
 
-            @decorate_class(slots=True)
-            class A7:
-                @mydecorator
-                def foo(self):
-                    super()
+        @decorate_class(slots=True)
+        class A7:
+            @mydecorator
+            def foo(self):
+                super()
 
-            A7().foo()
+        A7().foo()
 
-        with subtests.test("test_remembered_class"):
-            # Apply the decorate_class decorator manually (not when the class
-            # is created), so that we can keep a reference to the
-            # undecorated class.
-            class A8:
-                def cls(self: Self) -> type["A8"]:
-                    return __class__
+    with subtests.test("test_remembered_class"):
+        # Apply the decorate_class decorator manually (not when the class
+        # is created), so that we can keep a reference to the
+        # undecorated class.
+        class A8:
+            def cls(self: Self) -> type["A8"]:
+                return __class__
 
-            assert A8().cls() is A8
+        assert A8().cls() is A8
 
-            B = decorate_class(slots=True)(A8)
-            assert B().cls() is B
+        B1 = decorate_class(slots=True)(A8)
+        assert B1().cls() is B1
 
-            # This is undesirable behavior, but is a function of how
-            # modifying __class__ in the closure works.  I'm not sure this
-            # should be tested or not: I don't really want to guarantee
-            # this behavior, but I don't want to lose the point that this
-            # is how it works.
+        # This is undesirable behavior, but is a function of how
+        # modifying __class__ in the closure works.  I'm not sure this
+        # should be tested or not: I don't really want to guarantee
+        # this behavior, but I don't want to lose the point that this
+        # is how it works.
 
-            # The underlying class is "broken" by changing its __class__
-            # in A.foo() to B.  This normally isn't a problem, because no
-            # one will be keeping a reference to the underlying class A.
-            assert A8().cls() is B
+        # The underlying class is "broken" by changing its __class__
+        # in A.foo() to B.  This normally isn't a problem, because no
+        # one will be keeping a reference to the underlying class A.
+        assert A8().cls() is B1
+
+    with subtests.test("test_wrapped_property"):
+
+        def mydecorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                return f(*args, **kwargs)
+
+            return wrapper
+
+        class B9:
+            @property
+            def foo(self):
+                return "bar"
+
+        @decorate_class(slots=True)
+        class A9(B9):
+            @property
+            @mydecorator
+            def foo(self):
+                return super().foo
+
+        assert A9().foo == "bar"
+
+    with subtests.test("test_custom_descriptor"):
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._f = f
+
+            def __get__(self, instance, owner):
+                return self._f(instance)
+
+        class B10:
+            def foo(self):
+                return "bar"
+
+        @decorate_class(slots=True)
+        class A10(B10):
+            @CustomDescriptor
+            def foo(cls):
+                return super().foo()
+
+        assert A10().foo == "bar"
+
+    with subtests.test("test_custom_descriptor_wrapped"):
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._f = update_wrapper(lambda *args, **kwargs: f(*args, **kwargs), f)
+
+            def __get__(self, instance, owner):
+                return self._f(instance)
+
+        class B11:
+            def foo(self):
+                return "bar"
+
+        @decorate_class(slots=True)
+        class A11(B11):
+            @CustomDescriptor
+            def foo(cls):
+                return super().foo()
+
+        assert A11().foo == "bar"
+
+    with subtests.test("test_custom_nested_descriptor"):
+
+        class CustomFunctionWrapper:
+            def __init__(self, f):
+                self._f = f
+
+            def __call__(self, *args, **kwargs):
+                return self._f(*args, **kwargs)
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._wrapper = CustomFunctionWrapper(f)
+
+            def __get__(self, instance, owner):
+                return self._wrapper(instance)
+
+        class B12:
+            def foo(self):
+                return "bar"
+
+        @decorate_class(slots=True)
+        class A12(B12):
+            @CustomDescriptor
+            def foo(cls):
+                return super().foo()
+
+        assert A12().foo == "bar"
+
+    with subtests.test("test_custom_nested_descriptor_with_partial"):
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._wrapper = partial(f, value="bar")
+
+            def __get__(self, instance, owner):
+                return self._wrapper(instance)
+
+        class B13:
+            def foo(self, value):
+                return value
+
+        @decorate_class(slots=True)
+        class A13(B13):
+            @CustomDescriptor
+            def foo(self, value):
+                return super().foo(value)
+
+        assert A13().foo == "bar"
+
+    with subtests.test("test_custom_too_nested_descriptor"):
+
+        class UnnecessaryNestedWrapper:
+            def __init__(self, wrapper):
+                self._wrapper = wrapper
+
+            def __call__(self, *args, **kwargs):
+                return self._wrapper(*args, **kwargs)
+
+        class CustomFunctionWrapper:
+            def __init__(self, f):
+                self._f = f
+
+            def __call__(self, *args, **kwargs):
+                return self._f(*args, **kwargs)
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._wrapper = UnnecessaryNestedWrapper(CustomFunctionWrapper(f))
+
+            def __get__(self, instance, owner):
+                return self._wrapper(instance)
+
+        class B14:
+            def foo(self):
+                return "bar"
+
+        @decorate_class(slots=True)
+        class A14(B14):
+            @CustomDescriptor
+            def foo(cls):
+                return super().foo()
+
+        with pytest.raises(
+            TypeError,
+            match=re.escape(
+                "super(type, obj): obj (instance of A14) is not an instance or subtype of type (A14)."
+            ),
+        ):
+            A14().foo
+
+    with subtests.test("test_user_defined_code_execution"):
+
+        class CustomDescriptor:
+            def __init__(self, f):
+                self._wrapper = partial(f, value="bar")
+
+            def __get__(self, instance, owner):
+                return object.__getattribute__(self, "_wrapper")(instance)
+
+            def __getattribute__(self, name):
+                if name in {
+                    # these are the bare minimum for the feature to work
+                    "__class__",  # accessed on `isinstance(value, Field)`
+                    "__wrapped__",  # accessed by unwrap
+                    "__get__",  # is required for the descriptor protocol
+                    "__dict__",  # is accessed by dir() to work
+                }:
+                    return object.__getattribute__(self, name)
+                raise RuntimeError(f"Never should be accessed: {name}")
+
+        class B15:
+            def foo(self, value):
+                return value
+
+        @decorate_class(slots=True)
+        class A15(B15):
+            @CustomDescriptor
+            def foo(self, value):
+                return super().foo(value)
+
+        assert A15().foo == "bar"
+
+        @decorate_class(slots=True)
+        class A15(B15):
+            @CustomDescriptor
+            def foo(self, value):
+                return super().foo(value)
+
+        assert A15().foo == "bar"
