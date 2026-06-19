@@ -1,5 +1,7 @@
 from collections.abc import Generator
+from functools import wraps
 import re
+from types import FunctionType
 from typing import Any, Optional, Self
 
 import pytest
@@ -265,41 +267,6 @@ def test_decorator_inheritance(
     subtests: SubTests,
 ) -> None:
     with subtests.test("parent class test: case 1"):
-        with pytest.raises(
-            TypeError,
-            match=re.escape(
-                "super(type, obj): obj (instance of Test2) is not an instance or subtype of type (Test2)."
-            ),
-        ):
-
-            @decorate_class(slots=False, allow_defaults=False)
-            class Test1:
-                value: str
-
-                __slots__ = "value"
-
-                def __init__(self: Self, value: str) -> None:
-                    self.value = value
-
-            @decorate_class(slots=True, allow_defaults=False)
-            class Test2(Test1):
-                value2: str
-
-                def __init__(self: Self, value: str, value2: str) -> None:
-                    # see: https://github.com/python/cpython/issues/90562
-                    # on why this causes issues with slots=True
-                    super().__init__(value)
-
-                    self.value2 = value2
-
-            test2 = Test2("test1", "test2")
-
-            assert test2.value == "test1"
-            assert test2.value2 == "test2"
-
-            assert not hasattr(test2, "__dict__")
-
-    with subtests.test("parent class test: case 2"):
 
         @decorate_class(slots=False, allow_defaults=False)
         class Test1:
@@ -310,14 +277,20 @@ def test_decorator_inheritance(
             def __init__(self: Self, value: str) -> None:
                 self.value = value
 
+            def some_call(self: Self) -> int:
+                return 1
+
         @decorate_class(slots=True, allow_defaults=False)
         class Test2(Test1):
             value2: str
 
             def __init__(self: Self, value: str, value2: str) -> None:
-                super(Test2, self).__init__(value)
+                super().__init__(value)
 
                 self.value2 = value2
+
+            def some_func_using_super(self: Self) -> int:
+                return super().some_call() + 1
 
         test2 = Test2("test1", "test2")
 
@@ -325,3 +298,170 @@ def test_decorator_inheritance(
         assert test2.value2 == "test2"
 
         assert not hasattr(test2, "__dict__")
+
+        assert test2.some_func_using_super() == 2
+
+    with subtests.test("parent class test: case 2"):
+
+        @decorate_class(slots=False, allow_defaults=False)
+        class Test3:
+            value: str
+
+            __slots__ = "value"
+
+            def __init__(self: Self, value: str) -> None:
+                self.value = value
+
+        @decorate_class(slots=True, allow_defaults=False)
+        class Test4(Test3):
+            value2: str
+
+            def __init__(self: Self, value: str, value2: str) -> None:
+                super(Test4, self).__init__(value)
+
+                self.value2 = value2
+
+        test4 = Test4("test3", "test4")
+
+        assert test4.value == "test3"
+        assert test4.value2 == "test4"
+
+        assert not hasattr(test4, "__dict__")
+
+
+# tests from https://github.com/python/cpython/pull/124455/changes#diff-44ce2dc1c4922b2f5cf7631d8f86cc569a4c25eb003aaecdc2bc22eb9163d5f5R1224
+def test_decorator_slots_with_super_calls(
+    subtests: SubTests,
+) -> None:
+    with subtests.test("test_zero_argument_super"):
+
+        @decorate_class(slots=True)
+        class A1:
+            def foo(self: Self) -> None:
+                super()
+
+        A1().foo()
+
+    with subtests.test("test_dunder_class_with_old_property"):
+
+        @decorate_class(slots=True)
+        class A2:
+            def _get_foo(self: Self) -> type["A2"]:
+                assert __class__ is type(self)
+                assert __class__ is self.__class__
+                return __class__
+
+            def _set_foo(self: Self, value) -> None:
+                assert __class__ is type(self)
+                assert __class__ is self.__class__
+
+            def _del_foo(self: Self) -> None:
+                assert __class__ is type(self)
+                assert __class__ is self.__class__
+
+            foo = property(_get_foo, _set_foo, _del_foo)
+
+        a = A2()
+        assert a.foo is A2
+        a.foo = 4
+        del a.foo
+
+        with subtests.test("test_dunder_class_with_new_property"):
+
+            @decorate_class(slots=True)
+            class A3:
+                @property
+                def foo(self: Self) -> type[Self]:
+                    return self.__class__
+
+                @foo.setter
+                def foo(self: Self, value) -> None:
+                    assert __class__ is type(self)
+
+                @foo.deleter
+                def foo(self: Self) -> None:
+                    assert __class__ is type(self)
+
+            a = A3()
+            assert a.foo is A3
+            a.foo = 4
+            del a.foo
+
+        # Test the parts of a property individually.
+        with subtests.test("test_slots_dunder_class_property_getter"):
+
+            @decorate_class(slots=True)
+            class A4:
+                @property
+                def foo(self: Self) -> type["A4"]:
+                    return __class__
+
+            a = A4()
+            assert a.foo is A4
+
+        with subtests.test("test_slots_dunder_class_property_setter"):
+
+            @decorate_class(slots=True)
+            class A5:
+                foo = property()
+
+                @foo.setter
+                def foo(self: Self, val) -> None:
+                    assert __class__ is type(self)
+
+            a = A5()
+            a.foo = 4
+
+        with subtests.test("test_slots_dunder_class_property_deleter"):
+
+            @decorate_class(slots=True)
+            class A6:
+                foo = property()
+
+                @foo.deleter
+                def foo(self: Self) -> None:
+                    assert __class__ is type(self)
+
+            a = A6()
+            del a.foo
+
+        with subtests.test("test_wrapped"):
+
+            def mydecorator(f):
+                @wraps(f)
+                def wrapper(*args, **kwargs):
+                    return f(*args, **kwargs)
+
+                return wrapper
+
+            @decorate_class(slots=True)
+            class A7:
+                @mydecorator
+                def foo(self):
+                    super()
+
+            A7().foo()
+
+        with subtests.test("test_remembered_class"):
+            # Apply the decorate_class decorator manually (not when the class
+            # is created), so that we can keep a reference to the
+            # undecorated class.
+            class A8:
+                def cls(self: Self) -> type["A8"]:
+                    return __class__
+
+            assert A8().cls() is A8
+
+            B = decorate_class(slots=True)(A8)
+            assert B().cls() is B
+
+            # This is undesirable behavior, but is a function of how
+            # modifying __class__ in the closure works.  I'm not sure this
+            # should be tested or not: I don't really want to guarantee
+            # this behavior, but I don't want to lose the point that this
+            # is how it works.
+
+            # The underlying class is "broken" by changing its __class__
+            # in A.foo() to B.  This normally isn't a problem, because no
+            # one will be keeping a reference to the underlying class A.
+            assert A8().cls() is B
