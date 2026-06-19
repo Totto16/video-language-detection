@@ -2,6 +2,7 @@ import inspect
 import itertools
 import types
 from collections.abc import Callable, Generator
+from typing import Any, Optional, cast
 
 # some things here wer copied and modified from the @dataclass annotation
 
@@ -43,6 +44,11 @@ def __update_func_cell_for__class__impl_[A](
     # Fix the cell to point to the new class, if it's already pointing
     # at the old class.  I'm not convinced that the "is oldcls" test
     # is needed, but other than performance can't hurt.
+
+    if f.__closure__ is None:
+        msg = "closure should not be none, if co_freevars is set"
+        raise TypeError(msg)
+
     cell = f.__closure__[idx]
     if cell.cell_contents is oldcls:
         cell.cell_contents = newcls
@@ -50,24 +56,27 @@ def __update_func_cell_for__class__impl_[A](
     return False
 
 
-
 _object_members_values = {
-    value for name, value in
-    (
+    value
+    for name, value in (
         *inspect.getmembers_static(object),
-        *inspect.getmembers_static(object())
-     )
+        *inspect.getmembers_static(object()),
+    )
 }
 
 
-def _is_not_object_member(v):
+def _is_not_object_member(v: Any) -> bool:
     try:
         return v not in _object_members_values
     except TypeError:
         return True
 
 
-def _find_inner_functions(obj, seen=None, depth=0):
+def _find_inner_functions(
+    obj: property,
+    seen: Optional[set[int]] = None,
+    depth: int = 0,
+) -> Generator[types.FunctionType]:
     if seen is None:
         seen = set()
     if id(obj) in seen:
@@ -82,8 +91,13 @@ def _find_inner_functions(obj, seen=None, depth=0):
     if depth > 2:
         return None
 
-    obj_is_type_instance = type in inspect._static_getmro(type(obj))
-    for _, value in inspect.getmembers_static(obj, _is_not_object_member):
+    obj_is_type_instance = type in cast(Any, inspect)._static_getmro(  # noqa: SLF001
+        type(obj),
+    )
+    for _, value_iter in inspect.getmembers_static(obj, _is_not_object_member):
+
+        value = value_iter
+
         value_type = type(value)
         if value_type is types.MemberDescriptorType and not obj_is_type_instance:
             value = value.__get__(obj)
@@ -151,10 +165,10 @@ def __add_slots_impl[A](
 
     # and: https://github.com/python/cpython/pull/124455
     # for the solution
-    
+
     # and also: https://github.com/python/cpython/pull/124692
 
-    newcls: type[A] = type(cls)(cls.__name__, cls.__bases__, cls_dict)
+    newcls: type[A] = cast(type, type(cls))(cls.__name__, cls.__bases__, cls_dict)
 
     if qualname is not None:
         newcls.__qualname__ = qualname
@@ -168,10 +182,10 @@ def __add_slots_impl[A](
     # and then fallback to inspecting custom descriptors
     # if no pure function or property is found.
 
-    custom_descriptors_to_check = []
-    for member in newcls.__dict__.values():
+    custom_descriptors_to_check: list[property] = []
+    for member_val in newcls.__dict__.values():
         # If this is a wrapped function, unwrap it.
-        member = inspect.unwrap(member)
+        member = inspect.unwrap(member_val)
 
         if isinstance(member, types.FunctionType):
             if __update_func_cell_for__class__impl_(member, cls, newcls):
@@ -186,9 +200,7 @@ def __add_slots_impl[A](
             )
         ):
             break
-        elif hasattr(member, "__get__") and not inspect.ismemberdescriptor(
-            member
-        ):
+        elif hasattr(member, "__get__") and not inspect.ismemberdescriptor(member):
             # We don't want to inspect custom descriptors just yet
             # there's still a chance we'll encounter a pure function
             # or a property and won't have to use slower recursive search.

@@ -1,7 +1,6 @@
-from collections.abc import Generator
-from functools import partial, update_wrapper, wraps
 import re
-from types import FunctionType
+from collections.abc import Callable, Generator
+from functools import partial, update_wrapper, wraps
 from typing import Any, Optional, Self
 
 import pytest
@@ -136,7 +135,7 @@ def test_decorator_edge_cases(
             class Test1:
                 value: str
 
-                __slots__ = lambda x: x * 1  # noqa: E731
+                __slots__ = lambda x: x * 1  # type: ignore[assignment] # noqa: E731
 
                 def __init__(self: Self, value: str) -> None:
                     self.value = value
@@ -168,7 +167,7 @@ def test_decorator_edge_cases(
             class Test1:
                 value: str
 
-                __slots__ = ("value", 1)
+                __slots__ = ("value", 1)  # type: ignore[assignment]
 
                 def __init__(self: Self, value: str) -> None:
                     self.value = value
@@ -205,7 +204,7 @@ def test_decorator_edge_cases(
             class Test1:
                 value: str
 
-                __slots__ = slot_generator()
+                __slots__ = slot_generator()  # type: ignore[assignment]
 
                 def __init__(self: Self, value: str) -> None:
                     self.value = value
@@ -237,7 +236,7 @@ def test_decorator_edge_cases(
             class Test1:
                 value: str
 
-                __slots__ = {"value": 1, 2: "int"}
+                __slots__ = {"value": 1, 2: "int"}  # type: ignore[assignment, dict-item]
 
                 def __init__(self: Self, value: str) -> None:
                     self.value = value
@@ -272,7 +271,7 @@ def test_decorator_inheritance(
         class Test1:
             value: str
 
-            __slots__ = "value"
+            __slots__ = "value"  # noqa: PLC0205
 
             def __init__(self: Self, value: str) -> None:
                 self.value = value
@@ -307,7 +306,7 @@ def test_decorator_inheritance(
         class Test3:
             value: str
 
-            __slots__ = "value"
+            __slots__ = "value"  # noqa: PLC0205
 
             def __init__(self: Self, value: str) -> None:
                 self.value = value
@@ -317,7 +316,7 @@ def test_decorator_inheritance(
             value2: str
 
             def __init__(self: Self, value: str, value2: str) -> None:
-                super(Test4, self).__init__(value)
+                super(Test4, self).__init__(value)  # noqa: UP008
 
                 self.value2 = value2
 
@@ -330,7 +329,7 @@ def test_decorator_inheritance(
 
 
 # tests from https://github.com/python/cpython/pull/124455/changes#diff-44ce2dc1c4922b2f5cf7631d8f86cc569a4c25eb003aaecdc2bc22eb9163d5f5R1224
-def test_decorator_slots_with_super_calls(
+def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     subtests: SubTests,
 ) -> None:
     with subtests.test("test_zero_argument_super"):
@@ -347,17 +346,17 @@ def test_decorator_slots_with_super_calls(
         @decorate_class(slots=True)
         class A2:
             def _get_foo(self: Self) -> type["A2"]:
-                assert __class__ is type(self)
-                assert __class__ is self.__class__
-                return __class__
+                assert __class__ is type(self)  # type: ignore[name-defined]
+                assert __class__ is self.__class__  # type: ignore[name-defined]
+                return __class__  # type: ignore[name-defined]
 
-            def _set_foo(self: Self, value) -> None:
-                assert __class__ is type(self)
-                assert __class__ is self.__class__
+            def _set_foo(self: Self, value: Any) -> None:  # noqa: ARG002
+                assert __class__ is type(self)  # type: ignore[name-defined]
+                assert __class__ is self.__class__  # type: ignore[name-defined]
 
             def _del_foo(self: Self) -> None:
-                assert __class__ is type(self)
-                assert __class__ is self.__class__
+                assert __class__ is type(self)  # type: ignore[name-defined]
+                assert __class__ is self.__class__  # type: ignore[name-defined]
 
             foo = property(_get_foo, _set_foo, _del_foo)
 
@@ -375,12 +374,12 @@ def test_decorator_slots_with_super_calls(
                 return self.__class__
 
             @foo.setter
-            def foo(self: Self, value) -> None:
-                assert __class__ is type(self)
+            def foo(self: Self, value: Any) -> None:  # noqa: ARG002
+                assert __class__ is type(self)  # type: ignore[name-defined]
 
             @foo.deleter
             def foo(self: Self) -> None:
-                assert __class__ is type(self)
+                assert __class__ is type(self)  # type: ignore[name-defined]
 
         a = A3()
         assert a.foo is A3
@@ -394,7 +393,7 @@ def test_decorator_slots_with_super_calls(
         class A4:
             @property
             def foo(self: Self) -> type["A4"]:
-                return __class__
+                return __class__  # type: ignore[name-defined]
 
         a = A4()
         assert a.foo is A4
@@ -405,9 +404,9 @@ def test_decorator_slots_with_super_calls(
         class A5:
             foo = property()
 
-            @foo.setter
-            def foo(self: Self, val) -> None:
-                assert __class__ is type(self)
+            @foo.setter  # type: ignore[no-redef]
+            def foo(self: Self, val: Any) -> None:  # noqa: ARG002
+                assert __class__ is type(self)  # type: ignore[name-defined]
 
         a = A5()
         a.foo = 4
@@ -418,26 +417,28 @@ def test_decorator_slots_with_super_calls(
         class A6:
             foo = property()
 
-            @foo.deleter
+            @foo.deleter  # type: ignore[no-redef]
             def foo(self: Self) -> None:
-                assert __class__ is type(self)
+                assert __class__ is type(self)  # type: ignore[name-defined]
 
         a = A6()
         del a.foo
 
     with subtests.test("test_wrapped"):
 
-        def mydecorator(f):
+        def mydecorator1[T](
+            f: Callable[..., T],
+        ) -> Callable[..., T]:
             @wraps(f)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: Any, **kwargs: Any) -> T:
                 return f(*args, **kwargs)
 
             return wrapper
 
         @decorate_class(slots=True)
         class A7:
-            @mydecorator
-            def foo(self):
+            @mydecorator1
+            def foo(self: Self) -> None:
                 super()
 
         A7().foo()
@@ -448,11 +449,11 @@ def test_decorator_slots_with_super_calls(
         # undecorated class.
         class A8:
             def cls(self: Self) -> type["A8"]:
-                return __class__
+                return __class__  # type: ignore[name-defined]
 
         assert A8().cls() is A8
 
-        B1 = decorate_class(slots=True)(A8)
+        B1 = decorate_class(slots=True)(A8)  # noqa: N806
         assert B1().cls() is B1
 
         # This is undesirable behavior, but is a function of how
@@ -468,169 +469,174 @@ def test_decorator_slots_with_super_calls(
 
     with subtests.test("test_wrapped_property"):
 
-        def mydecorator(f):
+        def mydecorator2[T](
+            f: Callable[..., T],
+        ) -> Callable[..., T]:
             @wraps(f)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: Any, **kwargs: Any) -> T:
                 return f(*args, **kwargs)
 
             return wrapper
 
         class B9:
             @property
-            def foo(self):
+            def foo(self: Self) -> str:
                 return "bar"
 
         @decorate_class(slots=True)
         class A9(B9):
             @property
-            @mydecorator
-            def foo(self):
+            @mydecorator2
+            def foo(self: Self) -> str:
                 return super().foo
 
         assert A9().foo == "bar"
 
     with subtests.test("test_custom_descriptor"):
 
-        class CustomDescriptor:
-            def __init__(self, f):
+        class CustomDescriptor1:
+            def __init__(self: Self, f: Callable[["A10"], Any]) -> None:
                 self._f = f
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: "A10", owner: Any) -> Any:
                 return self._f(instance)
 
         class B10:
-            def foo(self):
+            def foo(self: Self) -> str:
                 return "bar"
 
         @decorate_class(slots=True)
         class A10(B10):
-            @CustomDescriptor
-            def foo(cls):
+            @CustomDescriptor1
+            def foo(cls: Self) -> str:  # noqa: N805
                 return super().foo()
 
         assert A10().foo == "bar"
 
     with subtests.test("test_custom_descriptor_wrapped"):
 
-        class CustomDescriptor:
-            def __init__(self, f):
-                self._f = update_wrapper(lambda *args, **kwargs: f(*args, **kwargs), f)
+        class CustomDescriptor2:
+            def __init__(self: Self, f: Callable[["A11"], Any]) -> None:
+                self._f = update_wrapper(
+                    lambda *args, **kwargs: f(*args, **kwargs),  # noqa: PLW0108
+                    f,
+                )
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: "A11", owner: Any) -> Any:
                 return self._f(instance)
 
         class B11:
-            def foo(self):
+            def foo(self: Self) -> str:
                 return "bar"
 
         @decorate_class(slots=True)
         class A11(B11):
-            @CustomDescriptor
-            def foo(cls):
+            @CustomDescriptor2
+            def foo(cls: Self) -> str:  # noqa: N805
                 return super().foo()
 
         assert A11().foo == "bar"
 
     with subtests.test("test_custom_nested_descriptor"):
 
-        class CustomFunctionWrapper:
-            def __init__(self, f):
+        class CustomFunctionWrapper3:
+            def __init__(self: Self, f: Callable[["A12"], Any]) -> None:
                 self._f = f
 
-            def __call__(self, *args, **kwargs):
+            def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._f(*args, **kwargs)
 
-        class CustomDescriptor:
-            def __init__(self, f):
-                self._wrapper = CustomFunctionWrapper(f)
+        class CustomDescriptor3:
+            def __init__(self: Self, f: Callable[["A12"], Any]) -> None:
+                self._wrapper = CustomFunctionWrapper3(f)
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: "A12", owner: Any) -> Any:
                 return self._wrapper(instance)
 
         class B12:
-            def foo(self):
+            def foo(self: Self) -> str:
                 return "bar"
 
         @decorate_class(slots=True)
         class A12(B12):
-            @CustomDescriptor
-            def foo(cls):
+            @CustomDescriptor3
+            def foo(cls: Self) -> str:  # noqa: N805
                 return super().foo()
 
         assert A12().foo == "bar"
 
     with subtests.test("test_custom_nested_descriptor_with_partial"):
 
-        class CustomDescriptor:
-            def __init__(self, f):
-                self._wrapper = partial(f, value="bar")
+        class CustomDescriptor4:
+            def __init__(self: Self, f: Callable[["A13", Any], Any]) -> None:
+                self._wrapper: Callable[[A13], Any] = partial(f, value="bar")  # type: ignore[call-arg]
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: "A13", owner: Any) -> Any:
                 return self._wrapper(instance)
 
         class B13:
-            def foo(self, value):
+            def foo(self: Self, value: Any) -> Any:
                 return value
 
         @decorate_class(slots=True)
         class A13(B13):
-            @CustomDescriptor
-            def foo(self, value):
+            @CustomDescriptor4
+            def foo(self: Self, value: Any) -> Any:
                 return super().foo(value)
 
         assert A13().foo == "bar"
 
     with subtests.test("test_custom_too_nested_descriptor"):
 
-        class UnnecessaryNestedWrapper:
-            def __init__(self, wrapper):
+        class UnnecessaryNestedWrapper5:
+            def __init__(self: Self, wrapper: Callable[["A14"], Any]) -> None:
                 self._wrapper = wrapper
 
-            def __call__(self, *args, **kwargs):
+            def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._wrapper(*args, **kwargs)
 
-        class CustomFunctionWrapper:
-            def __init__(self, f):
+        class CustomFunctionWrapper5:
+            def __init__(self: Self, f: Callable[["A14"], Any]) -> None:
                 self._f = f
 
-            def __call__(self, *args, **kwargs):
+            def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._f(*args, **kwargs)
 
-        class CustomDescriptor:
-            def __init__(self, f):
-                self._wrapper = UnnecessaryNestedWrapper(CustomFunctionWrapper(f))
+        class CustomDescriptor5:
+            def __init__(self: Self, f: Callable[["A14"], Any]) -> None:
+                self._wrapper = UnnecessaryNestedWrapper5(CustomFunctionWrapper5(f))
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: Any, owner: Any) -> Any:
                 return self._wrapper(instance)
 
         class B14:
-            def foo(self):
+            def foo(self: Self) -> str:
                 return "bar"
 
         @decorate_class(slots=True)
         class A14(B14):
-            @CustomDescriptor
-            def foo(cls):
+            @CustomDescriptor5
+            def foo(cls: Self) -> str:  # noqa: N805
                 return super().foo()
 
         with pytest.raises(
             TypeError,
             match=re.escape(
-                "super(type, obj): obj (instance of A14) is not an instance or subtype of type (A14)."
+                "super(type, obj): obj (instance of A14) is not an instance or subtype of type (A14).",
             ),
         ):
-            A14().foo
+            assert A14().foo == "bar"
 
     with subtests.test("test_user_defined_code_execution"):
 
-        class CustomDescriptor:
-            def __init__(self, f):
-                self._wrapper = partial(f, value="bar")
+        class CustomDescriptor6:
+            def __init__(self: Self, f: Callable[["A15", Any], Any]) -> None:
+                self._wrapper: Callable[[A15], Any] = partial(f, value="bar")  # type: ignore[call-arg]
 
-            def __get__(self, instance, owner):
+            def __get__(self: Self, instance: Any, owner: Any) -> Any:
                 return object.__getattribute__(self, "_wrapper")(instance)
 
-            def __getattribute__(self, name):
+            def __getattribute__(self: Self, name: str) -> Any:
                 if name in {
                     # these are the bare minimum for the feature to work
                     "__class__",  # accessed on `isinstance(value, Field)`
@@ -639,24 +645,18 @@ def test_decorator_slots_with_super_calls(
                     "__dict__",  # is accessed by dir() to work
                 }:
                     return object.__getattribute__(self, name)
-                raise RuntimeError(f"Never should be accessed: {name}")
+
+                msg = f"Never should be accessed: {name}"
+                raise RuntimeError(msg)
 
         class B15:
-            def foo(self, value):
+            def foo(self: Self, value: Any) -> Any:
                 return value
 
         @decorate_class(slots=True)
         class A15(B15):
-            @CustomDescriptor
-            def foo(self, value):
-                return super().foo(value)
-
-        assert A15().foo == "bar"
-
-        @decorate_class(slots=True)
-        class A15(B15):
-            @CustomDescriptor
-            def foo(self, value):
+            @CustomDescriptor6
+            def foo(self: Self, value: Any) -> Any:
                 return super().foo(value)
 
         assert A15().foo == "bar"

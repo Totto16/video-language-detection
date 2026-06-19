@@ -19,9 +19,9 @@ from typing import (
 
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
+from helper.decorator import decorate_class
 from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger
-from helper.decorator import decorate_class
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
 from helper.validator import validator_checks
