@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import reduce
 from logging import Logger
+from pathlib import Path
 from typing import Any, NewType, Optional, Self, assert_never, cast, override
 
 from content.base_class import Content
@@ -12,9 +13,11 @@ from content.general import SeasonDescription, SeriesDescription
 from content.language import Language
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
+from content.tagger.tagger import get_tagger_for_file
 from helper.classifier import ModelLanguage
 from helper.filter import EmptyFilter, Filter, ValidatorFilter
 from helper.log import get_logger
+from helper.manager import NoopManager
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -27,7 +30,7 @@ type ReporterWhere = tuple[
 ] | tuple[
     SeriesDescription,
     SeasonContent,
-] | SeriesContent | CollectionContent
+] | SeriesContent | CollectionContent | Path
 
 
 class ValidatorReporter(ABC):
@@ -42,6 +45,9 @@ class ValidatorReporter(ABC):
             return _("Collection {name}").format(name=where.description)
         if isinstance(where, SeriesContent):
             return _("Series {name}").format(name=where.description.name)
+
+        if isinstance(where, Path):
+            return _("File '{file}'").format(file=str(where))
 
         if isinstance(where, tuple):
             if len(where) == 2:
@@ -411,8 +417,12 @@ class Validator[ED, SD, S2D, CD](ABC):
     @abstractmethod
     def from_params(params: ValidatorParams) -> "Validator[ED, SD, S2D, CD]": ...
 
+    @staticmethod
+    @abstractmethod
+    def is_default() -> bool: ...
 
-# language validators, check if the language is a correct one
+
+# language validator, check if the language is a correct one
 class LanguageValidator(Validator[None, None, None, None]):
     __model_language: ModelLanguage
 
@@ -487,8 +497,13 @@ class LanguageValidator(Validator[None, None, None, None]):
     def from_params(params: ValidatorParams) -> "LanguageValidator":
         return LanguageValidator(params.reporter, params.model_language)
 
+    @staticmethod
+    @override
+    def is_default() -> bool:
+        return True
 
-# language validators, check if the language is a correct one
+
+# language consistency validator, check if the language is consistent across episodes and seasons
 class LanguageConsistencyValidator(
     Validator[
         tuple[EpisodeContent, Optional[Language]],
@@ -647,6 +662,98 @@ class LanguageConsistencyValidator(
     def from_params(params: ValidatorParams) -> "LanguageConsistencyValidator":
         return LanguageConsistencyValidator(params.reporter)
 
+    @staticmethod
+    @override
+    def is_default() -> bool:
+        return True
+
+
+# tags validator, checks, that every file has tags
+class TagsValidator(Validator[None, None, None, None]):
+    def __init__(
+        self: Self,
+        reporter: ValidatorReporter,
+    ) -> None:
+        super().__init__(reporter, "tags")
+
+    @override
+    def validate_episode(
+        self: Self,
+        episode: EpisodeContent,
+        series: SeriesDescription,
+        season: SeasonDescription,
+    ) -> None:
+        handle_result = get_tagger_for_file(episode.scanned_file.path)
+
+        if handle_result.err():
+            return
+
+        handle = handle_result.as_ok()
+
+        manager = NoopManager()
+
+        try:
+            with handle.r_ctx(manager=manager) as ctx:
+                tags = ctx.get_tags()
+                if tags.uuid is None:
+                    self.emit_error(
+                        episode.scanned_file.path,
+                        _("File not tagged"),
+                    )
+        except BaseException as err:  # noqa: BLE001
+            self.emit_error(
+                episode.scanned_file.path,
+                _("File not tagged: {err}").format(err=str(err)),
+            )
+
+    @override
+    def validate_season(
+        self: Self,
+        season: SeasonContent,
+        series: SeriesDescription,
+        result: list[None],
+    ) -> None:
+        pass
+
+    @override
+    def validate_series(
+        self: Self,
+        series: SeriesContent,
+        result: list[None],
+    ) -> None:
+        pass
+
+    @override
+    def validate_collection(
+        self: Self,
+        collection: CollectionContent,
+        result: list[None],
+    ) -> None:
+        pass
+
+    @override
+    def validate_all(
+        self: Self,
+        contents: list[SeriesContent | CollectionContent],
+        result: list[None],
+    ) -> None:
+        pass
+
+    @staticmethod
+    @override
+    def names() -> list[str]:
+        return ["tags", "has_tags"]
+
+    @staticmethod
+    @override
+    def from_params(params: ValidatorParams) -> "TagsValidator":
+        return TagsValidator(params.reporter)
+
+    @staticmethod
+    @override
+    def is_default() -> bool:
+        return False
+
 
 # TODO: metadata checks, check if no duplicates are found, missing episodes, missing seasons
 # check language consistency
@@ -666,6 +773,7 @@ def get_all_validators() -> (
     validator_classes: list[type[Validator[Any, Any, Any, Any]]] = [
         LanguageValidator,
         LanguageConsistencyValidator,
+        TagsValidator,
     ]
 
     for validator_class in validator_classes:
@@ -689,12 +797,24 @@ all_validators: dict[
 all_available_validators: set[str] = set(all_validators.keys())
 
 
+def __get_default_validators_impl(
+    params: ValidatorParams,
+) -> list[Validator[Any, Any, Any, Any]]:
+    result: list[Validator[Any, Any, Any, Any]] = []
+    for cb in all_validators.values():
+        validator = cb(params)
+        if validator.is_default():
+            result.append(validator)
+
+    return result
+
+
 def __get_validators_impl(
     params: ValidatorParams,
     filters: list[ValidatorFilter | EmptyFilter],
 ) -> list[Validator[Any, Any, Any, Any]]:
     if len(filters) == 0:
-        return [cb(params) for cb in all_validators.values()]
+        return __get_default_validators_impl(params)
 
     result: dict[str, Validator[Any, Any, Any, Any]] = {}
 
