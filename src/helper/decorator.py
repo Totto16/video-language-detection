@@ -1,6 +1,7 @@
 import inspect
 import itertools
 from collections.abc import Callable, Generator
+import types
 from typing import Optional, cast
 
 # some things here wer copied and modified from the @dataclass annotation
@@ -86,16 +87,12 @@ def __add_slots_impl[A](
 
 
 def __process_class_impl[A](
-    cls: Optional[type[A]],
+    cls: type[A],
     *,
     slots: bool,
     weakref_slot: bool,
     allow_defaults: bool,
 ) -> type[A]:
-    if cls is None:
-        msg = "class is None, expected value"
-        raise TypeError(msg)
-
     cls_annotations = inspect.get_annotations(cls)
 
     if not allow_defaults:
@@ -103,7 +100,13 @@ def __process_class_impl[A](
             has_field_name = hasattr(cls, field_name)
 
             if has_field_name:
-                msg = f"Invalid default value for field '{field_name}': {getattr(cls, field_name)}"
+                field_val = getattr(cls, field_name)
+
+                if isinstance(field_val, types.MemberDescriptorType):
+                    # descriptors are used by slots, which is later checked to not be already defined
+                    continue
+
+                msg = f"Invalid default value for field '{field_name}': {field_val}"
                 raise TypeError(msg)
 
     if not slots:
@@ -121,7 +124,7 @@ def decorate_class[A](
     allow_defaults: bool = False,
 ) -> Callable[[type[A]], type[A]]:
 
-    def wrap(cls: Optional[type[A]]) -> type[A]:
+    def wrap(cls: type[A]) -> type[A]:
         return __process_class_impl(
             cls,
             slots=slots,

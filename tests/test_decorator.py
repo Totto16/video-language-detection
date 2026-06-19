@@ -1,6 +1,7 @@
 from typing import Any, Optional, Self
 
 import pytest
+from pytest_subtests import SubTests
 
 from helper.decorator import decorate_class
 
@@ -96,3 +97,30 @@ def test_decorator_with_slots_works_as_expected() -> None:
         add_new_value()
 
     assert not hasattr(test2, "__dict__")
+
+
+def test_decorator_edge_cases(
+    subtests: SubTests,
+) -> None:
+
+    with subtests.test("class already defines __slots__"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test1:
+                value: str
+
+                __slots__ = ("value",)
+
+                def __init__(self: Self, value: str) -> None:
+                    self.value = value
+
+            test1 = Test1("test1")
+
+            assert test1.value == "test1"
+
+        with pytest.raises(
+            TypeError,
+            match="Test1 already specifies __slots_",
+        ):
+            declare_test()
