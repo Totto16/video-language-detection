@@ -700,7 +700,7 @@ class TagsValidator(Validator[None, None, None, None]):
                         episode.scanned_file.path,
                         _("File not tagged"),
                     )
-        except BaseException as err:  # noqa: BLE001
+        except (RuntimeError, ValueError, TypeError) as err:
             self.emit_error(
                 episode.scanned_file.path,
                 _("File not tagged: {err}").format(err=str(err)),
