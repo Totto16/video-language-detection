@@ -857,17 +857,17 @@ class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDKeyValueValueStr:
     value: str
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDKeyValueValueUUID:
     uuid: UUID
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDKeyValueValueJSON:
     data: ChunkJsonValue
 
@@ -1144,24 +1144,24 @@ def is_avi_file(
     return None
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDCustomSubChunk:
     data: VLDKeyValueValue
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDKnownStrSubChunk:
     fourcc: FOURCC
     value: str
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDCustomKeyValueEntry:
     key: str
     data: VLDKeyValueValue
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VLDUnknownStrSubChunk:
     fourcc: FOURCC
     data: bytes
@@ -1309,7 +1309,7 @@ ReadInfoChunkValues = list[ReadInfoChunkValue]
 InfoValues = Optional[ReadInfoChunkValues]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]

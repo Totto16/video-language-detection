@@ -275,17 +275,17 @@ class ConfigScanner(Scanner):
         return self.__is_aborted
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class FullScannerConfig:
     scanner_type: Literal["full"]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class NoScannerConfig:
     scanner_type: Literal["nothing"]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ConfigScannerConfig:
     scanner_type: Literal["config"]
     config: Annotated[Optional[ConfigScannerDict], OneOf]

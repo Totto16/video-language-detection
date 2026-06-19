@@ -160,20 +160,20 @@ class IOInterface(ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class IOOpProgress:
     type: Literal["progress"]
     which: Literal["read", "write"]
     amount: int
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class IOOpSeek:
     type: Literal["seek"]
     amount: int
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class IOOpTruncate:
     type: Literal["truncate"]
     amount: int

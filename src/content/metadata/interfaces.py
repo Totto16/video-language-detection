@@ -61,7 +61,7 @@ class Provider(ABC):
     def get_metadata_schema() -> Mapping[str, ObjectField]: ...
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class MissingProviderMetadataConfig:
     type: Literal["none"]
 

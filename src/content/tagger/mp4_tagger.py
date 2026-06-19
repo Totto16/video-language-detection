@@ -1473,19 +1473,19 @@ class PrimaryItemBox(MP4FullBox, FinalMP4Box):
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class MetaBoxHandlerInformation:
     handler_type: ISOMAtomName
     name: str
     reserved: Optional[bytes] = None
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class PrimaryItemInformation:
     item_id: int
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class OptionalMetaBoxes:
     pitm: Optional[PrimaryItemBox]  # PrimaryItemBox
     dinf: Optional[MP4Box]  # DataInformationBox
@@ -2509,7 +2509,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
 # ruff: enable[ERA001]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ApplItunesTagsData:
     type: AppleItunesItemDataType
     value: AppleItunesItemDataContent
@@ -2522,7 +2522,7 @@ class ApplItunesTagsData:
         )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ApplItunesTags:
     key: ISOMAtomName | AppleItunesFreeformKey
     data: ApplItunesTagsData
@@ -2869,7 +2869,7 @@ ReadMetaBoxValues = list[ApplItunesTags]
 MetaValues = Result[Optional[ReadMetaBoxValues], str]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]

@@ -756,7 +756,7 @@ class WSChoiceSeparator(ChoiceInterface):
 WSChoice = WSChoiceChoice | WSChoiceSeparator
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ReplyData:
     type: str
     finished: bool
@@ -1022,7 +1022,7 @@ class ScanStartQuery(pydantic.BaseModel):
     template: Optional[str] = None
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class StartOptions:
     template_to_use: Optional[str]
     filter: list[Filter]
@@ -1128,7 +1128,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
         )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class Address:
     host: str
     port: int
@@ -1140,7 +1140,7 @@ class Address:
         return f"<Address host: {self.host} port: {self.port}>"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class BackendOptions:
     address: Address
 
@@ -1158,7 +1158,7 @@ class ScannerStateRunning(pydantic.BaseModel):
     configs: list[FinalConfig]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class SummaryData:
     language: LanguageDict
     metadata: MetadataDict
@@ -1255,7 +1255,7 @@ def summary_tuple_to_serializable_data(
     )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ScannerStateFinished:
     type: Literal["finished"]
     result: list[Optional[SummaryData]]
@@ -1268,7 +1268,7 @@ class ScannerStateFinishedSerializable(pydantic.BaseModel):
     result: list[Optional[SummaryDataSerializable]]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ScannerStateError:
     type: Literal["error"]
     error: str | BaseException
@@ -1390,13 +1390,13 @@ class ThreadSafe[A](AbstractContextManager[ThreadSafeAcquired[A]]):
         return False
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ThreadState:
     thread: threading.Thread
     event: asyncio.Event
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ScannerThreadState:
     state: ScannerState
     thread: Optional[ThreadState]

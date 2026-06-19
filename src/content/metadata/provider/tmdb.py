@@ -27,20 +27,20 @@ logger: Logger = get_logger()
 _ = get_translator()
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TMDBConfig:
     api_key: str
     language: Optional[str] = field(default=None, metadata=none_as_undefined)
     region: Optional[str] = field(default=None, metadata=none_as_undefined)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TMDBMetadataConfig:
     type: Literal["tmdb"]
     config: Annotated[Optional[TMDBConfig], OneOf]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 @type_name("TMDBSeriesMetadata")
 class SeriesMetadata:
@@ -62,7 +62,7 @@ class SeriesMetadata:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 @type_name("TMDBSeasonMetadata")
 class SeasonMetadata:
@@ -80,7 +80,7 @@ class SeasonMetadata:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 @type_name("TMDBEpisodeMetadata")
 class EpisodeMetadata:
@@ -99,7 +99,7 @@ class EpisodeMetadata:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 class TMDBSkipMetadata(SkipMetadata):
     reason: str
@@ -112,7 +112,7 @@ class TMDBSkipMetadata(SkipMetadata):
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class SeriesHandle:
     series_id: int
 
@@ -123,7 +123,7 @@ class SeriesHandle:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class SeasonHandle:
     parent: SeriesHandle
     season_number: int
@@ -140,7 +140,7 @@ class SeasonHandle:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class EpisodeHandle:
     id: int
 
@@ -157,7 +157,7 @@ MetadataData = Annotated[
 ]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 class TMDBMetadataSchema:
     data: MetadataData

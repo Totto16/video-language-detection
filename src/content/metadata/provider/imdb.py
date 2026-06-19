@@ -15,18 +15,18 @@ from helper.apischema import OneOf
 from helper.decorator import decorate_class
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class IMDBConfig:
     url: str
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class IMDBMetadataConfig:
     type: Literal["imdb"]
     config: Annotated[Optional[IMDBConfig], OneOf]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 class IMDBMetadataSchema:
     data: None

@@ -44,7 +44,7 @@ def ExactLen(length: int) -> Len:  # noqa: N802
 RegionName = str
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class __LangValidationList:
     short_names_3: list[Iso_3Alpha]
     short_names_2: list[Iso_2Alpha]
@@ -187,7 +187,7 @@ def __generate_lang_code_validation_list() -> __LangValidationList:
 lang_code_validation_list_impl = __generate_lang_code_validation_list()
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AlphaLanguageCodeAnnnotation(GroupedMetadata):
     length: int
 
@@ -463,7 +463,7 @@ class Alpha2LanguageStr:
         return False
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class RegionLanguageStrAnnnotation(GroupedMetadata):
     def __iter__(self) -> Iterator[object]:
         yield Predicate(str.isupper)
@@ -821,7 +821,7 @@ class ShortLanguageStr:
 
 @schema()
 @type_name("LanguageImpl")
-@dataclass
+@dataclass(slots=True, repr=True)
 class LanguageSchema:
     short: Annotated[
         Alpha2LanguageStr

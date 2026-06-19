@@ -27,14 +27,14 @@ SerializableDictValue = str | int | dict[str, str | int] | dict[str, Any]
 SerializableDict = dict[str, SerializableDictValue]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class MetadataTags:
     comment: str
     uuid: UUID
     metadata: SerializableDict
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class MetadataTagsRead:
     comment: Optional[str]
     uuid: Optional[UUID]
@@ -276,7 +276,7 @@ class VideoTaggerMultiple(VideoTagger):
 TAGGER_DOMAIN = "lt.totto.vld"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AppleItunesFreeformKey:
     mean: str
     name: str

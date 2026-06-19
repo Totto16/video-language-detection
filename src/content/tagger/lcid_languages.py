@@ -5,7 +5,7 @@ from content.language import ShortLanguageStr
 from helper.decorator import decorate_class
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TODOAlpha3:
     value: str
 
@@ -16,7 +16,7 @@ def valid_iso_alpha3_language_todo(a: str) -> TODOAlpha3:
     return TODOAlpha3(a)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TODOAlpha2Regional:
     value: str
 
@@ -25,7 +25,7 @@ def valid_iso_alpha2_region_language_todo(a: str) -> TODOAlpha2Regional:
     return TODOAlpha2Regional(a)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TODOAlpha3Regional:
     value: str
 
@@ -34,7 +34,7 @@ def valid_iso_alpha3_region_language_todo(a: str) -> TODOAlpha3Regional:
     return TODOAlpha3Regional(a)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class InvalidISOstring:
     value: str
 

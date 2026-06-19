@@ -33,17 +33,17 @@ from helper.log import get_logger
 from helper.result import Err, Ok, Result
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class GeneralConfig:
     target_file: str
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class GeneralConfigParsed:
     target_file: Path
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ParserConfig:
     root_folder: str
     special: Optional[list[str]]
@@ -62,7 +62,7 @@ class ParserConfig:
     exception_on_error: Optional[bool] = field(metadata=schema(), default=True)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ParserConfigParsed:
     root_folder: Path
     special: list[str]
@@ -161,7 +161,7 @@ class CustomKey:
         )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class KeyBoardConfig:
     abort: CustomKey
 
@@ -176,7 +176,7 @@ class ConfigType(Enum):
     symlinked = "symlinked"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class FinalConfig:
     config_name: str
     config_type: ConfigType
@@ -192,7 +192,7 @@ class FinalConfig:
 logger: Logger = get_logger()
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ConfigGeneric:
     general: Annotated[Optional[GeneralConfig], OneOf] = field(
         default=None,
@@ -318,12 +318,12 @@ class ConfigGeneric:
         return results
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TemplateConfig(ConfigGeneric):
     pass
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class Config(ConfigGeneric):
     config_name: str = field(metadata=required, default="<ERROR>")
     config_type: ConfigType = field(metadata=required, default=ConfigType.normal)
@@ -335,12 +335,12 @@ UseFromCLI = Annotated[
 ]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ConfigTemplateSettings:
     prefer_cli_template: Optional[bool]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ConfigTemplates:
     defaults: list[Config] | Config
     names: dict[str, TemplateConfig]
@@ -358,7 +358,7 @@ class ConfigTemplates:
     )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ConfigTemplate:
     templates: ConfigTemplates
 
@@ -369,7 +369,7 @@ RawConfig = Config | list[Config] | ConfigTemplate
 SchemaConfig = Annotated[RawConfig, OneOf]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AdvancedConfig:
 
     @staticmethod

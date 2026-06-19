@@ -76,7 +76,7 @@ class SummaryResult(ABC):
 type ScanSummary = dict[bool, int]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ScanSummaryDetailed:
     success: dict[Language, int]
     failure: dict[str, int]

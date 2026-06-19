@@ -191,7 +191,7 @@ class ExecuteFilterFactory(FilterFactory):
         return ExecuteFilter.from_string(value)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ExecuteSteps:
     check: bool
     summary: bool
@@ -292,7 +292,7 @@ class ValidatorFilter(Filter):
         return ValidatorFilterFactory.name()
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ValidatorChecks:
     check: Callable[[str, Optional[str]], Result[None, str]]
     names: set[str]
@@ -349,7 +349,7 @@ special_values: list[str] = [
 ]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class FilterHelpOptions:
     cb: Optional[Callable[[], Never]]
 

@@ -273,7 +273,7 @@ class ScannedFile:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class EpisodeName:
     name: str
     season: int
@@ -304,7 +304,7 @@ class NameParser(ABC):
     def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]: ...
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class StartAmount:
     total: int
     processing: int

@@ -12,7 +12,7 @@ from helper.decorator import decorate_class
 from helper.manager import NoopManager
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class Finalizer[A]:
     data: A
     drop: Callable[[A], None]
@@ -40,7 +40,7 @@ class VideoFile(Protocol):
     def get(self: Self) -> bytes: ...
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VideoFileURL(VideoFile):
     url: str
     type: str
@@ -57,7 +57,7 @@ class VideoFileURL(VideoFile):
         return result.content
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class VideoFileLocal(VideoFile):
     file: Path | str
 
@@ -188,7 +188,7 @@ def temp_video_files(
     return Finalizer[list[Path]](results, delete_results)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class FFprobeData:
     codec: str
     duration: Optional[float]

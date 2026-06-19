@@ -147,7 +147,7 @@ class SkipHandle:
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class SkipMetadata:
     def __str__(self: Self) -> str:
         return "<SkipMetadata>"

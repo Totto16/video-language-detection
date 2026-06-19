@@ -96,7 +96,7 @@ class MemoryPattern(ABC):
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class LinearCoeffs:
     c: float  # x ^ 0
     m: float  # x ^ 1
@@ -145,7 +145,7 @@ class MemoryPatternLinear(MemoryPattern):
         return f"MemoryPatternLinear(coeffs=LinearCoeffs(c={self.__coeffs.c}, m={self.__coeffs.m}))"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class QuadraticCoeffs:
     c: float  # x ^ 0
     b: float  # x ^ 1
@@ -227,7 +227,7 @@ class ModelLanguage(ABC):
     def is_valid_language(self: Self, language: Language) -> Optional[str]: ...
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class Model:
     name: str
     sample_count: int
@@ -307,12 +307,12 @@ MAX_MEAN_VARIANCE: float = 0.05
 
 
 def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
-    @dataclass
+    @dataclass(slots=True, repr=True)
     class CalibrateResult:
         peak_bytes: int
         probe_sec: int
 
-    @dataclass
+    @dataclass(slots=True, repr=True)
     class SolvedPolynomial:
         p: Polynomial
         deg: int
@@ -444,7 +444,7 @@ class ConversionStatus(Enum):
         return str(self)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class FileAnnotation:
     type: FileType
     status: ConversionStatus
@@ -453,7 +453,7 @@ class FileAnnotation:
 type FileStatus = WavFile | FileAnnotation
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class Segment:
     index: int
     start: Optional[Timestamp]
@@ -479,7 +479,7 @@ class Segment:
         raise RuntimeError(msg)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class WAVOptions:
     bitrate: int
     segment: Segment
@@ -988,13 +988,13 @@ class ScanConfigDictTotal(TypedDict, total=True):
     maximum: Optional[AdvancedPercentage]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ManualBatchSettings:
     batch_type: Literal["manual"]
     amount: Timestamp
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AutoBatchSettingsConfig:
     batch_type: Literal["auto"]
     keep_free: Optional[Percentage] = field(
@@ -1007,7 +1007,7 @@ class AutoBatchSettingsConfig:
     )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AutoBatchSettings:
     batch_type: Literal["auto"]
     keep_free: Percentage
@@ -1058,7 +1058,7 @@ def resolve_batch_settings(
     return batch_settings
 
 
-@dataclass()
+@dataclass(slots=True, repr=True)
 class ClassifierOptions:
     batch_settings: BatchSettings
     accuracy: AccuracySettingsDictTotal
@@ -1084,7 +1084,7 @@ class ClassifierOptions:
         )
 
 
-@dataclass()
+@dataclass(slots=True, repr=True)
 class ClassifierOptionsConfig:
     batch_settings: Annotated[
         Optional[ManualBatchSettings | AutoBatchSettingsConfig | ConfigTimeStamp],
@@ -1388,7 +1388,7 @@ class PredictionFailReason(Enum):
     no_best_available = "no_best_available"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class PredictionFail:
     reason: PredictionFailReason
     best: Optional[PredictionBest]

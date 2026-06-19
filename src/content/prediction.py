@@ -16,7 +16,7 @@ class LanguagePercentageDict(TypedDict):
     score: float
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class PredictionBest:
     accuracy: float
     language: Language

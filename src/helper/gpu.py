@@ -27,7 +27,7 @@ class GPUVendor(Enum):
     intel = "intel"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class GPUDevice:
     name: str
     unique_id: str
@@ -144,7 +144,7 @@ def list_gpus_nvidia() -> Result[list[GPUDevice], str]:
         return Err("not build with nvidia support")
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class DeviceTopologyAmdSmi:
     domain: int
     bus: int
@@ -532,14 +532,14 @@ def get_devices() -> Result[list[GPUDevice], str]:
     return Err(f"All gpu detection methods failed: {", ".join(fails)}")
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TorchDevice:
     name: str
     uuid: str
     index: int
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class AvailableMemory:
     available: int
     total: int

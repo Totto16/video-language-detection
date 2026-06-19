@@ -104,7 +104,7 @@ class TuiValidatorReporter(ValidatorReporter):
         )
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ValidatorParams:
     reporter: ValidatorReporter
     model_language: ModelLanguage
@@ -247,7 +247,7 @@ class Validator[ED, SD, S2D, CD](ABC):
     __Any3 = NewType("__Any3", __AnyClass)
     __Any4 = NewType("__Any4", __AnyClass)
 
-    @dataclass
+    @dataclass(slots=True, repr=True)
     class __ValidatorState[S]:
         data: list[S]
 
@@ -780,7 +780,7 @@ class LanguageConsistencyValidator(
         return True
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TagOptions:
     strict: bool
 
@@ -928,7 +928,7 @@ ValidatorValidateOptionsCb = Callable[
 ]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ValidatorEntry:
     get: ValidatorGetCb
     validate_options: ValidatorValidateOptionsCb

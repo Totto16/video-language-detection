@@ -109,7 +109,7 @@ def resolve_interactive_config(
     return result
 
 
-@dataclass()
+@dataclass(slots=True, repr=True)
 class PredictionBestSelectResult:
     select_result_type: Literal["prediction_best"]
     value: PredictionBest
@@ -123,7 +123,7 @@ class SelectedType(Enum):
     unknown = "unknown"
 
 
-@dataclass()
+@dataclass(slots=True, repr=True)
 class ManualSelectResult:
     select_result_type: Literal["manual"]
     selected: SelectedType
@@ -172,13 +172,13 @@ class ChoiceColorValue(Enum):
     green = "ansigreen"
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ChoiceColor:
     type: ChoiceColorType
     color: ChoiceColorValue
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ChoiceTitle:
     color: Optional[ChoiceColor]
     content: str
@@ -594,12 +594,12 @@ class InteractiveLanguagePicker(LanguagePicker):
                         assert_never(result.select_result_type)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class NoLanguagePickerConfig:
     picker_type: Literal["none"]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class InteractiveLanguagePickerConfig:
     picker_type: Literal["interactive"]
     config: Annotated[Optional[InteractiveLanguagePickerDict], OneOf]
