@@ -154,7 +154,11 @@ def launch_tui(
 
         validators = get_validators(validator_params, filters)
 
-        Validator.validate_multiple(validators, contents)
+        Validator.validate_multiple(
+            validators,
+            contents,
+            manager=manager,
+        )
 
     if execute_steps.summary:
         language_summary, metadata_summary, video_metadata_summary = (

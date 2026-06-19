@@ -23,7 +23,7 @@ from helper.filter import (
     ValidatorFilter,
 )
 from helper.log import get_logger
-from helper.manager import NoopManager
+from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
@@ -134,9 +134,13 @@ class Validator[ED, SD, S2D, CD](ABC):
         series: SeriesDescription,
         season: SeasonDescription,
         contents: list[EpisodeContent],
+        *,
+        manager: ManagerInterface,
     ) -> list[ED]:
         state: list[ED] = [
-            self.validate_episode(content, series=series, season=season)
+            self.validate_episode(
+                content, series=series, season=season, manager=manager,
+            )
             for content in contents
         ]
         return state
@@ -145,6 +149,8 @@ class Validator[ED, SD, S2D, CD](ABC):
         self: Self,
         series: SeriesDescription,
         contents: list[SeasonContent],
+        *,
+        manager: ManagerInterface,
     ) -> list[SD]:
         state: list[SD] = []
 
@@ -153,35 +159,54 @@ class Validator[ED, SD, S2D, CD](ABC):
                 series=series,
                 season=content.description,
                 contents=content.episodes,
+                manager=manager,
             )
             state.append(
                 self.validate_season(content, series=series, result=local_state),
             )
         return state
 
-    def __validate_series_impl(self: Self, contents: list[SeriesContent]) -> list[S2D]:
+    def __validate_series_impl(
+        self: Self,
+        contents: list[SeriesContent],
+        *,
+        manager: ManagerInterface,
+    ) -> list[S2D]:
         state: list[S2D] = []
 
         for content in contents:
             local_state = self.__validate_seasons_impl(
                 series=content.description,
                 contents=content.seasons,
+                manager=manager,
             )
             state.append(self.validate_series(content, local_state))
 
         return state
 
-    def __validate_root_impl(self: Self, contents: list[Content]) -> None:
+    def __validate_root_impl(
+        self: Self,
+        contents: list[Content],
+        *,
+        manager: ManagerInterface,
+    ) -> None:
+        # TODO: use manager
         state: list[S2D | CD] = []
 
         root_content: list[SeriesContent | CollectionContent] = []
 
         for content in contents:
             if isinstance(content, CollectionContent):
-                local_state = self.__validate_series_impl(content.series)
+                local_state = self.__validate_series_impl(
+                    content.series,
+                    manager=manager,
+                )
                 state.append(self.validate_collection(content, local_state))
             elif isinstance(content, SeriesContent):
-                local_state = self.__validate_series_impl([content])
+                local_state = self.__validate_series_impl(
+                    [content],
+                    manager=manager,
+                )
                 if len(local_state) != 1:
                     msg = "UNREACHABLE"
                     raise RuntimeError(msg)
@@ -200,8 +225,16 @@ class Validator[ED, SD, S2D, CD](ABC):
 
         self.validate_all(root_content, state)
 
-    def validate(self: Self, contents: list[Content]) -> None:
-        self.__validate_root_impl(contents)
+    def validate(
+        self: Self,
+        contents: list[Content],
+        *,
+        manager: ManagerInterface,
+    ) -> None:
+        self.__validate_root_impl(
+            contents,
+            manager=manager,
+        )
 
     # helper for multipel validators to be typed correctly
     class __AnyClass:
@@ -222,6 +255,8 @@ class Validator[ED, SD, S2D, CD](ABC):
         series: SeriesDescription,
         season: SeasonDescription,
         contents: list[EpisodeContent],
+        *,
+        manager: ManagerInterface,
     ) -> list["Validator.__ValidatorState[Validator.__Any1]"]:
         state: list[Validator.__ValidatorState[Validator.__Any1]] = [
             Validator.__ValidatorState([]) for _ in validators
@@ -230,7 +265,12 @@ class Validator[ED, SD, S2D, CD](ABC):
         for content in contents:
             for i, validator in enumerate(validators):
                 state[i].data.append(
-                    validator.validate_episode(content, series=series, season=season),
+                    validator.validate_episode(
+                        content,
+                        series=series,
+                        season=season,
+                        manager=manager,
+                    ),
                 )
 
         return state
@@ -240,6 +280,8 @@ class Validator[ED, SD, S2D, CD](ABC):
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         series: SeriesDescription,
         contents: list[SeasonContent],
+        *,
+        manager: ManagerInterface,
     ) -> list["Validator.__ValidatorState[Validator.__Any2]"]:
         state: list[Validator.__ValidatorState[Validator.__Any2]] = [
             Validator.__ValidatorState([]) for _ in validators
@@ -252,6 +294,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                     series=series,
                     season=content.description,
                     contents=content.episodes,
+                    manager=manager,
                 )
             )
 
@@ -275,6 +318,8 @@ class Validator[ED, SD, S2D, CD](ABC):
     def __validate_multiple_series_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         contents: list[SeriesContent],
+        *,
+        manager: ManagerInterface,
     ) -> list["Validator.__ValidatorState[Validator.__Any3]"]:
         state: list[Validator.__ValidatorState[Validator.__Any3]] = [
             Validator.__ValidatorState([]) for _ in validators
@@ -286,6 +331,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                     validators,
                     series=content.description,
                     contents=content.seasons,
+                    manager=manager,
                 )
             )
 
@@ -308,7 +354,9 @@ class Validator[ED, SD, S2D, CD](ABC):
     def __validate_multiple_root_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         contents: list[Content],
+        manager: ManagerInterface,
     ) -> None:
+        # TODO: use manager
         state: list[Validator.__ValidatorState[Validator.__Any4 | Validator.__Any3]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
@@ -320,6 +368,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 local_states = Validator.__validate_multiple_series_impl(
                     validators,
                     content.series,
+                    manager=manager,
                 )
 
                 for i, validator, local_state in zip(
@@ -339,6 +388,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 local_states = Validator.__validate_multiple_series_impl(
                     validators,
                     [content],
+                    manager=manager,
                 )
 
                 for i, _validator, local_state in zip(
@@ -376,8 +426,10 @@ class Validator[ED, SD, S2D, CD](ABC):
     def validate_multiple(
         validators: list["Validator[Any, Any, Any, Any]"],
         contents: list[Content],
+        *,
+        manager: ManagerInterface,
     ) -> None:
-        Validator.__validate_multiple_root_impl(validators, contents)
+        Validator.__validate_multiple_root_impl(validators, contents, manager=manager)
 
     @abstractmethod
     def validate_episode(
@@ -385,6 +437,8 @@ class Validator[ED, SD, S2D, CD](ABC):
         episode: EpisodeContent,
         series: SeriesDescription,
         season: SeasonDescription,
+        *,
+        manager: ManagerInterface,
     ) -> ED: ...
 
     @abstractmethod
@@ -456,6 +510,8 @@ class LanguageValidator(Validator[None, None, None, None]):
         episode: EpisodeContent,
         series: SeriesDescription,
         season: SeasonDescription,
+        *,
+        manager: ManagerInterface,
     ) -> None:
         if episode.language in [Language.no_language(), Language.get_default()]:
             return
@@ -557,6 +613,8 @@ class LanguageConsistencyValidator(
         episode: EpisodeContent,
         series: SeriesDescription,
         season: SeasonDescription,
+        *,
+        manager: ManagerInterface,
     ) -> tuple[EpisodeContent, Optional[Language]]:
         if episode.language in [Language.no_language(), Language.get_default()]:
             return (episode, None)
@@ -742,6 +800,8 @@ class TagsValidator(Validator[None, None, None, None]):
         episode: EpisodeContent,
         series: SeriesDescription,
         season: SeasonDescription,
+        *,
+        manager: ManagerInterface,
     ) -> None:
         handle_result = get_tagger_for_file(episode.scanned_file.path)
 
@@ -756,9 +816,6 @@ class TagsValidator(Validator[None, None, None, None]):
             return
 
         handle = handle_result.as_ok()
-
-        manager = NoopManager()
-
         try:
             with handle.r_ctx(manager=manager) as ctx:
                 tags = ctx.get_tags()
