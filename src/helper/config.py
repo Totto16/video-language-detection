@@ -27,7 +27,7 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
-from helper.filter import AllFilter, ConfigFilter, DefaultFilter, EmptyFilter, Filter, SpecialFilter
+from helper.filter import ConfigFilter, Filter, SpecialFilter, SpecialFilterType
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
 
@@ -677,19 +677,17 @@ def __filter_configs_impl(
     result: dict[str, FinalConfig] = {}
 
     for filter_item in cfg_filter:
-        if isinstance(filter_item, (EmptyFilter, DefaultFilter, AllFilter)):
+        if isinstance(filter_item, SpecialFilter):
             if filter_item.name == ConfigFilter.factory_name():
-                factory_name = filter_item.factory_name()
-                match factory_name:
-                    case "all":
+                match filter_item.type:
+                    case SpecialFilterType.All:
                         result = to_dict(configs)
-                    case "empty":
+                    case SpecialFilterType.Empty:
                         result = {}
-                    case "default":
+                    case SpecialFilterType.Default:
                         result = to_dict(__get_default_configs_impl(configs))
                     case _:
-                        msg = f"Invalid special filter factory name: {factory_name}"
-                        raise RuntimeError(msg)
+                        assert_never(filter_item.type)
         elif isinstance(filter_item, ConfigFilter):
             val = filter_item.value
 
@@ -709,7 +707,7 @@ def __filter_configs_impl(
                 assert_never(val)
 
             cfg_name = cfg.config_name
-            if result.get(cfg_name, None) is not None:  # noqa: SIM910
+            if result.get(cfg_name, None) is not None:
                 msg = f"Config is already present, duplicate is not allowed: {cfg_name}"
                 raise RuntimeError(msg)
 
@@ -727,7 +725,7 @@ def filter_configs(
     cfg_filter: list[ConfigFilter | SpecialFilter] = [
         filter_val
         for filter_val in filters
-        if isinstance(filter_val, (ConfigFilter, EmptyFilter, DefaultFilter))
+        if isinstance(filter_val, (ConfigFilter, SpecialFilterType))
     ]
 
     return __filter_configs_impl(configs, cfg_filter)

@@ -15,7 +15,7 @@ from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
 from helper.classifier import ModelLanguage
-from helper.filter import EmptyFilter, Filter, ValidatorFilter
+from helper.filter import Filter, SpecialFilter, SpecialFilterType, ValidatorFilter
 from helper.log import get_logger
 from helper.manager import NoopManager
 from helper.translation import get_translator
@@ -809,24 +809,44 @@ def __get_default_validators_impl(
     return result
 
 
+def __get_all_validators_impl(
+    params: ValidatorParams,
+) -> list[Validator[Any, Any, Any, Any]]:
+    return [cb(params) for cb in all_validators.values()]
+
+
 def __get_validators_impl(
     params: ValidatorParams,
-    filters: list[ValidatorFilter | EmptyFilter],
+    filters: list[ValidatorFilter | SpecialFilter],
 ) -> list[Validator[Any, Any, Any, Any]]:
     if len(filters) == 0:
         return __get_default_validators_impl(params)
 
+    def to_dict(
+        lst: list[Validator[Any, Any, Any, Any]],
+    ) -> dict[str, Validator[Any, Any, Any, Any]]:
+        return {validator.name: validator for validator in lst}
+
     result: dict[str, Validator[Any, Any, Any, Any]] = {}
 
     for filter_item in filters:
-        if isinstance(filter_item, EmptyFilter):
+        if isinstance(filter_item, SpecialFilter):
             if filter_item.name == ValidatorFilter.factory_name():
-                result = {}
+                match filter_item.type:
+                    case SpecialFilterType.All:
+                        result = to_dict(__get_all_validators_impl(params))
+                    case SpecialFilterType.Empty:
+                        result = {}
+                    case SpecialFilterType.Default:
+                        result = to_dict(__get_default_validators_impl(params))
+                    case _:
+                        assert_never(filter_item.type)
+
         elif isinstance(filter_item, ValidatorFilter):
             validator_cb = all_validators[filter_item.name]
             validator = validator_cb(params)
             validator_name = validator.name
-            if result.get(validator_name, None) is not None:  # noqa: SIM910
+            if result.get(validator_name, None) is not None:
                 msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
                 raise RuntimeError(msg)
 
@@ -844,7 +864,7 @@ def get_validators(
     validator_filter: list[ValidatorFilter | SpecialFilter] = [
         filter_val
         for filter_val in filters
-        if isinstance(filter_val, (ValidatorFilter, EmptyFilter))
+        if isinstance(filter_val, (ValidatorFilter, SpecialFilter))
     ]
 
     return __get_validators_impl(params, validator_filter)

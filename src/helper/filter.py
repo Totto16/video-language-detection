@@ -32,49 +32,21 @@ class FilterFactory(ABC):
     def get_from_string(self: Self, value: str) -> Result[Filter, str]: ...
 
 
-class EmptyFilter(Filter):
-    __name: str
+class SpecialFilterType(Enum):
+    Empty = "empty"
+    All = "all"
+    Default = "default"
 
-    def __init__(self: Self, name: str) -> None:
+
+class SpecialFilter(Filter):
+    __name: str
+    __type: SpecialFilterType
+
+    def __init__(self: Self, name: str, typ: SpecialFilterType) -> None:
         super().__init__()
 
         self.__name = name
-
-    @staticmethod
-    @override
-    def factory_name() -> str:
-        return "empty"
-
-    @property
-    def name(self: Self) -> str:
-        return self.__name
-
-
-class AllFilter(Filter):
-    __name: str
-
-    def __init__(self: Self, name: str) -> None:
-        super().__init__()
-
-        self.__name = name
-
-    @staticmethod
-    @override
-    def factory_name() -> str:
-        return "all"
-
-    @property
-    def name(self: Self) -> str:
-        return self.__name
-
-
-class DefaultFilter(Filter):
-    __name: str
-
-    def __init__(self: Self, name: str) -> None:
-        super().__init__()
-
-        self.__name = name
+        self.__type = typ
 
     @staticmethod
     @override
@@ -85,8 +57,9 @@ class DefaultFilter(Filter):
     def name(self: Self) -> str:
         return self.__name
 
-
-SpecialFilter = EmptyFilter | AllFilter | DefaultFilter
+    @property
+    def type(self: Self) -> SpecialFilterType:
+        return self.__type
 
 
 class ConfigFilter(Filter):
@@ -209,21 +182,35 @@ class ExecuteSteps:
         return ExecuteSteps(check=True, summary=True, validate=True)
 
     @staticmethod
+    def all() -> "ExecuteSteps":
+        return ExecuteSteps(check=True, summary=True, validate=True)
+
+    @staticmethod
     def empty() -> "ExecuteSteps":
         return ExecuteSteps(check=False, summary=False, validate=False)
 
 
 def __execute_steps_from_filter_impl(
-    execute_filter: list[ExecuteFilter | EmptyFilter],
+    execute_filter: list[ExecuteFilter | SpecialFilter],
 ) -> ExecuteSteps:
     if len(execute_filter) == 0:
         return ExecuteSteps.default()
 
     result = ExecuteSteps.empty()
     for filter_val in execute_filter:
-        if isinstance(filter_val, EmptyFilter):
+        if isinstance(filter_val, SpecialFilter):
             if filter_val.name == ExecuteFilter.factory_name():
                 result = ExecuteSteps.empty()
+                match filter_val.type:
+                    case SpecialFilterType.All:
+                        result = ExecuteSteps.all()
+                    case SpecialFilterType.Empty:
+                        result = ExecuteSteps.empty()
+                    case SpecialFilterType.Default:
+                        result = ExecuteSteps.default()
+                    case _:
+                        assert_never(filter_val.type)
+
         elif isinstance(filter_val, ExecuteFilter):
             match filter_val.step:
                 case ExecuteStep.Check:
@@ -252,10 +239,10 @@ def __execute_steps_from_filter_impl(
 def execute_steps_from_filter(
     filters: list[Filter],
 ) -> ExecuteSteps:
-    execute_filter: list[ExecuteFilter | EmptyFilter] = [
+    execute_filter: list[ExecuteFilter | SpecialFilter] = [
         filter_val
         for filter_val in filters
-        if isinstance(filter_val, (ExecuteFilter | EmptyFilter))
+        if isinstance(filter_val, (ExecuteFilter, SpecialFilter))
     ]
 
     return __execute_steps_from_filter_impl(execute_filter)
@@ -312,9 +299,17 @@ class ValidatorFilterFactory(FilterFactory):
         return Err(f"Invalid validator: {value}")
 
 
-special_help_values = ["help", "h", "?"]
-special_empty_values = "-", "~"
-special_values: list[str] = [*special_help_values, *special_empty_values]
+special_help_values: list[str] = ["help", "h", "?"]
+special_empty_values: list[str] = ["-", "~"]
+special_all_values: list[str] = ["@"]
+special_default_values: list[str] = ["!"]
+
+special_values: list[str] = [
+    *special_help_values,
+    *special_empty_values,
+    *special_all_values,
+    *special_default_values,
+]
 
 
 @dataclass
@@ -418,7 +413,13 @@ class FilterManager:
                 )
 
         if value in special_empty_values:
-            return Ok(EmptyFilter(factory.name()))
+            return Ok(SpecialFilter(factory.name(), SpecialFilterType.Empty))
+
+        if value in special_all_values:
+            return Ok(SpecialFilter(factory.name(), SpecialFilterType.All))
+
+        if value in special_default_values:
+            return Ok(SpecialFilter(factory.name(), SpecialFilterType.Default))
 
         filter_val = factory.get_from_string(value)
 
@@ -444,9 +445,27 @@ class FilterManager:
 
         print()
         print("Special values:")
-        print(
-            "\t'~', '-': Only after the <prefix>. Reset to empty, this reset the filter to it's defintion of 'empty', which may mean different things per filter, but as the filter state can be default (no filter provided) and you can add one with <prefix>, there needs to be a method, to set it to empty",
-        )
+        special_values_help_text: list[tuple[str, list[str], str]] = [
+            (
+                "empty",
+                special_empty_values,
+                "but as the filter state can be default (no filter provided) and you can add one with <prefix>, there needs to be a method, to set it to empty",
+            ),
+            (
+                "all",
+                special_all_values,
+                "but it is a shortcut to specifying all available filters",
+            ),
+            (
+                "default",
+                special_default_values,
+                "but this helps to reset the state to the default",
+            ),
+        ]
+        for name, prefixes, but in special_values_help_text:
+            print(
+                f"\t{(", ".join(f"'{p}'" for p in prefixes))}: Only after the <prefix>. Reset to {name}, this reset the filter to it's defintion of '{name}', which may mean different things per filter, {but}",
+            )
         print(
             "\t'help', 'h', '?': As standalone or after prefix. Prints the helper either for all filters, or if it is found after a prefix, for the current one",
         )
