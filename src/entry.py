@@ -23,7 +23,7 @@ from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
-from helper.validator import all_available_validators
+from helper.validator import validator_checks
 from helper.version import PROGRAM_VERSION
 
 _ = get_translator()
@@ -138,7 +138,7 @@ def parse_args() -> AllParsedNameSpaces:
         raise SystemExit(0)
 
     filter_manager = FilterManager(
-        all_available_validators,
+        validator_checks=validator_checks,
         help_options=FilterHelpOptions(cb=help_cb),
     )
 

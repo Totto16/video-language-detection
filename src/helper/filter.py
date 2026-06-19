@@ -29,7 +29,11 @@ class FilterFactory(ABC):
     def help(self: Self) -> str: ...
 
     @abstractmethod
-    def get_from_string(self: Self, value: str) -> Result[Filter, str]: ...
+    def get_from_string(
+        self: Self,
+        value: str,
+        options: Optional[str],
+    ) -> Result[Filter, str]: ...
 
 
 class SpecialFilterType(Enum):
@@ -110,7 +114,14 @@ class ConfigFilterFactory(FilterFactory):
         return "the config to use, accepted values are: the name or the index"
 
     @override
-    def get_from_string(self: Self, value: str) -> Result[ConfigFilter, str]:
+    def get_from_string(
+        self: Self,
+        value: str,
+        options: Optional[str],
+    ) -> Result[ConfigFilter, str]:
+        if options is not None:
+            return Err(f"No options supported, but got: {options}")
+
         return Ok(ConfigFilter.from_string(value))
 
 
@@ -167,7 +178,14 @@ class ExecuteFilterFactory(FilterFactory):
         return f"the steps to execute, accepted values are: {values}"
 
     @override
-    def get_from_string(self: Self, value: str) -> Result[ExecuteFilter, str]:
+    def get_from_string(
+        self: Self,
+        value: str,
+        options: Optional[str],
+    ) -> Result[ExecuteFilter, str]:
+        if options is not None:
+            return Err(f"No options supported, but got: {options}")
+
         return ExecuteFilter.from_string(value)
 
 
@@ -250,15 +268,21 @@ def execute_steps_from_filter(
 
 class ValidatorFilter(Filter):
     __name: str
+    __options: Optional[str]
 
-    def __init__(self: Self, name: str) -> None:
+    def __init__(self: Self, name: str, options: Optional[str]) -> None:
         super().__init__()
 
         self.__name = name
+        self.__options = options
 
     @property
     def name(self: Self) -> str:
         return self.__name
+
+    @property
+    def options(self: Self) -> Optional[str]:
+        return self.__options
 
     @override
     @staticmethod
@@ -266,13 +290,19 @@ class ValidatorFilter(Filter):
         return ValidatorFilterFactory.name()
 
 
-class ValidatorFilterFactory(FilterFactory):
-    __available_validators: set[str]
+@dataclass
+class ValidatorChecks:
+    check: Callable[[str, Optional[str]], Result[None, str]]
+    names: set[str]
 
-    def __init__(self: Self, available_validators: set[str]) -> None:
+
+class ValidatorFilterFactory(FilterFactory):
+    __validator_checks: ValidatorChecks
+
+    def __init__(self: Self, validator_checks: ValidatorChecks) -> None:
         super().__init__()
 
-        self.__available_validators = available_validators
+        self.__validator_checks = validator_checks
 
     @override
     @staticmethod
@@ -287,16 +317,21 @@ class ValidatorFilterFactory(FilterFactory):
     @override
     def help(self: Self) -> str:
         values = ", ".join(
-            f"'{validator}'" for validator in self.__available_validators
+            f"'{validator}'" for validator in self.__validator_checks.names
         )
         return f"the validators to use, accepted values are: {values}"
 
     @override
-    def get_from_string(self: Self, value: str) -> Result[ValidatorFilter, str]:
-        if value in self.__available_validators:
-            return Ok(ValidatorFilter(value))
+    def get_from_string(
+        self: Self,
+        value: str,
+        options: Optional[str],
+    ) -> Result[ValidatorFilter, str]:
+        result = self.__validator_checks.check(value, options)
+        if result.ok():
+            return Ok(ValidatorFilter(value, options))
 
-        return Err(f"Invalid validator: {value}")
+        return Err(f"Invalid validator: {result.as_err()}")
 
 
 special_help_values: list[str] = ["help", "h", "?"]
@@ -331,13 +366,13 @@ class FilterManager:
 
     def __init__(
         self: Self,
-        available_validators: set[str],
+        validator_checks: ValidatorChecks,
         help_options: FilterHelpOptions,
     ) -> None:
         __all_available_filter_factories: list[FilterFactory] = [
             ConfigFilterFactory(),
             ExecuteFilterFactory(),
-            ValidatorFilterFactory(available_validators),
+            ValidatorFilterFactory(validator_checks),
         ]
 
         all_available_filter_factories: dict[str, FilterFactory] = (
@@ -385,16 +420,23 @@ class FilterManager:
             else:
                 return Err("Got help arg, but help is not supported")
 
-        temp = arg.split(":", 1)
+        temp = arg.split(":", 2)
         if len(temp) == 1:
             msg = f"Invalid config string, expected <prefix>:<value> but got: {arg}"
             return Err(msg)
 
-        if len(temp) != 2:
+        prefix: str
+        value: str
+        options: Optional[str]
+
+        if len(temp) == 2:
+            prefix, value = temp
+            options = None
+        elif len(temp) == 3:
+            prefix, value, options = temp
+        else:
             msg = f"Implementation error, only two values expected, but got {len(temp)}"
             return Err(msg)
-
-        prefix, value = temp
 
         factory = self.__factories.get(prefix, None)
 
@@ -421,10 +463,10 @@ class FilterManager:
         if value in special_default_values:
             return Ok(SpecialFilter(factory.name(), SpecialFilterType.Default))
 
-        filter_val = factory.get_from_string(value)
+        filter_val = factory.get_from_string(value, options)
 
         if filter_val.err():
-            msg = f"Invalid filter value for filter '{factory.name}': {filter_val.as_err()}"
+            msg = f"Invalid filter value for filter '{factory.name()}': {filter_val.as_err()}"
             return Err(msg)
 
         return Ok(filter_val.as_ok())

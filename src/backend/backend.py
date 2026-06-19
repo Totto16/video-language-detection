@@ -103,8 +103,8 @@ from helper.validator import (
     Validator,
     ValidatorParams,
     ValidatorReporter,
-    all_available_validators,
     get_validators,
+    validator_checks,
 )
 from main import AllContent
 
@@ -1028,7 +1028,7 @@ class StartOptions:
 def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
 
     filter_manager = FilterManager(
-        all_available_validators,
+        validator_checks=validator_checks,
         help_options=FilterHelpOptions(cb=None),
     )
 

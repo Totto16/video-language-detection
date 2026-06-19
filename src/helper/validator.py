@@ -15,9 +15,16 @@ from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
 from helper.classifier import ModelLanguage
-from helper.filter import Filter, SpecialFilter, SpecialFilterType, ValidatorFilter
+from helper.filter import (
+    Filter,
+    SpecialFilter,
+    SpecialFilterType,
+    ValidatorChecks,
+    ValidatorFilter,
+)
 from helper.log import get_logger
 from helper.manager import NoopManager
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -415,7 +422,16 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     @abstractmethod
-    def from_params(params: ValidatorParams) -> "Validator[ED, SD, S2D, CD]": ...
+    def validate_options(
+        options: Optional[str],
+    ) -> Result[Any, str]: ...
+
+    @staticmethod
+    @abstractmethod
+    def from_params(
+        params: ValidatorParams,
+        options: Optional[str],
+    ) -> Result["Validator[ED, SD, S2D, CD]", str]: ...
 
     @staticmethod
     @abstractmethod
@@ -494,8 +510,25 @@ class LanguageValidator(Validator[None, None, None, None]):
 
     @staticmethod
     @override
-    def from_params(params: ValidatorParams) -> "LanguageValidator":
-        return LanguageValidator(params.reporter, params.model_language)
+    def validate_options(
+        options: Optional[str],
+    ) -> Result[None, str]:
+        if options is not None:
+            return Err(f"No options supported, but got: {options}")
+
+        return Ok(None)
+
+    @staticmethod
+    @override
+    def from_params(
+        params: ValidatorParams,
+        options: Optional[str],
+    ) -> Result["LanguageValidator", str]:
+        result = LanguageValidator.validate_options(options)
+        if result.err():
+            return Err(result.as_err())
+
+        return Ok(LanguageValidator(params.reporter, params.model_language))
 
     @staticmethod
     @override
@@ -659,8 +692,25 @@ class LanguageConsistencyValidator(
 
     @staticmethod
     @override
-    def from_params(params: ValidatorParams) -> "LanguageConsistencyValidator":
-        return LanguageConsistencyValidator(params.reporter)
+    def validate_options(
+        options: Optional[str],
+    ) -> Result[None, str]:
+        if options is not None:
+            return Err(f"No options supported, but got: {options}")
+
+        return Ok(None)
+
+    @staticmethod
+    @override
+    def from_params(
+        params: ValidatorParams,
+        options: Optional[str],
+    ) -> Result["LanguageConsistencyValidator", str]:
+        result = LanguageConsistencyValidator.validate_options(options)
+        if result.err():
+            return Err(result.as_err())
+
+        return Ok(LanguageConsistencyValidator(params.reporter))
 
     @staticmethod
     @override
@@ -668,13 +718,23 @@ class LanguageConsistencyValidator(
         return True
 
 
+@dataclass
+class TagOptions:
+    strict: bool
+
+
 # tags validator, checks, that every file has tags
 class TagsValidator(Validator[None, None, None, None]):
+    __options: TagOptions
+
     def __init__(
         self: Self,
         reporter: ValidatorReporter,
+        options: TagOptions,
     ) -> None:
         super().__init__(reporter, "tags")
+
+        self.__options = options
 
     @override
     def validate_episode(
@@ -686,6 +746,13 @@ class TagsValidator(Validator[None, None, None, None]):
         handle_result = get_tagger_for_file(episode.scanned_file.path)
 
         if handle_result.err():
+            if self.__options.strict:
+                self.emit_error(
+                    episode.scanned_file.path,
+                    _("File not tagged: can't get tagger handle: {err}").format(
+                        err=handle_result.as_err(),
+                    ),
+                )
             return
 
         handle = handle_result.as_ok()
@@ -746,8 +813,34 @@ class TagsValidator(Validator[None, None, None, None]):
 
     @staticmethod
     @override
-    def from_params(params: ValidatorParams) -> "TagsValidator":
-        return TagsValidator(params.reporter)
+    def validate_options(
+        options: Optional[str],
+    ) -> Result[TagOptions, str]:
+        if options is None:
+            return Ok(TagOptions(strict=False))
+
+        result = TagOptions(strict=False)
+        for c in options:
+            if c == "s":
+                result.strict = True
+            else:
+                return Err(f"Invalid options flag: {c}")
+
+        return Ok(result)
+
+    @staticmethod
+    @override
+    def from_params(
+        params: ValidatorParams,
+        options: Optional[str],
+    ) -> Result["TagsValidator", str]:
+        result = TagsValidator.validate_options(options)
+        if result.err():
+            return Err(result.as_err())
+
+        tag_options = result.as_ok()
+
+        return Ok(TagsValidator(params.reporter, tag_options))
 
     @staticmethod
     @override
@@ -762,12 +855,27 @@ class TagsValidator(Validator[None, None, None, None]):
 # TODO: also display missing episodes / episodes with the "wrong" language etc
 
 
-def get_all_validators() -> (
-    dict[str, Callable[[ValidatorParams], Validator[Any, Any, Any, Any]]]
-):
+ValidatorGetCb = Callable[
+    [ValidatorParams, Optional[str]],
+    Result[Validator[Any, Any, Any, Any], str],
+]
+
+ValidatorValidateOptionsCb = Callable[
+    [Optional[str]],
+    Result[Any, str],
+]
+
+
+@dataclass
+class ValidatorEntry:
+    get: ValidatorGetCb
+    validate_options: ValidatorValidateOptionsCb
+
+
+def __get_all_validators_available_impl() -> dict[str, ValidatorEntry]:
     validators: dict[
         str,
-        Callable[[ValidatorParams], Validator[Any, Any, Any, Any]],
+        ValidatorEntry,
     ] = {}
 
     validator_classes: list[type[Validator[Any, Any, Any, Any]]] = [
@@ -783,26 +891,55 @@ def get_all_validators() -> (
                 msg = f"Duplicate validator name: {name}"
                 raise RuntimeError(msg)
 
-            validators[name] = validator_class.from_params
+            validators[name] = ValidatorEntry(
+                validator_class.from_params,
+                validator_class.validate_options,
+            )
 
     return validators
 
 
-all_validators: dict[
-    str,
-    Callable[[ValidatorParams], Validator[Any, Any, Any, Any]],
-] = get_all_validators()
+__all_validators_available_impl: dict[str, ValidatorEntry] = (
+    __get_all_validators_available_impl()
+)
 
 
-all_available_validators: set[str] = set(all_validators.keys())
+def __validator_check_impl(name: str, options: Optional[str]) -> Result[None, str]:
+    if name not in __all_validators_available_impl:
+        return Err(f"Not a valid validator name: {name}")
+
+    entry = __all_validators_available_impl[name]
+
+    options_res = entry.validate_options(options)
+
+    if options_res.err():
+        return Err(f"Invalid options for validator {name}: {options_res.as_err()}")
+
+    return Ok(None)
+
+
+__all_validator_names_available_impl: set[str] = set(
+    __all_validators_available_impl.keys(),
+)
+
+validator_checks: ValidatorChecks = ValidatorChecks(
+    check=__validator_check_impl,
+    names=__all_validator_names_available_impl,
+)
 
 
 def __get_default_validators_impl(
     params: ValidatorParams,
 ) -> list[Validator[Any, Any, Any, Any]]:
     result: list[Validator[Any, Any, Any, Any]] = []
-    for cb in all_validators.values():
-        validator = cb(params)
+    for entry in __all_validators_available_impl.values():
+        validator_res = entry.get(params, None)
+        if validator_res.err():
+            msg = f"Implementation error: no options should always return Ok, but got {validator_res.as_err()}"
+            raise RuntimeError(msg)
+
+        validator = validator_res.as_ok()
+
         if validator.is_default():
             result.append(validator)
 
@@ -812,7 +949,10 @@ def __get_default_validators_impl(
 def __get_all_validators_impl(
     params: ValidatorParams,
 ) -> list[Validator[Any, Any, Any, Any]]:
-    return [cb(params) for cb in all_validators.values()]
+    return [
+        entry.get(params, None).as_ok()
+        for entry in __all_validators_available_impl.values()
+    ]
 
 
 def __get_validators_impl(
@@ -843,9 +983,17 @@ def __get_validators_impl(
                         assert_never(filter_item.type)
 
         elif isinstance(filter_item, ValidatorFilter):
-            validator_cb = all_validators[filter_item.name]
-            validator = validator_cb(params)
+            validator_entry = __all_validators_available_impl[filter_item.name]
+
+            validator_res = validator_entry.get(params, filter_item.options)
+            if validator_res.err():
+                msg = f"Validator get error: {validator_res.as_err()}"
+                raise RuntimeError(msg)
+
+            validator = validator_res.as_ok()
+
             validator_name = validator.name
+
             if result.get(validator_name, None) is not None:
                 msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
                 raise RuntimeError(msg)
