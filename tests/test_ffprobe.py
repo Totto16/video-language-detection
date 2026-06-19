@@ -11,7 +11,7 @@ from fixtures import (
     mark_as_used,
 )
 from pytest_subtests import SubTests
-from test_helper import OkResult
+from test_helper import OkResult, re_exact_string
 
 from helper.ffprobe import ffprobe, parse_float_safely
 
@@ -119,7 +119,7 @@ def test_ffprobe_errors() -> None:
 
     with pytest.raises(
         OSError,
-        match=r"^ffprobe not found\.$",
+        match=re_exact_string("ffprobe not found."),
     ):
         ffprobe(Path("/dev/null"))
 

@@ -1,10 +1,13 @@
-import re
 from collections.abc import Callable, Generator
+from dataclasses import dataclass
+from enum import Enum, IntEnum, StrEnum
 from functools import partial, update_wrapper, wraps
-from typing import Any, Optional, Self
+from typing import Any, Optional, Self, TypedDict
 
+import pydantic
 import pytest
 from pytest_subtests import SubTests
+from test_helper import re_exact_string
 
 from helper.decorator import decorate_class
 
@@ -26,7 +29,7 @@ def test_decorator_allow_default_works_as_expected() -> None:
 
     with pytest.raises(
         TypeError,
-        match="Invalid default value for field 'value': default",
+        match=re_exact_string("Invalid default value for field 'value': default"),
     ):
 
         declare_test()
@@ -95,14 +98,16 @@ def test_decorator_with_slots_works_as_expected() -> None:
 
     with pytest.raises(
         AttributeError,
-        match="'Test1' object has no attribute 'new_value' and no __dict__ for setting new attributes",
+        match=re_exact_string(
+            "'Test1' object has no attribute 'new_value' and no __dict__ for setting new attributes",
+        ),
     ):
         add_new_value()
 
     assert not hasattr(test2, "__dict__")
 
 
-def test_decorator_edge_cases(
+def test_decorator_edge_cases(  # noqa: PLR0915
     subtests: SubTests,
 ) -> None:
 
@@ -124,7 +129,7 @@ def test_decorator_edge_cases(
 
         with pytest.raises(
             TypeError,
-            match="Test1 already specifies __slots_",
+            match=re_exact_string("Test1 already specifies __slots__"),
         ):
             declare_test()
 
@@ -168,7 +173,7 @@ def test_decorator_edge_cases(
 
         with pytest.raises(
             TypeError,
-            match="'function' object is not iterable",
+            match=re_exact_string("'function' object is not iterable"),
         ):
             declare_test()
 
@@ -200,7 +205,7 @@ def test_decorator_edge_cases(
 
         with pytest.raises(
             TypeError,
-            match="__slots__ items must be strings, not 'int'",
+            match=re_exact_string("__slots__ items must be strings, not 'int'"),
         ):
             declare_test()
 
@@ -237,7 +242,7 @@ def test_decorator_edge_cases(
 
         with pytest.raises(
             TypeError,
-            match="__slots__ items must be strings, not 'int'",
+            match=re_exact_string("__slots__ items must be strings, not 'int'"),
         ):
             declare_test()
 
@@ -269,7 +274,7 @@ def test_decorator_edge_cases(
 
         with pytest.raises(
             TypeError,
-            match="__slots__ items must be strings, not 'int'",
+            match=re_exact_string("__slots__ items must be strings, not 'int'"),
         ):
             declare_test()
 
@@ -668,7 +673,7 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
 
         with pytest.raises(
             TypeError,
-            match=re.escape(
+            match=re_exact_string(
                 "super(type, obj): obj (instance of A14) is not an instance or subtype of type (A14).",
             ),
         ):
@@ -707,3 +712,244 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
                 return super().foo(value)
 
         assert A15().foo == "bar"
+
+
+def test_decorator_invalid_parents(  # noqa: PLR0915
+    subtests: SubTests,
+) -> None:
+    with subtests.test("can't annotate Enum"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestEnum(Enum):
+                Value1 = "value1"
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <enum 'TestEnum'> <class 'enum.EnumType'>: An Enum can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate StrEnum"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestEnum(StrEnum):
+                Value1 = "value1"
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <enum 'TestEnum'> <class 'enum.EnumType'>: An Enum can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate IntEnum"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestEnum(IntEnum):
+                Value1 = 1
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <enum 'TestEnum'> <class 'enum.EnumType'>: An Enum can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't have Enum as parent"):
+
+        def declare_test() -> None:
+            class TestEnum(Enum):
+                value2 = "value2"
+
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test1(TestEnum):  # type: ignore[misc]
+                pass
+
+            test1 = Test1("test1")
+
+            assert test1.value == "test1"
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string("<enum 'Test1'> cannot extend <enum 'TestEnum'>"),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate TypedDict"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestTypedDict(TypedDict):
+                value: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.TestTypedDict'> <class 'typing._TypedDictMeta'>: A TypedDict can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't have TypedDict as parent"):
+
+        def declare_test() -> None:
+            class TestTypedDict(TypedDict):
+                value2: str
+
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test2(TestTypedDict):
+                value: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.Test2'> <class 'typing._TypedDictMeta'>: A TypedDict can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate pydantic.BaseModel"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestPydanticBaseModel(pydantic.BaseModel):
+                model_config = pydantic.ConfigDict(
+                    extra="forbid",
+                    strict=True,
+                )
+                idx: int
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.TestPydanticBaseModel'> <class 'pydantic._internal._model_construction.ModelMetaclass'>: A Pydantic BaseModel can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't have pydantic.BaseModel as parent"):
+
+        def declare_test() -> None:
+            class TestPydanticBaseModel(pydantic.BaseModel):
+                model_config = pydantic.ConfigDict(
+                    extra="forbid",
+                    strict=True,
+                )
+                idx: int
+
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test2(TestPydanticBaseModel):
+                value: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.Test2'> <class 'pydantic._internal._model_construction.ModelMetaclass'>: A Pydantic BaseModel can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate Exception"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestException(Exception):  # noqa: N818
+                msg2: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.TestException'> <class 'type'>: An Exception can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't have Exception as parent"):
+
+        def declare_test() -> None:
+            class TestException(Exception):  # noqa: N818
+                msg2: str
+
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test2(TestException):
+                value: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.Test2'> <class 'type'>: An Exception can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate dataclass"):
+
+        def declare_test() -> None:
+            @decorate_class(slots=True, allow_defaults=False)
+            @dataclass()
+            class TestDataclass:
+                msg2: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.TestDataclass'> <class 'type'>: A dataclass can't be annotated",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate dataclass: reversed annotations"):
+
+        def declare_test() -> None:
+            @dataclass(slots=True)
+            @decorate_class(slots=True, allow_defaults=False)
+            class TestDataclass:
+                msg2: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "TestDataclass already specifies __slots__",
+            ),
+        ):
+            declare_test()
+
+    with subtests.test("can't annotate dataclass: reversed annotations, no slots"):
+
+        # NOTE: if dataclass runs after the annotation, without slots, we never error out, it would be rather complicated, to implement that
+        @dataclass()
+        @decorate_class(slots=True, allow_defaults=False)
+        class TestDataclass2:
+            msg2: str
+
+        test2: TestDataclass2 = TestDataclass2("test")
+
+        assert test2.msg2 == "test"
+
+        assert not hasattr(test2, "__dict__")
+
+    with subtests.test("can't have dataclass as parent"):
+
+        def declare_test() -> None:
+            @dataclass()
+            class TestDataclass:
+                msg2: str
+
+            @decorate_class(slots=True, allow_defaults=False)
+            class Test2(TestDataclass):
+                value: str
+
+        with pytest.raises(
+            TypeError,
+            match=re_exact_string(
+                "Not allowed for class <class 'test_decorator.test_decorator_invalid_parents.<locals>.declare_test.<locals>.Test2'> <class 'type'>: A dataclass can't be annotated",
+            ),
+        ):
+            declare_test()

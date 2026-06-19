@@ -1,3 +1,4 @@
+import re
 import tempfile
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -45,6 +46,7 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
 
     return DuplicatesCtx()
 
+
 @decorate_class(slots=True)
 class OkResult:
 
@@ -65,3 +67,8 @@ class OkResult:
 
     def __hash__(self: Self) -> int:
         return hash(id(self))
+
+
+def re_exact_string(value: str) -> re.Pattern[str]:
+    base = re.escape(value)
+    return re.compile(f"^{base}$")
