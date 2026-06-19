@@ -327,6 +327,41 @@ def test_decorator_inheritance(
 
         assert not hasattr(test4, "__dict__")
 
+    with subtests.test("parent class test: case 3"):
+
+        @decorate_class(slots=False, allow_defaults=False)
+        class Test5A:
+            value: str
+
+            __slots__ = ("value",)
+
+            def __init__(self: Self, value: str) -> None:
+                self.value = value
+
+            def some_call(self: Self) -> int:
+                return 1
+
+        @decorate_class(slots=True, allow_defaults=False)
+        class Test5B(Test5A):
+            value2: str
+
+            def __init__(self: Self, value: str, value2: str) -> None:
+                super().__init__(value)
+
+                self.value2 = value2
+
+            def some_func_using_super(self: Self) -> int:
+                return super().some_call() + 1
+
+        test5b = Test5B("test5a", "test5b")
+
+        assert test5b.value == "test5a"
+        assert test5b.value2 == "test5b"
+
+        assert not hasattr(test2, "__dict__")
+
+        assert test2.some_func_using_super() == 2
+
 
 # tests from https://github.com/python/cpython/pull/124455/changes#diff-44ce2dc1c4922b2f5cf7631d8f86cc569a4c25eb003aaecdc2bc22eb9163d5f5R1224
 def test_decorator_slots_with_super_calls(  # noqa: PLR0915
