@@ -115,14 +115,13 @@ def __process_class_impl[A](
 
 
 def decorate_class[A](
-    cls: Optional[type[A]] = None,
     *,
     slots: bool = True,
     weakref_slot: bool = True,
     allow_defaults: bool = False,
 ) -> Callable[[type[A]], type[A]]:
 
-    def wrap[B](cls: Optional[type[B]]) -> type[B]:
+    def wrap(cls: Optional[type[A]]) -> type[A]:
         return __process_class_impl(
             cls,
             slots=slots,
@@ -130,11 +129,4 @@ def decorate_class[A](
             allow_defaults=allow_defaults,
         )
 
-    # See if we're being called as @<name> or @<name>().
-    if cls is None:
-        # We're called with parens.
-        return wrap
-
-    # We're called as @<name> without parens.
-    msg = "The 'decorate_class' decorator needs to be called"
-    raise TypeError(msg)
+    return wrap
