@@ -21,6 +21,7 @@ from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
 from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger
+from helper.slots import decorate_class
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
 from helper.validator import validator_checks
@@ -40,12 +41,13 @@ type SubCommand = Literal[
 ]
 
 
-# TODO: type and dataclass
+@decorate_class(slots=False, allow_defaults=False)
 class ParsedArgNamespace(argparse.Namespace):
     level: LogLevel
     subcommand: SubCommand
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class RunCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["run"]
     config: Path
@@ -53,11 +55,13 @@ class RunCommandParsedArgNamespace(ParsedArgNamespace):
     filter: list[Filter]
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class SchemaCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["schema"]
     schema_folder: Path
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["gui"]
     config: Path
@@ -69,12 +73,14 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
 TagCommand = Literal["read", "write"]
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class TaggerCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["tagger"]
 
     tag_action: TagCommand
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["read"]
     file: Path
@@ -83,6 +89,7 @@ class TaggerReadCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
 type ShortLanguageStrWrapper = Any
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["write"]
     file: Path
@@ -100,18 +107,21 @@ AllTaggerCommandParsedArgNamespace = (
 FfmpegCommand = Literal["scan", "fix-chapter"]
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class FfmpegCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["ffmpeg"]
 
     ffmpeg_command: FfmpegCommand
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class FfmpegScanCommandParsedArgNamespace(FfmpegCommandParsedArgNamespace):
     ffmpeg_command: Literal["scan"]
 
     files: list[str]
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class FfmpegFixChapterCommandParsedArgNamespace(FfmpegCommandParsedArgNamespace):
     ffmpeg_command: Literal["fix-chapter"]
 
@@ -123,6 +133,7 @@ AllFfmpegCommandParsedArgNamespace = (
 )
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["api"]
     config: Path
@@ -131,6 +142,7 @@ class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     port: int
 
 
+@decorate_class(slots=False, allow_defaults=False)
 class ConfigCheckCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["config_check"]
     config: Path
