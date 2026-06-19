@@ -52,6 +52,7 @@ from content.tagger.video_tagger import (
     uuid_from_str,
     uuid_to_str,
 )
+from helper.decorator import decorate_class
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
@@ -60,6 +61,7 @@ _ = get_translator()
 
 
 @final
+@decorate_class(slots=True)
 class ISOMAtomName:
     __value: bytes
 
@@ -118,6 +120,7 @@ class ISOMAtomName:
 
 
 @final
+@decorate_class(slots=True)
 class PackableISOMAtomName(Packable[ISOMAtomName, bytes]):
     @property
     @override
@@ -172,6 +175,7 @@ MDIR_ATOM_NAME: ISOMAtomName = ISOMAtomName(value=b"mdir")
 
 
 @final
+@decorate_class(slots=True)
 class MP4BoxSpan:
     __total: SimpleSpan
 
@@ -256,11 +260,11 @@ class MP4BoxSpan:
     def __repr__(self: Self) -> str:
         return str(self)
 
-
+@decorate_class(slots=True)
 class FinalMP4Box:
     __final__mp4_box__ = True
 
-
+@decorate_class(slots=True)
 class NonFinalMP4Box:
     def __init_subclass__(cls, *args: Any, **kwargs: Any) -> None:
         super().__init_subclass__(*args, **kwargs)
@@ -280,7 +284,7 @@ class NonFinalMP4Box:
 
 # ruff: disable[ERA001]
 
-
+@decorate_class(slots=True)
 class MP4Box(NonFinalMP4Box):
     type: ISOMAtomName
     span: MP4BoxSpan
@@ -471,7 +475,7 @@ class MP4Box(NonFinalMP4Box):
     def __repr__(self: Self) -> str:
         return str(self)
 
-
+@decorate_class(slots=True)
 class UserExtensionBox(MP4Box):
     usertype: UUID
 
@@ -501,13 +505,14 @@ class UserExtensionBox(MP4Box):
 UUIDExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae7")
 JSONExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae8")
 
-
+@decorate_class(slots=True)
 class UserExtensions:
     UUIDExtension_UUID = UUIDExtension_UUID
     JSONExtension_UUID = JSONExtension_UUID
 
 
 @final
+@decorate_class(slots=True)
 class UUIDExtensionBox(UserExtensionBox, FinalMP4Box):
     uuid: UUID
 
@@ -561,6 +566,7 @@ class UUIDExtensionBox(UserExtensionBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class JsonExtensionBox(UserExtensionBox, FinalMP4Box):
     data: SerializableDict
 
@@ -621,7 +627,7 @@ def user_extension_box_determine_correct_extension(
         case _:
             return box
 
-
+@decorate_class(slots=True)
 class MP4FullBox(MP4Box):
     version: int
     flags: bytes
@@ -718,6 +724,7 @@ class MP4FullBox(MP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class FileTypeBox(MP4Box, FinalMP4Box):
     major_brand: ISOMAtomName
     minor_version: int
@@ -801,6 +808,7 @@ class FileTypeBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class FreeSpaceBox(MP4Box, FinalMP4Box):
     data: bytes
 
@@ -859,6 +867,7 @@ class FreeSpaceBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class MediaHeaderBox(MP4FullBox, FinalMP4Box):
     # offset from the own header start, not the start of the whole chunk!
     language_offset: int
@@ -1042,6 +1051,7 @@ class MediaHeaderBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class MediaBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -1079,6 +1089,7 @@ class MediaBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class MovieBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -1116,6 +1127,7 @@ class MovieBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class HandlerBox(MP4FullBox, FinalMP4Box):
     handler_type: ISOMAtomName
     name: str
@@ -1261,6 +1273,7 @@ class HandlerBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class TrackBox(MP4Box, FinalMP4Box):
     hdlr: HandlerBox
 
@@ -1327,6 +1340,7 @@ class TrackBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class UserDataBox(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -1364,6 +1378,7 @@ class UserDataBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class PrimaryItemBox(MP4FullBox, FinalMP4Box):
     item_id: int
 
@@ -1527,12 +1542,13 @@ META_OPTIONAL_BOXES: list[ISOMAtomName] = [
     ISOMAtomName(b"idat"),  # ItemDataBox
 ]
 
-
+@decorate_class(slots=True)
 class MetaOptionalBoxes:
     PITM = PITM_ATOM_NAME
 
 
 @final
+@decorate_class(slots=True)
 class MetaBox(MP4FullBox, FinalMP4Box):
     handler_box: HandlerBox
     optional_boxes: OptionalMetaBoxes
@@ -1676,6 +1692,7 @@ class MetaBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemList(MP4Box, FinalMP4Box):
     def __init__(self: Self, parent: MP4Box) -> None:
         super().__init__(parent.type, parent.span, is_container=True)
@@ -1746,6 +1763,7 @@ class AppleItunesItemDataType(Enum):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
     type_indicator: int
     locale_indicator: int
@@ -2097,6 +2115,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
     value: str
 
@@ -2197,6 +2216,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
     value: str
 
@@ -2297,6 +2317,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemBox(MP4Box, FinalMP4Box):
     data: AppleItunesItemDataBox
 
@@ -2378,6 +2399,7 @@ class AppleItunesItemBox(MP4Box, FinalMP4Box):
 
 
 @final
+@decorate_class(slots=True)
 class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
     mean: AppleItunesItemMeanBox
     name: AppleItunesItemNameBox
@@ -2532,7 +2554,7 @@ class ApplItunesTags:
             data=ApplItunesTagsData(data_type, value),
         )
 
-
+@decorate_class(slots=True)
 class AppleItunesMetaBoxBuilder:
     __tags: dict[str, ApplItunesTags]
 
@@ -2666,7 +2688,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"sosn"): None,
 }
 
-
+@decorate_class(slots=True)
 class SupportedBoxes:
     MDHD = MDHD_ATOM_NAME
     MDIA = MDIA_ATOM_NAME
@@ -2852,7 +2874,7 @@ class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]
 
-
+@decorate_class(slots=True)
 class MP4MetadataHandler:
     __uuid_box: Optional[UUIDExtensionBox]
     __meta_values: MetaValues
@@ -3396,7 +3418,7 @@ class MP4MetadataHandler:
             list(reversed(our_boxes_reversed)),
         )
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextMP4(VideoTaggerContextRW):
     __writer: BinaryIO
     __streams: int
@@ -3539,7 +3561,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
         return result
 
-
+@decorate_class(slots=True)
 class VideoTaggerMP4(VideoTagger):
     __streams: int
     __types: list[ISOMAtomName]
@@ -3599,6 +3621,7 @@ class VideoTaggerMP4(VideoTagger):
         streams = self.__streams
         types = self.__types
 
+        @decorate_class(slots=True)
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
             __writer: Optional[BinaryIO]
             __backup: Optional[bytes]

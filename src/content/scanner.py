@@ -15,8 +15,10 @@ from content.metadata.metadata import InternalMetadataType
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
 from helper.apischema import Deprecated, OneOf
+from helper.decorator import decorate_class
 
 
+@decorate_class(slots=True)
 class StaticScanner(Scanner):
     __value: bool
 
@@ -48,7 +50,7 @@ class StaticScanner(Scanner):
             metadata,
         )
 
-
+@decorate_class(slots=True)
 class FullScanner(StaticScanner):
     def __init__(
         self: Self,
@@ -57,7 +59,7 @@ class FullScanner(StaticScanner):
     ) -> None:
         super().__init__(language_scanner, metadata_scanner, value=True)
 
-
+@decorate_class(slots=True)
 class NoScanner(StaticScanner):
     def __init__(
         self: Self,
@@ -131,7 +133,7 @@ class ConfigScannerDictTotal(TypedDict, total=True):
     types: ScannerTypes
     # TODO: print progress option
 
-
+@decorate_class(slots=True)
 class ConfigScanner(Scanner):
     __start_position: AdvancedScannerPositionTotal
     __scan_amount: AdvancedScannerPositionTotal

@@ -4,11 +4,13 @@ from pathlib import Path
 from types import TracebackType
 from typing import Literal, Optional, Self, override
 
+from helper.decorator import decorate_class
 from helper.result import Err, Ok
 
 
 def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
 
+    @decorate_class(slots=True)
     class DuplicatesCtx(AbstractContextManager[list[Path]]):
         __paths: list[Path]
 
@@ -43,7 +45,7 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
 
     return DuplicatesCtx()
 
-
+@decorate_class(slots=True)
 class OkResult:
 
     def __eq__(self, value: object) -> bool:

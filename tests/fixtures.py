@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 import pytest
 import requests
 
+from helper.decorator import decorate_class
 from helper.manager import NoopManager
 
 
@@ -16,7 +17,7 @@ class Finalizer[A]:
     data: A
     drop: Callable[[A], None]
 
-
+@decorate_class(slots=True)
 class FinalizerFixture[A]:
     __data: Finalizer[A]
 
@@ -131,7 +132,7 @@ def video_file_dict() -> dict[str, VideoFile]:
 def at_video_dict(dct: dict[str, VideoFile], name: str) -> tuple[str, VideoFile]:
     return (name, dct[name])
 
-
+@decorate_class(slots=True)
 class CachedFileManager:
     __cache_folder: Path
 

@@ -15,6 +15,7 @@ from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
 from helper.classifier import ModelLanguage
+from helper.decorator import decorate_class
 from helper.filter import (
     Filter,
     SpecialFilter,
@@ -39,7 +40,7 @@ type ReporterWhere = tuple[
     SeasonContent,
 ] | SeriesContent | CollectionContent | Path
 
-
+@decorate_class(slots=True)
 class ValidatorReporter(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -81,7 +82,7 @@ class ValidatorReporter(ABC):
         message: str,
     ) -> None: ...
 
-
+@decorate_class(slots=True)
 class TuiValidatorReporter(ValidatorReporter):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -108,7 +109,7 @@ class ValidatorParams:
     reporter: ValidatorReporter
     model_language: ModelLanguage
 
-
+@decorate_class(slots=True)
 class Validator[ED, SD, S2D, CD](ABC):
     __reporter: ValidatorReporter
     __name: str
@@ -237,6 +238,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         )
 
     # helper for multipel validators to be typed correctly
+    @decorate_class(slots=True)
     class __AnyClass:
         pass
 
@@ -493,6 +495,7 @@ class Validator[ED, SD, S2D, CD](ABC):
 
 
 # language validator, check if the language is a correct one
+@decorate_class(slots=True)
 class LanguageValidator(Validator[None, None, None, None]):
     __model_language: ModelLanguage
 
@@ -593,6 +596,7 @@ class LanguageValidator(Validator[None, None, None, None]):
 
 
 # language consistency validator, check if the language is consistent across episodes and seasons
+@decorate_class(slots=True)
 class LanguageConsistencyValidator(
     Validator[
         tuple[EpisodeContent, Optional[Language]],
@@ -782,6 +786,7 @@ class TagOptions:
 
 
 # tags validator, checks, that every file has tags
+@decorate_class(slots=True)
 class TagsValidator(Validator[None, None, None, None]):
     __options: TagOptions
 

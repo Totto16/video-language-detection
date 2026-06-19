@@ -7,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, cast
 
+from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 from helper.utils import parse_int_safely
 
@@ -32,6 +33,7 @@ class StreamType(Enum):
 
 # some things here were copied and modified from the original ffprobe-python repo:
 # https://github.com/gbstack/ffprobe-python/blob/master/ffprobe/ffprobe.py
+@decorate_class(slots=True)
 class FFprobeStream:
     __stream: FFprobeRawStream
 
@@ -139,7 +141,7 @@ def optional_float(val: Any) -> Optional[float]:
 
     return None
 
-
+@decorate_class(slots=True)
 class FFProbeFormatInfo:
     __raw: dict[str, Any]
 
@@ -172,12 +174,12 @@ class FFProbeFormatInfo:
     def __repr__(self: Self) -> str:
         return json.dumps(self.__raw)
 
-
+@decorate_class(slots=True)
 class FFProbeRawResult(TypedDict):
     streams: list[FFprobeRawStream]
     format: dict[str, Any]
 
-
+@decorate_class(slots=True)
 class FFProbeResult:
     __raw: FFProbeRawResult
 

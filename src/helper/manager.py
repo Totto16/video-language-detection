@@ -15,6 +15,7 @@ import enlighten
 import pydantic
 import pydantic_core
 
+from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 ManagerJustify = enlighten.Justify
@@ -100,7 +101,7 @@ class StatusBarInterfaceUpdateOptions(TypedDict, total=False):
     force: bool
     additional_args: AdditionalArgs
 
-
+@decorate_class(slots=True)
 class StatusBarInterface(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -115,7 +116,7 @@ class StatusBarInterface(ABC):
 
 # NOTE: only StatusBarInterface supports AdditionalArgs atm!
 
-
+@decorate_class(slots=True)
 class CounterInterface(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -128,7 +129,7 @@ class CounterInterface(ABC):
     @abstractmethod
     def close(self: Self, *, clear: bool = False) -> None: ...
 
-
+@decorate_class(slots=True)
 class ManagerInterface(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -149,7 +150,7 @@ class ManagerInterface(ABC):
         self: Self,
     ) -> None: ...
 
-
+@decorate_class(slots=True)
 class TuiStatusBar(StatusBarInterface):
     __impl: enlighten.StatusBar
 
@@ -177,7 +178,7 @@ class TuiStatusBar(StatusBarInterface):
 
         return self.__impl.update(**modified_fields)
 
-
+@decorate_class(slots=True)
 class TuiCounter(CounterInterface):
     __impl: enlighten.Counter
 
@@ -193,7 +194,7 @@ class TuiCounter(CounterInterface):
     def close(self: Self, *, clear: bool = False) -> None:
         return self.__impl.close(clear=clear)
 
-
+@decorate_class(slots=True)
 class TuiManager(ManagerInterface):
     __impl: enlighten.Manager
 
@@ -242,7 +243,7 @@ class TuiManager(ManagerInterface):
     ) -> None:
         return self.__impl.stop()
 
-
+@decorate_class(slots=True)
 class NoopStatusBar(StatusBarInterface):
 
     def __init__(self: Self) -> None:
@@ -256,7 +257,7 @@ class NoopStatusBar(StatusBarInterface):
     ) -> None:
         pass
 
-
+@decorate_class(slots=True)
 class NoopCounter(CounterInterface):
 
     def __init__(self: Self) -> None:
@@ -270,7 +271,7 @@ class NoopCounter(CounterInterface):
     def close(self: Self, *, clear: bool = False) -> None:
         pass
 
-
+@decorate_class(slots=True)
 class NoopManager(ManagerInterface):
 
     def __init__(self: Self) -> None:

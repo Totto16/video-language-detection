@@ -5,6 +5,7 @@ from typing import Optional, Self, TypeIs
 import psutil
 import torch
 
+from helper.decorator import decorate_class
 from helper.gpu import GPU, AvailableMemory
 from helper.log import get_logger
 from helper.translation import get_translator
@@ -17,19 +18,19 @@ class AllocatorType(Enum):
     cpu = "cpu"
     gpu = " gpu"
 
-
+@decorate_class(slots=True)
 class Allocator:
     type: AllocatorType
 
     def __init__(self: Self, type_: AllocatorType) -> None:
         self.type = type_
 
-
+@decorate_class(slots=True)
 class CPUAllocator(Allocator):
     def __init__(self) -> None:
         super().__init__(type_=AllocatorType.cpu)
 
-
+@decorate_class(slots=True)
 class GPUAllocator(Allocator):
     gpu: GPU
 
@@ -41,7 +42,7 @@ class GPUAllocator(Allocator):
 def is_cpu_allocator(allocator: GPUAllocator | CPUAllocator) -> TypeIs[CPUAllocator]:
     return allocator.type == AllocatorType.cpu
 
-
+@decorate_class(slots=True)
 class DeviceManager:
     __device_allocator: CPUAllocator | GPUAllocator
 

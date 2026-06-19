@@ -222,6 +222,9 @@ def __process_class_impl[A](
     weakref_slot: bool,
     allow_defaults: bool,
 ) -> type[A]:
+
+    # TODO: don't allow Enums, TypeDicts, pydantic BaseModels, exceptions, dataclasses
+
     cls_annotations = inspect.get_annotations(cls)
 
     if not allow_defaults:

@@ -49,6 +49,7 @@ from content.tagger.video_tagger import (
     uuid_from_str,
     uuid_to_str,
 )
+from helper.decorator import decorate_class
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
@@ -57,6 +58,7 @@ _ = get_translator()
 
 
 @final
+@decorate_class(slots=True)
 class FOURCC:
     __value: bytes
 
@@ -112,6 +114,7 @@ class FOURCC:
 
 
 @final
+@decorate_class(slots=True)
 class PackableFOURCC(Packable[FOURCC, bytes]):
     @property
     @override
@@ -162,6 +165,7 @@ VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC = FOURCC(b"vldf")
 
 
 @final
+@decorate_class(slots=True)
 class AVIChunkSpan:
     __total: SimpleSpan
 
@@ -275,11 +279,11 @@ class AVIChunkSpan:
 
 AVI_BYTE_ORDER = ByteOrder.Little
 
-
+@decorate_class(slots=True)
 class FinalAVIChunk:
     __final__avi_chunk__ = True
 
-
+@decorate_class(slots=True)
 class NonFinalAVIChunk:
     def __init_subclass__(cls, *args: Any, **kwargs: Any) -> None:
         super().__init_subclass__(*args, **kwargs)
@@ -295,7 +299,7 @@ class NonFinalAVIChunk:
                     msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
                     raise TypeError(msg)
 
-
+@decorate_class(slots=True)
 class AVIChunk(NonFinalAVIChunk):
     fourcc: FOURCC
     span: AVIChunkSpan
@@ -467,7 +471,7 @@ class AVIChunk(NonFinalAVIChunk):
     def __repr__(self: Self) -> str:
         return str(self)
 
-
+@decorate_class(slots=True)
 class AVIList(AVIChunk):
     type: FOURCC
 
@@ -551,6 +555,7 @@ class AVIList(AVIChunk):
 
 
 @final
+@decorate_class(slots=True)
 class AVIStreamHeader(AVIChunk, FinalAVIChunk):
     type: FOURCC
 
@@ -670,6 +675,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
 
 
 @final
+@decorate_class(slots=True)
 class VLDStrChunk(AVIChunk, FinalAVIChunk):
     value: str
 
@@ -735,6 +741,7 @@ ChunkJsonValue = SerializableDict | SerializableDictValue
 
 
 @final
+@decorate_class(slots=True)
 class VLDJsonChunk(AVIChunk, FinalAVIChunk):
     data: ChunkJsonValue
 
@@ -793,6 +800,7 @@ class VLDJsonChunk(AVIChunk, FinalAVIChunk):
 
 
 @final
+@decorate_class(slots=True)
 class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
     uuid: UUID
 
@@ -868,6 +876,7 @@ VLDKeyValueValue = VLDKeyValueValueStr | VLDKeyValueValueUUID | VLDKeyValueValue
 
 
 @final
+@decorate_class(slots=True)
 class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
     key: str
     value: VLDKeyValueValue
@@ -1000,7 +1009,7 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
     def __repr__(self: Self) -> str:
         return str(self)
 
-
+@decorate_class(slots=True)
 class SupportedChunks:
     RIFF = RIFF_FOURCC
     LIST = LIST_FOURCC
@@ -1165,7 +1174,7 @@ VLDSubChunkType = (
     | VLDCustomKeyValueEntry
 )
 
-
+@decorate_class(slots=True)
 class INFOChunkBuilder:
     __sub_chunks: dict[FOURCC | str, VLDSubChunkType]
 
@@ -1306,7 +1315,7 @@ class ReadMetadataImpl:
     uuid: Optional[UUID]
     unrecognized: list[VLDUnknownStrSubChunk]
 
-
+@decorate_class(slots=True)
 class AVIMetadataHandler:
     __info_values: InfoValues
     __our_chunks: list[AVIChunk]
@@ -1892,7 +1901,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
 
         return result
 
-
+@decorate_class(slots=True)
 class VideoTaggerAVI(VideoTagger):
     __streams: int
     __types: list[FOURCC]
@@ -1952,6 +1961,7 @@ class VideoTaggerAVI(VideoTagger):
         streams = self.__streams
         types = self.__types
 
+        @decorate_class(slots=True)
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
             __writer: Optional[BinaryIO]
             __backup: Optional[bytes]

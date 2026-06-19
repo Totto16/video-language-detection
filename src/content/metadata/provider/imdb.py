@@ -12,6 +12,7 @@ from content.metadata.interfaces import Provider
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 from helper.apischema import OneOf
+from helper.decorator import decorate_class
 
 
 @dataclass
@@ -32,7 +33,8 @@ class IMDBMetadataSchema:
     provider: Literal["imdb"]
 
 
-# TODO: implment correctly based on IMDB2sql
+# TODO: implement correctly based on IMDB2sql
+@decorate_class(slots=True)
 class IMDBProvider(Provider):
     __config: IMDBConfig
 

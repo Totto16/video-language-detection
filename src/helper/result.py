@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Never, Protocol, Self
 
+from helper.decorator import decorate_class
+
 
 class Result[T, E](Protocol):
     def ok(self: Self) -> bool: ...
@@ -14,7 +16,7 @@ class Result[T, E](Protocol):
 
     def err_or[U](self: Self, default: U) -> E | U: ...
 
-
+@decorate_class(slots=True)
 class Ok[T, O = None](Result[T, O]):
     __value: T
 
@@ -46,7 +48,7 @@ class Ok[T, O = None](Result[T, O]):
     def __repr__(self: Self) -> str:
         return str(self)
 
-
+@decorate_class(slots=True)
 class Err[E, O = None](Result[O, E]):
     __error: E
 

@@ -39,6 +39,7 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
+from helper.decorator import decorate_class
 from helper.devices import AllocatorType, DeviceManager
 from helper.error import ErrorMode
 from helper.ffprobe import ffprobe, ffprobe_check
@@ -71,7 +72,7 @@ class MemoryPatternType(Enum):
     linear = "linear"
     quadratic = "quadratic"
 
-
+@decorate_class(slots=True)
 class MemoryPattern(ABC):
     pattern_type: MemoryPatternType
 
@@ -100,7 +101,7 @@ class LinearCoeffs:
     c: float  # x ^ 0
     m: float  # x ^ 1
 
-
+@decorate_class(slots=True)
 class MemoryPatternLinear(MemoryPattern):
     """
     linear  =>
@@ -150,7 +151,7 @@ class QuadraticCoeffs:
     b: float  # x ^ 1
     a: float  # x ^ 2
 
-
+@decorate_class(slots=True)
 class MemoryPatternQuadratic(MemoryPattern):
     """
     quadratic  =>
@@ -219,7 +220,7 @@ class MemoryPatternQuadratic(MemoryPattern):
     def to_constructor_str(self: Self) -> str:
         return f"MemoryPatternQuadratic(coeffs=QuadraticCoeffs(c={self.__coeffs.c}, b={self.__coeffs.b}, a={self.__coeffs.a}))"
 
-
+@decorate_class(slots=True)
 class ModelLanguage(ABC):
 
     @abstractmethod
@@ -237,7 +238,7 @@ class Model:
         None  # if this is None, it is inferred and printed, so that you can hardcode it!
     )
 
-
+@decorate_class(slots=True)
 class RunOpts(TypedDict, total=False):
     device: str
     data_parallel_count: int
@@ -416,7 +417,7 @@ def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
 
     return memory_pattern
 
-
+@decorate_class(slots=True)
 class WavFile:
     pass
 
@@ -489,7 +490,7 @@ class FileMetadataError(ValueError):
     def __init__(self: Self, msg: str) -> None:
         super().__init__(msg)
 
-
+@decorate_class(slots=True)
 class OriginalWavFileManager(AbstractContextManager[Path]):
     __file: Path
 
@@ -509,7 +510,7 @@ class OriginalWavFileManager(AbstractContextManager[Path]):
     ) -> Literal[False]:  # actually bool
         return False
 
-
+@decorate_class(slots=True)
 class GeneratedWavFileManager(AbstractContextManager[Path]):
     __file: Path
     __released: bool
@@ -540,7 +541,7 @@ class GeneratedWavFileManager(AbstractContextManager[Path]):
             self.__file.unlink(missing_ok=True)
         return False
 
-
+@decorate_class(slots=True)
 class WAVFile:
     __file: Path
     __status: FileStatus
@@ -807,6 +808,7 @@ PERCENTAGE_PATTERN = r"^(\d{1,3})(?:\.(\d+))?%$"
 
 
 @schema(pattern=PERCENTAGE_PATTERN)
+@decorate_class(slots=True)
 class AdvancedPercentage:
     __value: float
 
@@ -1132,7 +1134,7 @@ MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 BATCH_SIZE_DECREASE_CONST: float = 0.075  # 7.5 %
 
-
+@decorate_class(slots=True)
 class ClassifierManager(AbstractContextManager[None]):
     __device_manager: DeviceManager
     __model: Model
@@ -1391,7 +1393,7 @@ class PredictionFail:
     reason: PredictionFailReason
     best: Optional[PredictionBest]
 
-
+@decorate_class(slots=True)
 class Classifier:
     __save_dir: Path
     __options: ClassifierOptions

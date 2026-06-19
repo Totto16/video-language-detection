@@ -26,10 +26,12 @@ import questionary.prompts.common
 from content.language import Language
 from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
+from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.terminal import ClearContextManager, Terminal
 
 
+@decorate_class(slots=True)
 class LanguagePicker(ABC):
     def __init__(
         self: Self,
@@ -43,7 +45,7 @@ class LanguagePicker(ABC):
         prediction: Prediction,
     ) -> Optional[Language]: ...
 
-
+@decorate_class(slots=True)
 class NoLanguagePicker(LanguagePicker):
     def __init__(
         self: Self,
@@ -181,12 +183,12 @@ class ChoiceTitle:
     color: Optional[ChoiceColor]
     content: str
 
-
+@decorate_class(slots=True)
 class ChoiceInterface:
     def __init__(self: Self) -> None:
         super().__init__()
 
-
+@decorate_class(slots=True)
 class ChoiceManagerInterface(ABC):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -216,7 +218,7 @@ class ChoiceManagerInterface(ABC):
         default: ChoiceInterface,
     ) -> Optional[SelectResult]: ...
 
-
+@decorate_class(slots=True)
 class TUIChoice(ChoiceInterface):
     __impl: questionary.Choice
 
@@ -228,7 +230,7 @@ class TUIChoice(ChoiceInterface):
     def impl(self: Self) -> questionary.Choice:
         return self.__impl
 
-
+@decorate_class(slots=True)
 class TuiContextWrapper(AbstractContextManager[None]):
     __underlying: ClearContextManager
 
@@ -254,7 +256,7 @@ class TuiContextWrapper(AbstractContextManager[None]):
         )
         return False
 
-
+@decorate_class(slots=True)
 class TUIChoiceManager(ChoiceManagerInterface):
 
     def __init__(self: Self) -> None:
@@ -332,7 +334,7 @@ class TUIChoiceManager(ChoiceManagerInterface):
 
         return result
 
-
+@decorate_class(slots=True)
 class InteractiveLanguagePicker(LanguagePicker):
     __config: InteractiveLanguagePickerDictTotal
     __manager: ChoiceManagerInterface

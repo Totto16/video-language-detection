@@ -19,6 +19,7 @@ from content.metadata.metadata import (
 )
 from content.shared import ScanType
 from helper.apischema import OneOf
+from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.translation import get_translator
 
@@ -162,7 +163,7 @@ class TMDBMetadataSchema:
     data: MetadataData
     provider: Literal["tmdb"]
 
-
+@decorate_class(slots=True)
 class TMDBProvider(Provider):
     __client: TMDb
 

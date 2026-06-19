@@ -30,6 +30,7 @@ from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
 from helper.config import ConfigType
 from helper.constants import APP_NAME
+from helper.decorator import decorate_class
 from helper.error import ErrorMode
 from helper.manager import (
     CounterInterface,
@@ -94,7 +95,7 @@ class ContentOptions(TypedDict):
     trailer_names: list[str]
     parse_error_is_exception: bool
 
-
+@decorate_class(slots=True)
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     __options: ContentOptions
     __name_parser: NameParser
@@ -260,7 +261,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     def options(self: Self) -> ContentOptions:
         return self.__options
 
-
+@decorate_class(slots=True)
 class NormalContentCallback(ContentCallback):
     @override
     def process(
@@ -311,7 +312,7 @@ class NormalContentCallback(ContentCallback):
 
         return None
 
-
+@decorate_class(slots=True)
 class NumeratedContentCallback(ContentCallback):
     @override
     def process(
@@ -362,7 +363,7 @@ class NumeratedContentCallback(ContentCallback):
 
         return None
 
-
+@decorate_class(slots=True)
 class SymlinkedContentCallback(ContentCallback):
     pass
 

@@ -32,6 +32,7 @@ from content.tagger.avi_tagger import (
 from content.tagger.parser import SimpleSpan
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import MetadataTags, uuid_to_str
+from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
@@ -43,7 +44,7 @@ mark_as_used(test_manager)
 # TODO: force locale in test cases!
 _ = get_translator()
 
-
+@decorate_class(slots=True)
 class PseudoAVIChunk(AVIChunk):
 
     def __init__(self: Self, fourcc: FOURCC, size: int) -> None:
@@ -53,13 +54,13 @@ class PseudoAVIChunk(AVIChunk):
             is_list=False,
         )
 
-
+@decorate_class(slots=True)
 class PseudoAVIList(AVIList):
 
     def __init__(self: Self, fourcc: FOURCC, size: int, typ: FOURCC) -> None:
         super().__init__(PseudoAVIChunk(fourcc, size), typ)
 
-
+@decorate_class(slots=True)
 class PseudoMOVIChunk(PseudoAVIList):
     children: int
 
@@ -67,7 +68,7 @@ class PseudoMOVIChunk(PseudoAVIList):
         super().__init__(LIST_FOURCC, size, FOURCC(b"movi"))
         self.children = children
 
-
+@decorate_class(slots=True)
 class RecursiveChunks:
     RecursiveChunkData = list[AVIChunk | tuple[AVIList, "RecursiveChunkData"]]
     __data: RecursiveChunkData
@@ -314,7 +315,7 @@ def list_all_chunks_recursively(f: BinaryIO) -> RecursiveChunks:
 
     return result
 
-
+@decorate_class(slots=True)
 class AVIChunkStructure(FancyEq):
     chunks: RecursiveChunks
 

@@ -8,8 +8,10 @@ from content.metadata.metadata import (
     should_skip_metadata,
 )
 from content.shared import ScanType
+from helper.decorator import decorate_class
 
 
+@decorate_class(slots=True)
 class MetadataScanner:
     __provider: Provider
 

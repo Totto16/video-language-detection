@@ -4,17 +4,19 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Never, Optional, Self, assert_never, override
 
+from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 from helper.utils import parse_int_safely
 
 
+@decorate_class(slots=True)
 class Filter(ABC):
 
     @staticmethod
     @abstractmethod
     def factory_name() -> str: ...
 
-
+@decorate_class(slots=True)
 class FilterFactory(ABC):
 
     @staticmethod
@@ -41,7 +43,7 @@ class SpecialFilterType(Enum):
     All = "all"
     Default = "default"
 
-
+@decorate_class(slots=True)
 class SpecialFilter(Filter):
     __name: str
     __type: SpecialFilterType
@@ -65,7 +67,7 @@ class SpecialFilter(Filter):
     def type(self: Self) -> SpecialFilterType:
         return self.__type
 
-
+@decorate_class(slots=True)
 class ConfigFilter(Filter):
     type __Item = str | int
 
@@ -93,7 +95,7 @@ class ConfigFilter(Filter):
     def factory_name() -> str:
         return ConfigFilterFactory.name()
 
-
+@decorate_class(slots=True)
 class ConfigFilterFactory(FilterFactory):
 
     def __init__(self: Self) -> None:
@@ -130,7 +132,7 @@ class ExecuteStep(Enum):
     Summary = "summary"
     Validate = "validate"
 
-
+@decorate_class(slots=True)
 class ExecuteFilter(Filter):
     __step: ExecuteStep
 
@@ -156,7 +158,7 @@ class ExecuteFilter(Filter):
     def factory_name() -> str:
         return ExecuteFilterFactory.name()
 
-
+@decorate_class(slots=True)
 class ExecuteFilterFactory(FilterFactory):
 
     def __init__(self: Self) -> None:
@@ -265,7 +267,7 @@ def execute_steps_from_filter(
 
     return __execute_steps_from_filter_impl(execute_filter)
 
-
+@decorate_class(slots=True)
 class ValidatorFilter(Filter):
     __name: str
     __options: Optional[str]
@@ -295,7 +297,7 @@ class ValidatorChecks:
     check: Callable[[str, Optional[str]], Result[None, str]]
     names: set[str]
 
-
+@decorate_class(slots=True)
 class ValidatorFilterFactory(FilterFactory):
     __validator_checks: ValidatorChecks
 
@@ -351,7 +353,7 @@ special_values: list[str] = [
 class FilterHelpOptions:
     cb: Optional[Callable[[], Never]]
 
-
+@decorate_class(slots=True)
 class FilterManager:
     __factories: dict[str, FilterFactory]
     __help_options: FilterHelpOptions

@@ -695,3 +695,5 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
                 return super().foo(value)
 
         assert A15().foo == "bar"
+
+#TODO: test empty class!

@@ -19,12 +19,14 @@ from typing import (
 )
 from uuid import UUID
 
+from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 _ = get_translator()
 
 
 @final
+@decorate_class(slots=True)
 class SimpleSpan:
     start: int
     size: int
@@ -70,7 +72,7 @@ class BoundedIOWriteable(Protocol):
 class BoundedIORW(BoundedIOReadable, BoundedIOWriteable):
     pass
 
-
+@decorate_class(slots=True)
 class ExclusiveIOBase:
     __f: BinaryIO
 
@@ -146,7 +148,7 @@ class ExclusiveIOBase:
             raise RuntimeError(msg)
         self.__holder = id(None)
 
-
+@decorate_class(slots=True)
 class BoundedIO:
     __io: ExclusiveIOBase
 
@@ -268,9 +270,11 @@ class BoundedIO:
                 )
                 raise RuntimeError(msg)
 
+        @decorate_class(slots=True)
         class BoundedIOReadableCtx(AbstractContextManager[BoundedIOReadable]):
             @override
             def __enter__(self: Self) -> BoundedIOReadable:
+                @decorate_class(slots=True)
                 class BoundedIOReadableImpl(BoundedIOReadable):
                     def read(self: Self, amount: int) -> bytes:
                         return read_impl(amount)
@@ -333,9 +337,11 @@ class BoundedIO:
                 )
                 raise RuntimeError(msg)
 
+        @decorate_class(slots=True)
         class BoundedIORWCtx(AbstractContextManager[BoundedIORW]):
             @override
             def __enter__(self: Self) -> BoundedIORW:
+                @decorate_class(slots=True)
                 class BoundedIORWImpl(BoundedIORW):
                     def read(self: Self, amount: int) -> bytes:
                         return read_impl(amount)
@@ -443,7 +449,7 @@ def uuid_to_bytes(order: ByteOrder, uuid: UUID) -> bytes:
 
     return result
 
-
+@decorate_class(slots=True)
 class Packable[Type, Underlying = Type](ABC):
     @property
     @abstractmethod
@@ -459,7 +465,7 @@ class Packable[Type, Underlying = Type](ABC):
     @abstractmethod
     def from_underlying(self: Self, value: Underlying) -> Type: ...
 
-
+@decorate_class(slots=True)
 class UnsignedInt(Packable[int]):
     @property
     @override
@@ -479,7 +485,7 @@ class UnsignedInt(Packable[int]):
     def from_underlying(self: Self, value: int) -> int:
         return value
 
-
+@decorate_class(slots=True)
 class UnsignedLongLong(Packable[int]):
     @property
     @override
@@ -499,7 +505,7 @@ class UnsignedLongLong(Packable[int]):
     def from_underlying(self: Self, value: int) -> int:
         return value
 
-
+@decorate_class(slots=True)
 class UnsignedShort(Packable[int]):
     @property
     @override
@@ -519,7 +525,7 @@ class UnsignedShort(Packable[int]):
     def from_underlying(self: Self, value: int) -> int:
         return value
 
-
+@decorate_class(slots=True)
 class Unpacker:
 
     @staticmethod
@@ -600,7 +606,7 @@ class Unpacker:
 
         return cast(tuple[Type1, Type2], result)
 
-
+@decorate_class(slots=True)
 class Packer:
 
     @staticmethod

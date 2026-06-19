@@ -10,6 +10,7 @@ from content.language import (
     long_string_checked,
 )
 from helper.classifier import LinearCoeffs, MemoryPatternLinear, Model, ModelLanguage
+from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 __all__: list[str] = ["voxlingua107_ecapa_model"]
@@ -465,7 +466,7 @@ voxlingua107_ecapa_languages: Annotated[
 if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
     raise RuntimeError("UNREACHABLE")  # noqa: EM101
 
-
+@decorate_class(slots=True)
 class ModelLanguageForList(ModelLanguage):
     __languages: list[
         tuple[

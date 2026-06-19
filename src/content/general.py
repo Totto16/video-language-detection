@@ -14,6 +14,7 @@ from apischema import schema
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
+from helper.decorator import decorate_class
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 
 
@@ -278,7 +279,7 @@ class EpisodeName:
     season: int
     episode: int
 
-
+@decorate_class(slots=True)
 class NameParser(ABC):
     __language: Language
 
@@ -313,7 +314,7 @@ class StartAmount:
 # a list of optional functions, they return if they deleted something or not, None means also no
 type CallbackWorkload = Optional[Callable[[], Optional[bool]]]
 
-
+@decorate_class(slots=True)
 class Callback[C, CT, RT](ABC):
     def __init__(self: Self) -> None:
         super().__init__()

@@ -4,10 +4,12 @@ from typing import Optional, Self
 import pytest
 from fixtures import cached_file_manager, mark_as_used, video_file_dict
 
+from helper.decorator import decorate_class
+
 mark_as_used(video_file_dict)
 mark_as_used(cached_file_manager)
 
-
+@decorate_class(slots=True)
 class FancyEq(ABC):
 
     @abstractmethod

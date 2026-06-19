@@ -3,9 +3,11 @@ from typing import Optional, Self, override
 
 from content.general import EpisodeName, NameParser
 from content.language import Language
+from helper.decorator import decorate_class
 from helper.utils import parse_int_safely
 
 
+@decorate_class(slots=True)
 class CustomNameParser(NameParser):
     __season_special_names: list[str]
 

@@ -74,6 +74,7 @@ from helper.config import (
     RawConfig,
     filter_configs,
 )
+from helper.decorator import decorate_class
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
 from helper.filter import (
@@ -116,6 +117,7 @@ if TYPE_CHECKING:
 _ = get_translator()
 
 
+@decorate_class(slots=True)
 class BackendRef:
     __backend: "Backend"
 
@@ -127,6 +129,7 @@ class BackendRef:
         return self.__backend
 
 
+@decorate_class(slots=True)
 class WebsocketHandler(ABC):
     __ws: WebSocket
 
@@ -186,7 +189,7 @@ def uuid_deserialize(value: str) -> uuid.UUID:
 def uuid_serialize(value: uuid.UUID) -> str:
     return value.hex
 
-
+@decorate_class(slots=True)
 class WsSingleManager(WebsocketHandler):
     __parent_ref: "WsManager"
 
@@ -649,7 +652,7 @@ OutgoingWsData = Annotated[
     pydantic.Discriminator(discriminator="type"),
 ]
 
-
+@decorate_class(slots=True)
 class ScannerStatusBar(StatusBarInterface):
     __ref: "WsManager"
     __idx: int
@@ -672,7 +675,7 @@ class ScannerStatusBar(StatusBarInterface):
         )
         self.__ref.send_data_sync(data)
 
-
+@decorate_class(slots=True)
 class ScannerCounter(CounterInterface):
     __ref: "WsManager"
     __idx: int
@@ -708,7 +711,7 @@ class ScannerCounter(CounterInterface):
         )
         self.__ref.send_data_sync(data)
 
-
+@decorate_class(slots=True)
 class EmptyContextManager(AbstractContextManager[None]):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -727,12 +730,12 @@ class EmptyContextManager(AbstractContextManager[None]):
         return False
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class WSChoiceChoiceImpl:
     title: list[ChoiceTitle]
     value: SelectResult
 
-
+@decorate_class(slots=True)
 class WSChoiceChoice(ChoiceInterface):
     __impl: WSChoiceChoiceImpl
 
@@ -744,7 +747,7 @@ class WSChoiceChoice(ChoiceInterface):
     def impl(self: Self) -> WSChoiceChoiceImpl:
         return self.__impl
 
-
+@decorate_class(slots=True)
 class WSChoiceSeparator(ChoiceInterface):
     def __init__(self: Self) -> None:
         super().__init__()
@@ -760,7 +763,7 @@ class ReplyData:
     event: asyncio.Event
     data: Optional[Any]
 
-
+@decorate_class(slots=True)
 class ManagerCtx(AbstractContextManager[WsSingleManager]):
     __manager: WsSingleManager
     __remove_fn: Callable[[], None]
@@ -788,7 +791,7 @@ class ManagerCtx(AbstractContextManager[WsSingleManager]):
         self.__remove_fn()
         return False
 
-
+@decorate_class(slots=True)
 class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
     __instances: list[WsSingleManager]
     __counters: list[CounterType]
@@ -1316,7 +1319,7 @@ class ScanStatusSerializableResult(pydantic.BaseModel):
 
     status: ScanStatusSerializable
 
-
+@decorate_class(slots=True)
 class ThreadSafeAcquired[A]:
     __get_impl: Callable[[], A]
     __set_impl: Callable[[A], None]
@@ -1338,7 +1341,7 @@ class ThreadSafeAcquired[A]:
     def modify(self: Self, fn: Callable[[A], A]) -> None:
         self.__set_impl(fn(self.__get_impl()))
 
-
+@decorate_class(slots=True)
 class ThreadSafe[A](AbstractContextManager[ThreadSafeAcquired[A]]):
     __data: A
     __mutex: threading.Lock
@@ -1401,7 +1404,7 @@ class ScannerThreadState:
 
 type ThreadId = int
 
-
+@decorate_class(slots=True)
 class ThreadHandler(Handler):
     __send: Callable[[ManagerWsLogMessageEventData], None]
     __thread_id: ThreadId
@@ -1435,7 +1438,7 @@ class ThreadHandler(Handler):
         except Exception:  # noqa: BLE001
             self.handleError(record)
 
-
+@decorate_class(slots=True)
 class ThreadLoggerCtx(AbstractContextManager[Logger]):
     __handlers: Optional[list[Handler]]
     __send: Callable[[ManagerWsLogMessage], None]
@@ -1512,7 +1515,7 @@ def run_in_thread(
 
     event.set()
 
-
+@decorate_class(slots=True)
 class BackendScanner:
     __raw_config: RawConfig
     __config_file_path: Path
@@ -1827,7 +1830,7 @@ class BackendScanner:
         state = self.__state.get_data()
         return scanner_state_to_serializable_data(state.state)
 
-
+@decorate_class(slots=True)
 class Backend:
     __options: BackendOptions
     __server: uvicorn.Server

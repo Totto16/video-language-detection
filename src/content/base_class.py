@@ -34,6 +34,7 @@ from helper.classifier import (
     PredictionFailReason,
     WAVFile,
 )
+from helper.decorator import decorate_class
 from helper.error import ErrorMode
 from helper.log import get_logger
 from helper.manager import ManagerInterface
@@ -44,7 +45,7 @@ _ = get_translator()
 
 type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
-
+@decorate_class(slots=True)
 class SummaryResult(ABC):
     __file: ScannedFile
     __value: bool
@@ -80,7 +81,7 @@ class ScanSummaryDetailed:
     success: dict[Language, int]
     failure: dict[str, int]
 
-
+@decorate_class(slots=True)
 class SuccessSummaryManager:
     __results: list[SummaryResult]
 
@@ -123,7 +124,7 @@ class FailReason(Enum):
     exception = " exception"
     scan_failure = "scan_failure"
 
-
+@decorate_class(slots=True)
 class FailedFor(SummaryResult):
     __reason: FailReason
 
@@ -148,7 +149,7 @@ class FailedFor(SummaryResult):
     def reason(self: Self) -> FailReason:
         return self.__reason
 
-
+@decorate_class(slots=True)
 class FailedForWithLanguage(FailedFor):
     __best: Optional[PredictionBest]
     __reason: PredictionFailReason
@@ -186,7 +187,7 @@ class FailedForWithLanguage(FailedFor):
     def best(self: Self) -> Optional[PredictionBest]:
         return self.__best
 
-
+@decorate_class(slots=True)
 class SuccessFor(SummaryResult):
     __best: PredictionBest
 
@@ -211,7 +212,7 @@ class SuccessFor(SummaryResult):
     def best(self: Self) -> PredictionBest:
         return self.__best
 
-
+@decorate_class(slots=True)
 class LanguageScanner:
     __classifier: Classifier
     __summary_manager: SuccessSummaryManager
@@ -284,7 +285,7 @@ class LanguageScanner:
     def summary_manager(self: Self) -> SuccessSummaryManager:
         return self.__summary_manager
 
-
+@decorate_class(slots=True)
 class Scanner(ABC):
     __language_scanner: LanguageScanner
     __metadata_scanner: MetadataScanner
@@ -320,7 +321,7 @@ class Scanner(ABC):
         return self.__metadata_scanner
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class CallbackData:
     manager: ManagerInterface
     scanner: Scanner

@@ -13,6 +13,7 @@ from content.metadata.metadata import (
 )
 from content.shared import MetadataKind
 from content.video_metadata import VideoMetadata
+from helper.decorator import decorate_class
 
 CollectionDescription = str
 
@@ -72,7 +73,7 @@ def metadata_handle_to_type(
 
     return MetadataType.ok
 
-
+@decorate_class(slots=True)
 class Summary:
     __complete: bool
     __detailed: bool

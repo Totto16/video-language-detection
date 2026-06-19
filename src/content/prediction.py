@@ -6,6 +6,7 @@ from math import floor
 from typing import Optional, Self, TypedDict, assert_never
 
 from content.language import Language
+from helper.decorator import decorate_class
 
 type PredictionType = list[tuple[float, Language]]
 
@@ -81,6 +82,7 @@ def get_mean(
             assert_never(mean_type)
 
 
+@decorate_class(slots=True)
 class Prediction:
     __data: list[PredictionType]
 

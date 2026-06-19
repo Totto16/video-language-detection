@@ -49,6 +49,7 @@ from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.parser import SimpleSpan
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import MetadataTags, uuid_to_str
+from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
@@ -60,7 +61,7 @@ mark_as_used(test_manager)
 # TODO: force locale in test cases!
 _ = get_translator()
 
-
+@decorate_class(slots=True)
 class PseudoMP4Box(MP4Box):
 
     def __init__(self: Self, typ: ISOMAtomName, size: int) -> None:
@@ -70,7 +71,7 @@ class PseudoMP4Box(MP4Box):
             is_container=False,
         )
 
-
+@decorate_class(slots=True)
 class PseudoAppleItunesMP4Box(MP4Box):
     type_indicator: AppleItunesItemDataType
     value: AppleItunesItemDataContent
@@ -91,7 +92,7 @@ class PseudoAppleItunesMP4Box(MP4Box):
         self.type_indicator = type_indicator
         self.value = value
 
-
+@decorate_class(slots=True)
 class PseudoAppleItunesMP4FreeformBox(PseudoAppleItunesMP4Box):
     mean: str
     name: str
@@ -109,7 +110,7 @@ class PseudoAppleItunesMP4FreeformBox(PseudoAppleItunesMP4Box):
         self.mean = mean
         self.name = name
 
-
+@decorate_class(slots=True)
 class RecursiveBoxes:
     RecursiveBoxesData = list[MP4Box | tuple[MP4Box, "RecursiveBoxesData"]]
     __data: RecursiveBoxesData
@@ -365,7 +366,7 @@ def list_all_boxes_recursively(f: BinaryIO) -> RecursiveBoxes:
 
     return result
 
-
+@decorate_class(slots=True)
 class MP4BoxStructure(FancyEq):
     boxes: RecursiveBoxes
 

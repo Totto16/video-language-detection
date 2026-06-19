@@ -30,6 +30,7 @@ from content.tagger.video_tagger import (
     uuid_from_str,
     uuid_to_str,
 )
+from helper.decorator import decorate_class
 from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
@@ -182,7 +183,7 @@ IOOp = IOOpProgress | IOOpSeek | IOOpTruncate
 
 OpCallback = Callable[[IOOp], None]
 
-
+@decorate_class(slots=True)
 class MutagenFileWrapper(IOInterface):
     __file: Path
     __impl: BinaryIO
@@ -320,6 +321,7 @@ class MutagenFileWrapper(IOInterface):
         def remove_cb() -> None:
             self.__callbacks.remove(callback)
 
+        @decorate_class(slots=True)
         class CallbackCtx(AbstractContextManager[None]):
 
             def __init__(self: Self) -> None:
@@ -341,7 +343,7 @@ class MutagenFileWrapper(IOInterface):
 
         return CallbackCtx()
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextMutagen(VideoTaggerContextRW):
     __filething: MutagenFileWrapper
     __instance: mutagen.FileType
@@ -585,7 +587,7 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
 
         return result
 
-
+@decorate_class(slots=True)
 class VideoTaggerMutagen(VideoTagger):
     __file: Path
 
@@ -659,6 +661,7 @@ class VideoTaggerMutagen(VideoTagger):
 
             return result.as_ok()
 
+        @decorate_class(slots=True)
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
             __filething: Optional[MutagenFileWrapper]
 

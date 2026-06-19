@@ -27,6 +27,7 @@ from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
 from helper.apischema import OneOf
 from helper.classifier import ClassifierOptionsConfig
+from helper.decorator import decorate_class
 from helper.filter import ConfigFilter, Filter, SpecialFilter, SpecialFilterType
 from helper.log import get_logger
 from helper.result import Err, Ok, Result
@@ -102,6 +103,7 @@ def get_all_keys_with_aliases() -> list[str]:
 
 
 @schema(extra=one_of_list(get_all_keys_with_aliases()))
+@decorate_class(slots=True)
 class CustomKey:
     __underlying: Keys
 
@@ -123,7 +125,7 @@ class CustomKey:
             # resolve values
             if key.value.lower() == inp.lower():
                 return key
-            # resolve humand readbale enum format
+            # resolve humand readable enum format
             if key.name.lower() == inp.lower():
                 return key
 
@@ -736,7 +738,7 @@ class FileLockError(RuntimeError):
     def __init__(self: Self, msg: str) -> None:
         super().__init__(msg)
 
-
+@decorate_class(slots=True)
 class LockFile(AbstractContextManager[None]):
     __lock_file: Path
     __fd: Optional[int]

@@ -8,11 +8,12 @@ from apischema.objects import ObjectField
 from content.metadata.metadata import InternalMetadataType
 from content.shared import ScanType
 from helper.apischema import SchemaType
+from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 _ = get_translator()
 
-
+@decorate_class(slots=True)
 class Provider(ABC):
     __name: str
 
@@ -64,7 +65,7 @@ class Provider(ABC):
 class MissingProviderMetadataConfig:
     type: Literal["none"]
 
-
+@decorate_class(slots=True)
 class MissingProvider(Provider):
 
     def __init__(self: Self) -> None:

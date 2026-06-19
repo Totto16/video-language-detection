@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from content.language import ShortLanguageStr
+from helper.decorator import decorate_class
 
 
 @dataclass
@@ -8102,6 +8103,8 @@ lcid_language_lookups: tuple[
 # Microsoft Language CID
 # see https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-lcid/70feba9f-294e-491e-b6eb-56532684c37f
 # https://winprotocoldoc.z19.web.core.windows.net/MS-LCID/%5bMS-LCID%5d.pdf
+
+@decorate_class(slots=True)
 class LCID:
     @staticmethod
     def decode_language(value: int) -> ShortLanguageStr | str:

@@ -8,6 +8,7 @@ from typing import Any, Literal, Optional, Self, assert_never, cast, override
 from uuid import UUID
 
 from content.language import Language
+from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.translation import get_translator
@@ -40,7 +41,7 @@ class MetadataTagsRead:
     metadata: SerializableDict
     unrecognized: list[tuple[str, str]]
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextInterface(ABC):
     __manager: ManagerInterface
 
@@ -55,14 +56,14 @@ class VideoTaggerContextInterface(ABC):
     def manager(self: Self) -> ManagerInterface:
         return self.__manager
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextReadable(VideoTaggerContextInterface):
     @abstractmethod
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead: ...
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextWriteable(VideoTaggerContextInterface):
     @abstractmethod
     def write_tags(
@@ -80,7 +81,7 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 class VideoTaggerContextRW(VideoTaggerContextReadable, VideoTaggerContextWriteable):
     pass
 
-
+@decorate_class(slots=True)
 class VideoTagger(ABC):
     __file: Path
 
@@ -113,7 +114,7 @@ class VideoTagger(ABC):
 
 ContextType = Literal["r", "w", "rw"]
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
     __impl: VideoTaggerContextRW
     __ctx: ContextType
@@ -155,7 +156,7 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
 
         return self.__impl.get_tags()
 
-
+@decorate_class(slots=True)
 class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     __contexts: list[AbstractContextManager[VideoTaggerContextRW]]
 
@@ -191,7 +192,7 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
         msg = "Merging the tags is not implemented yet!"
         raise NotImplementedError(msg)
 
-
+@decorate_class(slots=True)
 class VideoTaggerMultiple(VideoTagger):
     __tagger: list[VideoTagger]
 
@@ -220,6 +221,7 @@ class VideoTaggerMultiple(VideoTagger):
 
         contexts = [get_context(tagger) for tagger in self.__tagger]
 
+        @decorate_class(slots=True)
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
 
             def __init__(self: Self) -> None:
@@ -279,7 +281,7 @@ class AppleItunesFreeformKey:
     mean: str
     name: str
 
-
+@decorate_class(slots=True)
 class TaggerDomain:
     @staticmethod
     def get(key: str) -> str:

@@ -11,6 +11,7 @@ from typing import Any, Optional, Self, assert_never, cast, override
 import pyopencl as opencl
 import torch
 
+from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 from helper.utils import parse_int_safely
 
@@ -86,7 +87,7 @@ def list_gpus_linux() -> Result[list[GPUDevice], str]:
     except Exception as err:  # noqa:  BLE001
         return Err(str(err))
 
-
+# used for accessing a opaque type
 class NvmlMemoryPy:
     total: int
     free: int
@@ -543,7 +544,7 @@ class AvailableMemory:
     available: int
     total: int
 
-
+@decorate_class(slots=True)
 class GPU(ABC):
     __device: GPUDevice
 
@@ -676,7 +677,7 @@ class GPU(ABC):
         free, total = torch.cuda.mem_get_info(torch_device)
         return AvailableMemory(available=free, total=total)
 
-
+@decorate_class(slots=True)
 class NvidiaGPU(GPU):
 
     def __init__(self: Self, device: GPUDevice) -> None:
@@ -690,7 +691,7 @@ class NvidiaGPU(GPU):
         msg = "Not yet implemented for nvidia"
         raise RuntimeError(msg)
 
-
+@decorate_class(slots=True)
 class AmdGPU(GPU):
 
     def __init__(self: Self, device: GPUDevice) -> None:
