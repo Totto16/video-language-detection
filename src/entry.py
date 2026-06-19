@@ -29,10 +29,19 @@ from helper.version import PROGRAM_VERSION
 _ = get_translator()
 
 
-type SubCommand = Literal["run", "schema", "gui", "config_check", "api", "tagger"]
+type SubCommand = Literal[
+    "run",
+    "schema",
+    "gui",
+    "config_check",
+    "api",
+    "tagger",
+    "ffmpeg",
+]
 
 
-class ParsedArgNamespace:
+# TODO: type and dataclass
+class ParsedArgNamespace(argparse.Namespace):
     level: LogLevel
     subcommand: SubCommand
 
@@ -88,6 +97,32 @@ AllTaggerCommandParsedArgNamespace = (
 )
 
 
+FfmpegCommand = Literal["scan", "fix-chapter"]
+
+
+class FfmpegCommandParsedArgNamespace(ParsedArgNamespace):
+    subcommand: Literal["ffmpeg"]
+
+    ffmpeg_command: FfmpegCommand
+
+
+class FfmpegScanCommandParsedArgNamespace(FfmpegCommandParsedArgNamespace):
+    ffmpeg_command: Literal["scan"]
+
+    files: list[str]
+
+
+class FfmpegFixChapterCommandParsedArgNamespace(FfmpegCommandParsedArgNamespace):
+    ffmpeg_command: Literal["fix-chapter"]
+
+    files: list[str]
+
+
+AllFfmpegCommandParsedArgNamespace = (
+    FfmpegScanCommandParsedArgNamespace | FfmpegFixChapterCommandParsedArgNamespace
+)
+
+
 class ApiCommandParsedArgNamespace(ParsedArgNamespace):
     subcommand: Literal["api"]
     config: Path
@@ -110,6 +145,7 @@ type AllParsedNameSpaces = (
     | ApiCommandParsedArgNamespace
     | ConfigCheckCommandParsedArgNamespace
     | AllTaggerCommandParsedArgNamespace
+    | AllFfmpegCommandParsedArgNamespace
 )
 
 
@@ -388,6 +424,38 @@ def parse_args() -> AllParsedNameSpaces:
         help=_(
             "Add a language to all streams",
         ),
+    )
+
+    ffmpeg_parser = subparsers.add_parser(
+        "ffmpeg",
+        description=_("FFmpeg helper actions"),
+    )
+
+    ffmpeg_subparsers = ffmpeg_parser.add_subparsers(
+        required=True,
+        dest="ffmpeg_command",
+    )
+
+    ffmpeg_scan_parser = ffmpeg_subparsers.add_parser(
+        "scan",
+        description=_("scan files"),
+    )
+
+    ffmpeg_scan_parser.add_argument(
+        nargs="*",
+        dest="files",
+        help=_("The files to process"),
+    )
+
+    ffmpeg_fix_chapter_parser = ffmpeg_subparsers.add_parser(
+        "fix-chapter",
+        description=_("fix chapters"),
+    )
+
+    ffmpeg_fix_chapter_parser.add_argument(
+        nargs="*",
+        dest="files",
+        help=_("The files to process"),
     )
 
     return cast(AllParsedNameSpaces, parser.parse_args())
@@ -756,6 +824,31 @@ def subcommand_tagger(
     assert_never(args.tag_action)
 
 
+def subcommand_ffmpeg(
+    logger: Logger,
+    args: AllFfmpegCommandParsedArgNamespace,
+) -> ExitCode:
+    files: list[Path] = [Path(file) for file in args.files]
+    if len(files) == 0:
+        logger.error("No path given, using CWD")
+        files = [Path.cwd().absolute()]
+
+    from ffmpeg_helper.fix_chapters import fix_chapters
+    from ffmpeg_helper.scan_files import scan_files
+
+
+
+
+    match args.ffmpeg_command:
+        case "scan":
+            scan_files(files)
+        case "fix-chapter":
+            fix_chapters(files)
+        case _:
+            assert_never(args.ffmpeg_command)
+
+
+
 def main() -> ExitCode:
     args = parse_args()
     logger: Logger = setup_custom_logger(args.level)
@@ -783,6 +876,11 @@ def main() -> ExitCode:
                 )
             case "tagger":
                 return subcommand_tagger(
+                    logger,
+                    args,
+                )
+            case "ffmpeg":
+                return subcommand_ffmpeg(
                     logger,
                     args,
                 )
