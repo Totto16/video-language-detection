@@ -15,7 +15,7 @@ from content.metadata.metadata import InternalMetadataType
 from content.metadata.scanner import MetadataScanner
 from content.shared import ScanKind, ScanType
 from helper.apischema import Deprecated, OneOf
-from helper.decorator import decorate_class, typedict_variant
+from helper.decorator import decorate_class
 
 
 @decorate_class(slots=True)
@@ -78,47 +78,77 @@ class ScannerTypes(Enum):
     none = "none"
 
 
-@typedict_variant()
-class AdvancedScannerPosition:
+class AdvancedScannerPositionDict(TypedDict, total=False):
     language: int
     metadata: int
 
 
+@dataclass(slots=True, repr=True)
+class AdvancedScannerPositionData:
+    language: int
+    metadata: int
+
+    def at(self: Self, key: Literal["metadata", "language"] | ScanKind) -> int:
+        return (
+            self.language if key in ("language", ScanKind.language) else self.metadata
+        )
+
+    def set(
+        self: Self,
+        key: Literal["metadata", "language"] | ScanKind,
+        value: int,
+    ) -> None:
+        if key in ("language", ScanKind.language):
+            self.language = value
+        else:
+            self.metadata = value
+
+
 def to_advanced_scanner_postion_total(
-    value: int | AdvancedScannerPosition | AdvancedScannerPosition.total,
-    defaults: AdvancedScannerPosition.total,
-) -> AdvancedScannerPosition.total:
+    value: int | AdvancedScannerPositionDict | AdvancedScannerPositionData,
+    defaults: AdvancedScannerPositionData,
+) -> AdvancedScannerPositionData:
     if isinstance(value, int):
-        return {
-            "language": value,
-            "metadata": value,
-        }
+        return AdvancedScannerPositionData(
+            language=value,
+            metadata=value,
+        )
+
+    if isinstance(value, AdvancedScannerPositionData):
+        return value
 
     language: int = value.get(
         "language",
-        defaults["language"],
+        defaults.language,
     )
 
     metadata: int = value.get(
         "metadata",
-        defaults["metadata"],
+        defaults.metadata,
     )
 
-    return {
-        "language": language,
-        "metadata": metadata,
-    }
+    return AdvancedScannerPositionData(
+        language=language,
+        metadata=metadata,
+    )
 
 
 SimplePosition = Annotated[int, Deprecated]
 
-Position = Annotated[SimplePosition | AdvancedScannerPosition, OneOf]
+Position = Annotated[SimplePosition | AdvancedScannerPositionDict, OneOf]
 
 
-@typedict_variant()
-class ConfigScannerDict:
+class ConfigScannerDict(TypedDict, total=False):
     start_position: Position
     scan_amount: Position
+    allow_abort: bool
+    types: ScannerTypes
+
+
+@dataclass(slots=True, repr=True)
+class ConfigScannerData:
+    start_position: AdvancedScannerPositionData
+    scan_amount: AdvancedScannerPositionData
     allow_abort: bool
     types: ScannerTypes
     # TODO: print progress option
@@ -126,22 +156,22 @@ class ConfigScannerDict:
 
 @decorate_class(slots=True)
 class ConfigScanner(Scanner):
-    __start_position: AdvancedScannerPosition.total
-    __scan_amount: AdvancedScannerPosition.total
+    __start_position: AdvancedScannerPositionData
+    __scan_amount: AdvancedScannerPositionData
     __allow_abort: bool
     __types: ScannerTypes
     # state
-    __current_position: AdvancedScannerPosition.total
+    __current_position: AdvancedScannerPositionData
     __is_aborted: bool
 
     @property
-    def __defaults(self: Self) -> ConfigScannerDictTotal:
-        return {
-            "start_position": {"language": 0, "metadata": 0},
-            "scan_amount": {"language": 100, "metadata": 100},
-            "allow_abort": True,
-            "types": ScannerTypes.both,
-        }
+    def __defaults(self: Self) -> ConfigScannerData:
+        return ConfigScannerData(
+            start_position=AdvancedScannerPositionData(language=0, metadata=0),
+            scan_amount=AdvancedScannerPositionData(language=100, metadata=100),
+            allow_abort=True,
+            types=ScannerTypes.both,
+        )
 
     def __init__(
         self: Self,
@@ -155,44 +185,44 @@ class ConfigScanner(Scanner):
         loaded_dict: Optional[ConfigScannerDict] = config
         if loaded_dict is not None:
             start_position: (
-                int | AdvancedScannerPosition.total | AdvancedScannerPosition
+                int | AdvancedScannerPositionData | AdvancedScannerPositionDict
             ) = loaded_dict.get(
                 "start_position",
-                self.__defaults["start_position"],
+                self.__defaults.start_position,
             )
 
             self.__start_position = to_advanced_scanner_postion_total(
                 start_position,
-                self.__defaults["start_position"],
+                self.__defaults.start_position,
             )
 
             scan_amount: (
-                int | AdvancedScannerPosition.total | AdvancedScannerPosition
+                int | AdvancedScannerPositionData | AdvancedScannerPositionDict
             ) = loaded_dict.get(
                 "scan_amount",
-                self.__defaults["scan_amount"],
+                self.__defaults.scan_amount,
             )
 
             self.__scan_amount = to_advanced_scanner_postion_total(
                 scan_amount,
-                self.__defaults["scan_amount"],
+                self.__defaults.scan_amount,
             )
 
             self.__allow_abort = loaded_dict.get(
                 "allow_abort",
-                self.__defaults["allow_abort"],
+                self.__defaults.allow_abort,
             )
             self.__types = loaded_dict.get(
                 "types",
-                self.__defaults["types"],
+                self.__defaults.types,
             )
         else:
-            self.__start_position = self.__defaults["start_position"]
-            self.__scan_amount = self.__defaults["scan_amount"]
-            self.__allow_abort = self.__defaults["allow_abort"]
-            self.__types = self.__defaults["types"]
+            self.__start_position = self.__defaults.start_position
+            self.__scan_amount = self.__defaults.scan_amount
+            self.__allow_abort = self.__defaults.allow_abort
+            self.__types = self.__defaults.types
 
-        self.__current_position = {"language": 0, "metadata": 0}
+        self.__current_position = AdvancedScannerPositionData(language=0, metadata=0)
         self.__is_aborted = False
 
     def __is_type(self: Self, scan_kind: ScanKind) -> bool:
@@ -217,17 +247,15 @@ class ConfigScanner(Scanner):
         result = False
 
         if (
-            self.__start_position[scan_kind.name]  # type: ignore[literal-required]
-            <= self.__current_position[scan_kind.name]  # type: ignore[literal-required]
+            self.__start_position.at(scan_kind) <= self.__current_position.at(scan_kind)
         ) and (
-            self.__current_position[scan_kind.name]  # type: ignore[literal-required]
-            - self.__start_position[scan_kind.name]  # type: ignore[literal-required]
-            < self.__scan_amount[scan_kind.name]  # type: ignore[literal-required]
+            self.__current_position.at(scan_kind) - self.__start_position.at(scan_kind)
+            < self.__scan_amount.at(scan_kind)
         ):
             result = True
 
-        self.__current_position[scan_kind.name] = (  # type: ignore[literal-required]
-            self.__current_position[scan_kind.name] + 1  # type: ignore[literal-required]
+        self.__current_position.set(
+            scan_kind, self.__current_position.at(scan_kind) + 1,
         )
 
         return result

@@ -8,6 +8,7 @@ from logging import Logger
 from pathlib import Path
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,
@@ -24,11 +25,13 @@ import questionary.prompts
 import questionary.prompts.common
 
 from content.language import Language
-from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
-from helper.decorator import decorate_class, typedict_variant
+from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.terminal import ClearContextManager, Terminal
+
+if TYPE_CHECKING:
+    from content.prediction import Prediction, PredictionBest
 
 
 @decorate_class(slots=True)
@@ -44,6 +47,7 @@ class LanguagePicker(ABC):
         path: Path,
         prediction: Prediction,
     ) -> Optional[Language]: ...
+
 
 @decorate_class(slots=True)
 class NoLanguagePicker(LanguagePicker):
@@ -61,44 +65,50 @@ class NoLanguagePicker(LanguagePicker):
         return None
 
 
-@typedict_variant()
-class InteractiveLanguagePickerDict(TypedDict):
+class InteractiveLanguagePickerDict(TypedDict, total=False):
+    entries_to_show: int
+    show_full_list: bool
+    play_sound: bool
+
+
+@dataclass(slots=True, repr=True)
+class InteractiveLanguagePickerData:
     entries_to_show: int
     show_full_list: bool
     play_sound: bool
 
 
 def resolve_interactive_config(
-    config: Optional[InteractiveLanguagePickerDict.optional],
-) -> InteractiveLanguagePickerDict.total:
-    defaults: InteractiveLanguagePickerDict.total = {
-        "entries_to_show": 10,
-        "show_full_list": False,
-        "play_sound": True,
-    }
+    config: Optional[InteractiveLanguagePickerDict],
+) -> InteractiveLanguagePickerData:
+    defaults: InteractiveLanguagePickerData = InteractiveLanguagePickerData(
+        entries_to_show=10,
+        show_full_list=False,
+        play_sound=True,
+    )
 
     loaded_dict: Optional[InteractiveLanguagePickerDict] = config
-    result: InteractiveLanguagePickerDict.total = defaults
+    result: InteractiveLanguagePickerData = defaults
 
     if loaded_dict is not None:
-        result["entries_to_show"] = loaded_dict.get(
+        result.entries_to_show = loaded_dict.get(
             "entries_to_show",
-            defaults["entries_to_show"],
+            defaults.entries_to_show,
         )
 
-        result["show_full_list"] = loaded_dict.get(
+        result.show_full_list = loaded_dict.get(
             "show_full_list",
-            defaults["show_full_list"],
+            defaults.show_full_list,
         )
 
-        result["play_sound"] = loaded_dict.get(
+        result.play_sound = loaded_dict.get(
             "play_sound",
-            defaults["play_sound"],
+            defaults.play_sound,
         )
     else:
-        result["entries_to_show"] = defaults["entries_to_show"]
-        result["show_full_list"] = defaults["show_full_list"]
-        result["play_sound"] = defaults["play_sound"]
+        result.entries_to_show = defaults.entries_to_show
+        result.show_full_list = defaults.show_full_list
+        result.play_sound = defaults.play_sound
 
     return result
 
@@ -177,10 +187,12 @@ class ChoiceTitle:
     color: Optional[ChoiceColor]
     content: str
 
+
 @decorate_class(slots=True)
 class ChoiceInterface:
     def __init__(self: Self) -> None:
         super().__init__()
+
 
 @decorate_class(slots=True)
 class ChoiceManagerInterface(ABC):
@@ -212,6 +224,7 @@ class ChoiceManagerInterface(ABC):
         default: ChoiceInterface,
     ) -> Optional[SelectResult]: ...
 
+
 @decorate_class(slots=True)
 class TUIChoice(ChoiceInterface):
     __impl: questionary.Choice
@@ -223,6 +236,7 @@ class TUIChoice(ChoiceInterface):
     @property
     def impl(self: Self) -> questionary.Choice:
         return self.__impl
+
 
 @decorate_class(slots=True)
 class TuiContextWrapper(AbstractContextManager[None]):
@@ -249,6 +263,7 @@ class TuiContextWrapper(AbstractContextManager[None]):
             exc_tb,
         )
         return False
+
 
 @decorate_class(slots=True)
 class TUIChoiceManager(ChoiceManagerInterface):
@@ -328,15 +343,16 @@ class TUIChoiceManager(ChoiceManagerInterface):
 
         return result
 
+
 @decorate_class(slots=True)
 class InteractiveLanguagePicker(LanguagePicker):
-    __config: InteractiveLanguagePickerDict.total
+    __config: InteractiveLanguagePickerData
     __manager: ChoiceManagerInterface
 
     def __init__(
         self: Self,
         *,
-        config: InteractiveLanguagePickerDict.total,
+        config: InteractiveLanguagePickerData,
         manager: ChoiceManagerInterface,
     ) -> None:
         super().__init__()
@@ -522,14 +538,14 @@ class InteractiveLanguagePicker(LanguagePicker):
         prediction: Prediction,
     ) -> Optional[Language]:
         with self.__manager.picker_ctx():
-            if self.__config["play_sound"]:
+            if self.__config.play_sound:
                 play_notification_sound()
 
             best_list: list[PredictionBest] = prediction.get_best_list()
             length_to_use: int = (
                 len(best_list)
-                if self.__config["show_full_list"]
-                else self.__config["entries_to_show"]
+                if self.__config.show_full_list
+                else self.__config.entries_to_show
             )
 
             while True:
