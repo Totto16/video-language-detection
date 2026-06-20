@@ -4,15 +4,19 @@ verify_ssl = true
 name = "pypi"
 
 [[source]]
-url = "https://download.pytorch.org/whl/cu130/"
+url = "https://download.pytorch.org/whl/cu132/"
 verify_ssl = true
 name = "torch-nvidia"
+
+[[source]]
+url = "https://download.pytorch.org/whl/cu130/"
+verify_ssl = true
+name = "torch-nvidia-old"
 
 [[source]]
 url = "https://download.pytorch.org/whl/nightly/rocm7.2/"
 verify_ssl = true
 name = "torch-amd"
-
 
 [[source]]
 url = "https://download.pytorch.org/whl/cpu"
@@ -52,6 +56,7 @@ pymkv2 = "*"
 
 ##no dedicated gpu
 [integrated]
+torchaudio = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torchvision = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torch = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
@@ -60,6 +65,7 @@ speechbrain = {version = ">=1.1.0"}
 ##nvidia gpu
 [nvidia]
 nvidia-ml-py = "*"
+torchaudio = {version = "*", index="torch-nvidia-old", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
@@ -68,10 +74,10 @@ speechbrain = {version = ">=1.1.0"}
 ##amd gpu
 [amd]
 amdsmi = "*"
-torchvision = {version = "==0.27.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "==2.13.0.dev20260426+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torchaudio = {version = "==2.11.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-triton-rocm = {version = "==3.7.0+git88b227e2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "==0.29.0.dev20260619+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torch = {version = "==2.14.0.dev20260618+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchaudio = {version = "==2.11.0.dev20260619+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+triton-rocm = {version = "==3.7.1+git5d6048aa", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
 
 speechbrain = {version = ">=1.1.0"}
 
