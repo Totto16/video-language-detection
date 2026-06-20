@@ -39,7 +39,7 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
-from helper.decorator import decorate_class, typedict_variant
+from helper.decorator import decorate_class
 from helper.devices import AllocatorType, DeviceManager
 from helper.error import ErrorMode
 from helper.ffprobe import ffprobe, ffprobe_check
@@ -72,6 +72,7 @@ class MemoryPatternType(Enum):
     linear = "linear"
     quadratic = "quadratic"
 
+
 @decorate_class(slots=True)
 class MemoryPattern(ABC):
     pattern_type: MemoryPatternType
@@ -100,6 +101,7 @@ class MemoryPattern(ABC):
 class LinearCoeffs:
     c: float  # x ^ 0
     m: float  # x ^ 1
+
 
 @decorate_class(slots=True)
 class MemoryPatternLinear(MemoryPattern):
@@ -150,6 +152,7 @@ class QuadraticCoeffs:
     c: float  # x ^ 0
     b: float  # x ^ 1
     a: float  # x ^ 2
+
 
 @decorate_class(slots=True)
 class MemoryPatternQuadratic(MemoryPattern):
@@ -220,6 +223,7 @@ class MemoryPatternQuadratic(MemoryPattern):
     def to_constructor_str(self: Self) -> str:
         return f"MemoryPatternQuadratic(coeffs=QuadraticCoeffs(c={self.__coeffs.c}, b={self.__coeffs.b}, a={self.__coeffs.a}))"
 
+
 @decorate_class(slots=True)
 class ModelLanguage(ABC):
 
@@ -237,6 +241,7 @@ class Model:
     memory_pattern: Optional[MemoryPattern] = (
         None  # if this is None, it is inferred and printed, so that you can hardcode it!
     )
+
 
 @decorate_class(slots=True)
 class RunOpts(TypedDict, total=False):
@@ -417,6 +422,7 @@ def get_memory_pattern_for_model(model: Model) -> Optional[MemoryPattern]:
 
     return memory_pattern
 
+
 @decorate_class(slots=True)
 class WavFile:
     pass
@@ -490,6 +496,7 @@ class FileMetadataError(ValueError):
     def __init__(self: Self, msg: str) -> None:
         super().__init__(msg)
 
+
 @decorate_class(slots=True)
 class OriginalWavFileManager(AbstractContextManager[Path]):
     __file: Path
@@ -509,6 +516,7 @@ class OriginalWavFileManager(AbstractContextManager[Path]):
         _exc_tb: Optional[TracebackType],
     ) -> Literal[False]:  # actually bool
         return False
+
 
 @decorate_class(slots=True)
 class GeneratedWavFileManager(AbstractContextManager[Path]):
@@ -540,6 +548,7 @@ class GeneratedWavFileManager(AbstractContextManager[Path]):
         if self.__file.exists():
             self.__file.unlink(missing_ok=True)
         return False
+
 
 @decorate_class(slots=True)
 class WAVFile:
@@ -964,18 +973,29 @@ def get_percentage_value(percentage: Percentage) -> float:
     return percentage
 
 
-@typedict_variant()
-class AccuracySettingsDict:
+class AccuracySettingsDict(TypedDict, total=False):
     normal_threshold: Percentage
     final_threshold: Percentage
     use_picker_at_end: bool
 
 
+@dataclass(slots=True, repr=True)
+class AccuracySettingsData:
+    normal_threshold: AdvancedPercentage
+    final_threshold: AdvancedPercentage
+    use_picker_at_end: bool
 
-@typedict_variant()
-class ScanConfigDict:
+
+class ScanConfigDict(TypedDict, total=False):
     minimum: Percentage
     maximum: Percentage
+
+
+@dataclass(slots=True, repr=True)
+class ScanConfigData:
+    minimum: AdvancedPercentage
+    maximum: Optional[AdvancedPercentage]
+
 
 @dataclass(slots=True, repr=True)
 class ManualBatchSettings:
@@ -1050,18 +1070,18 @@ def resolve_batch_settings(
 @dataclass(slots=True, repr=True)
 class ClassifierOptions:
     batch_settings: BatchSettings
-    accuracy: AccuracySettingsDictTotal
-    scan_config: ScanConfigDictTotal
+    accuracy: AccuracySettingsData
+    scan_config: ScanConfigData
 
     @staticmethod
     def default() -> "ClassifierOptions":
-        default_accuracy = AccuracySettingsDictTotal(
+        default_accuracy = AccuracySettingsData(
             normal_threshold=AdvancedPercentage(0.95, "normal_threshold"),
             final_threshold=AdvancedPercentage(0.75, "final_threshold"),
             use_picker_at_end=True,
         )
 
-        default_scan_config = ScanConfigDictTotal(
+        default_scan_config = ScanConfigData(
             minimum=AdvancedPercentage(0.4, "minimum"),
             maximum=None,
         )
@@ -1087,13 +1107,13 @@ class ClassifierOptionsConfig:
         config_defaults: ClassifierOptions = ClassifierOptions.default()
 
         default_accuracy = AccuracySettingsDict(
-            normal_threshold=config_defaults.accuracy["normal_threshold"],
-            final_threshold=config_defaults.accuracy["final_threshold"],
-            use_picker_at_end=config_defaults.accuracy["use_picker_at_end"],
+            normal_threshold=config_defaults.accuracy.normal_threshold,
+            final_threshold=config_defaults.accuracy.final_threshold,
+            use_picker_at_end=config_defaults.accuracy.use_picker_at_end,
         )
 
         default_scan_config = ScanConfigDict(
-            minimum=config_defaults.scan_config["minimum"],
+            minimum=config_defaults.scan_config.minimum,
         )
 
         default_batch_settings: (
@@ -1108,7 +1128,7 @@ class ClassifierOptionsConfig:
             else config_defaults.batch_settings
         )
 
-        maximum = config_defaults.scan_config["maximum"]
+        maximum = config_defaults.scan_config.maximum
         if maximum is not None:
             default_scan_config["maximum"] = maximum
 
@@ -1122,6 +1142,7 @@ class ClassifierOptionsConfig:
 MAX_RETRY_COUNT_FOR_GPU: int = 5
 MAX_RETRY_COUNT: int = 10
 BATCH_SIZE_DECREASE_CONST: float = 0.075  # 7.5 %
+
 
 @decorate_class(slots=True)
 class ClassifierManager(AbstractContextManager[None]):
@@ -1382,6 +1403,7 @@ class PredictionFail:
     reason: PredictionFailReason
     best: Optional[PredictionBest]
 
+
 @decorate_class(slots=True)
 class Classifier:
     __save_dir: Path
@@ -1416,35 +1438,55 @@ class Classifier:
             )
 
             if options.accuracy is not None:
-                normal_threshold = options.accuracy.get("normal_threshold", None)
+                normal_threshold = (
+                    options.accuracy.normal_threshold
+                    if isinstance(options.accuracy, AccuracySettingsData)
+                    else options.accuracy.get("normal_threshold", None)
+                )
                 if normal_threshold is not None:
-                    total_options.accuracy["normal_threshold"] = to_advanced_percentage(
+                    total_options.accuracy.normal_threshold = to_advanced_percentage(
                         normal_threshold,
                         "normal_threshold",
                     )
 
-                final_threshold = options.accuracy.get("final_threshold", None)
+                final_threshold = (
+                    options.accuracy.final_threshold
+                    if isinstance(options.accuracy, AccuracySettingsData)
+                    else options.accuracy.get("final_threshold", None)
+                )
                 if final_threshold is not None:
-                    total_options.accuracy["final_threshold"] = to_advanced_percentage(
+                    total_options.accuracy.final_threshold = to_advanced_percentage(
                         final_threshold,
                         "final_threshold",
                     )
 
-                use_picker_at_end = options.accuracy.get("use_picker_at_end", None)
+                use_picker_at_end =  (
+                    options.accuracy.use_picker_at_end
+                    if isinstance(options.accuracy, AccuracySettingsData)
+                    else options.accuracy.get("use_picker_at_end", None)
+                )
                 if use_picker_at_end is not None:
-                    total_options.accuracy["use_picker_at_end"] = use_picker_at_end
+                    total_options.accuracy.use_picker_at_end = use_picker_at_end
 
             if options.scan_config is not None:
-                minimum = options.scan_config.get("minimum", None)
+                minimum =  (
+                    options.scan_config.minimum
+                    if isinstance(options.scan_config, ScanConfigData)
+                    else options.scan_config.get("minimum", None)
+                )
                 if minimum is not None:
-                    total_options.scan_config["minimum"] = to_advanced_percentage(
+                    total_options.scan_config.minimum = to_advanced_percentage(
                         minimum,
                         "minimum",
                     )
 
-                maximum = options.scan_config.get("maximum", None)
+                maximum = (
+                    options.scan_config.maximum
+                    if isinstance(options.scan_config, ScanConfigData)
+                    else options.scan_config.get("maximum", None)
+                )
                 if maximum is not None:
-                    total_options.scan_config["maximum"] = to_advanced_percentage(
+                    total_options.scan_config.maximum = to_advanced_percentage(
                         maximum,
                         "maximum",
                     )
@@ -1532,9 +1574,9 @@ class Classifier:
 
         # This guards for cases, where scanning is useless, e.g. when you want 20 % to be scanned, for a valid result, but scan until 10 %
         scan_nothing: bool = (
-            self.__options.scan_config["maximum"] is not None
-            and self.__options.scan_config["maximum"]
-            < self.__options.scan_config["minimum"]
+            self.__options.scan_config.maximum is not None
+            and self.__options.scan_config.maximum
+            < self.__options.scan_config.minimum
         )
 
         segments: list[tuple[Segment, Timestamp]] = (
@@ -1566,13 +1608,13 @@ class Classifier:
 
             amount_scanned = scanned_length / wav_file.runtime
 
-            if amount_scanned < self.__options.scan_config["minimum"]:
+            if amount_scanned < self.__options.scan_config.minimum:
                 # scan the next segment
                 continue
 
             if (
-                self.__options.scan_config["maximum"] is not None
-                and amount_scanned >= self.__options.scan_config["maximum"]
+                self.__options.scan_config.maximum is not None
+                and amount_scanned >= self.__options.scan_config.maximum
             ):
                 # go to the end, to check if the result is good enough
                 break
@@ -1585,7 +1627,7 @@ class Classifier:
                 # scan the next segment
                 continue
 
-            if best_local.accuracy >= self.__options.accuracy["normal_threshold"]:
+            if best_local.accuracy >= self.__options.accuracy.normal_threshold:
                 # go to evaluation, if the result is good enough
                 break
 
@@ -1603,16 +1645,16 @@ class Classifier:
 
         maximum_to_scan: float = (
             1.0
-            if self.__options.scan_config["maximum"] is None
-            else self.__options.scan_config["maximum"].value
+            if self.__options.scan_config.maximum is None
+            else self.__options.scan_config.maximum.value
         )
 
         if amount_scanned >= maximum_to_scan:
             # use final treshold
-            if best.accuracy >= self.__options.accuracy["final_threshold"]:
+            if best.accuracy >= self.__options.accuracy.final_threshold:
                 return best
 
-            if self.__options.accuracy["use_picker_at_end"]:
+            if self.__options.accuracy.use_picker_at_end:
                 picked_language = language_picker.pick_language(path, prediction)
 
                 if picked_language is not None:
@@ -1623,7 +1665,7 @@ class Classifier:
             return PredictionFail(PredictionFailReason.final_threshold_failed, best)
 
         # use normal treshold
-        if best.accuracy >= self.__options.accuracy["normal_threshold"]:
+        if best.accuracy >= self.__options.accuracy.normal_threshold:
             return best
 
         msg = _("Couldn't get Language of '{path}': Best was {best}").format(
