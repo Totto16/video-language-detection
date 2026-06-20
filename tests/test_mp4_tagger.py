@@ -1,15 +1,12 @@
 import json
-from collections.abc import Callable
 from copy import deepcopy
 from io import BytesIO
-from pathlib import Path
-from typing import Any, BinaryIO, Optional, Self, cast, override
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Self, cast, override
 from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
-from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
 
 from content.language import Language
@@ -51,9 +48,16 @@ from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import MetadataTags, uuid_to_str
 from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
-from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from pytest_subtests import SubTests
+
+    from helper.manager import ManagerInterface
 
 mark_as_used(mp4_test_parse_files)
 mark_as_used(test_manager)
@@ -118,7 +122,7 @@ class RecursiveBoxes:
     def __init__(self: Self, data: RecursiveBoxesData) -> None:
         self.__data = data
 
-    def append(self: Self, val: MP4Box | tuple[MP4Box, "RecursiveBoxes"]) -> None:
+    def append(self: Self, val: MP4Box | tuple[MP4Box, RecursiveBoxes]) -> None:
         if isinstance(val, tuple):
             self.__data.append((val[0], val[1].__data))  # noqa: SLF001
             return
@@ -131,7 +135,7 @@ class RecursiveBoxes:
 
     @staticmethod
     def __single_to_str(
-        data: MP4Box | tuple[MP4Box, "RecursiveBoxesData"],
+        data: MP4Box | tuple[MP4Box, RecursiveBoxesData],
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -332,7 +336,7 @@ class RecursiveBoxes:
     def __repr__(self: Self) -> str:
         return RecursiveBoxes.__to_str(self.__data, 0, "  ")
 
-    def eq_impl(self: Self, other: "RecursiveBoxes") -> Result[None, list[str]]:
+    def eq_impl(self: Self, other: RecursiveBoxes) -> Result[None, list[str]]:
         return self.__eq_impl(other.data)
 
     def __eq__(self: Self, other: object) -> bool:
@@ -374,7 +378,7 @@ class MP4BoxStructure(FancyEq):
         self.boxes = boxes
 
     @staticmethod
-    def from_file(file: Path) -> Result["MP4BoxStructure", str]:
+    def from_file(file: Path) -> Result[MP4BoxStructure, str]:
         try:
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f)

@@ -43,7 +43,7 @@ class SimpleSpan:
     def end(self: Self) -> int:
         return self.start + self.size
 
-    def sub_span(self: Self, new_size: int) -> "SimpleSpan":
+    def sub_span(self: Self, new_size: int) -> SimpleSpan:
         if new_size > self.size:
             msg = f"New span size overflows parent: {new_size} > {self.size}"
             raise RuntimeError(msg)
@@ -180,7 +180,7 @@ class BoundedIO:
         self.__reset_seek()
 
     @staticmethod
-    def get_new(io_base: BinaryIO, span: SimpleSpan) -> "BoundedIO":
+    def get_new(io_base: BinaryIO, span: SimpleSpan) -> BoundedIO:
         return BoundedIO(ExclusiveIOBase(io_base), span)
 
     def __read_exact_bounds_checked(self: Self, amount: int) -> bytes:
@@ -377,7 +377,7 @@ class BoundedIO:
     ) -> AbstractContextManager[BoundedIOWriteable]:
         return self.rw_ctx(force_entire_read=False)
 
-    def new_span_io(self: Self, span: SimpleSpan) -> "BoundedIO":
+    def new_span_io(self: Self, span: SimpleSpan) -> BoundedIO:
         if span.start < self.__span.start:
             msg = f"Start of new payload io is before parent start: {span.start} <  {self.__span.start}"
             raise RuntimeError(msg)

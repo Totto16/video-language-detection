@@ -133,7 +133,7 @@ class CustomKey:
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "CustomKey":
+    def deserialize_str(inp: str) -> CustomKey:
         key = CustomKey.__key_from_str(inp)
         if key is None:
             msg = f"Deserialization error: invalid key string: {inp}"
@@ -166,7 +166,7 @@ class KeyBoardConfig:
     abort: CustomKey
 
     @staticmethod
-    def default() -> "KeyBoardConfig":
+    def default() -> KeyBoardConfig:
         return KeyBoardConfig(abort=CustomKey(Keys.ControlG))
 
 
@@ -224,7 +224,7 @@ class ConfigGeneric:
     )
 
     @staticmethod
-    def __defaults() -> "FinalConfig":
+    def __defaults() -> FinalConfig:
         return FinalConfig(
             config_name="<None>",
             config_type=ConfigType.normal,
@@ -245,9 +245,9 @@ class ConfigGeneric:
         )
 
     @staticmethod
-    def fill_defaults(configs: "Config | list[Config]") -> list[FinalConfig]:
+    def fill_defaults(configs: Config | list[Config]) -> list[FinalConfig]:
 
-        def fill_one_default(config: "Config") -> FinalConfig:
+        def fill_one_default(config: Config) -> FinalConfig:
             defaults = Config.__defaults()  # noqa: SLF001
 
             # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
@@ -749,7 +749,7 @@ class LockFile(AbstractContextManager[None]):
         self.__fd = None
 
     @staticmethod
-    def for_file(file: Path) -> "LockFile":
+    def for_file(file: Path) -> LockFile:
         lock_file = file.parent / (file.stem + ".lock")
         return LockFile(lock_file)
 

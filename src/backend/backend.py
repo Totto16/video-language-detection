@@ -119,12 +119,12 @@ _ = get_translator()
 
 @decorate_class(slots=True)
 class BackendRef:
-    __backend: "Backend"
+    __backend: Backend
 
-    def __init__(self: Self, backend: "Backend") -> None:
+    def __init__(self: Self, backend: Backend) -> None:
         self.__backend = backend
 
-    async def wait_for_ready(self: Self) -> "Backend":
+    async def wait_for_ready(self: Self) -> Backend:
         await self.__backend.ready()
         return self.__backend
 
@@ -175,7 +175,7 @@ class ManagerWsChoiceMessageAskQuestionReply(pydantic.BaseModel):
 
     type: Literal["reply"] = "reply"
     reply: Literal["ask_question"]
-    result: Optional["ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult"]
+    result: Optional[ManagerWsChoiceMessageAskQuestionChoiceDataChoiceSelectResult]
     id: str
 
 
@@ -191,11 +191,11 @@ def uuid_serialize(value: uuid.UUID) -> str:
 
 @decorate_class(slots=True)
 class WsSingleManager(WebsocketHandler):
-    __parent_ref: "WsManager"
+    __parent_ref: WsManager
 
     def __init__(
         self: Self,
-        parent_ref: "WsManager",
+        parent_ref: WsManager,
         websocket: WebSocket,
     ) -> None:
         super().__init__(websocket=websocket)
@@ -204,7 +204,7 @@ class WsSingleManager(WebsocketHandler):
     async def __process_data(
         self: Self,
         data: IncomingWsData,
-    ) -> Optional[Result["OutgoingWsData", str]]:
+    ) -> Optional[Result[OutgoingWsData, str]]:
         match data.type:
             case "reply":
                 match data.reply:
@@ -526,7 +526,7 @@ ManagerWsChoiceMessageAskQuestionChoiceData = Annotated[
 
 
 def choice_to_serializable_data(
-    data: "WSChoice",
+    data: WSChoice,
 ) -> ManagerWsChoiceMessageAskQuestionChoiceData:
     if isinstance(data, WSChoiceSeparator):
         separator: ManagerWsChoiceMessageAskQuestionChoiceDataSeparator = (
@@ -654,10 +654,10 @@ OutgoingWsData = Annotated[
 
 @decorate_class(slots=True)
 class ScannerStatusBar(StatusBarInterface):
-    __ref: "WsManager"
+    __ref: WsManager
     __idx: int
 
-    def __init__(self: Self, ref: "WsManager", idx: int) -> None:
+    def __init__(self: Self, ref: WsManager, idx: int) -> None:
         super().__init__()
         self.__ref = ref
         self.__idx = idx
@@ -677,10 +677,10 @@ class ScannerStatusBar(StatusBarInterface):
 
 @decorate_class(slots=True)
 class ScannerCounter(CounterInterface):
-    __ref: "WsManager"
+    __ref: WsManager
     __idx: int
 
-    def __init__(self: Self, ref: "WsManager", idx: int) -> None:
+    def __init__(self: Self, ref: WsManager, idx: int) -> None:
         super().__init__()
         self.__ref = ref
         self.__idx = idx
@@ -1065,7 +1065,7 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
 
         return __get_filters_impl([filter_inp])
 
-    async def retreive_backend() -> "Backend":
+    async def retreive_backend() -> Backend:
         return await backend_ref.wait_for_ready()
 
     @app.get("/shutdown/")
@@ -1495,10 +1495,10 @@ class ThreadLoggerCtx(AbstractContextManager[Logger]):
 
 
 def run_in_thread(
-    self: "BackendScanner",
+    self: BackendScanner,
     configs: list[FinalConfig],
     event: asyncio.Event,
-    backend: "Backend",
+    backend: Backend,
     config_file_path: Path,
     filters: list[Filter],
 ) -> None:
@@ -1676,7 +1676,7 @@ class BackendScanner:
     async def start_run_async(
         self: Self,
         configs: list[FinalConfig],
-        backend: "Backend",
+        backend: Backend,
         config_file_path: Path,
         filters: list[Filter],
     ) -> None:
@@ -1728,7 +1728,7 @@ class BackendScanner:
         self: Self,
         configs: list[FinalConfig],
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
-        backend: "Backend",
+        backend: Backend,
         filters: list[Filter],
     ) -> Optional[str]:
 
@@ -1787,7 +1787,7 @@ class BackendScanner:
         self: Self,
         options: StartOptions,
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
-        backend: "Backend",
+        backend: Backend,
     ) -> Optional[str]:
 
         parsed_config = AdvancedConfig.resolve_raw(

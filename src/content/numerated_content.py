@@ -49,7 +49,7 @@ class NumeratedContent(Content):
         path: Path,
         scanned_file: ScannedFile,
         name_parser: NameParser,
-    ) -> "NumeratedContent":
+    ) -> NumeratedContent:
         description: Optional[NumeratedDescription] = (
             NumeratedContent.parse_description(
                 path.name,

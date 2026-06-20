@@ -1,11 +1,14 @@
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import pytest
-from pytest_subtests import SubTests
 from test_helper import re_exact_string
 
 from helper.timestamp import Timestamp
 from helper.utils import parse_int_safely
+
+if TYPE_CHECKING:
+    from pytest_subtests import SubTests
 
 
 def test_int_parsing_correct(subtests: SubTests) -> None:

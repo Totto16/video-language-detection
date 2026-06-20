@@ -29,7 +29,7 @@ class CollectionContent(Content):
     __series: list[SeriesContent] = field(metadata=alias("series"))
 
     @staticmethod
-    def from_path(path: Path, scanned_file: ScannedFile) -> "CollectionContent":
+    def from_path(path: Path, scanned_file: ScannedFile) -> CollectionContent:
         return CollectionContent(
             ContentType.collection,
             scanned_file,

@@ -191,7 +191,7 @@ class AVIChunkSpan:
     def from_avi_specified_size(
         span: SimpleSpan,
         header_size: int,
-    ) -> "AVIChunkSpan":
+    ) -> AVIChunkSpan:
         return AVIChunkSpan(SimpleSpan(span.start, span.size + 8), header_size)
 
     def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
@@ -317,7 +317,7 @@ class AVIChunk(NonFinalAVIChunk):
         self.is_list = is_list
 
     @staticmethod
-    def read_avi_chunk(io: BoundedIO) -> "AVIChunk":
+    def read_avi_chunk(io: BoundedIO) -> AVIChunk:
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI Chunk structure:
         # fourcc | 4 bytes | char[4]
@@ -481,7 +481,7 @@ class AVIList(AVIChunk):
         self.type = typ
 
     @staticmethod
-    def __read_impl(io: BoundedIO, parent: AVIChunk) -> "AVIList":
+    def __read_impl(io: BoundedIO, parent: AVIChunk) -> AVIList:
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
         # AVI List structure:
         # chunk    | <chunk size> bytes | parent chunk
@@ -504,12 +504,12 @@ class AVIList(AVIChunk):
             return AVIList(parent, typ)
 
     @staticmethod
-    def read_avi_list(io: BoundedIO) -> "AVIList":
+    def read_avi_list(io: BoundedIO) -> AVIList:
         chunk = AVIChunk.read_avi_chunk(io)
         return AVIList.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_avi_list_from_parent(io: BoundedIO, parent: AVIChunk) -> "AVIList":
+    def read_avi_list_from_parent(io: BoundedIO, parent: AVIChunk) -> AVIList:
         return AVIList.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
@@ -568,7 +568,7 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
     def __read_impl(
         io: BoundedIO,
         parent: AVIChunk,
-    ) -> "AVIStreamHeader":
+    ) -> AVIStreamHeader:
         # spec https://learn.microsoft.com/en-us/previous-versions/ms779638(v=vs.85)
         # AVI Stream Header structure:
         # chunk    | <chunk size> bytes | parent chunk
@@ -617,12 +617,12 @@ class AVIStreamHeader(AVIChunk, FinalAVIChunk):
             return AVIStreamHeader(parent, typ)
 
     @staticmethod
-    def read(io: BoundedIO) -> "AVIStreamHeader":
+    def read(io: BoundedIO) -> AVIStreamHeader:
         chunk = AVIChunk.read_avi_chunk(io)
         return AVIStreamHeader.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "AVIStreamHeader":
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> AVIStreamHeader:
         return AVIStreamHeader.__read_impl(io, parent)
 
     @property
@@ -688,7 +688,7 @@ class VLDStrChunk(AVIChunk, FinalAVIChunk):
     def __read_impl(
         io: BoundedIO,
         parent: AVIChunk,
-    ) -> "VLDStrChunk":
+    ) -> VLDStrChunk:
         # custom chunk
         # just contains some string data
 
@@ -706,12 +706,12 @@ class VLDStrChunk(AVIChunk, FinalAVIChunk):
             return VLDStrChunk(parent, value)
 
     @staticmethod
-    def read(io: BoundedIO) -> "VLDStrChunk":
+    def read(io: BoundedIO) -> VLDStrChunk:
         chunk = AVIChunk.read_avi_chunk(io)
         return VLDStrChunk.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_checked(io: BoundedIO) -> "VLDStrChunk":
+    def read_checked(io: BoundedIO) -> VLDStrChunk:
         chunk = AVIChunk.read_avi_chunk(io)
         if chunk.fourcc != VLD_STR_CHUNK_FOURCC:
             msg = f"Invalid VLDStrChunk fourcc: {chunk.fourcc}"
@@ -719,7 +719,7 @@ class VLDStrChunk(AVIChunk, FinalAVIChunk):
         return VLDStrChunk.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDStrChunk":
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> VLDStrChunk:
         return VLDStrChunk.__read_impl(io, parent)
 
     @staticmethod
@@ -758,7 +758,7 @@ class VLDJsonChunk(AVIChunk, FinalAVIChunk):
     def __read_impl(
         io: BoundedIO,
         parent: AVIChunk,
-    ) -> "VLDJsonChunk":
+    ) -> VLDJsonChunk:
         # custom chunk
         # just contains a json payload
 
@@ -776,12 +776,12 @@ class VLDJsonChunk(AVIChunk, FinalAVIChunk):
             return VLDJsonChunk(parent, data)
 
     @staticmethod
-    def read(io: BoundedIO) -> "VLDJsonChunk":
+    def read(io: BoundedIO) -> VLDJsonChunk:
         chunk = AVIChunk.read_avi_chunk(io)
         return VLDJsonChunk.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDJsonChunk":
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> VLDJsonChunk:
         return VLDJsonChunk.__read_impl(io, parent)
 
     @staticmethod
@@ -813,7 +813,7 @@ class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
     def __read_impl(
         io: BoundedIO,
         parent: AVIChunk,
-    ) -> "VLDUUIDChunk":
+    ) -> VLDUUIDChunk:
         # custom chunk
         # just contains an UUID
 
@@ -834,12 +834,12 @@ class VLDUUIDChunk(AVIChunk, FinalAVIChunk):
             return VLDUUIDChunk(parent, uuid)
 
     @staticmethod
-    def read(io: BoundedIO) -> "VLDUUIDChunk":
+    def read(io: BoundedIO) -> VLDUUIDChunk:
         chunk = AVIChunk.read_avi_chunk(io)
         return VLDUUIDChunk.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDUUIDChunk":
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> VLDUUIDChunk:
         return VLDUUIDChunk.__read_impl(io, parent)
 
     @staticmethod
@@ -896,7 +896,7 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
     def __read_impl(
         io: BoundedIO,
         parent: AVIChunk,
-    ) -> "VLDKeyValueChunk":
+    ) -> VLDKeyValueChunk:
         # custom chunk
         # contains a key and a value
 
@@ -957,12 +957,12 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
         return VLDKeyValueChunk(parent, key_chunk.value, value)
 
     @staticmethod
-    def read(io: BoundedIO) -> "VLDKeyValueChunk":
+    def read(io: BoundedIO) -> VLDKeyValueChunk:
         chunk = AVIChunk.read_avi_chunk(io)
         return VLDKeyValueChunk.__read_impl(chunk.payload_io(io), chunk)
 
     @staticmethod
-    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> "VLDKeyValueChunk":
+    def read_from_parent(io: BoundedIO, parent: AVIChunk) -> VLDKeyValueChunk:
         return VLDKeyValueChunk.__read_impl(io, parent)
 
     @staticmethod
@@ -1652,7 +1652,7 @@ class AVIMetadataHandler:
     @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
         f: BinaryIO,
-    ) -> "AVIMetadataHandler":
+    ) -> AVIMetadataHandler:
 
         info_values: InfoValues = None
 
@@ -1919,7 +1919,7 @@ class VideoTaggerAVI(VideoTagger):
         streams = 0
 
     @staticmethod
-    def get_handle(file: Path) -> Result["VideoTagger", str]:
+    def get_handle(file: Path) -> Result[VideoTagger, str]:
 
         try:
 

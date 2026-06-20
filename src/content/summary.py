@@ -161,7 +161,7 @@ class Summary:
         video_metadata: Optional[VideoMetadata],
         *,
         detailed: bool,
-    ) -> "Summary":
+    ) -> Summary:
 
         return Summary(
             languages=[language],
@@ -180,7 +180,7 @@ class Summary:
     def combine_episodes(
         self: Self,
         description: SeasonDescription,
-        summary: "Summary",
+        summary: Summary,
     ) -> None:
         for desc in summary.descriptions:
             if isinstance(desc[0], EpisodeDescription):
@@ -202,10 +202,10 @@ class Summary:
     def construct_for_season(
         metadata: InternalMetadataType,
         description: SeasonDescription,
-        episode_summaries: Iterable["Summary"],
+        episode_summaries: Iterable[Summary],
         *,
         detailed: bool,
-    ) -> "Summary":
+    ) -> Summary:
         summary = Summary(
             languages=[],
             metadatas=[(MetadataKind.season, metadata)],
@@ -221,7 +221,7 @@ class Summary:
     def combine_seasons(
         self: Self,
         description: SeriesDescription,
-        summary: "Summary",
+        summary: Summary,
     ) -> None:
         for desc in summary.descriptions:
             if len(desc) == 2:
@@ -245,10 +245,10 @@ class Summary:
     def construct_for_series(
         metadata: InternalMetadataType,
         description: SeriesDescription,
-        season_summaries: Iterable["Summary"],
+        season_summaries: Iterable[Summary],
         *,
         detailed: bool,
-    ) -> "Summary":
+    ) -> Summary:
         summary = Summary(
             languages=[],
             metadatas=[(MetadataKind.series, metadata)],
@@ -264,7 +264,7 @@ class Summary:
     def combine_series(
         self: Self,
         description: CollectionDescription,
-        summary: "Summary",
+        summary: Summary,
     ) -> None:
         for desc in summary.descriptions:
             if len(desc) == 3:
@@ -287,10 +287,10 @@ class Summary:
     @staticmethod
     def construct_for_collection(
         description: CollectionDescription,
-        series_summaries: Iterable["Summary"],
+        series_summaries: Iterable[Summary],
         *,
         detailed: bool,
-    ) -> "Summary":
+    ) -> Summary:
         summary = Summary(
             languages=[],
             metadatas=[],
@@ -384,7 +384,7 @@ class Summary:
 
     @staticmethod
     def combine_summaries(
-        input_iterable: Iterable["Summary"],
+        input_iterable: Iterable[Summary],
     ) -> tuple[LanguageDict, MetadataDict, VideoMetadataDict]:
         input_list: list[tuple[LanguageDict, MetadataDict, VideoMetadataDict]] = [
             (inp.language, inp.metadata, inp.video_metadata) for inp in input_iterable

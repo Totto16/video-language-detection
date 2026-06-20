@@ -83,7 +83,7 @@ class ConfigFilter(Filter):
         return self.__value
 
     @staticmethod
-    def from_string(inp: str) -> "ConfigFilter":
+    def from_string(inp: str) -> ConfigFilter:
         num = parse_int_safely(inp)
         if num is not None:
             return ConfigFilter(num)
@@ -146,7 +146,7 @@ class ExecuteFilter(Filter):
         return self.__step
 
     @staticmethod
-    def from_string(inp: str) -> Result["ExecuteFilter", str]:
+    def from_string(inp: str) -> Result[ExecuteFilter, str]:
         try:
             step = ExecuteStep(inp)
             return Ok(ExecuteFilter(step))
@@ -198,15 +198,15 @@ class ExecuteSteps:
     validate: bool
 
     @staticmethod
-    def default() -> "ExecuteSteps":
+    def default() -> ExecuteSteps:
         return ExecuteSteps(check=True, summary=True, validate=True)
 
     @staticmethod
-    def all() -> "ExecuteSteps":
+    def all() -> ExecuteSteps:
         return ExecuteSteps(check=True, summary=True, validate=True)
 
     @staticmethod
-    def empty() -> "ExecuteSteps":
+    def empty() -> ExecuteSteps:
         return ExecuteSteps(check=False, summary=False, validate=False)
 
 

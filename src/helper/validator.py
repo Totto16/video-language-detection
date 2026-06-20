@@ -253,13 +253,13 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     def __validate_multiple_episodes_impl(
-        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        validators: list[Validator[__Any1, __Any2, __Any3, __Any4]],
         series: SeriesDescription,
         season: SeasonDescription,
         contents: list[EpisodeContent],
         *,
         manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any1]"]:
+    ) -> list[Validator.__ValidatorState[Validator.__Any1]]:
         state: list[Validator.__ValidatorState[Validator.__Any1]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
@@ -279,12 +279,12 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     def __validate_multiple_seasons_impl(
-        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        validators: list[Validator[__Any1, __Any2, __Any3, __Any4]],
         series: SeriesDescription,
         contents: list[SeasonContent],
         *,
         manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any2]"]:
+    ) -> list[Validator.__ValidatorState[Validator.__Any2]]:
         state: list[Validator.__ValidatorState[Validator.__Any2]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
@@ -318,11 +318,11 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     def __validate_multiple_series_impl(
-        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        validators: list[Validator[__Any1, __Any2, __Any3, __Any4]],
         contents: list[SeriesContent],
         *,
         manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any3]"]:
+    ) -> list[Validator.__ValidatorState[Validator.__Any3]]:
         state: list[Validator.__ValidatorState[Validator.__Any3]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
@@ -354,7 +354,7 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     def __validate_multiple_root_impl(
-        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        validators: list[Validator[__Any1, __Any2, __Any3, __Any4]],
         contents: list[Content],
         manager: ManagerInterface,
     ) -> None:
@@ -426,7 +426,7 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @staticmethod
     def validate_multiple(
-        validators: list["Validator[Any, Any, Any, Any]"],
+        validators: list[Validator[Any, Any, Any, Any]],
         contents: list[Content],
         *,
         manager: ManagerInterface,
@@ -487,7 +487,7 @@ class Validator[ED, SD, S2D, CD](ABC):
     def from_params(
         params: ValidatorParams,
         options: Optional[str],
-    ) -> Result["Validator[ED, SD, S2D, CD]", str]: ...
+    ) -> Result[Validator[ED, SD, S2D, CD], str]: ...
 
     @staticmethod
     @abstractmethod
@@ -582,7 +582,7 @@ class LanguageValidator(Validator[None, None, None, None]):
     def from_params(
         params: ValidatorParams,
         options: Optional[str],
-    ) -> Result["LanguageValidator", str]:
+    ) -> Result[LanguageValidator, str]:
         result = LanguageValidator.validate_options(options)
         if result.err():
             return Err(result.as_err())
@@ -767,7 +767,7 @@ class LanguageConsistencyValidator(
     def from_params(
         params: ValidatorParams,
         options: Optional[str],
-    ) -> Result["LanguageConsistencyValidator", str]:
+    ) -> Result[LanguageConsistencyValidator, str]:
         result = LanguageConsistencyValidator.validate_options(options)
         if result.err():
             return Err(result.as_err())
@@ -895,7 +895,7 @@ class TagsValidator(Validator[None, None, None, None]):
     def from_params(
         params: ValidatorParams,
         options: Optional[str],
-    ) -> Result["TagsValidator", str]:
+    ) -> Result[TagsValidator, str]:
         result = TagsValidator.validate_options(options)
         if result.err():
             return Err(result.as_err())

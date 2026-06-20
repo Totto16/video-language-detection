@@ -1,8 +1,10 @@
 import logging
-
-from pytest_subtests import SubTests
+from typing import TYPE_CHECKING
 
 from helper.log import LogLevel, get_logger, setup_custom_logger
+
+if TYPE_CHECKING:
+    from pytest_subtests import SubTests
 
 
 def test_loglevel_from_str(subtests: SubTests) -> None:

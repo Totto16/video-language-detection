@@ -50,7 +50,7 @@ class SeasonContent(Content):
         path: Path,
         scanned_file: ScannedFile,
         name_parser: NameParser,
-    ) -> "SeasonContent":
+    ) -> SeasonContent:
         description: Optional[SeasonDescription] = SeasonContent.parse_description(
             path.name,
             name_parser,

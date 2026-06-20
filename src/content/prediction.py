@@ -128,7 +128,7 @@ class Prediction:
     def append(self: Self, data: PredictionType) -> None:
         self.__data.append(data)
 
-    def append_other(self: Self, pred: "Prediction") -> None:
+    def append_other(self: Self, pred: Prediction) -> None:
         self.__data.extend(pred.data)
 
     def __iadd__(self: Self, value: object) -> Self:
@@ -139,7 +139,7 @@ class Prediction:
         msg = f"'+=' not supported between instances of 'Prediction' and '{value.__class__.__name__}'"
         raise TypeError(msg)
 
-    def __add__(self: Self, value: object) -> "Prediction":
+    def __add__(self: Self, value: object) -> Prediction:
         new_value = Prediction()
         new_value += self
         new_value += value

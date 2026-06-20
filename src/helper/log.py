@@ -22,7 +22,7 @@ class LogLevel(Enum):
     NOTSET = "NOTSET"
 
     @staticmethod
-    def from_str(inp: str) -> Optional["LogLevel"]:
+    def from_str(inp: str) -> Optional[LogLevel]:
         for level in LogLevel:
             if str(level).lower() == inp.lower():
                 return level
@@ -30,7 +30,7 @@ class LogLevel(Enum):
         return None
 
     @staticmethod
-    def __underlying_impl(value: "LogLevel") -> int:
+    def __underlying_impl(value: LogLevel) -> int:
         match value:
             case LogLevel.CRITICAL:
                 return logging.CRITICAL

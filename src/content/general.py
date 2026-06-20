@@ -23,7 +23,7 @@ class ScannedFileType(Enum):
     folder = "folder"
 
     @staticmethod
-    def from_path(path: Path) -> "ScannedFileType":
+    def from_path(path: Path) -> ScannedFileType:
         return ScannedFileType.folder if path.is_dir() else ScannedFileType.file
 
     def __str__(self: Self) -> str:
@@ -151,7 +151,7 @@ class Stats:
         *,
         generate_checksum: bool = True,
         manager: ManagerInterface,
-    ) -> "Stats":
+    ) -> Stats:
         mtime: float = file_path.stat().st_mtime
 
         checksum: Optional[str] = (
@@ -236,7 +236,7 @@ class ScannedFile:
         file_type: ScannedFileType,
         parent_folders: list[str],
         manager: ManagerInterface,
-    ) -> "ScannedFile":
+    ) -> ScannedFile:
         if len(parent_folders) > 3:
             msg = "No more than 3 parent folders are allowed: [collection] -> series -> season"
             raise RuntimeError(msg)

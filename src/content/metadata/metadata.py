@@ -54,7 +54,7 @@ class HandleImpl(ABC):
         return self.__data
 
     @abstractmethod
-    def to_handle(self: Self) -> "MetadataHandle": ...
+    def to_handle(self: Self) -> MetadataHandle: ...
 
 
 @define_schema_lazy(fn=make_provider_schema_imdb)
@@ -69,7 +69,7 @@ class ImdbHandleImpl(HandleImpl):
         super().__init__(provider, data)
 
     @override
-    def to_handle(self: Self) -> "MetadataHandle":
+    def to_handle(self: Self) -> MetadataHandle:
         msg = _(
             "Deserialization error: Not implemented for provider {provider}"  # noqa: COM812
         ).format(provider=self.provider)
@@ -88,7 +88,7 @@ class TmdbHandleImpl(HandleImpl):
         super().__init__(provider, data)
 
     @override
-    def to_handle(self: Self) -> "MetadataHandle":
+    def to_handle(self: Self) -> MetadataHandle:
         return MetadataHandle(
             self.provider,
             self.data,
@@ -124,7 +124,7 @@ class MetadataHandle:
 
     @deserializer
     @staticmethod
-    def deserialize(data: MetadataHandleSchema) -> "MetadataHandle":
+    def deserialize(data: MetadataHandleSchema) -> MetadataHandle:
         return data.to_handle()
 
     def __str__(self: Self) -> str:

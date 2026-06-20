@@ -128,7 +128,7 @@ class VideoMetadata:
     def __read_metadata(
         file: Path,
         error_mode: ErrorMode,
-    ) -> Result["VideoMetadata", str]:
+    ) -> Result[VideoMetadata, str]:
         metadata_res = ffprobe(file.absolute())
 
         if metadata_res.err():
@@ -225,7 +225,7 @@ class VideoMetadata:
             raise RuntimeError(msg)
 
     @staticmethod
-    def from_file(file: Path, error_mode: ErrorMode) -> Result["VideoMetadata", str]:
+    def from_file(file: Path, error_mode: ErrorMode) -> Result[VideoMetadata, str]:
         VideoMetadata.__check_ffprobe()
 
         return VideoMetadata.__read_metadata(file=file, error_mode=error_mode)

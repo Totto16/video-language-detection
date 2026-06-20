@@ -397,7 +397,7 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
 
         @decorate_class(slots=True)
         class A2:
-            def _get_foo(self: Self) -> type["A2"]:
+            def _get_foo(self: Self) -> type[A2]:
                 assert __class__ is type(self)  # type: ignore[name-defined]
                 assert __class__ is self.__class__  # type: ignore[name-defined]
                 return __class__  # type: ignore[name-defined]
@@ -444,7 +444,7 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
         @decorate_class(slots=True)
         class A4:
             @property
-            def foo(self: Self) -> type["A4"]:
+            def foo(self: Self) -> type[A4]:
                 return __class__  # type: ignore[name-defined]
 
         a = A4()
@@ -500,7 +500,7 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
         # is created), so that we can keep a reference to the
         # undecorated class.
         class A8:
-            def cls(self: Self) -> type["A8"]:
+            def cls(self: Self) -> type[A8]:
                 return __class__  # type: ignore[name-defined]
 
         assert A8().cls() is A8
@@ -547,10 +547,10 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_custom_descriptor"):
 
         class CustomDescriptor1:
-            def __init__(self: Self, f: Callable[["A10"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A10], Any]) -> None:
                 self._f = f
 
-            def __get__(self: Self, instance: "A10", owner: Any) -> Any:
+            def __get__(self: Self, instance: A10, owner: Any) -> Any:
                 return self._f(instance)
 
         class B10:
@@ -568,13 +568,13 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_custom_descriptor_wrapped"):
 
         class CustomDescriptor2:
-            def __init__(self: Self, f: Callable[["A11"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A11], Any]) -> None:
                 self._f = update_wrapper(
                     lambda *args, **kwargs: f(*args, **kwargs),  # noqa: PLW0108
                     f,
                 )
 
-            def __get__(self: Self, instance: "A11", owner: Any) -> Any:
+            def __get__(self: Self, instance: A11, owner: Any) -> Any:
                 return self._f(instance)
 
         class B11:
@@ -592,17 +592,17 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_custom_nested_descriptor"):
 
         class CustomFunctionWrapper3:
-            def __init__(self: Self, f: Callable[["A12"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A12], Any]) -> None:
                 self._f = f
 
             def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._f(*args, **kwargs)
 
         class CustomDescriptor3:
-            def __init__(self: Self, f: Callable[["A12"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A12], Any]) -> None:
                 self._wrapper = CustomFunctionWrapper3(f)
 
-            def __get__(self: Self, instance: "A12", owner: Any) -> Any:
+            def __get__(self: Self, instance: A12, owner: Any) -> Any:
                 return self._wrapper(instance)
 
         class B12:
@@ -620,10 +620,10 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_custom_nested_descriptor_with_partial"):
 
         class CustomDescriptor4:
-            def __init__(self: Self, f: Callable[["A13", Any], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A13, Any], Any]) -> None:
                 self._wrapper: Callable[[A13], Any] = partial(f, value="bar")  # type: ignore[call-arg]
 
-            def __get__(self: Self, instance: "A13", owner: Any) -> Any:
+            def __get__(self: Self, instance: A13, owner: Any) -> Any:
                 return self._wrapper(instance)
 
         class B13:
@@ -641,21 +641,21 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_custom_too_nested_descriptor"):
 
         class UnnecessaryNestedWrapper5:
-            def __init__(self: Self, wrapper: Callable[["A14"], Any]) -> None:
+            def __init__(self: Self, wrapper: Callable[[A14], Any]) -> None:
                 self._wrapper = wrapper
 
             def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._wrapper(*args, **kwargs)
 
         class CustomFunctionWrapper5:
-            def __init__(self: Self, f: Callable[["A14"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A14], Any]) -> None:
                 self._f = f
 
             def __call__(self: Self, *args: Any, **kwargs: Any) -> Any:
                 return self._f(*args, **kwargs)
 
         class CustomDescriptor5:
-            def __init__(self: Self, f: Callable[["A14"], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A14], Any]) -> None:
                 self._wrapper = UnnecessaryNestedWrapper5(CustomFunctionWrapper5(f))
 
             def __get__(self: Self, instance: Any, owner: Any) -> Any:
@@ -682,7 +682,7 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
     with subtests.test("test_user_defined_code_execution"):
 
         class CustomDescriptor6:
-            def __init__(self: Self, f: Callable[["A15", Any], Any]) -> None:
+            def __init__(self: Self, f: Callable[[A15, Any], Any]) -> None:
                 self._wrapper: Callable[[A15], Any] = partial(f, value="bar")  # type: ignore[call-arg]
 
             def __get__(self: Self, instance: Any, owner: Any) -> Any:

@@ -13,7 +13,7 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]:
+def get_tagger_for_mp4_file_deprecated(file: Path) -> Result[VideoTagger, str]:
 
     try:
 
@@ -49,7 +49,7 @@ def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]
         )
 
 
-def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
+def get_tagger_for_mp4_file(file: Path) -> Result[VideoTagger, str]:
 
     try:
 
@@ -66,7 +66,7 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
         )
 
 
-def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
+def get_tagger_for_avi_file(file: Path) -> Result[VideoTagger, str]:
 
     try:
 
@@ -83,7 +83,7 @@ def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
         )
 
 
-def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
+def get_tagger_for_file(file: Path) -> Result[VideoTagger, str]:
 
     ext = file.suffix
 

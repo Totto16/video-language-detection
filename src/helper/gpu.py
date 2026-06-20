@@ -155,7 +155,7 @@ class DeviceTopologyAmdSmi:
         return f"{self.domain:04x}:{self.bus:02x}:{self.device:02x}.{self.function:x}"
 
     @staticmethod
-    def from_str(topology: str) -> Optional["DeviceTopologyAmdSmi"]:
+    def from_str(topology: str) -> Optional[DeviceTopologyAmdSmi]:
         parsed = topology.split(":")
         if (len(parsed)) != 3:
             return None
@@ -191,7 +191,7 @@ class DeviceTopologyAmdSmi:
         )
 
     @staticmethod
-    def from_processor_handle(processor_handle: Any) -> "DeviceTopologyAmdSmi":
+    def from_processor_handle(processor_handle: Any) -> DeviceTopologyAmdSmi:
         from amdsmi import (  # type: ignore[import-not-found,unused-ignore]  # noqa: PLC0415
             amdsmi_interface,
         )
@@ -553,7 +553,7 @@ class GPU(ABC):
         self.__device = device
 
     @staticmethod
-    def get_best(*, use_integrated: bool = False) -> Result["GPU", str]:
+    def get_best(*, use_integrated: bool = False) -> Result[GPU, str]:
         try:
             devices_res = get_devices()
 
@@ -609,7 +609,7 @@ class GPU(ABC):
             return Err(str(err))
 
     @staticmethod
-    def from_device(device: GPUDevice) -> "GPU":
+    def from_device(device: GPUDevice) -> GPU:
         match device.vendor:
             case GPUVendor.nvidia:
                 return NvidiaGPU(device)

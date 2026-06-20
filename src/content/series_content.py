@@ -41,7 +41,7 @@ class SeriesContent(Content):
         path: Path,
         scanned_file: ScannedFile,
         name_parser: NameParser,
-    ) -> "SeriesContent":
+    ) -> SeriesContent:
         description: Optional[SeriesDescription] = SeriesContent.parse_description(
             path.name,
             name_parser,

@@ -74,7 +74,7 @@ class EpisodeContent(Content):
         path: Path,
         scanned_file: ScannedFile,
         name_parser: NameParser,
-    ) -> "EpisodeContent":
+    ) -> EpisodeContent:
         description: Optional[EpisodeDescription] = EpisodeContent.parse_description(
             path.name,
             name_parser,

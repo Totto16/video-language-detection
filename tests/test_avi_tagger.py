@@ -76,7 +76,7 @@ class RecursiveChunks:
     def __init__(self: Self, data: RecursiveChunkData) -> None:
         self.__data = data
 
-    def append(self: Self, val: AVIChunk | tuple[AVIList, "RecursiveChunks"]) -> None:
+    def append(self: Self, val: AVIChunk | tuple[AVIList, RecursiveChunks]) -> None:
         if isinstance(val, tuple):
             self.__data.append((val[0], val[1].__data))  # noqa: SLF001
             return
@@ -89,7 +89,7 @@ class RecursiveChunks:
 
     @staticmethod
     def __single_to_str(
-        data: AVIChunk | tuple[AVIChunk, "RecursiveChunkData"],
+        data: AVIChunk | tuple[AVIChunk, RecursiveChunkData],
         depth: int,
         indent_str: str = " ",
     ) -> str:
@@ -275,7 +275,7 @@ class RecursiveChunks:
     def __repr__(self: Self) -> str:
         return RecursiveChunks.__to_str(self.__data, 0, "  ")
 
-    def eq_impl(self: Self, other: "RecursiveChunks") -> Result[None, list[str]]:
+    def eq_impl(self: Self, other: RecursiveChunks) -> Result[None, list[str]]:
         return self.__eq_impl(other.data)
 
     def __eq__(self: Self, other: object) -> bool:
@@ -323,7 +323,7 @@ class AVIChunkStructure(FancyEq):
         self.chunks = chunks
 
     @staticmethod
-    def from_file(file: Path) -> Result["AVIChunkStructure", str]:
+    def from_file(file: Path) -> Result[AVIChunkStructure, str]:
         try:
             with file.open("rb") as f:
                 avi_res = is_avi_file(f)

@@ -388,7 +388,7 @@ class Content(ABC):
     def scan(
         self: Self,
         callback: Callback[
-            "Content",
+            Content,
             ContentCharacteristic,
             CallbackData,
         ],

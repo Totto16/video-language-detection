@@ -2,9 +2,9 @@ import inspect
 import itertools
 import types
 from collections.abc import Callable, Generator
-from dataclasses import dataclass, is_dataclass
+from dataclasses import is_dataclass
 from enum import EnumType
-from typing import Any, Optional, TypedDict, cast, is_typeddict
+from typing import Any, Optional, cast, is_typeddict
 
 from pydantic._internal._model_construction import ModelMetaclass
 

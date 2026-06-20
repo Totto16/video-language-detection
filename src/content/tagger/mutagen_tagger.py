@@ -632,7 +632,7 @@ class VideoTaggerMutagen(VideoTagger):
             )
 
     @staticmethod
-    def get_handle(file: Path) -> Result["VideoTaggerMutagen", str]:
+    def get_handle(file: Path) -> Result[VideoTaggerMutagen, str]:
         result = VideoTaggerMutagen.__get_handle_impl(file, ctx="r")
 
         if result.err():

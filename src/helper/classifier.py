@@ -119,7 +119,7 @@ class MemoryPatternLinear(MemoryPattern):
     @staticmethod
     def from_poly_coefs(
         coeffs: tuple[float, float],
-    ) -> "MemoryPatternLinear":
+    ) -> MemoryPatternLinear:
         l_coeffs = LinearCoeffs(c=coeffs[0], m=coeffs[1])
         return MemoryPatternLinear(coeffs=l_coeffs)
 
@@ -170,7 +170,7 @@ class MemoryPatternQuadratic(MemoryPattern):
     @staticmethod
     def from_poly_coefs(
         coeffs: tuple[float, float, float],
-    ) -> "MemoryPatternQuadratic":
+    ) -> MemoryPatternQuadratic:
         q_coeffs = QuadraticCoeffs(c=coeffs[0], b=coeffs[1], a=coeffs[2])
         return MemoryPatternQuadratic(coeffs=q_coeffs)
 
@@ -531,7 +531,7 @@ class GeneratedWavFileManager(AbstractContextManager[Path]):
     def __enter__(self: Self) -> Path:
         return self.__file
 
-    def release(self: Self) -> "GeneratedWavFileManager":
+    def release(self: Self) -> GeneratedWavFileManager:
         self.__released = True
         return GeneratedWavFileManager(self.__file)
 
@@ -833,7 +833,7 @@ class AdvancedPercentage:
         self.__value = value
 
     @staticmethod
-    def safe_from_value(value: float) -> Optional["AdvancedPercentage"]:
+    def safe_from_value(value: float) -> Optional[AdvancedPercentage]:
 
         if not is_percentage(value):
             return None
@@ -850,7 +850,7 @@ class AdvancedPercentage:
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "AdvancedPercentage":
+    def deserialize_str(inp: str) -> AdvancedPercentage:
         match = re.match(PERCENTAGE_PATTERN, inp)
 
         if match is None:
@@ -1023,7 +1023,7 @@ class AutoBatchSettings:
     target_fullness: Percentage
 
     @staticmethod
-    def default() -> "AutoBatchSettings":
+    def default() -> AutoBatchSettings:
         return AutoBatchSettings(
             batch_type="auto",
             keep_free=0.1,
@@ -1074,7 +1074,7 @@ class ClassifierOptions:
     scan_config: ScanConfigData
 
     @staticmethod
-    def default() -> "ClassifierOptions":
+    def default() -> ClassifierOptions:
         default_accuracy = AccuracySettingsData(
             normal_threshold=AdvancedPercentage(0.95, "normal_threshold"),
             final_threshold=AdvancedPercentage(0.75, "final_threshold"),
@@ -1103,7 +1103,7 @@ class ClassifierOptionsConfig:
     scan_config: Annotated[Optional[ScanConfigDict], OneOf]
 
     @staticmethod
-    def default() -> "ClassifierOptionsConfig":
+    def default() -> ClassifierOptionsConfig:
         config_defaults: ClassifierOptions = ClassifierOptions.default()
 
         default_accuracy = AccuracySettingsDict(

@@ -247,7 +247,7 @@ class Alpha3LanguageStr:
         inp: str,
         *,
         valid_check: bool,
-    ) -> Optional["Alpha3LanguageStr"]:
+    ) -> Optional[Alpha3LanguageStr]:
         val = Alpha3LanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
 
         if val is None:
@@ -259,11 +259,11 @@ class Alpha3LanguageStr:
         )
 
     @staticmethod
-    def from_str(inp: str) -> Optional["Alpha3LanguageStr"]:
+    def from_str(inp: str) -> Optional[Alpha3LanguageStr]:
         return Alpha3LanguageStr.__from_str_impl(inp, valid_check=True)
 
     @staticmethod
-    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "Alpha3LanguageStr":
+    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> Alpha3LanguageStr:
         val: Optional[Alpha3LanguageStr] = Alpha3LanguageStr.__from_str_impl(
             inp,
             valid_check=valid_check,
@@ -277,7 +277,7 @@ class Alpha3LanguageStr:
         return val
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "Alpha3LanguageStr":
+    def from_str_unsafe(inp: str) -> Alpha3LanguageStr:
         return Alpha3LanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
 
     @serializer
@@ -286,7 +286,7 @@ class Alpha3LanguageStr:
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "Alpha3LanguageStr":
+    def deserialize_str(inp: str) -> Alpha3LanguageStr:
         match = re.match(ALPHA_3_LANGUAGE_STR_PATTERN, inp)
 
         if match is None:
@@ -369,7 +369,7 @@ class Alpha2LanguageStr:
         inp: str,
         *,
         valid_check: bool,
-    ) -> Optional["Alpha2LanguageStr"]:
+    ) -> Optional[Alpha2LanguageStr]:
         val = Alpha2LanguageStr.__from_raw_str_checked(inp, valid_check=valid_check)
 
         if val is None:
@@ -381,11 +381,11 @@ class Alpha2LanguageStr:
         )
 
     @staticmethod
-    def from_str(inp: str) -> Optional["Alpha2LanguageStr"]:
+    def from_str(inp: str) -> Optional[Alpha2LanguageStr]:
         return Alpha2LanguageStr.__from_str_impl(inp, valid_check=True)
 
     @staticmethod
-    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> "Alpha2LanguageStr":
+    def __impl_from_str_unsafe(inp: str, *, valid_check: bool) -> Alpha2LanguageStr:
         val: Optional[Alpha2LanguageStr] = Alpha2LanguageStr.__from_str_impl(
             inp,
             valid_check=valid_check,
@@ -399,7 +399,7 @@ class Alpha2LanguageStr:
         return val
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "Alpha2LanguageStr":
+    def from_str_unsafe(inp: str) -> Alpha2LanguageStr:
         return Alpha2LanguageStr.__impl_from_str_unsafe(inp, valid_check=True)
 
     @serializer
@@ -407,16 +407,16 @@ class Alpha2LanguageStr:
         return self.__data
 
     @staticmethod
-    def no_lang() -> "Alpha2LanguageStr":
+    def no_lang() -> Alpha2LanguageStr:
         return Alpha2LanguageStr.__impl_from_str_unsafe("xx", valid_check=False)
 
     @staticmethod
-    def unknown_lang() -> "Alpha2LanguageStr":
+    def unknown_lang() -> Alpha2LanguageStr:
         return Alpha2LanguageStr.__impl_from_str_unsafe("un", valid_check=False)
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "Alpha2LanguageStr":
+    def deserialize_str(inp: str) -> Alpha2LanguageStr:
         # backwards compatible, as before the enforcing of the two alpha rule, no language wasn't two alpha digits!
         if inp in ["no_lang", "xx"]:
             return Alpha2LanguageStr.no_lang()
@@ -523,7 +523,7 @@ class Alpha2LanguageStrRegional:
         region: str,
         *,
         valid_check: bool,
-    ) -> Optional["Alpha2LanguageStrRegional"]:
+    ) -> Optional[Alpha2LanguageStrRegional]:
         lang_val: Optional[Alpha2LanguageStr] = Alpha2LanguageStr.from_str(lang)
 
         if lang_val is None:
@@ -549,7 +549,7 @@ class Alpha2LanguageStrRegional:
         inp: str,
         *,
         valid_check: bool,
-    ) -> Optional["Alpha2LanguageStrRegional"]:
+    ) -> Optional[Alpha2LanguageStrRegional]:
         arr: list[str] = [a.strip() for a in inp.split("-")]
         if len(arr) != 2:
             return None
@@ -561,7 +561,7 @@ class Alpha2LanguageStrRegional:
         )
 
     @staticmethod
-    def from_str(inp: str) -> Optional["Alpha2LanguageStrRegional"]:
+    def from_str(inp: str) -> Optional[Alpha2LanguageStrRegional]:
         return Alpha2LanguageStrRegional.__from_str_impl(inp, valid_check=True)
 
     @staticmethod
@@ -569,7 +569,7 @@ class Alpha2LanguageStrRegional:
         inp: str,
         *,
         valid_check: bool,
-    ) -> "Alpha2LanguageStrRegional":
+    ) -> Alpha2LanguageStrRegional:
         lan: Optional[Alpha2LanguageStrRegional] = (
             Alpha2LanguageStrRegional.__from_str_impl(
                 inp,
@@ -585,7 +585,7 @@ class Alpha2LanguageStrRegional:
         return lan
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "Alpha2LanguageStrRegional":
+    def from_str_unsafe(inp: str) -> Alpha2LanguageStrRegional:
         return Alpha2LanguageStrRegional.__from_str_unsafe_impl(inp, valid_check=True)
 
     @serializer
@@ -594,7 +594,7 @@ class Alpha2LanguageStrRegional:
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "Alpha2LanguageStrRegional":
+    def deserialize_str(inp: str) -> Alpha2LanguageStrRegional:
         match = re.match(REGIONAL_LANGUAGE_STR_PATTERN, inp)
 
         if match is None:
@@ -669,7 +669,7 @@ class ShortLanguageStr:
     @staticmethod
     def __from_str_impl(
         val: str,
-    ) -> Optional["ShortLanguageStr"]:
+    ) -> Optional[ShortLanguageStr]:
         def optional_short(
             val: Optional[
                 Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
@@ -694,11 +694,11 @@ class ShortLanguageStr:
     @staticmethod
     def from_str(
         val: str,
-    ) -> Optional["ShortLanguageStr"]:
+    ) -> Optional[ShortLanguageStr]:
         return ShortLanguageStr.__from_str_impl(val)
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "ShortLanguageStr":
+    def from_str_unsafe(inp: str) -> ShortLanguageStr:
         lan: Optional[ShortLanguageStr] = ShortLanguageStr.from_str(inp)
         if lan is None:
             msg = _("Couldn't get the Short Language from str: '{inp}'").format(inp=inp)
@@ -872,7 +872,7 @@ class Language:
         return self.__long
 
     @staticmethod
-    def from_str(inp: str) -> Optional["Language"]:
+    def from_str(inp: str) -> Optional[Language]:
         arr: list[str] = [a.strip() for a in inp.split(":")]
         if len(arr) != 2:
             return None
@@ -885,7 +885,7 @@ class Language:
         long: str,
         *,
         valid_check: bool,
-    ) -> Optional["Language"]:
+    ) -> Optional[Language]:
         short_val: Optional[ShortLanguageStr] = ShortLanguageStr.from_str(short)
 
         if short_val is None:
@@ -903,11 +903,11 @@ class Language:
     def from_values(
         short: str,
         long: str,
-    ) -> Optional["Language"]:
+    ) -> Optional[Language]:
         return Language.__from_values_impl(short=short, long=long, valid_check=True)
 
     @staticmethod
-    def from_str_unsafe(inp: str) -> "Language":
+    def from_str_unsafe(inp: str) -> Language:
         lan: Optional[Language] = Language.from_str(inp)
         if lan is None:
             msg = _("Couldn't get the Language from str: '{inp}'").format(inp=inp)
@@ -916,7 +916,7 @@ class Language:
         return lan
 
     @staticmethod
-    def from_values_unsafe(short: str, long: str) -> "Language":
+    def from_values_unsafe(short: str, long: str) -> Language:
         lan: Optional[Language] = Language.from_values(
             short,
             long,
@@ -932,7 +932,7 @@ class Language:
 
     # this is for episodes, that have no real language, for some special episodes of some tv series
     @staticmethod
-    def no_language() -> "Language":
+    def no_language() -> Language:
         return Language(
             ShortLanguageStr(Alpha2LanguageStr.no_lang()),
             LongLanguageStr("No Language"),
@@ -941,7 +941,7 @@ class Language:
 
     # note this is an implementation detail, that should not leak
     @staticmethod
-    def __unknown() -> "Language":
+    def __unknown() -> Language:
         return Language(
             ShortLanguageStr(Alpha2LanguageStr.unknown_lang()),
             LongLanguageStr("Unknown"),
@@ -949,11 +949,11 @@ class Language:
         )
 
     @staticmethod
-    def get_default() -> "Language":
+    def get_default() -> Language:
         return Language.__unknown()
 
     @staticmethod
-    def is_default_value(language: "Language") -> bool:
+    def is_default_value(language: Language) -> bool:
         return language == Language.__unknown()
 
     def __str__(self: Self) -> str:
@@ -981,7 +981,7 @@ class Language:
 
     # @deserializer
     @staticmethod
-    def deserialize(language: LanguageSchema) -> "Language":
+    def deserialize(language: LanguageSchema) -> Language:
         if (
             language.short == "no_lang"  # noqa: PLR1714
             or language.short == NoLangDeprecatedType.no_lang

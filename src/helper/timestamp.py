@@ -31,15 +31,15 @@ class Timestamp(SupportsFloat):
         )
 
     @staticmethod
-    def zero() -> "Timestamp":
+    def zero() -> Timestamp:
         return Timestamp(timedelta(seconds=0))
 
     @staticmethod
-    def from_minutes(minutes: float) -> "Timestamp":
+    def from_minutes(minutes: float) -> Timestamp:
         return Timestamp(timedelta(minutes=minutes))
 
     @staticmethod
-    def from_seconds(seconds: float) -> "Timestamp":
+    def from_seconds(seconds: float) -> Timestamp:
         return Timestamp(timedelta(seconds=seconds))
 
     @serializer
@@ -48,7 +48,7 @@ class Timestamp(SupportsFloat):
 
     @deserializer
     @staticmethod
-    def deserialize_str(inp: str) -> "Timestamp":
+    def deserialize_str(inp: str) -> Timestamp:
         # https://stackoverflow.com/questions/4628122/how-to-construct-a-timedelta-object-from-a-simple-string
         t = datetime.strptime(inp, "%H:%M:%S").astimezone()
         delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
@@ -168,12 +168,12 @@ class Timestamp(SupportsFloat):
         msg = f"'+=' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
         raise TypeError(msg)
 
-    def __add__(self: Self, value: object) -> "Timestamp":
+    def __add__(self: Self, value: object) -> Timestamp:
         new_value: Timestamp = Timestamp(self.__delta)
         new_value += value
         return new_value
 
-    def __sub__(self: Self, value: object) -> "Timestamp":
+    def __sub__(self: Self, value: object) -> Timestamp:
         if isinstance(value, Timestamp):
             result: timedelta = self.__delta - value.delta
             return Timestamp(result)
@@ -184,7 +184,7 @@ class Timestamp(SupportsFloat):
         msg = f"'-' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
         raise TypeError(msg)
 
-    def __abs__(self: Self) -> "Timestamp":
+    def __abs__(self: Self) -> Timestamp:
         return Timestamp(abs(self.__delta))
 
     @override
@@ -220,7 +220,7 @@ class TimestampCompat:
 
     @deserializer
     @staticmethod
-    def deserialize_int(inp: int) -> "TimestampCompat":
+    def deserialize_int(inp: int) -> TimestampCompat:
         return TimestampCompat(Timestamp.from_seconds(inp))
 
     @classmethod
