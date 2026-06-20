@@ -39,7 +39,7 @@ from content.language import Language
 from content.language_picker import LanguagePicker
 from content.prediction import MeanType, Prediction, PredictionBest
 from helper.apischema import OneOf
-from helper.decorator import decorate_class
+from helper.decorator import decorate_class, typedict_variant
 from helper.devices import AllocatorType, DeviceManager
 from helper.error import ErrorMode
 from helper.ffprobe import ffprobe, ffprobe_check
@@ -964,29 +964,18 @@ def get_percentage_value(percentage: Percentage) -> float:
     return percentage
 
 
-# TODO: is there a better way?
-class AccuracySettingsDict(TypedDict, total=False):
+@typedict_variant()
+class AccuracySettingsDict:
     normal_threshold: Percentage
     final_threshold: Percentage
     use_picker_at_end: bool
 
 
-class AccuracySettingsDictTotal(TypedDict, total=True):
-    normal_threshold: AdvancedPercentage
-    final_threshold: AdvancedPercentage
-    use_picker_at_end: bool
 
-
-# TODO: is there a better way?
-class ScanConfigDict(TypedDict, total=False):
+@typedict_variant()
+class ScanConfigDict:
     minimum: Percentage
     maximum: Percentage
-
-
-class ScanConfigDictTotal(TypedDict, total=True):
-    minimum: AdvancedPercentage
-    maximum: Optional[AdvancedPercentage]
-
 
 @dataclass(slots=True, repr=True)
 class ManualBatchSettings:

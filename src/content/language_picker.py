@@ -26,7 +26,7 @@ import questionary.prompts.common
 from content.language import Language
 from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
-from helper.decorator import decorate_class
+from helper.decorator import decorate_class, typedict_variant
 from helper.log import get_logger
 from helper.terminal import ClearContextManager, Terminal
 
@@ -61,30 +61,24 @@ class NoLanguagePicker(LanguagePicker):
         return None
 
 
-# TODO: is there a better way?
-class InteractiveLanguagePickerDict(TypedDict, total=False):
-    entries_to_show: int
-    show_full_list: bool
-    play_sound: bool
-
-
-class InteractiveLanguagePickerDictTotal(TypedDict, total=True):
+@typedict_variant()
+class InteractiveLanguagePickerDict(TypedDict):
     entries_to_show: int
     show_full_list: bool
     play_sound: bool
 
 
 def resolve_interactive_config(
-    config: Optional[InteractiveLanguagePickerDict],
-) -> InteractiveLanguagePickerDictTotal:
-    defaults: InteractiveLanguagePickerDictTotal = {
+    config: Optional[InteractiveLanguagePickerDict.optional],
+) -> InteractiveLanguagePickerDict.total:
+    defaults: InteractiveLanguagePickerDict.total = {
         "entries_to_show": 10,
         "show_full_list": False,
         "play_sound": True,
     }
 
     loaded_dict: Optional[InteractiveLanguagePickerDict] = config
-    result: InteractiveLanguagePickerDictTotal = defaults
+    result: InteractiveLanguagePickerDict.total = defaults
 
     if loaded_dict is not None:
         result["entries_to_show"] = loaded_dict.get(
@@ -336,13 +330,13 @@ class TUIChoiceManager(ChoiceManagerInterface):
 
 @decorate_class(slots=True)
 class InteractiveLanguagePicker(LanguagePicker):
-    __config: InteractiveLanguagePickerDictTotal
+    __config: InteractiveLanguagePickerDict.total
     __manager: ChoiceManagerInterface
 
     def __init__(
         self: Self,
         *,
-        config: InteractiveLanguagePickerDictTotal,
+        config: InteractiveLanguagePickerDict.total,
         manager: ChoiceManagerInterface,
     ) -> None:
         super().__init__()

@@ -2,9 +2,9 @@ import inspect
 import itertools
 import types
 from collections.abc import Callable, Generator
-from dataclasses import is_dataclass
+from dataclasses import dataclass, is_dataclass
 from enum import EnumType
-from typing import Any, Optional, cast, is_typeddict
+from typing import Any, Optional, TypedDict, cast, is_typeddict
 
 from pydantic._internal._model_construction import ModelMetaclass
 
@@ -221,7 +221,7 @@ def __add_slots_impl[A](
 
 def __not_allowed_checks_impl[A](cls: type[A]) -> Optional[str]:
 
-    # NOT: don't allow Enums, TypeDicts, pydantic BaseModels, exceptions, dataclasses
+    # NOT: don't allow Enums, TypedDicts, pydantic BaseModels, exceptions, dataclasses
 
     if isinstance(cls, EnumType):
         return "An Enum can't be annotated"  # type: ignore[unreachable]
@@ -241,7 +241,7 @@ def __not_allowed_checks_impl[A](cls: type[A]) -> Optional[str]:
     return None
 
 
-def __process_class_impl[A](
+def __process_decorate_class_impl[A](
     cls: type[A],
     *,
     slots: bool,
@@ -287,11 +287,52 @@ def decorate_class[A](
 ) -> Callable[[type[A]], type[A]]:
 
     def wrap(cls: type[A]) -> type[A]:
-        return __process_class_impl(
+        return __process_decorate_class_impl(
             cls,
             slots=slots,
             weakref_slot=weakref_slot,
             allow_defaults=allow_defaults,
+        )
+
+    return wrap
+
+
+@dataclass
+class TypedDictVariants[A]:
+    total: dict[str, A]
+    normal: dict[str, A]
+
+
+def __process_typedict_variant_impl[A](
+    cls: type[A],
+) -> type[TypedDictVariants[A]]:
+
+    if is_typeddict(cls):
+        msg = f"Not allowed for class {cls} {type(cls)}: A TypedDict can't be annotated"
+        raise TypeError(msg)
+
+    cls_annotations = inspect.get_annotations(cls)
+
+    normal = TypedDict(
+        cls.__name__,
+        cls_annotations,
+        total=False,
+    )
+
+    total = TypedDict(
+        f"{cls.__name__}Total",
+        cls_annotations,
+        total=True,
+    )
+
+    return TypedDictVariants(total=total, normal=normal)
+
+
+def typedict_variant[A]() -> Callable[[type[A]], type[TypedDictVariants[A]]]:
+
+    def wrap(cls: type[A]) -> type[TypedDictVariants[A]]:
+        return __process_typedict_variant_impl(
+            cls,
         )
 
     return wrap
