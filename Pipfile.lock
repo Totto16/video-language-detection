@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "6cf654c0fab82f301d5f9cb4e05d89392e1f674f12c7696e5907735cf4af1e86"
+            "sha256": "488ce594935ba9c9615c8ffe432506cab4fd751e97e9b1f15d7ff8572d921634"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,6 +16,11 @@
             {
                 "name": "torch-nvidia",
                 "url": "https://download.pytorch.org/whl/cu132/",
+                "verify_ssl": true
+            },
+            {
+                "name": "torch-nvidia-old",
+                "url": "https://download.pytorch.org/whl/cu130/",
                 "verify_ssl": true
             },
             {
@@ -5536,15 +5541,31 @@
         },
         "torchaudio": {
             "hashes": [
-                "sha256:0c92c559d2698ca98b0710f87b4c80094fb36cc70399e51cd230559eeb357043",
-                "sha256:3eba6d352435838eed5975e236676ce17dccf3df0034e755393f85c5772e5928",
-                "sha256:5413b2783ff0c6596e088c528048c9e141b5a9d3e8c4e180dfc466c419010359",
-                "sha256:86d8c9e8b4bb80e791b1cf45ded75f205c4dff95bfce590f8adcf002bb00f071",
-                "sha256:ba05a44216846cfc47986cc8f114ac42f23ee392f596eae5c1746c856b6ad836",
-                "sha256:bbb8998c48ddea31739757fcad86dcd1c8348ac0dab8c8b614617ac60a08bbe2"
+                "sha256:18818a326b779abc7bfd5cfb9fe88501916dde144cb1944fc9e7b4fb6208dfc7",
+                "sha256:2354248848d06a9ae1e7a12165f800f0dda7df60ecac9fca892322b722b922c0",
+                "sha256:2ddcb49458aa9783121222c535c0eb9cd54445ec44bb8dd22c9e52cdb730dbc2",
+                "sha256:2faa8d8f251d1fa44813765b00791048b617e9dc06e6cd9222aba81023929119",
+                "sha256:34c5dcd704e17a2b01c097b4fe3b5f83c5cdbc42b9f2abd095e026c588f873d4",
+                "sha256:3c0175d0ed054bf0dc3b154a744b1a127c94291b3f3b7bdd0639b4b238c89445",
+                "sha256:42ce393036ca6ac507226a7a6cf83be29c8c0a51c3fb775498f8b1563f476387",
+                "sha256:591ed8279f0170ef28933873f65e9f5f8c439287088ef6285cda65988b0ba614",
+                "sha256:5d665234def325e22c15518c581b0107a651c9f843176e3192360b092ebcb656",
+                "sha256:64c0a3591a5d343640ca5fc5ccdac3ef9d8bcb5928e24c97acfb9f84cb8487a9",
+                "sha256:69db7c3d86af1bc8224f7053395ace3e2bd8c56b0c3922bc7b798114440c88e5",
+                "sha256:7a5ecdd20fb26d8eb1d62135ddc6db0f806b17667c10e82df913fd509d1f5cfe",
+                "sha256:95d517bd1a0a28dacd1c37550ced95cab64f3a7a4ef9b8219b41049388a71163",
+                "sha256:a3df9c41706a22de0f43fe2734f54db31cb5a7314cc92ecc84657a8492b3ff8d",
+                "sha256:abbff04127caf6e16e3a7c3e1ca2739b68899e14926d7cbec4bd8b40f72375d5",
+                "sha256:ad3e6141c1078c5c9c8ae7c3cdf6c80eb35612c99c8cf3f76fe295845f45bb9d",
+                "sha256:b6bfca873bd67d02fbbaa254312283be48dc1ca5532013152527210db432ef8c",
+                "sha256:b9dd2c6ac144001dc6dac38b564c1de73ac26ef0c195d5037c4a94990b0e2b5a",
+                "sha256:be19f467eb7a173264653369426e7ecc4745e28d15f9c52eea2ad5316ec685eb",
+                "sha256:fa0c22f58f60c3537b7d28ed2501e0995acb2a65d9af2708f21edaad67186cd8",
+                "sha256:fae220128cbfe060c663fbb2a1967b88c605f9eb49b535903cca694011662534"
             ],
-            "index": "torch-amd",
-            "version": "==2.11.0.dev20260619+rocm7.2"
+            "index": "torch-cpu",
+            "markers": "sys_platform == 'linux' and python_version == '3.14'",
+            "version": "==2.11.0+cpu"
         },
         "torchvision": {
             "hashes": [
@@ -6787,15 +6808,31 @@
         },
         "torchaudio": {
             "hashes": [
-                "sha256:0c92c559d2698ca98b0710f87b4c80094fb36cc70399e51cd230559eeb357043",
-                "sha256:3eba6d352435838eed5975e236676ce17dccf3df0034e755393f85c5772e5928",
-                "sha256:5413b2783ff0c6596e088c528048c9e141b5a9d3e8c4e180dfc466c419010359",
-                "sha256:86d8c9e8b4bb80e791b1cf45ded75f205c4dff95bfce590f8adcf002bb00f071",
-                "sha256:ba05a44216846cfc47986cc8f114ac42f23ee392f596eae5c1746c856b6ad836",
-                "sha256:bbb8998c48ddea31739757fcad86dcd1c8348ac0dab8c8b614617ac60a08bbe2"
+                "sha256:04aadf807c27df785c6e3463e70bb1a657ed2d1a16b5578114c9fdf7e8c1ac10",
+                "sha256:0a36531ffb90f0b1870e994bc57643bf6466fd8c290b5b9b2b36dadc3445d0c0",
+                "sha256:1cef8561494c44b12eb6a390d9f2ff52f6fa540b9a7aba6c8951c074056a2f11",
+                "sha256:23498b01097648e304e78d6495a9f5bdce8441a802afc3025e2561973d74c025",
+                "sha256:378b49671b581114a2d25d40928f12a150872feadf11669a63f573e81c78019a",
+                "sha256:3fba988f4301fe13547fe5e99c76d9ae36a27e19ded82eeffed9d2456e12edef",
+                "sha256:408834847432c161aacd4d089c86379484b061df563f46eb05246a52be5aba4f",
+                "sha256:7171f810887e7cd1a4763974d5a1f2e1466692404315bb70705e0f49fb3a28e0",
+                "sha256:91497b6525569dcd0871991d32bb4beda90775bcbe9050328ea7b8022106e2fa",
+                "sha256:94e90c94c93a626e21686c3dc76d4597c3e4ad178a911611fed4f14c8de07293",
+                "sha256:9bbd4470c74172be32d0e11efbcf5e8dc785f7403b8232c07aac575c8d96715f",
+                "sha256:ac4988a74921500f9f2dc6502867876bf1bf15d845a518f4711d21ec81a1efef",
+                "sha256:b345401d76a371031b2fe965bd9579b9621c9d87902ee3e586be665df04c179e",
+                "sha256:b9dd151f06842ca77dc341aed94ea2f5d13a89e5027aa032a47198d073bcf3db",
+                "sha256:ce09a7b144b7982b46c8fe399cf5f91d43dda571e9d6ddba67e928567551f614",
+                "sha256:d07c4cbe4bec3e15bb18ba163058038f5f5fc1775c3061685c194439af4d2e9f",
+                "sha256:e9c07cfdab691454092ff12d21dd1407a4bb8ad081d38f222cf6fcf6abcc18c8",
+                "sha256:f6e1e3ab31abfa81f5c8801a0eab769d5308514dc644bb39dcf0a9057f364f16",
+                "sha256:f74949f9ace1e4a6cf9468bdb3211b9cfa0af6ea348125471ac71c8621d6c77d",
+                "sha256:f9b277a0d3b2ab4385778146b7e879716f36b6f2080f7190ec744e3383511791",
+                "sha256:fa4de5984cc666557d4e5eea3c50735b1ccb39b2ae284efb14b721e642eef652"
             ],
-            "index": "torch-amd",
-            "version": "==2.11.0.dev20260619+rocm7.2"
+            "index": "torch-nvidia-old",
+            "markers": "sys_platform == 'linux' and python_version == '3.14'",
+            "version": "==2.11.0+cu130"
         },
         "torchvision": {
             "hashes": [
