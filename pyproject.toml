@@ -13,7 +13,7 @@ exclude = []
 line-length = 100
 indent-width = 4
 
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 
@@ -88,7 +88,7 @@ source = ["src/"]
 
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 warn_return_any = false
 disallow_untyped_calls = false
 strict = true

@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [[source]]
-url = "https://download.pytorch.org/whl/cu130/"
+url = "https://download.pytorch.org/whl/cu132/"
 verify_ssl = true
 name = "torch-nvidia"
 
@@ -52,26 +52,26 @@ pymkv2 = "*"
 
 ##no dedicated gpu
 [integrated]
-torchvision = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.14'"}
+torch = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.14'"}
 
 speechbrain = {version = ">=1.1.0"}
 
 ##nvidia gpu
 [nvidia]
 nvidia-ml-py = "*"
-torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.14'"}
+torch = {version = "*", index="torch-nvidia", markers = "sys_platform == 'linux' and python_version == '3.14'"}
 
 speechbrain = {version = ">=1.1.0"}
 
 ##amd gpu
 [amd]
 amdsmi = "*"
-torchvision = {version = "==0.27.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torch = {version = "==2.13.0.dev20260426+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-torchaudio = {version = "==2.11.0.dev20260427+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
-triton-rocm = {version = "==3.7.0+git88b227e2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.13'"}
+torchvision = {version = "==0.29.0.dev20260619+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.14'"}
+torch = {version = "==2.14.0.dev20260619+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.14'"}
+torchaudio = {version = "==2.11.0.dev20260619+rocm7.2", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.14'"}
+triton-rocm = {version = "==3.7.1+git5d6048aa", index="torch-amd", markers = "sys_platform == 'linux' and python_version == '3.14'"}
 
 speechbrain = {version = ">=1.1.0"}
 
@@ -109,4 +109,4 @@ extract_translation = "pygettext3 -d video_language_detect -o locales/video_lang
 generate_translation = "bash -c 'for PO_FILE in locales/*/LC_MESSAGES/*.po; do MO_FILE=\"${PO_FILE/.po/.mo}\"; msgfmt -o \"$MO_FILE\" \"$PO_FILE\"; done'"
 
 [requires]
-python_version = "3.13"
+python_version = "3.14"
