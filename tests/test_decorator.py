@@ -1,9 +1,10 @@
 from collections.abc import Callable, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, IntEnum, StrEnum
 from functools import partial, update_wrapper, wraps
 from typing import Any, Optional, Self, TypedDict
 
+from apischema import alias
 import pydantic
 import pytest
 from pytest_subtests import SubTests
@@ -953,3 +954,25 @@ def test_decorator_invalid_parents(  # noqa: PLR0915
             ),
         ):
             declare_test()
+
+        with subtests.test("can't annotate Exception"):
+
+            def declare_test() -> None:
+                @decorate_class(slots=True, allow_defaults=False)
+                class MetadataHandle:
+                    __provider: str = field(metadata=alias("provider"))
+                    __data: Any = field(metadata=alias("data"))
+
+                    @property
+                    def provider(self: Self) -> str:
+                        return self.__provider
+
+                    @property
+                    def data(self: Self) -> Any:
+                        return self.__data
+
+            with pytest.raises(
+                TypeError,
+                match=r"^Invalid default value for field '_MetadataHandle__provider': Field\(name=None,type=None,default=<dataclasses\._MISSING_TYPE object at 0x[a-fA-F0-9]*>,default_factory=<dataclasses\._MISSING_TYPE object at 0x[a-fA-F0-9]*>,init=True,repr=True,hash=None,compare=True,metadata=mappingproxy\({'_apischema_alias': 'provider'}\),kw_only=<dataclasses\._MISSING_TYPE object at 0x[a-fA-F0-9]*>,_field_type=None\)$",
+            ):
+                declare_test()

@@ -1,8 +1,9 @@
-
-[tool.pytest.ini_options]
+[tool.pytest]
+filterwarnings = ['error']
 enable_assertion_pass_hook = true
-pythonpath = "src"
+pythonpath = ["src"]
 testpaths = ["tests"]
+
 
 [tool.ruff]
 

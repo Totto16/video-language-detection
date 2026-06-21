@@ -243,7 +243,6 @@ class Model:
     )
 
 
-@decorate_class(slots=True)
 class RunOpts(TypedDict, total=False):
     device: str
     data_parallel_count: int

@@ -97,7 +97,7 @@ class TmdbHandleImpl(HandleImpl):
 
 MetadataHandleSchema = Annotated[ImdbHandleImpl | TmdbHandleImpl, OneOf]
 
-@decorate_class(slots=True)
+@dataclass(slots=True, repr=True)
 class MetadataHandle:
     __provider: str = field(metadata=alias("provider"))
     __data: Any = field(metadata=alias("data"))

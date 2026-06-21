@@ -25,13 +25,11 @@ import questionary.prompts
 import questionary.prompts.common
 
 from content.language import Language
+from content.prediction import Prediction, PredictionBest
 from helper.apischema import OneOf
 from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.terminal import ClearContextManager, Terminal
-
-if TYPE_CHECKING:
-    from content.prediction import Prediction, PredictionBest
 
 
 @decorate_class(slots=True)
