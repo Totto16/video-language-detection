@@ -96,7 +96,7 @@ from helper.manager import (
     number_like_convert_to_serializable,
 )
 from helper.models import voxlingua107_ecapa_model
-from helper.parser import CustomNameParser
+from helper.custom_parser import CustomNameParser
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 from helper.validator import (

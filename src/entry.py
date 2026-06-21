@@ -544,7 +544,7 @@ def subcommand_run(
         LockFile,
         filter_configs,
     )
-    from helper.parser import CustomNameParser
+    from helper.custom_parser import CustomNameParser
     from helper.tui import launch_tui
     from main import AllContent
 

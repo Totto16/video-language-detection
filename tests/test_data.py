@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from pytest_subtests import SubTests
+from helper.custom_parser import CustomNameParser
 from test_helper import re_exact_string
 
 from helper.base import load_from_file
@@ -37,3 +38,67 @@ def test_data_parse_fails(subtests: SubTests) -> None:
             match=re_exact_string("Data not loadable from 'txt' file!"),
         ):
             load()
+
+
+def test_custom_name_parser(subtests: SubTests) -> None:
+    season_special_names = ["Extras", "Specials", "Special"]
+
+    with subtests.test("series name: invalid"):
+        parser = CustomNameParser(season_special_names)
+
+        series_data = parser.parse_series_name("Invalid")
+
+        assert series_data is None
+
+    with subtests.test("series name: valid"):
+        parser = CustomNameParser(season_special_names)
+
+        series_data = parser.parse_series_name("Cool Series (2042)")
+
+        assert series_data is not None
+
+        assert series_data[0] == "Cool Series"
+        assert series_data[1] == 2042
+
+    with subtests.test("season name: invalid"):
+        parser = CustomNameParser(season_special_names)
+
+        season_data = parser.parse_season_name("Invalid")
+
+        assert season_data is None
+
+    with subtests.test("season name: valid"):
+        parser = CustomNameParser(season_special_names)
+
+        season_data = parser.parse_season_name("Staffel 42")
+
+        assert season_data is not None
+
+        assert season_data[0] == 42
+
+    with subtests.test("season name: special"):
+        parser = CustomNameParser(season_special_names)
+
+        season_data = parser.parse_season_name("Special")
+
+        assert season_data is not None
+
+        assert season_data[0] == 0
+
+    with subtests.test("episode name: invalid"):
+        parser = CustomNameParser(season_special_names)
+
+        episode_data = parser.parse_episode_name("Invalid")
+
+        assert episode_data is None
+
+    with subtests.test("episode name: valid"):
+        parser = CustomNameParser(season_special_names)
+
+        episode_data = parser.parse_episode_name("Episode 01 - Cool Name [S09E01].mp4")
+
+        assert episode_data is not None
+
+        assert episode_data.episode == 1
+        assert episode_data.name == "Cool Name"
+        assert episode_data.season == 9
