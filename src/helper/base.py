@@ -84,6 +84,7 @@ def load_from_file(
                     parsed_dict,
                 )
                 return json_loaded
+            # TODO: deprecate json, bump the major version and use a sqlite file or something similar?
             case _:
                 msg = _("Data not loadable from '{suffix}' file!").format(suffix=suffix)
                 raise RuntimeError(msg)
@@ -94,6 +95,7 @@ class ContentOptions(TypedDict):
     video_formats: list[str]
     trailer_names: list[str]
     parse_error_is_exception: bool
+
 
 @decorate_class(slots=True)
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
@@ -261,6 +263,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     def options(self: Self) -> ContentOptions:
         return self.__options
 
+
 @decorate_class(slots=True)
 class NormalContentCallback(ContentCallback):
     @override
@@ -312,6 +315,7 @@ class NormalContentCallback(ContentCallback):
 
         return None
 
+
 @decorate_class(slots=True)
 class NumeratedContentCallback(ContentCallback):
     @override
@@ -362,6 +366,7 @@ class NumeratedContentCallback(ContentCallback):
         )
 
         return None
+
 
 @decorate_class(slots=True)
 class SymlinkedContentCallback(ContentCallback):
