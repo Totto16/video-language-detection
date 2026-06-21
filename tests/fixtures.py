@@ -9,13 +9,13 @@ import pytest
 import requests
 
 from helper.decorator import decorate_class
-from helper.manager import NoopManager
 
 
 @dataclass(slots=True, repr=True)
 class Finalizer[A]:
     data: A
     drop: Callable[[A], None]
+
 
 @decorate_class(slots=True)
 class FinalizerFixture[A]:
@@ -131,6 +131,7 @@ def video_file_dict() -> dict[str, VideoFile]:
 
 def at_video_dict(dct: dict[str, VideoFile], name: str) -> tuple[str, VideoFile]:
     return (name, dct[name])
+
 
 @decorate_class(slots=True)
 class CachedFileManager:
@@ -306,7 +307,9 @@ and what stays off.""",
 
 
 @pytest.fixture(scope="package")
-def test_manager() -> NoopManager:
+def test_manager() -> Any:  # "ManagerInterface"
+    from helper.manager import NoopManager  # noqa: PLC0415
+
     return NoopManager()
 
 

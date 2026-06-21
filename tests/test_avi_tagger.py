@@ -36,13 +36,10 @@ from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
-from helper.translation import get_translator
 
 mark_as_used(avi_test_parse_files)
 mark_as_used(test_manager)
 
-# TODO: force locale in test cases!
-_ = get_translator()
 
 @decorate_class(slots=True)
 class PseudoAVIChunk(AVIChunk):
@@ -54,11 +51,13 @@ class PseudoAVIChunk(AVIChunk):
             is_list=False,
         )
 
+
 @decorate_class(slots=True)
 class PseudoAVIList(AVIList):
 
     def __init__(self: Self, fourcc: FOURCC, size: int, typ: FOURCC) -> None:
         super().__init__(PseudoAVIChunk(fourcc, size), typ)
+
 
 @decorate_class(slots=True)
 class PseudoMOVIChunk(PseudoAVIList):
@@ -67,6 +66,7 @@ class PseudoMOVIChunk(PseudoAVIList):
     def __init__(self: Self, children: int, size: int) -> None:
         super().__init__(LIST_FOURCC, size, FOURCC(b"movi"))
         self.children = children
+
 
 @decorate_class(slots=True)
 class RecursiveChunks:
@@ -314,6 +314,7 @@ def list_all_chunks_recursively(f: BinaryIO) -> RecursiveChunks:
                 current_target.append(chunk)
 
     return result
+
 
 @decorate_class(slots=True)
 class AVIChunkStructure(FancyEq):

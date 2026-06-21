@@ -1,8 +1,9 @@
+import builtins
 import gettext
 import locale
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 type SupportedLanguage = Literal["en", "de"]
 SUPPORTED_LANGUAGES: list[SupportedLanguage] = ["de", "en"]
@@ -24,19 +25,18 @@ def get_current_language() -> SupportedLanguage:
 type TranslationFunction = Callable[[str], str]
 
 
-__global_translation: Optional[TranslationFunction] = None
+TRANSLATION_DOMAIN = "video_language_detect"
+
+TRANSLATION_DIR = Path(__file__).parent.parent.parent / "locales"
 
 
 def get_translator() -> TranslationFunction:
-    global __global_translation  # noqa: PLW0603
-    if __global_translation is None:
+    if builtins.__dict__.get("_", None) is None:
         translation = gettext.translation(
-            "video_language_detect",
-            localedir=(Path(__file__).parent.parent.parent / "locales"),
+            TRANSLATION_DOMAIN,
+            localedir=TRANSLATION_DIR,
             languages=[get_current_language()],
         )
         translation.install()
 
-        __global_translation = translation.gettext
-
-    return __global_translation
+    return builtins.__dict__["_"]

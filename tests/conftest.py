@@ -5,9 +5,11 @@ import pytest
 from fixtures import cached_file_manager, mark_as_used, video_file_dict
 
 from helper.decorator import decorate_class
+from helper.translation import DEFAULT_LANGUAGE, TRANSLATION_DIR, TRANSLATION_DOMAIN
 
 mark_as_used(video_file_dict)
 mark_as_used(cached_file_manager)
+
 
 @decorate_class(slots=True)
 class FancyEq(ABC):
@@ -29,3 +31,16 @@ def pytest_assertrepr_compare(
         return left.fancy_eq(right)
 
     return None
+
+def fixed_translator() -> None:
+    import gettext  # noqa: PLC0415
+
+    translation = gettext.translation(
+        TRANSLATION_DOMAIN,
+        localedir=TRANSLATION_DIR,
+        languages=[DEFAULT_LANGUAGE],
+    )
+    translation.install()
+
+
+fixed_translator()

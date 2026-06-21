@@ -4,9 +4,9 @@ from enum import Enum, IntEnum, StrEnum
 from functools import partial, update_wrapper, wraps
 from typing import Any, Optional, Self, TypedDict
 
-from apischema import alias
 import pydantic
 import pytest
+from apischema import alias
 from pytest_subtests import SubTests
 from test_helper import re_exact_string
 
