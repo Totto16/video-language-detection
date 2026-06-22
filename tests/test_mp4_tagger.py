@@ -53,9 +53,12 @@ from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
+from helper.translation import get_translator
 
 mark_as_used(mp4_test_parse_files)
 mark_as_used(test_manager)
+
+_ = get_translator()
 
 @decorate_class(slots=True)
 class PseudoMP4Box(MP4Box):

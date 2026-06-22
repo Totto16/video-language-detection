@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 from pytest_subtests import SubTests
-from helper.custom_parser import CustomNameParser
 from test_helper import re_exact_string
 
 from helper.base import load_from_file
+from helper.custom_parser import CustomNameParser
 from main import AllContent
 
 
