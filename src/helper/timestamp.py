@@ -5,7 +5,6 @@ import pydantic
 import pydantic_core
 from apischema import deserializer, schema, serializer
 
-from helper.decorator import decorate_class
 from helper.manager import SupportsFloat
 from helper.utils import parse_int_safely
 
@@ -13,7 +12,6 @@ from helper.utils import parse_int_safely
 
 
 @schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$")
-@decorate_class(slots=True)
 class Timestamp(SupportsFloat):
     __delta: timedelta
 
@@ -207,7 +205,6 @@ if TYPE_CHECKING:
 
 
 @schema(min=1, max=60 * 60 * 24, deprecated=True)
-@decorate_class(slots=True)
 class TimestampCompat:
     __value: Timestamp
 

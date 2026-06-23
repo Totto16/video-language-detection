@@ -202,7 +202,6 @@ ALPHA_3_LANGUAGE_STR_PATTERN = r"^([a-z]{3})$"
 
 # this should be ISO 639-2 codes (alpha-3 code)
 @schema(pattern=ALPHA_3_LANGUAGE_STR_PATTERN)
-@decorate_class(slots=True)
 class Alpha3LanguageStr:
     __PrivateStrImpl = NewType(
         "__PrivateStrImpl",
@@ -324,7 +323,6 @@ ALPHA_2_LANGUAGE_STR_PATTERN = r"^([a-z]{2})$"
 
 # this should be ISO 639-1 codes (alpha-2 code)
 @schema(pattern=ALPHA_2_LANGUAGE_STR_PATTERN)
-@decorate_class(slots=True)
 class Alpha2LanguageStr:
     __PrivateStrImpl = NewType(
         "__PrivateStrImpl",
@@ -499,7 +497,6 @@ REGIONAL_LANGUAGE_STR_PATTERN = r"^([a-z]{2}-[A-Z]{2})$"
 
 
 @schema(pattern=REGIONAL_LANGUAGE_STR_PATTERN)
-@decorate_class(slots=True)
 class Alpha2LanguageStrRegional:
     __lang: Alpha2LanguageStr
     __region: RegionLanguageStr
@@ -650,7 +647,7 @@ def long_string_checked(long: str) -> LongLanguageStr:
 class NoLangDeprecatedType(StrEnum):
     no_lang = "no_lang"
 
-@decorate_class(slots=True)
+
 class ShortLanguageStr:
     __data: Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional
 
@@ -834,7 +831,6 @@ class LanguageSchema:
 
 
 @use_schema_from(LanguageSchema)
-@decorate_class(slots=True)
 class Language:
     __short: ShortLanguageStr
     __long: LongLanguageStr

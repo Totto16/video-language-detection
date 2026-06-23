@@ -40,9 +40,9 @@ class TMDBMetadataConfig:
     config: Annotated[Optional[TMDBConfig], OneOf]
 
 
-@dataclass(slots=True, repr=True)
 @schema()
 @type_name("TMDBSeriesMetadata")
+@dataclass(slots=True, repr=True)
 class SeriesMetadata:
     episodes_count: Optional[int]
     seasons_count: Optional[int]
@@ -62,9 +62,9 @@ class SeriesMetadata:
         return str(self)
 
 
-@dataclass(slots=True, repr=True)
 @schema()
 @type_name("TMDBSeasonMetadata")
+@dataclass(slots=True, repr=True)
 class SeasonMetadata:
     air_date: Optional[date]
     episodes_count: Optional[int]
@@ -80,9 +80,9 @@ class SeasonMetadata:
         return str(self)
 
 
-@dataclass(slots=True, repr=True)
-@schema()
 @type_name("TMDBEpisodeMetadata")
+@schema()
+@dataclass(slots=True, repr=True)
 class EpisodeMetadata:
     air_date: Optional[date]
     runtime: Optional[int]
@@ -99,8 +99,8 @@ class EpisodeMetadata:
         return str(self)
 
 
-@dataclass(slots=True, repr=True)
 @schema()
+@dataclass(slots=True, repr=True)
 class TMDBSkipMetadata(SkipMetadata):
     reason: str
     metadata_type: Literal["skip"]
@@ -163,7 +163,6 @@ class TMDBMetadataSchema:
     data: MetadataData
     provider: Literal["tmdb"]
 
-@decorate_class(slots=True)
 class TMDBProvider(Provider):
     __client: TMDb
 

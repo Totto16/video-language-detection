@@ -142,7 +142,6 @@ def get_all_keys_with_aliases() -> list[str]:
 
 
 @schema(extra=one_of_list(get_all_keys_with_aliases()))
-@decorate_class(slots=True)
 class CustomKey:
     __underlying: Keys
 

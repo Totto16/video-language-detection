@@ -13,8 +13,8 @@ from helper.translation import get_translator
 _ = get_translator()
 
 
-@dataclass(slots=True, repr=True)
 @schema()
+@dataclass(slots=True, repr=True)
 class MetadataHandleHelper:
     provider: str
     data: Any
@@ -31,7 +31,6 @@ def make_provider_schema_imdb() -> Sequence[ObjectField]:
 
     return [v for k, v in IMDBProvider.get_metadata_schema().items()]
 
-@decorate_class(slots=True)
 class HandleImpl(ABC):
     __provider: str
     __data: Any
@@ -58,7 +57,6 @@ class HandleImpl(ABC):
 
 
 @define_schema_lazy(fn=make_provider_schema_imdb)
-@decorate_class(slots=True)
 class ImdbHandleImpl(HandleImpl):
 
     def __init__(
@@ -77,7 +75,6 @@ class ImdbHandleImpl(HandleImpl):
 
 
 @define_schema_lazy(fn=make_provider_schema_tmdb)
-@decorate_class(slots=True)
 class TmdbHandleImpl(HandleImpl):
 
     def __init__(
@@ -97,7 +94,8 @@ class TmdbHandleImpl(HandleImpl):
 
 MetadataHandleSchema = Annotated[ImdbHandleImpl | TmdbHandleImpl, OneOf]
 
-@dataclass(slots=True, repr=True)
+@schema()
+@dataclass(slots=False, repr=True)
 class MetadataHandle:
     __provider: str = field(metadata=alias("provider"))
     __data: Any = field(metadata=alias("data"))
@@ -133,7 +131,6 @@ class MetadataHandle:
     def __repr__(self: Self) -> str:
         return str(self)
 
-@decorate_class(slots=True)
 class SkipHandle:
     # serialize the same as None
     @serializer
@@ -147,6 +144,7 @@ class SkipHandle:
         return str(self)
 
 
+@schema()
 @dataclass(slots=True, repr=True)
 class SkipMetadata:
     def __str__(self: Self) -> str:

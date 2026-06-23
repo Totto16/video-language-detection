@@ -13,7 +13,6 @@ from helper.translation import get_translator
 
 _ = get_translator()
 
-@decorate_class(slots=True)
 class Provider(ABC):
     __name: str
 

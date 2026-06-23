@@ -82,11 +82,56 @@
             "type": "object",
             "properties": {
                 "target_file": {
-                    "type": "string"
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/TargetFileJson"
+                        },
+                        {
+                            "$ref": "#/$defs/TargetFileWip"
+                        },
+                        {
+                            "type": "string",
+                            "deprecated": true
+                        }
+                    ]
                 }
             },
             "required": [
                 "target_file"
+            ],
+            "additionalProperties": false
+        },
+        "TargetFileJson": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "json"
+                },
+                "file": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "file"
+            ],
+            "additionalProperties": false
+        },
+        "TargetFileWip": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "wip"
+                },
+                "file": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "file"
             ],
             "additionalProperties": false
         },
@@ -202,7 +247,7 @@
                             "deprecated": true
                         },
                         {
-                            "$ref": "#/$defs/AdvancedScannerPosition"
+                            "$ref": "#/$defs/AdvancedScannerPositionDict"
                         }
                     ]
                 },
@@ -213,7 +258,7 @@
                             "deprecated": true
                         },
                         {
-                            "$ref": "#/$defs/AdvancedScannerPosition"
+                            "$ref": "#/$defs/AdvancedScannerPositionDict"
                         }
                     ]
                 },
@@ -226,7 +271,7 @@
             },
             "additionalProperties": false
         },
-        "AdvancedScannerPosition": {
+        "AdvancedScannerPositionDict": {
             "type": "object",
             "properties": {
                 "language": {

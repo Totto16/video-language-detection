@@ -816,7 +816,6 @@ PERCENTAGE_PATTERN = r"^(\d{1,3})(?:\.(\d+))?%$"
 
 
 @schema(pattern=PERCENTAGE_PATTERN)
-@decorate_class(slots=True)
 class AdvancedPercentage:
     __value: float
 
