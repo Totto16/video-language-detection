@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
 )
 
 from prompt_toolkit.key_binding import KeyBindings
@@ -16,12 +15,12 @@ from content.language_picker import (
 )
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
-from helper.base import AnyType, app_status_bar_manager, parse_contents
+from helper.base import AnyType, AppStatusBar, parse_contents
 from helper.classifier import Classifier, Model
 from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
 from helper.filter import Filter, execute_steps_from_filter
-from helper.manager import TuiManager
+from helper.manager import ManagerInterface
 from helper.models import voxlingua107_ecapa_model
 from helper.validator import (
     TuiValidatorReporter,
@@ -67,8 +66,9 @@ def launch_tui(
     config: FinalConfig,
     name_parser: NameParser,
     all_content_type: AnyType,
-    config_paramaters: Optional[tuple[int, int]],
     filters: list[Filter],
+    manager: ManagerInterface,
+    status_bar: AppStatusBar,
 ) -> None:
 
     execute_steps = execute_steps_from_filter(filters)
@@ -106,69 +106,51 @@ def launch_tui(
     # this is also unnecessary complicated for a tui app, do this in the gui instead
     _kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
 
-    general_info: list[str] = [
-        x
-        for x in [
-            _("Config: '{config_name}'").format(config_name=config.config_name),
-            (
-                None
-                if config_paramaters is None
-                else _("Config progress: {start} / {end}").format(
-                    start=config_paramaters[0] + 1,
-                    end=config_paramaters[1],
-                )
-            ),
-            _("Config type: '{config_type}'").format(
-                config_type=config.config_type.value,
-            ),
-        ]
-        if x is not None
-    ]
+    status_bar.stage = _("Scanning")
+    contents: list[Content] = parse_contents(
+        root_folder=config.parser.root_folder,
+        options={
+            "ignore_files": config.parser.ignore_files,
+            "video_formats": config.parser.video_formats,
+            "trailer_names": config.parser.trailer_names,
+            "parse_error_is_exception": config.parser.exception_on_error,
+        },
+        save_file=config.general.target_file,
+        name_parser=name_parser,
+        scanner=scanner,
+        language_picker=language_picker,
+        all_content_type=all_content_type,
+        config_type=config.config_type,
+        manager=manager,
+        error_mode=error_mode,
+        check=execute_steps.check,
+    )
 
-    manager = TuiManager()
+    status_bar.stage = _("Validate")
+    if execute_steps.validate:
+        tui_reporter: ValidatorReporter = TuiValidatorReporter()
 
-    with app_status_bar_manager(general_info, manager) as status_bar:
+        validator_params = ValidatorParams(tui_reporter, model.model_language)
 
-        contents: list[Content] = parse_contents(
-            root_folder=config.parser.root_folder,
-            options={
-                "ignore_files": config.parser.ignore_files,
-                "video_formats": config.parser.video_formats,
-                "trailer_names": config.parser.trailer_names,
-                "parse_error_is_exception": config.parser.exception_on_error,
-            },
-            save_file=config.general.target_file,
-            name_parser=name_parser,
-            scanner=scanner,
-            language_picker=language_picker,
-            all_content_type=all_content_type,
-            config_type=config.config_type,
+        validators = get_validators(validator_params, filters)
+
+        Validator.validate_multiple(
+            validators,
+            contents,
             manager=manager,
-            error_mode=error_mode,
-            check=execute_steps.check,
         )
 
-        if execute_steps.validate:
-            tui_reporter: ValidatorReporter = TuiValidatorReporter()
+    status_bar.stage = _("Summary")
+    if execute_steps.summary:
+        language_summary, metadata_summary, video_metadata_summary = (
+            Summary.combine_summaries(content.summary() for content in contents)
+        )
 
-            validator_params = ValidatorParams(tui_reporter, model.model_language)
+        scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
-            validators = get_validators(validator_params, filters)
+        logger.info(language_summary)
+        logger.info(metadata_summary)
+        logger.info(video_metadata_summary)
+        logger.info(scan_summary)
 
-            Validator.validate_multiple(
-                validators,
-                contents,
-                manager=manager,
-            )
-
-        if execute_steps.summary:
-            language_summary, metadata_summary, video_metadata_summary = (
-                Summary.combine_summaries(content.summary() for content in contents)
-            )
-
-            scan_summary = language_scanner.summary_manager.get_detailed_summary()
-
-            logger.info(language_summary)
-            logger.info(metadata_summary)
-            logger.info(video_metadata_summary)
-            logger.info(scan_summary)
+    status_bar.stage = _("Finished")

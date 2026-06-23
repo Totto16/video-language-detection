@@ -296,5 +296,3 @@ class NoopManager(ManagerInterface):
 
 # 64 KB
 PROGRESS_CHUNK_SIZE: int = 64 * 1024
-
-ConfigParameters = tuple[int, int]

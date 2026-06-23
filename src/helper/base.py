@@ -31,7 +31,7 @@ from content.general import (
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
-from helper.config import ConfigType, ParsedTargetFile
+from helper.config import ConfigType, FinalConfig, ParsedTargetFile
 from helper.constants import APP_NAME
 from helper.decorator import decorate_class
 from helper.error import ErrorMode
@@ -119,28 +119,32 @@ class AppStatusBar:
     __manager: ManagerInterface
     __status_bar: StatusBarInterface
     __stopped: bool
+    __length: Optional[int]
+    __info_kw: dict[str, str]
 
     def __init__(
         self: Self,
-        general_info: list[str],
+        configs: list[FinalConfig],
         manager: ManagerInterface,
     ) -> None:
         super().__init__()
 
         self.__manager = manager
         self.__stopped = False
+        self.__length = None if len(configs) == 1 else len(configs)
 
         info_str: str = ""
-        info_kw: dict[str, str] = {}
 
-        if len(general_info) > 0:
-            info_parts: list[tuple[str, str]] = [
-                (f"info_{i}", general_info[i]) for i in range(len(general_info))
-            ]
-            info_kw = dict(info_parts)
-            info_str = "{fill}".join(f"{{{x[0]}}}" for x in info_parts) + "{fill}"
+        info_parts: list[tuple[str, str]] = [
+            (f"info_{i}", _("<Starting>"))
+            for i in range(2 if self.__length is None else 3)
+        ]
+        info_kw = dict(info_parts)
+        info_str = "{fill}".join(f"{{{x[0]}}}" for x in info_parts) + "{fill}"
 
-        info_kw["stage"] = _("Scanning")
+        info_kw["stage"] = _("Idle")
+
+        self.__info_kw = info_kw
 
         self.__status_bar = self.__manager.status_bar(
             status_format=APP_NAME
@@ -153,16 +157,106 @@ class AppStatusBar:
             justify=ManagerJustify.CENTER,
             autorefresh=True,
             min_delta=0.5,
-            additional_args=info_kw,
+            additional_args=self.__info_kw,
         )
 
-    def set_stage(self: Self, stage: str) -> None:
-        self.__status_bar.update(additional_args={"stage": stage})
+    def __update_info(self: Self) -> None:
+        self.__status_bar.update(additional_args=self.__info_kw)
+
+    @property(fget=None).setter
+    def stage(self: Self, stage: str) -> None:
+        self.__info_kw["stage"] = stage
+        self.__update_info()
+
+    def __unset_config(self: Self) -> None:
+        info_parts: list[tuple[str, str]] = [
+            (f"info_{i}", _("<Not set>"))
+            for i in range(2 if self.__length is None else 3)
+        ]
+
+        for key, value in info_parts:
+            self.__info_kw[key] = value
+
+        self.__update_info()
+
+    def __set_config(self: Self, index: int, config: FinalConfig) -> None:
+        config_paramaters: Optional[tuple[int, int]] = (
+            None if self.__length is None else (index, self.__length)
+        )
+
+        general_info: list[str] = [
+            x
+            for x in [
+                _("Config: '{config_name}'").format(
+                    config_name=config.config_name,
+                ),
+                (
+                    None
+                    if config_paramaters is None
+                    else _("Config progress: {start} / {end}").format(
+                        start=config_paramaters[0] + 1,
+                        end=config_paramaters[1],
+                    )
+                ),
+                _("Config type: '{config_type}'").format(
+                    config_type=config.config_type.value,
+                ),
+            ]
+            if x is not None
+        ]
+
+        expected_length = 2 if self.__length is None else 3
+
+        if len(general_info) != expected_length:
+            msg = f"Invalid config set:  {len(general_info)}  != {expected_length}"
+            raise RuntimeError(msg)
+
+        info_parts: list[tuple[str, str]] = [
+            (f"info_{i}", general_info[i]) for i in range(len(general_info))
+        ]
+
+        for key, value in info_parts:
+            self.__info_kw[key] = value
+
+        self.__update_info()
+
+    def config(
+        self: Self,
+        index: int,
+        config: FinalConfig,
+    ) -> AbstractContextManager[None]:
+        def enter_cb() -> None:
+            self.__set_config(index, config)
+
+        def exit_cb() -> None:
+            self.__unset_config()
+
+        @decorate_class(slots=True)
+        class ConfigContextWrapper(AbstractContextManager[None]):
+
+            def __init__(self: Self) -> None:
+                super().__init__()
+
+            @override
+            def __enter__(self: Self) -> None:
+                enter_cb()
+
+            @override
+            def __exit__(
+                self: Self,
+                exc_type: Optional[type[BaseException]],
+                exc_val: Optional[BaseException],
+                exc_tb: Optional[TracebackType],
+            ) -> Literal[False]:  # actually bool
+                exit_cb()
+                return False
+
+        return ConfigContextWrapper()
 
     def stop(self: Self) -> None:
         if not self.__stopped:
             self.__stopped = True
-            self.set_stage(_("finished"))
+            self.stage = _("End")
             self.__manager.stop()
 
     def __del__(self: Self) -> None:
@@ -170,7 +264,7 @@ class AppStatusBar:
 
 
 def app_status_bar_manager(
-    general_info: list[str],
+    configs: list[FinalConfig],
     manager: ManagerInterface,
 ) -> AbstractContextManager[AppStatusBar]:
     @decorate_class(slots=True)
@@ -184,7 +278,7 @@ def app_status_bar_manager(
 
         @override
         def __enter__(self: Self) -> AppStatusBar:
-            self.__status_bar = AppStatusBar(general_info, manager)
+            self.__status_bar = AppStatusBar(configs, manager)
 
             return self.__status_bar
 

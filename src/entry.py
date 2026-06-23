@@ -8,7 +8,6 @@ import sys
 from logging import Logger
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     Literal,
     Never,
@@ -19,9 +18,11 @@ from typing import (
 
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import SerializableDict, SerializableDictValue
+from helper.base import app_status_bar_manager
 from helper.decorator import decorate_class
 from helper.filter import Filter, FilterHelpOptions, FilterManager
 from helper.log import LogLevel, setup_custom_logger
+from helper.manager import TuiManager
 from helper.translation import get_translator
 from helper.utils import parse_int_safely
 from helper.validator import validator_checks
@@ -548,9 +549,6 @@ def subcommand_run(
     from helper.tui import launch_tui
     from main import AllContent
 
-    if TYPE_CHECKING:
-        from helper.manager import ConfigParameters
-
     parsed_config = AdvancedConfig.load_and_resolve(
         args.config,
         args.template_to_use,
@@ -581,25 +579,28 @@ def subcommand_run(
         logger.error(_("filtering returned 0 configs"))
         return 1
 
+    manager = TuiManager()
+
     try:
-        with LockFile.for_file(args.config):
+        with (
+            LockFile.for_file(args.config),
+            app_status_bar_manager(configs, manager) as status_bar,
+        ):
             for index, config in enumerate(configs):
-                name_parser = CustomNameParser(
-                    season_special_names=config.parser.special,
-                )
+                with status_bar.config(index, config):
+                    name_parser = CustomNameParser(
+                        season_special_names=config.parser.special,
+                    )
 
-                config_paramaters: Optional[ConfigParameters] = (
-                    None if len(configs) == 1 else (index, len(configs))
-                )
-
-                launch_tui(
-                    logger=logger,
-                    config=config,
-                    name_parser=name_parser,
-                    all_content_type=AllContent,
-                    config_paramaters=config_paramaters,
-                    filters=args.filter,
-                )
+                    launch_tui(
+                        logger=logger,
+                        config=config,
+                        name_parser=name_parser,
+                        all_content_type=AllContent,
+                        filters=args.filter,
+                        manager=manager,
+                        status_bar=status_bar,
+                    )
     except FileLockError as err:
         logger.error(_("File lock error: {err}").format(err=str(err)))  # noqa: TRY400
         return 1

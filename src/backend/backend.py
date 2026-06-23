@@ -63,6 +63,7 @@ from content.summary import (
 )
 from helper.base import (
     AnyType,
+    AppStatusBar,
     app_status_bar_manager,
     parse_contents,
 )
@@ -75,6 +76,7 @@ from helper.config import (
     RawConfig,
     filter_configs,
 )
+from helper.custom_parser import CustomNameParser
 from helper.decorator import decorate_class
 from helper.devices import DeviceManager
 from helper.error import ErrorModeNone
@@ -86,7 +88,6 @@ from helper.filter import (
 )
 from helper.log import get_logger
 from helper.manager import (
-    ConfigParameters,
     CounterInterface,
     CounterOptions,
     ManagerInterface,
@@ -97,7 +98,6 @@ from helper.manager import (
     number_like_convert_to_serializable,
 )
 from helper.models import voxlingua107_ecapa_model
-from helper.custom_parser import CustomNameParser
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 from helper.validator import (
@@ -1548,9 +1548,9 @@ class BackendScanner:
         config: FinalConfig,
         name_parser: NameParser,
         all_content_type: AnyType,
-        config_paramaters: Optional[ConfigParameters],
         manager: WsManager,
         filters: list[Filter],
+        status_bar: AppStatusBar,
     ) -> Optional[SummaryData]:
 
         execute_steps = execute_steps_from_filter(filters)
@@ -1579,78 +1579,61 @@ class BackendScanner:
             manager,
         )
 
-        general_info: list[str] = [
-            x
-            for x in [
-                _("Config: '{config_name}'").format(config_name=config.config_name),
-                (
-                    None
-                    if config_paramaters is None
-                    else _("Config progress: {start} / {end}").format(
-                        start=config_paramaters[0] + 1,
-                        end=config_paramaters[1],
-                    )
-                ),
-                _("Config type: '{config_type}'").format(
-                    config_type=config.config_type.value,
-                ),
-            ]
-            if x is not None
-        ]
-
         # TODO: make configurable
         error_mode = ErrorModeNone()
 
-        with app_status_bar_manager(general_info, manager) as status_bar:
+        status_bar.stage = _("Scanning")
+        contents: list[Content] = parse_contents(
+            root_folder=config.parser.root_folder,
+            options={
+                "ignore_files": config.parser.ignore_files,
+                "video_formats": config.parser.video_formats,
+                "trailer_names": config.parser.trailer_names,
+                "parse_error_is_exception": config.parser.exception_on_error,
+            },
+            save_file=config.general.target_file,
+            name_parser=name_parser,
+            scanner=scanner,
+            language_picker=language_picker,
+            all_content_type=all_content_type,
+            config_type=config.config_type,
+            manager=manager,
+            error_mode=error_mode,
+            check=execute_steps.check,
+        )
 
-            contents: list[Content] = parse_contents(
-                root_folder=config.parser.root_folder,
-                options={
-                    "ignore_files": config.parser.ignore_files,
-                    "video_formats": config.parser.video_formats,
-                    "trailer_names": config.parser.trailer_names,
-                    "parse_error_is_exception": config.parser.exception_on_error,
-                },
-                save_file=config.general.target_file,
-                name_parser=name_parser,
-                scanner=scanner,
-                language_picker=language_picker,
-                all_content_type=all_content_type,
-                config_type=config.config_type,
-                manager=manager,
-                error_mode=error_mode,
-                check=execute_steps.check,
+        status_bar.stage = _("Validate")
+        if execute_steps.validate:
+            validator_params = ValidatorParams(
+                reporter=manager,
+                model_language=model.model_language,
             )
 
-            if execute_steps.validate:
-                validator_params = ValidatorParams(
-                    reporter=manager,
-                    model_language=model.model_language,
-                )
+            validators = get_validators(validator_params, filters)
 
-                validators = get_validators(validator_params, filters)
+            Validator.validate_multiple(
+                validators,
+                contents,
+                manager=manager,
+            )
 
-                Validator.validate_multiple(
-                    validators,
-                    contents,
-                    manager=manager,
-                )
+        status_bar.stage = _("Summary")
+        if execute_steps.summary:
+            language_summary, metadata_summary, video_metadata_summary = (
+                Summary.combine_summaries(content.summary() for content in contents)
+            )
 
-            if execute_steps.summary:
-                language_summary, metadata_summary, video_metadata_summary = (
-                    Summary.combine_summaries(content.summary() for content in contents)
-                )
+            scan_summary = language_scanner.summary_manager.get_detailed_summary()
 
-                scan_summary = language_scanner.summary_manager.get_detailed_summary()
+            return SummaryData(
+                language=language_summary,
+                metadata=metadata_summary,
+                video_metadata=video_metadata_summary,
+                details=scan_summary,
+            )
 
-                return SummaryData(
-                    language=language_summary,
-                    metadata=metadata_summary,
-                    video_metadata=video_metadata_summary,
-                    details=scan_summary,
-                )
-
-            return None
+        status_bar.stage = _("Finished")
+        return None
 
     async def __start_coroutine(
         self: Self,
@@ -1662,27 +1645,26 @@ class BackendScanner:
         result: list[Optional[SummaryData]] = []
 
         try:
-            with LockFile.for_file(config_file_path):
-
+            with (
+                LockFile.for_file(config_file_path),
+                app_status_bar_manager(configs, manager) as status_bar,
+            ):
                 for index, config in enumerate(configs):
-                    name_parser = CustomNameParser(
-                        season_special_names=config.parser.special,
-                    )
+                    with status_bar.config(index, config):
+                        name_parser = CustomNameParser(
+                            season_special_names=config.parser.special,
+                        )
 
-                    config_paramaters: Optional[ConfigParameters] = (
-                        None if len(configs) == 1 else (index, len(configs))
-                    )
+                        summary = await self.__launch_scanner_in_background(
+                            config=config,
+                            name_parser=name_parser,
+                            all_content_type=AllContent,
+                            manager=manager,
+                            filters=filters,
+                            status_bar=status_bar,
+                        )
 
-                    summary = await self.__launch_scanner_in_background(
-                        config=config,
-                        name_parser=name_parser,
-                        all_content_type=AllContent,
-                        config_paramaters=config_paramaters,
-                        manager=manager,
-                        filters=filters,
-                    )
-
-                    result.append(summary)
+                        result.append(summary)
 
                 return result
         except FileLockError as err:
