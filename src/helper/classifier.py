@@ -79,7 +79,7 @@ class MemoryPattern(ABC):
 
     def __init__(self: Self, pattern_type: MemoryPatternType) -> None:
         super().__init__()
-        self.typepattern_type = pattern_type
+        self.pattern_type = pattern_type
 
     @abstractmethod
     def get_seconds_for_memory_amount(
