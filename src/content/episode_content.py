@@ -190,6 +190,30 @@ class EpisodeContent(Content):
 
         return metadata
 
+    def get_tags(self: Self) -> MetadataTags:
+        def metadata_prefix(name: str) -> str:
+            return f"video_language_detect_{name}"
+
+        now = datetime.now()  # noqa: DTZ005
+
+        metadata: SerializableDict = {
+            metadata_prefix("metadata"): self.__metadata_for_file(),
+            metadata_prefix("version"): PROGRAM_VERSION,
+            metadata_prefix("iso_time"): now.isoformat(),
+        }
+
+        comment: str = "see other metadata for more info by video_language_detect"
+
+        # NOTE: the uuid should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
+
+        tags = MetadataTags(
+            comment=comment,
+            uuid=uuid4(),
+            metadata=metadata,
+        )
+
+        return tags
+
     def update_video_metadata(
         self: Self,
         manager: ManagerInterface,
@@ -220,28 +244,7 @@ class EpisodeContent(Content):
 
             try:
 
-                def metadata_prefix(name: str) -> str:
-                    return f"video_language_detect_{name}"
-
-                now = datetime.now()  # noqa: DTZ005
-
-                metadata: SerializableDict = {
-                    metadata_prefix("metadata"): self.__metadata_for_file(),
-                    metadata_prefix("version"): PROGRAM_VERSION,
-                    metadata_prefix("iso_time"): now.isoformat(),
-                }
-
-                comment: str = (
-                    "see other metadata for more info by video_language_detect"
-                )
-
-                # NOTE: the uuid should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
-
-                tags = MetadataTags(
-                    comment=comment,
-                    uuid=uuid4(),
-                    metadata=metadata,
-                )
+                tags = self.get_tags()
 
                 # TODO: remove
                 global global_counter_wip
@@ -257,7 +260,6 @@ class EpisodeContent(Content):
                         language_write_ok = ctx.write_language(self.language)
                         print("language_write_ok: ", language_write_ok)
                         ctx.write_tags(tags)
-                        print(metadata)
                         self.scanned_file.reset_file_data()
                         changed_file = True
             except (RuntimeError, ValueError, TypeError) as err:

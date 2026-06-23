@@ -40,6 +40,7 @@ type ReporterWhere = tuple[
     SeasonContent,
 ] | SeriesContent | CollectionContent | Path
 
+
 @decorate_class(slots=True)
 class ValidatorReporter(ABC):
     def __init__(self: Self) -> None:
@@ -82,6 +83,7 @@ class ValidatorReporter(ABC):
         message: str,
     ) -> None: ...
 
+
 @decorate_class(slots=True)
 class TuiValidatorReporter(ValidatorReporter):
     def __init__(self: Self) -> None:
@@ -108,6 +110,7 @@ class TuiValidatorReporter(ValidatorReporter):
 class ValidatorParams:
     reporter: ValidatorReporter
     model_language: ModelLanguage
+
 
 @decorate_class(slots=True)
 class Validator[ED, SD, S2D, CD](ABC):
@@ -140,7 +143,10 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> list[ED]:
         state: list[ED] = [
             self.validate_episode(
-                content, series=series, season=season, manager=manager,
+                content,
+                series=series,
+                season=season,
+                manager=manager,
             )
             for content in contents
         ]
@@ -783,6 +789,7 @@ class LanguageConsistencyValidator(
 @dataclass(slots=True, repr=True)
 class TagOptions:
     strict: bool
+    write: bool
 
 
 # tags validator, checks, that every file has tags
@@ -822,13 +829,18 @@ class TagsValidator(Validator[None, None, None, None]):
 
         handle = handle_result.as_ok()
         try:
-            with handle.r_ctx(manager=manager) as ctx:
+            with handle.rw_ctx(manager=manager) as ctx:
                 tags = ctx.get_tags()
                 if tags.uuid is None:
-                    self.emit_error(
-                        episode.scanned_file.path,
-                        _("File not tagged"),
-                    )
+                    if self.__options.write:
+                        new_tags = episode.get_tags()
+                        ctx.write_tags(new_tags)
+                    else:
+                        self.emit_error(
+                            episode.scanned_file.path,
+                            _("File not tagged"),
+                        )
+
         except (RuntimeError, ValueError, TypeError) as err:
             self.emit_error(
                 episode.scanned_file.path,
@@ -879,12 +891,14 @@ class TagsValidator(Validator[None, None, None, None]):
         options: Optional[str],
     ) -> Result[TagOptions, str]:
         if options is None:
-            return Ok(TagOptions(strict=False))
+            return Ok(TagOptions(strict=False, write=False))
 
-        result = TagOptions(strict=False)
+        result = TagOptions(strict=False, write=False)
         for c in options:
             if c == "s":
                 result.strict = True
+            if c == "w":
+                result.write = True
             else:
                 return Err(f"Invalid options flag: {c}")
 
