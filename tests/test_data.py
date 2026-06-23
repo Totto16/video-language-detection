@@ -1,12 +1,16 @@
+from collections.abc import Mapping
+import json
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pytest_subtests import SubTests
+from helper.apischema import get_schema
 from test_helper import re_exact_string
 
 from helper.base import load_from_file
-from helper.config import ParsedTargetFileJson
+from helper.config import ParsedTargetFileJson, SchemaConfig
 from helper.custom_parser import CustomNameParser
 from main import AllContent
 
@@ -17,7 +21,8 @@ def test_data_parse_fails(subtests: SubTests) -> None:
 
         def load() -> None:
             load_from_file(
-                ParsedTargetFileJson("json", Path("not_present.json")), AllContent,
+                ParsedTargetFileJson("json", Path("not_present.json")),
+                AllContent,
             )
 
         with pytest.raises(
@@ -105,3 +110,46 @@ def test_custom_name_parser(subtests: SubTests) -> None:
         assert episode_data.episode == 1
         assert episode_data.name == "Cool Name"
         assert episode_data.season == 9
+
+
+def generate_test_schema(any_type: Any) -> Mapping[str, Any]:
+    result: Mapping[str, Any] = get_schema(
+        any_type,
+        additional_properties=False,
+        all_refs=True,
+        emit_type="deserialize",
+    )
+
+    return result
+
+
+def read_json_file(file: Path) -> Any:
+    with file.open(mode="r") as f:
+        return json.load(f)
+
+
+def test_schema_generation(subtests: SubTests) -> None:
+
+    schema_folder = Path(__file__).parent.parent / "schema"
+
+    with subtests.test("validate schema: content schema"):
+        schema = generate_test_schema(
+            list[AllContent],
+        )
+
+        schema_file = schema_folder / "content_list_schema.json"
+
+        schema_content = read_json_file(schema_file)
+
+        assert schema == schema_content
+
+    with subtests.test("validate schema: config schema"):
+        schema = generate_test_schema(
+            SchemaConfig,
+        )
+
+        schema_file = schema_folder / "config_schema.json"
+
+        schema_content = read_json_file(schema_file)
+
+        assert schema == schema_content
