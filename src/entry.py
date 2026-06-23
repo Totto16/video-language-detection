@@ -756,8 +756,8 @@ def subcommand_tagger_write(  # noqa: PLR0915
 
     metadata: SerializableDict = {}
 
-    for value in args.metadata:
-        key, val = get_key_value(value)
+    for value_m in args.metadata:
+        key, val = get_key_value(value_m)
 
         if val is None:
             metadata = merge_dicts(metadata, {key: ""}, "error")
@@ -771,8 +771,8 @@ def subcommand_tagger_write(  # noqa: PLR0915
         metadata=metadata,
     )
 
-    with handle.w_ctx(manager=tui_manager) as ctx:
-        ctx.write_tags(write_tags)
+    with handle.w_ctx(manager=tui_manager) as w_ctx:
+        w_ctx.write_tags(write_tags)
 
         logger.info(_("Wrote tags:"))
 
@@ -781,8 +781,8 @@ def subcommand_tagger_write(  # noqa: PLR0915
         logger.info(_("UUID: {uuid}").format(uuid=write_tags.uuid))
 
         logger.info(_("Generic Metadata:"))
-        for key, value in write_tags.metadata.items():
-            msg = f"{key}: {value}"
+        for key_m, value in write_tags.metadata.items():
+            msg = f"{key_m}: {value}"
             logger.info(msg)
 
         if args.language is not None:
@@ -791,14 +791,14 @@ def subcommand_tagger_write(  # noqa: PLR0915
                 raise RuntimeError(msg)
 
             language = Language.from_values_unsafe(str(args.language), "Not applicable")
-            ctx.write_language(language)
+            w_ctx.write_language(language)
 
             logger.info(_("Wrote language: {lang}").format(lang=str(language.short)))
 
     noop_manager = NoopManager()
 
-    with handle.r_ctx(manager=noop_manager) as ctx:
-        tags = ctx.get_tags()
+    with handle.r_ctx(manager=noop_manager) as r_ctx:
+        tags = r_ctx.get_tags()
 
         print()  # noqa: T201
         logger.info(_("Which resulted in these tags tags:"))

@@ -65,10 +65,10 @@ class ValidatorReporter(ABC):
                     season=season.description.season,
                 )
 
-            series, season, episode = where
+            series, season_desc, episode = where
             return _("Series {name} Season {season} Episode {episode}").format(
                 name=series.name,
-                season=season.season,
+                season=season_desc.season,
                 episode=episode.description.episode,
             )
 

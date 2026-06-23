@@ -115,7 +115,7 @@ def _find_inner_functions(
 
 def __add_slots_impl[A](
     cls: type[A],
-    field_names: list[str],
+    field_names_inp: list[str],
     *,
     weakref_slot: bool,
 ) -> type[A]:
@@ -130,7 +130,7 @@ def __add_slots_impl[A](
 
     # Create a new dict for our new class.
     cls_dict = dict(cls.__dict__)
-    field_names = tuple(field_names)
+    field_names = tuple(field_names_inp)
     # Make sure slots don't overlap with those in base classes.
     inherited_slots = set(
         itertools.chain.from_iterable(map(__get_slots_impl, cls.__mro__[1:-1])),

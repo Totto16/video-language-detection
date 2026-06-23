@@ -413,10 +413,10 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
 
             foo = property(_get_foo, _set_foo, _del_foo)
 
-        a = A2()
-        assert a.foo is A2
-        a.foo = 4
-        del a.foo
+        a2 = A2()
+        assert a2.foo is A2
+        a2.foo = 4
+        del a2.foo
 
     with subtests.test("test_dunder_class_with_new_property"):
 
@@ -434,10 +434,10 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
             def foo(self: Self) -> None:
                 assert __class__ is type(self)  # type: ignore[name-defined]
 
-        a = A3()
-        assert a.foo is A3
-        a.foo = 4
-        del a.foo
+        a3 = A3()
+        assert a3.foo is A3
+        a3.foo = 4
+        del a3.foo
 
     # Test the parts of a property individually.
     with subtests.test("test_slots_dunder_class_property_getter"):
@@ -448,8 +448,8 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
             def foo(self: Self) -> type["A4"]:
                 return __class__  # type: ignore[name-defined]
 
-        a = A4()
-        assert a.foo is A4
+        a4 = A4()
+        assert a4.foo is A4
 
     with subtests.test("test_slots_dunder_class_property_setter"):
 
@@ -461,8 +461,8 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
             def foo(self: Self, val: Any) -> None:  # noqa: ARG002
                 assert __class__ is type(self)  # type: ignore[name-defined]
 
-        a = A5()
-        a.foo = 4
+        a5 = A5()
+        a5.foo = 4
 
     with subtests.test("test_slots_dunder_class_property_deleter"):
 
@@ -474,8 +474,8 @@ def test_decorator_slots_with_super_calls(  # noqa: PLR0915
             def foo(self: Self) -> None:
                 assert __class__ is type(self)  # type: ignore[name-defined]
 
-        a = A6()
-        del a.foo
+        a6 = A6()
+        del a6.foo
 
     with subtests.test("test_wrapped"):
 
