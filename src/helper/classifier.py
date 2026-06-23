@@ -805,7 +805,7 @@ class WAVFile:
 
 # TODO: relativate to the root path
 def relative_path_str(path: Path) -> str:
-    return str(object=path)
+    return str(path)
 
 
 def is_percentage(value: float) -> bool:

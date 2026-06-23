@@ -16,7 +16,7 @@ from content.language_picker import (
 )
 from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
-from helper.base import AnyType, parse_contents
+from helper.base import AnyType, app_status_bar_manager, parse_contents
 from helper.classifier import Classifier, Model
 from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
@@ -127,47 +127,48 @@ def launch_tui(
 
     manager = TuiManager()
 
-    contents: list[Content] = parse_contents(
-        root_folder=config.parser.root_folder,
-        options={
-            "ignore_files": config.parser.ignore_files,
-            "video_formats": config.parser.video_formats,
-            "trailer_names": config.parser.trailer_names,
-            "parse_error_is_exception": config.parser.exception_on_error,
-        },
-        save_file=config.general.target_file,
-        name_parser=name_parser,
-        scanner=scanner,
-        language_picker=language_picker,
-        all_content_type=all_content_type,
-        general_info=general_info,
-        config_type=config.config_type,
-        manager=manager,
-        error_mode=error_mode,
-        check=execute_steps.check,
-    )
+    with app_status_bar_manager(general_info, manager) as status_bar:
 
-    if execute_steps.validate:
-        tui_reporter: ValidatorReporter = TuiValidatorReporter()
-
-        validator_params = ValidatorParams(tui_reporter, model.model_language)
-
-        validators = get_validators(validator_params, filters)
-
-        Validator.validate_multiple(
-            validators,
-            contents,
+        contents: list[Content] = parse_contents(
+            root_folder=config.parser.root_folder,
+            options={
+                "ignore_files": config.parser.ignore_files,
+                "video_formats": config.parser.video_formats,
+                "trailer_names": config.parser.trailer_names,
+                "parse_error_is_exception": config.parser.exception_on_error,
+            },
+            save_file=config.general.target_file,
+            name_parser=name_parser,
+            scanner=scanner,
+            language_picker=language_picker,
+            all_content_type=all_content_type,
+            config_type=config.config_type,
             manager=manager,
+            error_mode=error_mode,
+            check=execute_steps.check,
         )
 
-    if execute_steps.summary:
-        language_summary, metadata_summary, video_metadata_summary = (
-            Summary.combine_summaries(content.summary() for content in contents)
-        )
+        if execute_steps.validate:
+            tui_reporter: ValidatorReporter = TuiValidatorReporter()
 
-        scan_summary = language_scanner.summary_manager.get_detailed_summary()
+            validator_params = ValidatorParams(tui_reporter, model.model_language)
 
-        logger.info(language_summary)
-        logger.info(metadata_summary)
-        logger.info(video_metadata_summary)
-        logger.info(scan_summary)
+            validators = get_validators(validator_params, filters)
+
+            Validator.validate_multiple(
+                validators,
+                contents,
+                manager=manager,
+            )
+
+        if execute_steps.summary:
+            language_summary, metadata_summary, video_metadata_summary = (
+                Summary.combine_summaries(content.summary() for content in contents)
+            )
+
+            scan_summary = language_scanner.summary_manager.get_detailed_summary()
+
+            logger.info(language_summary)
+            logger.info(metadata_summary)
+            logger.info(video_metadata_summary)
+            logger.info(scan_summary)

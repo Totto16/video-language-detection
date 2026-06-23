@@ -1,14 +1,14 @@
-from collections.abc import Mapping
 import json
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 from pytest_subtests import SubTests
-from helper.apischema import get_schema
 from test_helper import re_exact_string
 
+from helper.apischema import get_schema
 from helper.base import load_from_file
 from helper.config import ParsedTargetFileJson, SchemaConfig
 from helper.custom_parser import CustomNameParser

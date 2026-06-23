@@ -63,6 +63,7 @@ from content.summary import (
 )
 from helper.base import (
     AnyType,
+    app_status_bar_manager,
     parse_contents,
 )
 from helper.classifier import Classifier, Model
@@ -188,6 +189,7 @@ def uuid_deserialize(value: str) -> uuid.UUID:
 
 def uuid_serialize(value: uuid.UUID) -> str:
     return value.hex
+
 
 @decorate_class(slots=True)
 class WsSingleManager(WebsocketHandler):
@@ -652,6 +654,7 @@ OutgoingWsData = Annotated[
     pydantic.Discriminator(discriminator="type"),
 ]
 
+
 @decorate_class(slots=True)
 class ScannerStatusBar(StatusBarInterface):
     __ref: "WsManager"
@@ -674,6 +677,7 @@ class ScannerStatusBar(StatusBarInterface):
             ),
         )
         self.__ref.send_data_sync(data)
+
 
 @decorate_class(slots=True)
 class ScannerCounter(CounterInterface):
@@ -711,6 +715,7 @@ class ScannerCounter(CounterInterface):
         )
         self.__ref.send_data_sync(data)
 
+
 @decorate_class(slots=True)
 class EmptyContextManager(AbstractContextManager[None]):
     def __init__(self: Self) -> None:
@@ -735,6 +740,7 @@ class WSChoiceChoiceImpl:
     title: list[ChoiceTitle]
     value: SelectResult
 
+
 @decorate_class(slots=True)
 class WSChoiceChoice(ChoiceInterface):
     __impl: WSChoiceChoiceImpl
@@ -746,6 +752,7 @@ class WSChoiceChoice(ChoiceInterface):
     @property
     def impl(self: Self) -> WSChoiceChoiceImpl:
         return self.__impl
+
 
 @decorate_class(slots=True)
 class WSChoiceSeparator(ChoiceInterface):
@@ -762,6 +769,7 @@ class ReplyData:
     finished: bool
     event: asyncio.Event
     data: Optional[Any]
+
 
 @decorate_class(slots=True)
 class ManagerCtx(AbstractContextManager[WsSingleManager]):
@@ -790,6 +798,7 @@ class ManagerCtx(AbstractContextManager[WsSingleManager]):
     ) -> Literal[False]:  # actually bool
         self.__remove_fn()
         return False
+
 
 @decorate_class(slots=True)
 class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
@@ -1319,6 +1328,7 @@ class ScanStatusSerializableResult(pydantic.BaseModel):
 
     status: ScanStatusSerializable
 
+
 @decorate_class(slots=True)
 class ThreadSafeAcquired[A]:
     __get_impl: Callable[[], A]
@@ -1340,6 +1350,7 @@ class ThreadSafeAcquired[A]:
 
     def modify(self: Self, fn: Callable[[A], A]) -> None:
         self.__set_impl(fn(self.__get_impl()))
+
 
 @decorate_class(slots=True)
 class ThreadSafe[A](AbstractContextManager[ThreadSafeAcquired[A]]):
@@ -1404,6 +1415,7 @@ class ScannerThreadState:
 
 type ThreadId = int
 
+
 @decorate_class(slots=True)
 class ThreadHandler(Handler):
     __send: Callable[[ManagerWsLogMessageEventData], None]
@@ -1437,6 +1449,7 @@ class ThreadHandler(Handler):
             raise
         except Exception:  # noqa: BLE001
             self.handleError(record)
+
 
 @decorate_class(slots=True)
 class ThreadLoggerCtx(AbstractContextManager[Logger]):
@@ -1515,6 +1528,7 @@ def run_in_thread(
 
     event.set()
 
+
 @decorate_class(slots=True)
 class BackendScanner:
     __raw_config: RawConfig
@@ -1587,55 +1601,56 @@ class BackendScanner:
         # TODO: make configurable
         error_mode = ErrorModeNone()
 
-        contents: list[Content] = parse_contents(
-            root_folder=config.parser.root_folder,
-            options={
-                "ignore_files": config.parser.ignore_files,
-                "video_formats": config.parser.video_formats,
-                "trailer_names": config.parser.trailer_names,
-                "parse_error_is_exception": config.parser.exception_on_error,
-            },
-            save_file=config.general.target_file,
-            name_parser=name_parser,
-            scanner=scanner,
-            language_picker=language_picker,
-            all_content_type=all_content_type,
-            general_info=general_info,
-            config_type=config.config_type,
-            manager=manager,
-            error_mode=error_mode,
-            check=execute_steps.check,
-        )
+        with app_status_bar_manager(general_info, manager) as status_bar:
 
-        if execute_steps.validate:
-            validator_params = ValidatorParams(
-                reporter=manager,
-                model_language=model.model_language,
-            )
-
-            validators = get_validators(validator_params, filters)
-
-            Validator.validate_multiple(
-                validators,
-                contents,
+            contents: list[Content] = parse_contents(
+                root_folder=config.parser.root_folder,
+                options={
+                    "ignore_files": config.parser.ignore_files,
+                    "video_formats": config.parser.video_formats,
+                    "trailer_names": config.parser.trailer_names,
+                    "parse_error_is_exception": config.parser.exception_on_error,
+                },
+                save_file=config.general.target_file,
+                name_parser=name_parser,
+                scanner=scanner,
+                language_picker=language_picker,
+                all_content_type=all_content_type,
+                config_type=config.config_type,
                 manager=manager,
+                error_mode=error_mode,
+                check=execute_steps.check,
             )
 
-        if execute_steps.summary:
-            language_summary, metadata_summary, video_metadata_summary = (
-                Summary.combine_summaries(content.summary() for content in contents)
-            )
+            if execute_steps.validate:
+                validator_params = ValidatorParams(
+                    reporter=manager,
+                    model_language=model.model_language,
+                )
 
-            scan_summary = language_scanner.summary_manager.get_detailed_summary()
+                validators = get_validators(validator_params, filters)
 
-            return SummaryData(
-                language=language_summary,
-                metadata=metadata_summary,
-                video_metadata=video_metadata_summary,
-                details=scan_summary,
-            )
+                Validator.validate_multiple(
+                    validators,
+                    contents,
+                    manager=manager,
+                )
 
-        return None
+            if execute_steps.summary:
+                language_summary, metadata_summary, video_metadata_summary = (
+                    Summary.combine_summaries(content.summary() for content in contents)
+                )
+
+                scan_summary = language_scanner.summary_manager.get_detailed_summary()
+
+                return SummaryData(
+                    language=language_summary,
+                    metadata=metadata_summary,
+                    video_metadata=video_metadata_summary,
+                    details=scan_summary,
+                )
+
+            return None
 
     async def __start_coroutine(
         self: Self,
@@ -1829,6 +1844,7 @@ class BackendScanner:
     def status(self: Self) -> ScanStatusSerializable:
         state = self.__state.get_data()
         return scanner_state_to_serializable_data(state.state)
+
 
 @decorate_class(slots=True)
 class Backend:

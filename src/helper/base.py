@@ -1,7 +1,10 @@
 import json
+from contextlib import AbstractContextManager
 from pathlib import Path
+from types import TracebackType
 from typing import (
     Any,
+    Literal,
     Optional,
     Self,
     TypedDict,
@@ -112,35 +115,20 @@ class ContentOptions(TypedDict):
 
 
 @decorate_class(slots=True)
-class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
-    __options: ContentOptions
-    __name_parser: NameParser
-    __scanner: Scanner
-    __progress_bars: dict[str, CounterInterface]
-
+class AppStatusBar:
     __manager: ManagerInterface
     __status_bar: StatusBarInterface
-    __language_picker: LanguagePicker
-    __error_mode: ErrorMode
+    __stopped: bool
 
     def __init__(
         self: Self,
-        options: ContentOptions,
-        name_parser: NameParser,
-        scanner: Scanner,
-        language_picker: LanguagePicker,
         general_info: list[str],
         manager: ManagerInterface,
-        error_mode: ErrorMode,
     ) -> None:
         super().__init__()
 
-        self.__options = options
-        self.__name_parser = name_parser
-        self.__scanner = scanner
-        self.__progress_bars = {}
-
         self.__manager = manager
+        self.__stopped = False
 
         info_str: str = ""
         info_kw: dict[str, str] = {}
@@ -167,6 +155,84 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
             min_delta=0.5,
             additional_args=info_kw,
         )
+
+    def set_stage(self: Self, stage: str) -> None:
+        self.__status_bar.update(additional_args={"stage": stage})
+
+    def stop(self: Self) -> None:
+        if not self.__stopped:
+            self.__stopped = True
+            self.set_stage(_("finished"))
+            self.__manager.stop()
+
+    def __del__(self: Self) -> None:
+        self.stop()
+
+
+def app_status_bar_manager(
+    general_info: list[str],
+    manager: ManagerInterface,
+) -> AbstractContextManager[AppStatusBar]:
+    @decorate_class(slots=True)
+    class AppStatusBarContextManager(AbstractContextManager[AppStatusBar]):
+        __status_bar: Optional[AppStatusBar]
+
+        def __init__(self: Self) -> None:
+            super().__init__()
+
+            self.__status_bar = None
+
+        @override
+        def __enter__(self: Self) -> AppStatusBar:
+            self.__status_bar = AppStatusBar(general_info, manager)
+
+            return self.__status_bar
+
+        @override
+        def __exit__(
+            self: Self,
+            _exc_type: Optional[type[BaseException]],
+            _exc_val: Optional[BaseException],
+            _exc_tb: Optional[TracebackType],
+        ) -> Literal[False]:  # actually bool
+            if self.__status_bar is not None:
+                self.__status_bar.stop()
+                self.__status_bar = None
+
+            return False
+
+    return AppStatusBarContextManager()
+
+
+@decorate_class(slots=True)
+class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
+    __options: ContentOptions
+    __name_parser: NameParser
+    __scanner: Scanner
+    __progress_bars: dict[str, CounterInterface]
+
+    __manager: ManagerInterface
+    __language_picker: LanguagePicker
+    __error_mode: ErrorMode
+
+    def __init__(
+        self: Self,
+        options: ContentOptions,
+        name_parser: NameParser,
+        scanner: Scanner,
+        language_picker: LanguagePicker,
+        manager: ManagerInterface,
+        error_mode: ErrorMode,
+    ) -> None:
+        super().__init__()
+
+        self.__options = options
+        self.__name_parser = name_parser
+        self.__scanner = scanner
+        self.__progress_bars = {}
+
+        self.__manager = manager
+
         self.__language_picker = language_picker
         self.__error_mode = error_mode
 
@@ -264,10 +330,6 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
 
         self.__progress_bars[name].close(clear=True)
         del self.__progress_bars[name]
-
-    def __del__(self: Self) -> None:
-        self.__status_bar.update(additional_args={"stage": _("finished")})
-        self.__manager.stop()
 
     @property
     def name_parser(self: Self) -> NameParser:
@@ -395,7 +457,6 @@ def parse_contents(
     scanner: Scanner,
     language_picker: LanguagePicker,
     all_content_type: AnyType,
-    general_info: list[str],
     config_type: ConfigType,
     manager: ManagerInterface,
     error_mode: ErrorMode,
@@ -412,7 +473,6 @@ def parse_contents(
                 name_parser=name_parser,
                 scanner=scanner,
                 language_picker=language_picker,
-                general_info=general_info,
                 manager=manager,
                 error_mode=error_mode,
             )
@@ -422,7 +482,6 @@ def parse_contents(
                 name_parser=name_parser,
                 scanner=scanner,
                 language_picker=language_picker,
-                general_info=general_info,
                 manager=manager,
                 error_mode=error_mode,
             )
@@ -434,7 +493,6 @@ def parse_contents(
                 name_parser=name_parser,
                 scanner=scanner,
                 language_picker=language_picker,
-                general_info=general_info,
                 manager=manager,
                 error_mode=error_mode,
             )
