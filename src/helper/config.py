@@ -14,7 +14,13 @@ from typing import Annotated, Any, Literal, Optional, Self, assert_never, overri
 import pydantic
 import pydantic_core
 import yaml
-from apischema import ValidationError, deserialize, deserializer, schema, serializer
+from apischema import (
+    ValidationError,
+    deserialize,
+    deserializer,
+    schema,
+    serializer,
+)
 from apischema.metadata import none_as_undefined, required
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
@@ -25,7 +31,7 @@ from content.language_picker import (
 from content.metadata.config import MetadataConfig
 from content.metadata.interfaces import MissingProviderMetadataConfig
 from content.scanner import ConfigScannerConfig, ScannerConfig
-from helper.apischema import OneOf
+from helper.apischema import Deprecated, OneOf
 from helper.classifier import ClassifierOptionsConfig
 from helper.decorator import decorate_class
 from helper.filter import ConfigFilter, Filter, SpecialFilter, SpecialFilterType
@@ -34,13 +40,46 @@ from helper.result import Err, Ok, Result
 
 
 @dataclass(slots=True, repr=True)
+class TargetFileJson:
+    type: Literal["json"]
+    file: str
+
+
+@dataclass(slots=True, repr=True)
+class TargetFileWip:
+    type: Literal["wip"]
+    file: str
+
+
+TargetFile = Annotated[
+    TargetFileJson | TargetFileWip | Annotated[str, Deprecated],
+    OneOf,
+]
+
+
+@dataclass(slots=True, repr=True)
 class GeneralConfig:
-    target_file: str
+    target_file: TargetFile
+
+
+@dataclass(slots=True, repr=True)
+class ParsedTargetFileJson:
+    type: Literal["json"]
+    file: Path
+
+
+@dataclass(slots=True, repr=True)
+class ParsedTargetFileWip:
+    type: Literal["wip"]
+    file: Path
+
+
+ParsedTargetFile = Annotated[ParsedTargetFileJson | ParsedTargetFileWip, OneOf]
 
 
 @dataclass(slots=True, repr=True)
 class GeneralConfigParsed:
-    target_file: Path
+    target_file: ParsedTargetFile
 
 
 @dataclass(slots=True, repr=True)
@@ -192,6 +231,19 @@ class FinalConfig:
 logger: Logger = get_logger()
 
 
+def parse_target_file(tgt: TargetFile) -> ParsedTargetFile:
+    if isinstance(tgt, str):
+        return ParsedTargetFileJson("json", file=Path(tgt))
+
+    if isinstance(tgt, TargetFileJson):
+        return ParsedTargetFileJson("json", Path(tgt.file))
+
+    if isinstance(tgt, TargetFileWip):
+        return ParsedTargetFileWip("wip", Path(tgt.file))
+
+    assert_never(tgt)
+
+
 @dataclass(slots=True, repr=True)
 class ConfigGeneric:
     general: Annotated[Optional[GeneralConfig], OneOf] = field(
@@ -228,7 +280,9 @@ class ConfigGeneric:
         return FinalConfig(
             config_name="<None>",
             config_type=ConfigType.normal,
-            general=GeneralConfigParsed(target_file=Path("data.json")),
+            general=GeneralConfigParsed(
+                target_file=ParsedTargetFileJson("json", Path("data.json")),
+            ),
             parser=ParserConfigParsed(
                 root_folder=Path.cwd(),
                 special=[],
@@ -253,8 +307,10 @@ class ConfigGeneric:
             # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
             parsed_general = defaults.general
             if config.general is not None:
+                target_file = parse_target_file(config.general.target_file)
+
                 parsed_general = GeneralConfigParsed(
-                    target_file=Path(config.general.target_file),
+                    target_file=target_file,
                 )
 
             parsed_parser = defaults.parser
@@ -423,8 +479,10 @@ class AdvancedConfig:
             # TODO this is done manually atm, it can be done more automated
             parsed_general = defaults.general
             if template.general is not None:
+                target_file = parse_target_file(template.general.target_file)
+
                 parsed_general = GeneralConfigParsed(
-                    target_file=Path(template.general.target_file),
+                    target_file=target_file,
                 )
 
             parsed_parser = defaults.parser
@@ -737,6 +795,7 @@ class FileLockError(RuntimeError):
 
     def __init__(self: Self, msg: str) -> None:
         super().__init__(msg)
+
 
 @decorate_class(slots=True)
 class LockFile(AbstractContextManager[None]):

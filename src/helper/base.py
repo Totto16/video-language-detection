@@ -28,7 +28,7 @@ from content.general import (
 from content.language_picker import LanguagePicker
 from content.metadata.metadata import HandlesType
 from content.scan_helpers import normal_content_from_scan, numerated_content_from_scan
-from helper.config import ConfigType
+from helper.config import ConfigType, ParsedTargetFile
 from helper.constants import APP_NAME
 from helper.decorator import decorate_class
 from helper.error import ErrorMode
@@ -46,47 +46,62 @@ type AnyType = Any
 
 
 def save_to_file(
-    file_path: Path,
+    tgt: ParsedTargetFile,
     contents: list[Content],
     serialize_type: AnyType,
 ) -> None:
-    if not file_path.parent.exists():
-        file_path.parent.mkdir(parents=True)
+    if not tgt.file.parent.exists():
+        tgt.file.parent.mkdir(parents=True)
 
-    encoded_dict: dict[str, Any] = serialize(
-        list[serialize_type],
-        contents,
-    )
+    if tgt.type == "json":
 
-    with file_path.open(
-        mode="w",
-    ) as file:
-        suffix: str = file_path.suffix[1:]
-        match suffix:
-            case "json":
-                json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
-            case _:
-                msg = _("Data not saveable to '{suffix}' file!").format(suffix=suffix)
-                raise RuntimeError(msg)
+        encoded_dict: dict[str, Any] = serialize(
+            list[serialize_type],
+            contents,
+        )
+
+        with tgt.file.open(
+            mode="w",
+        ) as file:
+            suffix: str = tgt.file.suffix[1:]
+            match suffix:
+                case "json":
+                    json.dump(encoded_dict, file, indent=4, ensure_ascii=False)
+                case _:
+                    msg = _("Data not saveable to '{suffix}' file!").format(
+                        suffix=suffix,
+                    )
+                    raise RuntimeError(msg)
+
+        return
+
+    msg = f"file type '{tgt.type}' is not implemented yet"
+    raise NotImplementedError(msg)
 
 
 def load_from_file(
-    file_path: Path,
+    tgt: ParsedTargetFile,
     serialize_type: AnyType,
 ) -> list[Content]:
-    with file_path.open(mode="r") as file:
-        suffix: str = file_path.suffix[1:]
-        match suffix:
-            case "json":
-                parsed_dict: dict[str, Any] = json.load(file)
-                json_loaded: list[Content] = deserialize(
-                    list[serialize_type],
-                    parsed_dict,
-                )
-                return json_loaded
-            case _:
-                msg = _("Data not loadable from '{suffix}' file!").format(suffix=suffix)
-                raise RuntimeError(msg)
+    if tgt.type == "json":
+        with tgt.file.open(mode="r") as file:
+            suffix: str = tgt.file.suffix[1:]
+            match suffix:
+                case "json":
+                    parsed_dict: dict[str, Any] = json.load(file)
+                    json_loaded: list[Content] = deserialize(
+                        list[serialize_type],
+                        parsed_dict,
+                    )
+                    return json_loaded
+                case _:
+                    msg = _("Data not loadable from '{suffix}' file!").format(
+                        suffix=suffix,
+                    )
+                    raise RuntimeError(msg)
+
+    msg = f"file type '{tgt.type}' is not implemented yet"
+    raise NotImplementedError(msg)
 
 
 class ContentOptions(TypedDict):
@@ -94,6 +109,7 @@ class ContentOptions(TypedDict):
     video_formats: list[str]
     trailer_names: list[str]
     parse_error_is_exception: bool
+
 
 @decorate_class(slots=True)
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
@@ -261,6 +277,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     def options(self: Self) -> ContentOptions:
         return self.__options
 
+
 @decorate_class(slots=True)
 class NormalContentCallback(ContentCallback):
     @override
@@ -311,6 +328,7 @@ class NormalContentCallback(ContentCallback):
         )
 
         return None
+
 
 @decorate_class(slots=True)
 class NumeratedContentCallback(ContentCallback):
@@ -363,6 +381,7 @@ class NumeratedContentCallback(ContentCallback):
 
         return None
 
+
 @decorate_class(slots=True)
 class SymlinkedContentCallback(ContentCallback):
     pass
@@ -371,7 +390,7 @@ class SymlinkedContentCallback(ContentCallback):
 def parse_contents(
     root_folder: Path,
     options: ContentOptions,
-    save_file: Path,
+    save_file: ParsedTargetFile,
     name_parser: NameParser,
     scanner: Scanner,
     language_picker: LanguagePicker,
@@ -424,7 +443,7 @@ def parse_contents(
         case _:
             assert_never(config_type)
 
-    if not save_file.exists():
+    if not save_file.file.exists():
         contents: list[Content] = process_folder(
             root_folder,
             callback=callback,
@@ -434,7 +453,7 @@ def parse_contents(
         )
 
         save_to_file(
-            file_path=save_file,
+            tgt=save_file,
             contents=contents,
             serialize_type=all_content_type,
         )
@@ -442,7 +461,7 @@ def parse_contents(
         return contents
 
     contents = load_from_file(
-        file_path=save_file,
+        tgt=save_file,
         serialize_type=all_content_type,
     )
 
@@ -459,7 +478,7 @@ def parse_contents(
     )
 
     save_to_file(
-        file_path=save_file,
+        tgt=save_file,
         contents=new_contents,
         serialize_type=all_content_type,
     )
