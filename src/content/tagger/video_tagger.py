@@ -4,7 +4,17 @@ from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, assert_never, cast, override
+from typing import (
+    Any,
+    BinaryIO,
+    Literal,
+    Optional,
+    Self,
+    assert_never,
+    cast,
+    final,
+    override,
+)
 from uuid import UUID
 
 from content.language import Language
@@ -41,6 +51,7 @@ class MetadataTagsRead:
     metadata: SerializableDict
     unrecognized: list[tuple[str, str]]
 
+
 @decorate_class(slots=True)
 class VideoTaggerContextInterface(ABC):
     __manager: ManagerInterface
@@ -56,12 +67,14 @@ class VideoTaggerContextInterface(ABC):
     def manager(self: Self) -> ManagerInterface:
         return self.__manager
 
+
 @decorate_class(slots=True)
 class VideoTaggerContextReadable(VideoTaggerContextInterface):
     @abstractmethod
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead: ...
+
 
 @decorate_class(slots=True)
 class VideoTaggerContextWriteable(VideoTaggerContextInterface):
@@ -80,6 +93,7 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 
 class VideoTaggerContextRW(VideoTaggerContextReadable, VideoTaggerContextWriteable):
     pass
+
 
 @decorate_class(slots=True)
 class VideoTagger(ABC):
@@ -113,6 +127,7 @@ class VideoTagger(ABC):
 
 
 ContextType = Literal["r", "w", "rw"]
+
 
 @decorate_class(slots=True)
 class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
@@ -156,6 +171,102 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
 
         return self.__impl.get_tags()
 
+
+@decorate_class(slots=True)
+class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW]):
+    __writer: Optional[BinaryIO]
+    __backup: Optional[bytes]
+    __file: Path
+    __ctx: ContextType
+    __manager: ManagerInterface
+
+    def __init__(
+        self: Self,
+        file: Path,
+        ctx: ContextType,
+        manager: ManagerInterface,
+    ) -> None:
+        super().__init__()
+        self.__writer = None
+        self.__file = file
+        self.__backup = None
+        self.__ctx = ctx
+        self.__manager = manager
+
+    @abstractmethod
+    def get_context(
+        self: Self,
+        manager: ManagerInterface,
+        writer: BinaryIO,
+    ) -> VideoTaggerContextRW: ...
+
+    @final
+    @override
+    def __enter__(self: Self) -> VideoTaggerContextRW:
+        writer = self.__file.open(mode="rb" if self.__ctx == "r" else "rb+")
+
+        writer.seek(0, 2)
+        filesize = writer.tell()
+        writer.seek(0)
+
+        backup = writer.read(-1)
+
+        writer.seek(0)
+
+        if len(backup) != filesize:
+            writer.close()
+            msg = f"Error: reading file bytes for backup failed. didn't get enough bytes: {len(backup)} != {filesize}"
+            raise RuntimeError(msg)
+
+        self.__writer = writer
+        self.__backup = backup
+
+        return VideoTaggerContextWrapperGeneric(
+            self.__manager,
+            self.get_context(
+                self.__manager,
+                self.__writer,
+            ),
+            self.__ctx,
+        )
+
+    @final
+    def restore_backup(self: Self) -> None:
+        if self.__backup is None:
+            msg = "Backup for file not present"
+            raise RuntimeError(msg)
+
+        # restore file backup
+        if self.__ctx != "r":
+            restore_writer = self.__file.open("rb+")
+            restore_writer.truncate()
+            restore_writer.write(self.__backup)
+            restore_writer.close()
+            print(f"RESTORED BACKUP FOR FILE: '{self.__file}'")  # noqa: T201
+
+        self.__backup = None
+
+    @final
+    @override
+    def __exit__(
+        self: Self,
+        _exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        _exc_tb: Optional[TracebackType],
+    ) -> Literal[False]:  # actually bool
+        if self.__writer is not None:
+            self.__writer.close()
+            self.__writer = None
+
+        if exc_val is not None:
+            self.restore_backup()
+
+        if self.__backup is not None:
+            self.__backup = None
+
+        return False
+
+
 @decorate_class(slots=True)
 class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     __contexts: list[AbstractContextManager[VideoTaggerContextRW]]
@@ -191,6 +302,7 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     def get_tags(self: Self) -> MetadataTagsRead:
         msg = "Merging the tags is not implemented yet!"
         raise NotImplementedError(msg)
+
 
 @decorate_class(slots=True)
 class VideoTaggerMultiple(VideoTagger):
@@ -234,7 +346,8 @@ class VideoTaggerMultiple(VideoTagger):
                     VideoTaggerContextMultipleRW(
                         manager,
                         cast(
-                            list[AbstractContextManager[VideoTaggerContextRW]], contexts,
+                            list[AbstractContextManager[VideoTaggerContextRW]],
+                            contexts,
                         ),
                     ),
                     ctx,
@@ -280,6 +393,7 @@ TAGGER_DOMAIN = "lt.totto.vld"
 class AppleItunesFreeformKey:
     mean: str
     name: str
+
 
 class TaggerDomain:
     @staticmethod

@@ -42,6 +42,7 @@ from content.tagger.video_tagger import (
     SerializableDictValue,
     TaggerDomain,
     VideoTagger,
+    VideoTaggerContextCtxGeneric,
     VideoTaggerContextReadable,
     VideoTaggerContextRW,
     VideoTaggerContextWrapperGeneric,
@@ -279,9 +280,11 @@ class AVIChunkSpan:
 
 AVI_BYTE_ORDER = ByteOrder.Little
 
+
 @decorate_class(slots=True)
 class FinalAVIChunk:
     __final__avi_chunk__ = True
+
 
 @decorate_class(slots=True)
 class NonFinalAVIChunk:
@@ -298,6 +301,7 @@ class NonFinalAVIChunk:
                 if fn_name in cls.__dict__:
                     msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
                     raise TypeError(msg)
+
 
 @decorate_class(slots=True)
 class AVIChunk(NonFinalAVIChunk):
@@ -470,6 +474,7 @@ class AVIChunk(NonFinalAVIChunk):
 
     def __repr__(self: Self) -> str:
         return str(self)
+
 
 @decorate_class(slots=True)
 class AVIList(AVIChunk):
@@ -1009,6 +1014,7 @@ class VLDKeyValueChunk(AVIChunk, FinalAVIChunk):
     def __repr__(self: Self) -> str:
         return str(self)
 
+
 @decorate_class(slots=True)
 class SupportedChunks:
     RIFF = RIFF_FOURCC
@@ -1174,6 +1180,7 @@ VLDSubChunkType = (
     | VLDCustomKeyValueEntry
 )
 
+
 @decorate_class(slots=True)
 class INFOChunkBuilder:
     __sub_chunks: dict[FOURCC | str, VLDSubChunkType]
@@ -1314,6 +1321,7 @@ class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]
     unrecognized: list[VLDUnknownStrSubChunk]
+
 
 @decorate_class(slots=True)
 class AVIMetadataHandler:
@@ -1901,6 +1909,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
 
         return result
 
+
 @decorate_class(slots=True)
 class VideoTaggerAVI(VideoTagger):
     __streams: int
@@ -1962,70 +1971,18 @@ class VideoTaggerAVI(VideoTagger):
         types = self.__types
 
         @decorate_class(slots=True)
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
-            __writer: Optional[BinaryIO]
-            __backup: Optional[bytes]
+        class VideoTaggerContextCtx(VideoTaggerContextCtxGeneric):
 
             def __init__(self: Self) -> None:
-                super().__init__()
-                self.__writer = None
+                super().__init__(file, ctx, manager)
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContextRW:
-                writer = file.open(mode="rb" if ctx == "r" else "rb+")
-
-                writer.seek(0, 2)
-                filesize = writer.tell()
-                writer.seek(0)
-
-                backup = writer.read(-1)
-
-                writer.seek(0)
-
-                if len(backup) != filesize:
-                    writer.close()
-                    msg = f"Error: reading file bytes for backup failed. didn't get enough bytes: {len(backup)} != {filesize}"
-                    raise RuntimeError(msg)
-
-                self.__writer = writer
-                self.__backup = backup
-
-                return VideoTaggerContextWrapperGeneric(
-                    manager,
-                    VideoTaggerContextAVI(manager, writer, streams, types),
-                    ctx,
-                )
-
-            @override
-            def __exit__(
+            def get_context(
                 self: Self,
-                _exc_type: Optional[type[BaseException]],
-                exc_val: Optional[BaseException],
-                _exc_tb: Optional[TracebackType],
-            ) -> Literal[False]:  # actually bool
-                if self.__writer is not None:
-                    self.__writer.close()
-                    self.__writer = None
-
-                if exc_val is not None:
-                    if self.__backup is None:
-                        msg = "Backup for file not present"
-                        raise RuntimeError(msg) from exc_val
-
-                    # restore file backup
-                    if ctx != "r":
-                        restore_writer = file.open("rb+")
-                        restore_writer.truncate()
-                        restore_writer.write(self.__backup)
-                        restore_writer.close()
-                        print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
-
-                    self.__backup = None
-
-                if self.__backup is not None:
-                    self.__backup = None
-
-                return False
+                manager: ManagerInterface,
+                writer: BinaryIO,
+            ) -> VideoTaggerContextAVI:
+                return VideoTaggerContextAVI(manager, writer, streams, types)
 
         return VideoTaggerContextCtx()
 

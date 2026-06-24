@@ -45,6 +45,7 @@ from content.tagger.video_tagger import (
     SerializableDictValue,
     TaggerDomain,
     VideoTagger,
+    VideoTaggerContextCtxGeneric,
     VideoTaggerContextReadable,
     VideoTaggerContextRW,
     VideoTaggerContextWrapperGeneric,
@@ -260,9 +261,11 @@ class MP4BoxSpan:
     def __repr__(self: Self) -> str:
         return str(self)
 
+
 @decorate_class(slots=True)
 class FinalMP4Box:
     __final__mp4_box__ = True
+
 
 @decorate_class(slots=True)
 class NonFinalMP4Box:
@@ -283,6 +286,7 @@ class NonFinalMP4Box:
 
 
 # ruff: disable[ERA001]
+
 
 @decorate_class(slots=True)
 class MP4Box(NonFinalMP4Box):
@@ -475,6 +479,7 @@ class MP4Box(NonFinalMP4Box):
     def __repr__(self: Self) -> str:
         return str(self)
 
+
 @decorate_class(slots=True)
 class UserExtensionBox(MP4Box):
     usertype: UUID
@@ -504,6 +509,7 @@ class UserExtensionBox(MP4Box):
 
 UUIDExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae7")
 JSONExtension_UUID = UUID(hex="90e175d1-efdb-4144-a214-ebfab6258ae8")
+
 
 @decorate_class(slots=True)
 class UserExtensions:
@@ -626,6 +632,7 @@ def user_extension_box_determine_correct_extension(
             return JsonExtensionBox.read_from_parent(io, box)
         case _:
             return box
+
 
 @decorate_class(slots=True)
 class MP4FullBox(MP4Box):
@@ -1541,6 +1548,7 @@ META_OPTIONAL_BOXES: list[ISOMAtomName] = [
     ISOMAtomName(b"iref"),  # ItemReferenceBox
     ISOMAtomName(b"idat"),  # ItemDataBox
 ]
+
 
 @decorate_class(slots=True)
 class MetaOptionalBoxes:
@@ -2554,6 +2562,7 @@ class ApplItunesTags:
             data=ApplItunesTagsData(data_type, value),
         )
 
+
 @decorate_class(slots=True)
 class AppleItunesMetaBoxBuilder:
     __tags: dict[str, ApplItunesTags]
@@ -2687,6 +2696,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"soco"): None,
     ISOMAtomName(b"sosn"): None,
 }
+
 
 @decorate_class(slots=True)
 class SupportedBoxes:
@@ -2873,6 +2883,7 @@ MetaValues = Result[Optional[ReadMetaBoxValues], str]
 class ReadMetadataImpl:
     metadata: SerializableDict
     uuid: Optional[UUID]
+
 
 @decorate_class(slots=True)
 class MP4MetadataHandler:
@@ -3418,6 +3429,7 @@ class MP4MetadataHandler:
             list(reversed(our_boxes_reversed)),
         )
 
+
 @decorate_class(slots=True)
 class VideoTaggerContextMP4(VideoTaggerContextRW):
     __writer: BinaryIO
@@ -3561,6 +3573,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
         return result
 
+
 @decorate_class(slots=True)
 class VideoTaggerMP4(VideoTagger):
     __streams: int
@@ -3622,70 +3635,18 @@ class VideoTaggerMP4(VideoTagger):
         types = self.__types
 
         @decorate_class(slots=True)
-        class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
-            __writer: Optional[BinaryIO]
-            __backup: Optional[bytes]
+        class VideoTaggerContextCtx(VideoTaggerContextCtxGeneric):
 
             def __init__(self: Self) -> None:
-                super().__init__()
-                self.__writer = None
+                super().__init__(file, ctx, manager)
 
             @override
-            def __enter__(self: Self) -> VideoTaggerContextRW:
-                writer = file.open(mode="rb" if ctx == "r" else "rb+")
-
-                writer.seek(0, 2)
-                filesize = writer.tell()
-                writer.seek(0)
-
-                backup = writer.read(-1)
-
-                writer.seek(0)
-
-                if len(backup) != filesize:
-                    writer.close()
-                    msg = f"Error: reading file bytes for backup failed. didn't get enough bytes: {len(backup)} != {filesize}"
-                    raise RuntimeError(msg)
-
-                self.__writer = writer
-                self.__backup = backup
-
-                return VideoTaggerContextWrapperGeneric(
-                    manager,
-                    VideoTaggerContextMP4(manager, writer, streams, types),
-                    ctx,
-                )
-
-            @override
-            def __exit__(
+            def get_context(
                 self: Self,
-                _exc_type: Optional[type[BaseException]],
-                exc_val: Optional[BaseException],
-                _exc_tb: Optional[TracebackType],
-            ) -> Literal[False]:  # actually bool
-                if self.__writer is not None:
-                    self.__writer.close()
-                    self.__writer = None
-
-                if exc_val is not None:
-                    if self.__backup is None:
-                        msg = "Backup for file not present"
-                        raise RuntimeError(msg) from exc_val
-
-                    # restore file backup
-                    if ctx != "r":
-                        restore_writer = file.open("rb+")
-                        restore_writer.truncate()
-                        restore_writer.write(self.__backup)
-                        restore_writer.close()
-                        print(f"RESTORED BACKUP FOR FILE: '{file}'")  # noqa: T201
-
-                    self.__backup = None
-
-                if self.__backup is not None:
-                    self.__backup = None
-
-                return False
+                manager: ManagerInterface,
+                writer: BinaryIO,
+            ) -> VideoTaggerContextMP4:
+                return VideoTaggerContextMP4(manager, writer, streams, types)
 
         return VideoTaggerContextCtx()
 
