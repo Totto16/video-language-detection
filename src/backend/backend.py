@@ -76,6 +76,7 @@ from helper.config import (
     RawConfig,
     filter_configs,
 )
+from helper.content_filter import ContentFilter
 from helper.custom_parser import CustomNameParser
 from helper.decorator import decorate_class
 from helper.devices import DeviceManager
@@ -1611,11 +1612,14 @@ class BackendScanner:
 
             validators = get_validators(validator_params, filters)
 
+            content_filter = ContentFilter.from_filters(filters)
+
             Validator.validate_multiple(
                 validators,
                 contents,
                 config.parser.root_folder,
                 manager=manager,
+                content_filter=content_filter,
             )
 
         status_bar.stage = _("Summary")

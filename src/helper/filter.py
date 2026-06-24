@@ -1,3 +1,4 @@
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -6,7 +7,10 @@ from typing import Never, Optional, Self, assert_never, override
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
+from helper.translation import get_translator
 from helper.utils import parse_int_safely
+
+_ = get_translator()
 
 
 @decorate_class(slots=True)
@@ -15,6 +19,7 @@ class Filter(ABC):
     @staticmethod
     @abstractmethod
     def factory_name() -> str: ...
+
 
 @decorate_class(slots=True)
 class FilterFactory(ABC):
@@ -43,6 +48,7 @@ class SpecialFilterType(Enum):
     All = "all"
     Default = "default"
 
+
 @decorate_class(slots=True)
 class SpecialFilter(Filter):
     __name: str
@@ -66,6 +72,7 @@ class SpecialFilter(Filter):
     @property
     def type(self: Self) -> SpecialFilterType:
         return self.__type
+
 
 @decorate_class(slots=True)
 class ConfigFilter(Filter):
@@ -94,6 +101,7 @@ class ConfigFilter(Filter):
     @override
     def factory_name() -> str:
         return ConfigFilterFactory.name()
+
 
 @decorate_class(slots=True)
 class ConfigFilterFactory(FilterFactory):
@@ -132,6 +140,7 @@ class ExecuteStep(Enum):
     Summary = "summary"
     Validate = "validate"
 
+
 @decorate_class(slots=True)
 class ExecuteFilter(Filter):
     __step: ExecuteStep
@@ -157,6 +166,7 @@ class ExecuteFilter(Filter):
     @staticmethod
     def factory_name() -> str:
         return ExecuteFilterFactory.name()
+
 
 @decorate_class(slots=True)
 class ExecuteFilterFactory(FilterFactory):
@@ -267,6 +277,7 @@ def execute_steps_from_filter(
 
     return __execute_steps_from_filter_impl(execute_filter)
 
+
 @decorate_class(slots=True)
 class ValidatorFilter(Filter):
     __name: str
@@ -296,6 +307,7 @@ class ValidatorFilter(Filter):
 class ValidatorChecks:
     check: Callable[[str, Optional[str]], Result[None, str]]
     names: set[str]
+
 
 @decorate_class(slots=True)
 class ValidatorFilterFactory(FilterFactory):
@@ -336,6 +348,121 @@ class ValidatorFilterFactory(FilterFactory):
         return Err(f"Invalid validator: {result.as_err()}")
 
 
+class PathFilterType(Enum):
+    Positive = "positive"
+    Negative = "negative"
+
+
+@decorate_class(slots=True)
+class PathFilter(Filter):
+    __type: PathFilterType
+    __pattern: re.Pattern[str]
+
+    def __init__(self: Self, pattern: re.Pattern[str], typ: PathFilterType) -> None:
+        super().__init__()
+
+        self.__pattern = pattern
+        self.__type = typ
+
+    @property
+    def pattern(self: Self) -> re.Pattern[str]:
+        return self.__pattern
+
+    @property
+    def type(self: Self) -> PathFilterType:
+        return self.__type
+
+    @override
+    @staticmethod
+    def factory_name() -> str:
+        return PathFilterFactory.name()
+
+    def __str__(self: Self) -> str:
+        return f"<PathFilter type: {self.__type.name} pattern: {self.__pattern}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash((self.__type.value, self.__pattern))
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, PathFilter):
+            return (self.__type, self.__pattern) == (other.type, other.pattern)
+
+        return False
+
+
+@decorate_class(slots=True)
+class PathFilterFactory(FilterFactory):
+
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    @staticmethod
+    def name() -> str:
+        return "path"
+
+    @override
+    @staticmethod
+    def prefix() -> str:
+        return "p"
+
+    @override
+    def help(self: Self) -> str:
+        return """the path to scan, accepted values are: in the form '<filter_type>?<regex_type>:<regex_value>'
+                regex_type: <required> '=' means exact match or '~' means regex match
+                filter_type: <optional> '+' means positive alias include only those values or '-' means negative, or exclude all those values"""
+
+    def __from_exact(self: Self, exact: str) -> re.Pattern[str]:
+        base = re.escape(exact)
+        return re.compile(f"^{base}$")
+
+    def __from_regex(self: Self, pattern: str) -> re.Pattern[str]:
+        return re.compile(pattern)
+
+    @override
+    def get_from_string(
+        self: Self,
+        value: str,
+        options: Optional[str],
+    ) -> Result[PathFilter, str]:
+        if options is None:
+            return Err(_("Options are required"))
+
+        val: str
+        type_str: Optional[str]
+        if len(value) == 1:
+            val = value
+            type_str = None
+        if len(value) == 2:
+            val = value[1]
+            type_str = value[0]
+
+        pattern: re.Pattern[str]
+        match val:
+            case "=":
+                pattern = self.__from_exact(options)
+            case "~":
+                pattern = self.__from_regex(options)
+            case _:
+                return Err(f"Unsupported regex_type: {val}, use '=' or '~'")
+
+        typ_val: PathFilterType
+        match type_str:
+            case None:
+                typ_val = PathFilterType.Positive
+            case "+":
+                typ_val = PathFilterType.Positive
+            case "-":
+                typ_val = PathFilterType.Negative
+            case _:
+                return Err(f"Unsupported filter_type: {type_str}, use '+' or '-'")
+
+        return Ok(PathFilter(pattern, typ_val))
+
+
 special_help_values: list[str] = ["help", "h", "?"]
 special_empty_values: list[str] = ["-", "~"]
 special_all_values: list[str] = ["@"]
@@ -352,6 +479,7 @@ special_values: list[str] = [
 @dataclass(slots=True, repr=True)
 class FilterHelpOptions:
     cb: Optional[Callable[[], Never]]
+
 
 @decorate_class(slots=True)
 class FilterManager:
@@ -375,6 +503,7 @@ class FilterManager:
             ConfigFilterFactory(),
             ExecuteFilterFactory(),
             ValidatorFilterFactory(validator_checks),
+            PathFilterFactory(),
         ]
 
         all_available_filter_factories: dict[str, FilterFactory] = (

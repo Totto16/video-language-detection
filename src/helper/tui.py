@@ -17,6 +17,7 @@ from content.metadata.config import get_metadata_scanner_from_config
 from content.summary import Summary
 from helper.base import AnyType, AppStatusBar, parse_contents
 from helper.classifier import Classifier, Model
+from helper.content_filter import ContentFilter
 from helper.devices import DeviceManager
 from helper.error import ErrorModeFile
 from helper.filter import Filter, execute_steps_from_filter
@@ -134,11 +135,14 @@ def launch_tui(
 
         validators = get_validators(validator_params, filters)
 
+        content_filter = ContentFilter.from_filters(filters)
+
         Validator.validate_multiple(
             validators,
             contents,
             config.parser.root_folder,
             manager=manager,
+            content_filter=content_filter,
         )
 
     status_bar.stage = _("Summary")

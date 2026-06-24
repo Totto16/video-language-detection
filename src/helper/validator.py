@@ -21,6 +21,7 @@ from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
 from helper.base import StatusBarManager
 from helper.classifier import ModelLanguage
+from helper.content_filter import ContentFilter
 from helper.decorator import decorate_class
 from helper.filter import (
     Filter,
@@ -294,6 +295,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         directory: Path,
         *,
         manager: ManagerInterface,
+        content_filter: ContentFilter,
     ) -> None:
         status_bar_manager: StatusBarManager = StatusBarManager(manager)
 
@@ -606,6 +608,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         directory: Path,
         *,
         manager: ManagerInterface,
+        content_filter: ContentFilter,
     ) -> None:
         status_bar_manager: StatusBarManager = StatusBarManager(manager)
 
