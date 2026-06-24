@@ -1,5 +1,5 @@
 import json
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
@@ -2759,18 +2759,6 @@ def read_box(io: BoundedIO) -> MP4Box:
             return AppleItunesItemBox.read_from_parent(box.payload_io(io), box, value)
         case SupportedBoxes.AppleItunesItemBoxAtomFreeform:
             return AppleItunesItemFreeformBox.read_from_parent(box.payload_io(io), box)
-        case SupportedBoxes.DATA:
-            return AppleItunesItemDataBox.read_from_parent(
-                box.payload_io(io),
-                box,
-                None,
-            )
-        case SupportedBoxes.MEAN:
-            return AppleItunesItemMeanBox.read_from_parent(box.payload_io(io), box)
-        case SupportedBoxes.NAME:
-            with io.r_ctx(force_entire_read=True) as f:
-                print(f.read(io.span.size))
-            return AppleItunesItemNameBox.read_from_parent(box.payload_io(io), box)
         case _:
             return box
 
@@ -2784,8 +2772,6 @@ def mp4_iter_boxes(
     while pos < span.end:
         io = BoundedIO.get_new(io_base, SimpleSpan(pos, span.end - pos))
         box = read_box(io)
-
-        # print(box.type)
 
         if pos + box.span.total.size > span.end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
@@ -3646,7 +3632,6 @@ class VideoTaggerMP4(VideoTagger):
                     VideoTaggerMP4(file, streams, types),
                 )
         except (RuntimeError, ValueError, TypeError) as err:
-            # except (KeyboardInterrupt) as err:
             return Err(str(err))
 
     def __context_impl(

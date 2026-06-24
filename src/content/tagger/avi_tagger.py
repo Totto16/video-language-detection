@@ -1,5 +1,5 @@
 import json
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from io import BytesIO
