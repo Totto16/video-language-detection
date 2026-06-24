@@ -288,9 +288,19 @@ class NonFinalMP4Box:
                     raise TypeError(msg)
 
 
+class Mp4DecodeType(Enum):
+    Check = "check"
+    Normal = "normal"
+
+
 @dataclass(slots=True, repr=True)
 class Mp4DecodeOptions:
     strict: bool
+    type: Mp4DecodeType
+
+    @staticmethod
+    def default() -> "Mp4DecodeOptions":
+        return Mp4DecodeOptions(strict=True, type=Mp4DecodeType.Normal)
 
 
 # ruff: disable[ERA001]
@@ -1884,16 +1894,19 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
         if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
             if expected_type is None:
-                if decode_options.strict:
-                    msg = _(
-                        "No implicit type known for value: {value!r}"  # noqa: COM812
-                    ).format(value=value)
-                    raise AppleItunesFormatError(msg)
+                if (
+                    not decode_options.strict
+                    and decode_options.type != Mp4DecodeType.Check
+                ):
+                    return AppleItunesItemDataBox.__decode_value_impl(
+                        AppleItunesItemDataType.UTF8,
+                        value,
+                    )
 
-                return AppleItunesItemDataBox.__decode_value_impl(
-                    AppleItunesItemDataType.UTF8,
-                    value,
-                )
+                msg = _(
+                    "No implicit type known for value: {value!r}"  # noqa: COM812
+                ).format(value=value)
+                raise AppleItunesFormatError(msg)
 
             return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
 
@@ -2067,7 +2080,10 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
             value_raw = f.read(value_size)
 
             value = AppleItunesItemDataBox.__decode_value(
-                type_indicator, value_raw, expected_type, options,
+                type_indicator,
+                value_raw,
+                expected_type,
+                options,
             )
 
             parent.span.add_header(parent.span.payload_span.size)
@@ -3563,7 +3579,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         )
         bar.update(0, force=True)
 
-        options = Mp4DecodeOptions(strict=True)
+        options = Mp4DecodeOptions.default()
 
         try:
             mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
@@ -3607,7 +3623,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         )
         bar.update(0, force=True)
 
-        options = Mp4DecodeOptions(strict=True)
+        options = Mp4DecodeOptions.default()
 
         try:
             self.__writer.seek(0)
@@ -3655,7 +3671,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
             return value
 
-        options = Mp4DecodeOptions(strict=True)
+        options = Mp4DecodeOptions.default()
 
         mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
             f=self.__writer,
@@ -3712,7 +3728,9 @@ class VideoTaggerMP4(VideoTagger):
     @staticmethod
     def get_handle(file: Path) -> Result["VideoTagger", str]:
 
-        options: Mp4DecodeOptions = Mp4DecodeOptions(strict=False)
+        options: Mp4DecodeOptions = Mp4DecodeOptions(
+            strict=False, type=Mp4DecodeType.Check
+        )
 
         try:
 
@@ -3811,12 +3829,12 @@ class VideoTaggerMP4(VideoTagger):
 
             printer.element(element, depth)
 
-        mp4_options: Mp4DecodeOptions = Mp4DecodeOptions(strict=True)
+        options: Mp4DecodeOptions = Mp4DecodeOptions.default()
 
         with self.file.open(mode="rb") as f:
 
             def iterate_boxes_recursive(span: SimpleSpan, *, depth: int) -> None:
-                for box in mp4_iter_boxes(f, span, mp4_options):
+                for box in mp4_iter_boxes(f, span, options):
 
                     print_box(box, depth=depth)
 

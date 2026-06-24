@@ -253,7 +253,7 @@ def mp4_test_parse_files(
 
 @pytest.fixture(scope="package")
 def mp4_options() -> Mp4DecodeOptions:
-    return Mp4DecodeOptions(strict=True)
+    return Mp4DecodeOptions.default()
 
 
 @pytest.fixture(scope="package")
