@@ -21,7 +21,7 @@ from uuid import UUID
 
 from content.language import Language
 from helper.decorator import decorate_class
-from helper.ffprobe import ffprobe
+from helper.ffprobe import FFProbeResult, ffprobe
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.translation import get_translator
@@ -87,6 +87,28 @@ class RestoreFileNotSupported:
     pass
 
 
+def is_the_same_file(pre_res: FFProbeResult, after_res: FFProbeResult) -> Optional[str]:
+    try:
+        if len(pre_res.streams) != len(after_res.streams):
+            return f"Number of streams differs: {len(pre_res.streams)} != {len(after_res.streams)}"
+
+        if (
+            pre_res.file_info.duration_seconds()
+            != after_res.file_info.duration_seconds()
+        ):
+            return f"Duration differs: {pre_res.file_info.duration_seconds()} != {after_res.file_info.duration_seconds()}"
+
+        if (
+            pre_res.file_info.raw["format_name"]
+            != after_res.file_info.raw["format_name"]
+        ):
+            return f"Format name differs: {pre_res.file_info.raw["format_name"] } != {after_res.file_info.raw["format_name"] }"
+
+        return None  # noqa: TRY300
+    except (KeyError, RuntimeError, ValueError) as err:
+        return f"Excpetion occurred: {err!s}"
+
+
 @decorate_class(slots=True)
 class VideoTaggerContextWriteable(VideoTaggerContextInterface):
     @abstractmethod
@@ -113,9 +135,11 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 
             after_write = after_write_res.as_ok()
 
-            raise RuntimeError(
-                f"{pre_write.file_info.raw} vs {after_write.file_info.raw}"
-            )
+            same_res = is_the_same_file(pre_write, after_write)
+
+            if same_res is not None:
+                msg = f"FFProbe detected differences: {same_res}"
+                raise RuntimeError(msg)  # noqa: TRY301
 
             return None  # noqa: TRY300
         except Exception as err:  # noqa: BLE001
