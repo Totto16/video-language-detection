@@ -255,6 +255,7 @@ class Validator[ED, SD, S2D, CD](ABC):
 
         root_content: list[SeriesContent | CollectionContent] = []
 
+        # TODO: sort files correctly and also ignore files correctly
         amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
         status_bar_manager.start(amount, directory.name, DefaultStatusBarInfo())
 
@@ -323,7 +324,10 @@ class Validator[ED, SD, S2D, CD](ABC):
 
         def append(self: Self, data: S, name: str) -> None:
             if self.__v_name != name:
-                msg = f"invalid append to ValidatorState: {self.__v_name} != {name}"
+                msg = _("invalid append to ValidatorState: {v_name} != {name}").format(
+                    v_name=self.__v_name,
+                    name=name,
+                )
                 raise RuntimeError(msg)
 
             self.__data.append(data)
@@ -752,7 +756,9 @@ class LanguageValidator(Validator[None, None, None, None]):
         options: Optional[str],
     ) -> Result[None, str]:
         if options is not None:
-            return Err(f"No options supported, but got: {options}")
+            return Err(
+                _("No options supported, but got: {options}").format(options=options),
+            )
 
         return Ok(None)
 
@@ -937,7 +943,9 @@ class LanguageConsistencyValidator(
         options: Optional[str],
     ) -> Result[None, str]:
         if options is not None:
-            return Err(f"No options supported, but got: {options}")
+            return Err(
+                _("No options supported, but got: {options}").format(options=options),
+            )
 
         return Ok(None)
 
@@ -963,6 +971,7 @@ class LanguageConsistencyValidator(
 class TagOptions:
     strict: bool
     write: bool
+    language: bool
 
 
 # tags validator, checks, that every file has tags
@@ -1020,38 +1029,41 @@ class TagsValidator(Validator[None, None, None, None]):
                             _("File not tagged"),
                         )
 
-                lang_res = ctx.read_language()
-                if lang_res.err():
-                    if self.__options.strict:
-                        self.emit_error(
-                            episode.scanned_file.path,
-                            _("File Language get error: {err}").format(
-                                err=lang_res.as_err(),
-                            ),
-                        )
-                else:
-                    lang = lang_res.as_ok()
-                    if lang is None:
-                        if self.__options.write:
-                            new_lang = episode.language
-                            if Language.is_default_value(new_lang):
-                                if self.__options.strict:
-                                    self.emit_error(
-                                        episode.scanned_file.path,
-                                        _("File has no language, can't annotate it"),
-                                    )
-                            else:
-                                lang_write_res = ctx.write_language(new_lang)
-                                if not lang_write_res:
-                                    self.emit_error(
-                                        episode.scanned_file.path,
-                                        _("File language annotate error"),
-                                    )
-                        else:
+                if self.__options.language:
+                    lang_res = ctx.read_language()
+                    if lang_res.err():
+                        if self.__options.strict:
                             self.emit_error(
                                 episode.scanned_file.path,
-                                _("File has no annotated language"),
+                                _("File Language get error: {err}").format(
+                                    err=lang_res.as_err(),
+                                ),
                             )
+                    else:
+                        lang = lang_res.as_ok()
+                        if lang is None:
+                            if self.__options.write:
+                                new_lang = episode.language
+                                if Language.is_default_value(new_lang):
+                                    if self.__options.strict:
+                                        self.emit_error(
+                                            episode.scanned_file.path,
+                                            _(
+                                                "File has no language, can't annotate it"  # noqa: COM812
+                                            ),
+                                        )
+                                else:
+                                    lang_write_res = ctx.write_language(new_lang)
+                                    if not lang_write_res:
+                                        self.emit_error(
+                                            episode.scanned_file.path,
+                                            _("File language annotate error"),
+                                        )
+                            else:
+                                self.emit_error(
+                                    episode.scanned_file.path,
+                                    _("File has no annotated language"),
+                                )
 
         except (RuntimeError, ValueError, TypeError) as err:
             self.emit_error(
@@ -1103,16 +1115,18 @@ class TagsValidator(Validator[None, None, None, None]):
         options: Optional[str],
     ) -> Result[TagOptions, str]:
         if options is None:
-            return Ok(TagOptions(strict=False, write=False))
+            return Ok(TagOptions(strict=False, write=False, language=False))
 
-        result = TagOptions(strict=False, write=False)
+        result = TagOptions(strict=False, write=False, language=False)
         for c in options:
             if c == "s":
                 result.strict = True
             elif c == "w":
                 result.write = True
+            elif c == "l":
+                result.language = True
             else:
-                return Err(f"Invalid options flag: {c}")
+                return Err(_("Invalid options flag: {flag}").format(flag=c))
 
         return Ok(result)
 
@@ -1176,7 +1190,7 @@ def __get_all_validators_available_impl() -> dict[str, ValidatorEntry]:
         names = validator_class.names()
         for name in names:
             if validators.get(name, None) is not None:  # noqa: SIM910
-                msg = f"Duplicate validator name: {name}"
+                msg = _("Duplicate validator name: {name}").format(name=name)
                 raise RuntimeError(msg)
 
             validators[name] = ValidatorEntry(
@@ -1194,14 +1208,19 @@ __all_validators_available_impl: dict[str, ValidatorEntry] = (
 
 def __validator_check_impl(name: str, options: Optional[str]) -> Result[None, str]:
     if name not in __all_validators_available_impl:
-        return Err(f"Not a valid validator name: {name}")
+        return Err(_("Not a valid validator name: {name}").format(name=name))
 
     entry = __all_validators_available_impl[name]
 
     options_res = entry.validate_options(options)
 
     if options_res.err():
-        return Err(f"Invalid options for validator {name}: {options_res.as_err()}")
+        return Err(
+            _("Invalid options for validator {name}: {err}").format(
+                name=name,
+                err=options_res.as_err(),
+            ),
+        )
 
     return Ok(None)
 
@@ -1223,7 +1242,9 @@ def __get_default_validators_impl(
     for entry in __all_validators_available_impl.values():
         validator_res = entry.get(params, None)
         if validator_res.err():
-            msg = f"Implementation error: no options should always return Ok, but got {validator_res.as_err()}"
+            msg = _(
+                "Implementation error: no options should always return Ok, but got {err}"  # noqa: COM812
+            ).format(err=validator_res.as_err())
             raise RuntimeError(msg)
 
         validator: Validator[Any, Any, Any, Any] = validator_res.as_ok()
@@ -1275,7 +1296,7 @@ def __get_validators_impl(
 
             validator_res = validator_entry.get(params, filter_item.options)
             if validator_res.err():
-                msg = f"Validator get error: {validator_res.as_err()}"
+                msg = _("Validator get error: {err}").format(err=validator_res.as_err())
                 raise RuntimeError(msg)
 
             validator = validator_res.as_ok()
@@ -1283,7 +1304,9 @@ def __get_validators_impl(
             validator_name = validator.name
 
             if result.get(validator_name, None) is not None:
-                msg = f"Validator is already present, duplicate is not allowed: {validator_name}"
+                msg = _(
+                    "Validator is already present, duplicate is not allowed: {validator_name}"  # noqa: COM812
+                ).format(validator_name=validator_name)
                 raise RuntimeError(msg)
 
             result[validator_name] = validator
