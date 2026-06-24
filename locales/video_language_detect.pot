@@ -3,130 +3,142 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 2.5.3\n"
-"POT-Creation-Date: 2026-06-04 16:32+0200\n"
+"POT-Creation-Date: 2026-06-24 06:38+0200\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: src/backend/backend.py:1523 src/helper/tui.py:106
-msgid "Config: '{config_name}'"
+#: src/backend/backend.py:1585 src/helper/tui.py:109
+msgid "Scanning"
 msgstr ""
 
-#: src/backend/backend.py:1527 src/helper/tui.py:110
-msgid "Config progress: {start} / {end}"
+#: src/backend/backend.py:1605 src/helper/tui.py:129
+msgid "Validate"
 msgstr ""
 
-#: src/backend/backend.py:1532 src/helper/tui.py:115
-msgid "Config type: '{config_type}'"
+#: src/backend/backend.py:1621 src/helper/tui.py:144
+msgid "Summary"
 msgstr ""
 
-#: src/content/base_class.py:135
+#: src/backend/backend.py:1636 src/helper/tui.py:157
+msgid "Finished"
+msgstr ""
+
+#: src/content/base_class.py:161
 msgid "Scan failed with reason: {reason!s}"
 msgstr ""
 
-#: src/content/base_class.py:143
+#: src/content/base_class.py:169
 msgid "Failed summaries can't access the language"
 msgstr ""
 
-#: src/content/base_class.py:168
+#: src/content/base_class.py:195
 msgid "Scan failed with language reason: {reason!s}"
 msgstr ""
 
-#: src/content/base_class.py:172
+#: src/content/base_class.py:199
 msgid "Scan failed with language reason: {reason!s} and the best language was {language} with {accuracy:.2%}"
 msgstr ""
 
-#: src/content/base_class.py:198
+#: src/content/base_class.py:226
 msgid "Scan was successful"
 msgstr ""
 
-#: src/content/base_class.py:202
+#: src/content/base_class.py:230
 msgid "Successful summaries can't access the reason identifier"
 msgstr ""
 
-#: src/content/base_class.py:258
+#: src/content/base_class.py:287
 msgid "Get Language"
 msgstr ""
 
-#: src/content/base_class.py:507
+#: src/content/base_class.py:539
 msgid "Path to delete wasn't found: {path}"
 msgstr ""
 
-#: src/content/episode_content.py:78
+#: src/content/episode_content.py:83
 msgid "Couldn't get EpisodeDescription from '{path}'"
 msgstr ""
 
-#: src/content/episode_content.py:82
+#: src/content/episode_content.py:87
 msgid "EpisodeDescription is invalid, episode number is < 1: {description} -> '{path}'"
 msgstr ""
 
-#: src/content/episode_content.py:147
+#: src/content/episode_content.py:152
 msgid "Length of handles is invalid, expected 2 but got {length}"
 msgstr ""
 
-#: src/content/episode_content.py:204
+#: src/content/episode_content.py:234
 msgid "Can't tag the file '{file}': {reason}"
 msgstr ""
 
-#: src/content/episode_content.py:244
+#: src/content/episode_content.py:266
 msgid "Write Video Metadata: {err}"
 msgstr ""
 
-#: src/content/episode_content.py:273
+#: src/content/episode_content.py:295
 msgid "Error in getting video metadata for file '{file}': {reason}"
 msgstr ""
 
-#: src/content/episode_content.py:285
+#: src/content/episode_content.py:307
 msgid "Analyze Video Metadata: {err}"
 msgstr ""
 
-#: src/content/language.py:210
+#: src/content/language.py:236
 msgid "Short Language string is invalid according to ISO (3 alpha): '{short}'"
 msgstr ""
 
-#: src/content/language.py:244 src/content/language.py:362
+#: src/content/language.py:270 src/content/language.py:391
 msgid "Couldn't get the Short Language String from str '{inp}'"
 msgstr ""
 
-#: src/content/language.py:265
+#: src/content/language.py:291
 msgid "Invalid pattern for Alpha3LanguageStr: got '{inp}', this didn't match the pattern '{pattern}'"
 msgstr ""
 
-#: src/content/language.py:328
+#: src/content/language.py:357
 msgid "Short Language string is invalid according to ISO (2 alpha): '{short}'"
 msgstr ""
 
-#: src/content/language.py:395
+#: src/content/language.py:424
 msgid "Invalid pattern for Alpha2LanguageStr: got '{inp}', this didn't match the pattern '{pattern}'"
 msgstr ""
 
-#: src/content/language.py:451
+#: src/content/language.py:480
 msgid "Region Specifier is invalid: '{region}'"
 msgstr ""
 
-#: src/content/language.py:457
+#: src/content/language.py:486
 msgid "Region Language String is invalid: '{string}'"
 msgstr ""
 
-#: src/content/language.py:545
+#: src/content/language.py:576
 msgid "Couldn't get the Regional Language String from str: '{inp}'"
 msgstr ""
 
-#: src/content/language.py:566
+#: src/content/language.py:597
 msgid "Invalid pattern for Alpha2LanguageStrRegional: got '{inp}', this didn't match the pattern '{pattern}'"
 msgstr ""
 
-#: src/content/language.py:603
+#: src/content/language.py:638
 msgid "Long Language string is invalid according to ISO: '{long}'"
 msgstr ""
 
-#: src/content/language.py:720
+#: src/content/language.py:700
+msgid "Couldn't get the Short Language from str: '{inp}'"
+msgstr ""
+
+#: src/content/language.py:723
+msgid "Can't convert alpha 2 language string {lang} to alpha 3 language string"
+msgstr ""
+
+#: src/content/language.py:908
 msgid "Couldn't get the Language from str: '{inp}'"
 msgstr ""
 
-#: src/content/language.py:732
+#: src/content/language.py:920
 msgid "Couldn't get the Language from values: '{short}' '{long}'"
 msgstr ""
 
@@ -150,24 +162,70 @@ msgstr ""
 msgid "Deserialization error: Not implemented for provider {provider}"
 msgstr ""
 
-#: src/content/metadata/provider/tmdb.py:160
+#: src/content/metadata/provider/tmdb.py:208
 msgid "Expected SeriesMetadata, but got other metadata data"
 msgstr ""
 
-#: src/content/metadata/provider/tmdb.py:186
+#: src/content/metadata/provider/tmdb.py:234
 msgid "Expected SeasonMetadata, but got other metadata data"
 msgstr ""
 
-#: src/content/metadata/provider/tmdb.py:312
-msgid "Deserialization error: missing property 'metadata_type'"
+#: src/content/tagger/avi_tagger.py:1134
+msgid "Not a valid RIFF / AVI file"
 msgstr ""
 
-#: src/content/metadata/provider/tmdb.py:316
-msgid "Deserialization error: property 'metadata_type' is not a 'str'"
+#: src/content/tagger/avi_tagger.py:1137
+msgid "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}"
 msgstr ""
 
-#: src/content/metadata/provider/tmdb.py:329
-msgid "Deserialization error: Unknown metadata_type {metadata_type}"
+#: src/content/tagger/avi_tagger.py:1142
+msgid "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}"
+msgstr ""
+
+#: src/content/tagger/avi_tagger.py:1964
+msgid "Invalid language in avi detected: {lang}"
+msgstr ""
+
+#: src/content/tagger/mp4_tagger.py:2861
+msgid "Not a valid ISOM / MP4 file"
+msgstr ""
+
+#: src/content/tagger/mp4_tagger.py:2864
+msgid "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"
+msgstr ""
+
+#: src/content/tagger/mp4_tagger.py:3632
+msgid "Invalid language in mp4 detected: {lang}"
+msgstr ""
+
+#: src/content/tagger/mutagen_tagger.py:456
+#: src/content/tagger/mutagen_tagger.py:564
+msgid "Unrecognized mutagen instance, this is an implementation error: {clazz}"
+msgstr ""
+
+#: src/content/tagger/mutagen_tagger.py:641
+msgid "Not supported file type"
+msgstr ""
+
+#: src/content/tagger/mutagen_tagger.py:647
+msgid "get tag handle {err}"
+msgstr ""
+
+#: src/content/tagger/mutagen_tagger.py:651
+msgid "get tag handle (mutagen impl error): {err}"
+msgstr ""
+
+#: src/content/tagger/mutagen_tagger.py:677
+msgid "Mutagen failed, after we checked, that it would work: {err}"
+msgstr ""
+
+#: src/content/tagger/tagger.py:48 src/content/tagger/tagger.py:65
+#: src/content/tagger/tagger.py:82
+msgid "get tagger {err}"
+msgstr ""
+
+#: src/content/tagger/tagger.py:99
+msgid "Unsupported file extension {ext}"
 msgstr ""
 
 #: src/content/video_metadata.py:137
@@ -176,267 +234,403 @@ msgid ""
 "{err}"
 msgstr ""
 
-#: src/content/video_metadata.py:144
+#: src/content/video_metadata.py:146
 msgid "File is not a video"
 msgstr ""
 
-#: src/content/video_metadata.py:151 src/helper/classifier.py:582
+#: src/content/video_metadata.py:153 src/helper/classifier.py:592
 msgid "Only one video stream supported, but got {video_streams}"
 msgstr ""
 
-#: src/content/video_metadata.py:160
+#: src/content/video_metadata.py:162
 msgid "Video file has no dimensions"
 msgstr ""
 
-#: src/content/video_metadata.py:169
+#: src/content/video_metadata.py:171
 msgid "Only one audio stream supported, but got {audio_streams}"
 msgstr ""
 
-#: src/content/video_metadata.py:177
+#: src/content/video_metadata.py:179
 msgid "No video duration was found"
 msgstr ""
 
-#: src/entry.py:101
+#: src/entry.py:169
 msgid "expected the argument to be a port but got: {arg}"
 msgstr ""
 
-#: src/entry.py:113
+#: src/entry.py:204
 msgid "Detect video languages"
 msgstr ""
 
-#: src/entry.py:132
+#: src/entry.py:223
 msgid "The loglevel to use"
 msgstr ""
 
-#: src/entry.py:149
+#: src/entry.py:240
 msgid "Run the whole program in the terminal"
 msgstr ""
 
-#: src/entry.py:156 src/entry.py:200 src/entry.py:227
+#: src/entry.py:248 src/entry.py:295 src/entry.py:323
 msgid "The config to use"
 msgstr ""
 
-#: src/entry.py:163 src/entry.py:261
+#: src/entry.py:255 src/entry.py:358
 msgid "The config template to use, if the config specifies, to use the cli one"
 msgstr ""
 
-#: src/entry.py:174 src/entry.py:272
-msgid "Filter the provided configs, allowed are names or indices"
+#: src/entry.py:267 src/entry.py:369
+msgid "Generic filter, see '--filter help' for all available options"
 msgstr ""
 
-#: src/entry.py:181
+#: src/entry.py:274
 msgid "Create schemas for config and the resulting data"
 msgstr ""
 
-#: src/entry.py:188
+#: src/entry.py:282
 msgid "The folder where to put the schemas"
 msgstr ""
 
-#: src/entry.py:193
+#: src/entry.py:287
 msgid "Run the whole program as GUI"
 msgstr ""
 
-#: src/entry.py:207 src/entry.py:234
+#: src/entry.py:302 src/entry.py:330
 msgid "The host the backend runs on"
 msgstr ""
 
-#: src/entry.py:215 src/entry.py:242
+#: src/entry.py:310 src/entry.py:338
 msgid "The port the backend runs on"
 msgstr ""
 
-#: src/entry.py:220
+#: src/entry.py:315
 msgid "Run the API"
 msgstr ""
 
-#: src/entry.py:247
+#: src/entry.py:343
 msgid "Check the config for validity"
 msgstr ""
 
-#: src/entry.py:254
+#: src/entry.py:351
 msgid "The config to check"
 msgstr ""
 
-#: src/entry.py:289
-msgid "Successfully generated the schemas"
+#: src/entry.py:376
+msgid "Invoke the tagger on a file"
 msgstr ""
 
-#: src/entry.py:303 src/entry.py:322
-msgid "error while parsing config: can't load config"
+#: src/entry.py:386
+msgid "read tags from a file"
 msgstr ""
 
-#: src/entry.py:341
-msgid "error while parsing config: {err}"
-msgstr ""
-
-#: src/entry.py:348 src/entry.py:413
-msgid "parsing returned 0 configs"
-msgstr ""
-
-#: src/entry.py:355 src/entry.py:420
-msgid "filtering returned more configs than there are, at least one was used multiple times"
-msgstr ""
-
-#: src/entry.py:362 src/entry.py:427
-msgid "filtering returned 0 configs"
-msgstr ""
-
-#: src/entry.py:384
-msgid "File lock error: {err}"
+#: src/entry.py:395
+msgid "The file to read from"
 msgstr ""
 
 #: src/entry.py:400
-msgid "Config '{config}' is not valid: {err}"
+msgid "write tags to a file"
 msgstr ""
 
 #: src/entry.py:409
+msgid "The file to write to"
+msgstr ""
+
+#: src/entry.py:417
+msgid "The comment to write"
+msgstr ""
+
+#: src/entry.py:426
+msgid "Add custom metadata to write, format: <key>:<value>, where key is a string, value can be a literal or a json encoded string"
+msgstr ""
+
+#: src/entry.py:437
+msgid "Add a language to all streams"
+msgstr ""
+
+#: src/entry.py:444
+msgid "FFmpeg helper actions"
+msgstr ""
+
+#: src/entry.py:454
+msgid "scan files"
+msgstr ""
+
+#: src/entry.py:460 src/entry.py:471
+msgid "The files to process"
+msgstr ""
+
+#: src/entry.py:465
+msgid "fix chapters"
+msgstr ""
+
+#: src/entry.py:493
+msgid "Successfully generated the schemas"
+msgstr ""
+
+#: src/entry.py:509 src/entry.py:529
+msgid "error while parsing config: can't load config"
+msgstr ""
+
+#: src/entry.py:558
+msgid "error while parsing config: {err}"
+msgstr ""
+
+#: src/entry.py:565 src/entry.py:641
+msgid "parsing returned 0 configs"
+msgstr ""
+
+#: src/entry.py:572 src/entry.py:648
+msgid "filtering returned more configs than there are, at least one was used multiple times"
+msgstr ""
+
+#: src/entry.py:579 src/entry.py:655
+msgid "filtering returned 0 configs"
+msgstr ""
+
+#: src/entry.py:605
+msgid "File lock error: {err}"
+msgstr ""
+
+#: src/entry.py:628
+msgid "Config '{config}' is not valid: {err}"
+msgstr ""
+
+#: src/entry.py:637
 msgid "Config '{config}' is valid!"
 msgstr ""
 
-#: src/entry.py:410
+#: src/entry.py:638
 msgid "Info about config: {info}"
 msgstr ""
 
-#: src/entry.py:434
+#: src/entry.py:662
 msgid "Printing final config as json:"
 msgstr ""
 
-#: src/entry.py:471
+#: src/entry.py:678 src/entry.py:743
+msgid "<Err: {err}>"
+msgstr ""
+
+#: src/entry.py:683 src/entry.py:748
+msgid "<Nothing>"
+msgstr ""
+
+#: src/entry.py:690
+msgid "Can't read tags from file '{file}': Opening a handle failed: {reason}"
+msgstr ""
+
+#: src/entry.py:706
+msgid "Read tags:"
+msgstr ""
+
+#: src/entry.py:708 src/entry.py:809 src/entry.py:838
+msgid "Comment: {comment}"
+msgstr ""
+
+#: src/entry.py:710 src/entry.py:811 src/entry.py:840
+msgid "UUID: {uuid}"
+msgstr ""
+
+#: src/entry.py:712 src/entry.py:813 src/entry.py:842
+msgid "Generic Metadata:"
+msgstr ""
+
+#: src/entry.py:717 src/entry.py:847
+msgid "Unrecognized tags:"
+msgstr ""
+
+#: src/entry.py:724 src/entry.py:854
+msgid "Read Language: {language}"
+msgstr ""
+
+#: src/entry.py:755
+msgid "Can't write tags to file '{file}': Opening a handle failed: {reason}"
+msgstr ""
+
+#: src/entry.py:774
+msgid "Implementation error, only two values expected, but got {length}"
+msgstr ""
+
+#: src/entry.py:807
+msgid "Wrote tags:"
+msgstr ""
+
+#: src/entry.py:820
+msgid "Implementation error: language is wrong type: {typ}"
+msgstr ""
+
+#: src/entry.py:828
+msgid "Wrote language: {lang}"
+msgstr ""
+
+#: src/entry.py:836
+msgid "Which resulted in these tags tags:"
+msgstr ""
+
+#: src/entry.py:864
+msgid "File '{file}' doesn't exist"
+msgstr ""
+
+#: src/entry.py:882
+msgid "No path given, using CWD"
+msgstr ""
+
+#: src/entry.py:949
 msgid "Ctrl + C pressed"
 msgstr ""
 
-#: src/helper/base.py:68
+#: src/helper/base.py:77
 msgid "Data not saveable to '{suffix}' file!"
 msgstr ""
 
-#: src/helper/base.py:87
+#: src/helper/base.py:104
 msgid "Data not loadable from '{suffix}' file!"
 msgstr ""
 
-#: src/helper/base.py:138
-msgid "Scanning"
+#: src/helper/base.py:142
+msgid "<Starting>"
 msgstr ""
 
-#: src/helper/base.py:143
+#: src/helper/base.py:148
+msgid "Idle"
+msgstr ""
+
+#: src/helper/base.py:155
 msgid "Stage"
 msgstr ""
 
-#: src/helper/base.py:200
-msgid "series"
+#: src/helper/base.py:176
+msgid "<Not set>"
 msgstr ""
 
-#: src/helper/base.py:202
-msgid "seasons"
+#: src/helper/base.py:193
+msgid "Config: '{config_name}'"
+msgstr ""
+
+#: src/helper/base.py:199
+msgid "Config progress: {start} / {end}"
 msgstr ""
 
 #: src/helper/base.py:204
+msgid "Config type: '{config_type}'"
+msgstr ""
+
+#: src/helper/base.py:262
+msgid "End"
+msgstr ""
+
+#: src/helper/base.py:334
+msgid "series"
+msgstr ""
+
+#: src/helper/base.py:336
+msgid "seasons"
+msgstr ""
+
+#: src/helper/base.py:338
 msgid "episodes"
 msgstr ""
 
-#: src/helper/base.py:206
+#: src/helper/base.py:340
 msgid "tasks"
 msgstr ""
 
-#: src/helper/base.py:208
+#: src/helper/base.py:342
 msgid "folders"
 msgstr ""
 
-#: src/helper/base.py:231
+#: src/helper/base.py:362
 msgid "No Progressbar, on progress callback"
 msgstr ""
 
-#: src/helper/base.py:245
+#: src/helper/base.py:372
 msgid "No Progressbar, on progress finish"
 msgstr ""
 
-#: src/helper/base.py:252
-msgid "finished"
-msgstr ""
-
-#: src/helper/base.py:288 src/helper/base.py:339
+#: src/helper/base.py:506 src/helper/base.py:558
 msgid "Parse Error: Couldn't parse content from '{file}'"
 msgstr ""
 
-#: src/helper/classifier.py:281
+#: src/helper/classifier.py:286
 msgid "Not supported torch device: '{device}'"
 msgstr ""
 
-#: src/helper/classifier.py:569
+#: src/helper/classifier.py:577
 msgid ""
 "Unable to get a valid stream from file '{file}':\n"
 "{err}"
 msgstr ""
 
-#: src/helper/classifier.py:610
+#: src/helper/classifier.py:620
 msgid "Got a Video with no Audio Stream, aborting: '{file}'"
 msgstr ""
 
-#: src/helper/classifier.py:615
+#: src/helper/classifier.py:625
 msgid "Got a Video with {audio_streams} Audio Streams, aborting: '{file}'"
 msgstr ""
 
-#: src/helper/classifier.py:625
+#: src/helper/classifier.py:635
 msgid "Only one audio stream supported, but got {audio_streams}: '{file}'"
 msgstr ""
 
-#: src/helper/classifier.py:705
+#: src/helper/classifier.py:715
 msgid "Segment is not valid: start > end: {start:3n} > {end:3n}"
 msgstr ""
 
-#: src/helper/classifier.py:773
+#: src/helper/classifier.py:783
 msgid "FFmpeg exception in file {file}"
 msgstr ""
 
-#: src/helper/classifier.py:817
+#: src/helper/classifier.py:827
 msgid "Option {option_name}has to be in percentage (0.0 - 1.0) but was: {value}"
 msgstr ""
 
-#: src/helper/classifier.py:845
+#: src/helper/classifier.py:855
 msgid "Invalid pattern for AdvancedPercentage: got '{inp}', this didn't match the pattern '{pattern}'"
 msgstr ""
 
-#: src/helper/classifier.py:877
+#: src/helper/classifier.py:887
 msgid "Option has to be in percentage (0.0 - 1.0) but was: {value}"
 msgstr ""
 
-#: src/helper/classifier.py:910
+#: src/helper/classifier.py:920
 msgid "'{comparions_desc}' not supported between instances of 'AdvancedPercentage' and '{name}'"
 msgstr ""
 
-#: src/helper/classifier.py:1178
+#: src/helper/classifier.py:1189
 msgid "Found audio backends: {backends}"
 msgstr ""
 
-#: src/helper/classifier.py:1217
+#: src/helper/classifier.py:1228
 msgid "failed to derive the memory pattern for the model {name}"
 msgstr ""
 
-#: src/helper/classifier.py:1222
+#: src/helper/classifier.py:1233
 msgid ""
 "No memory_pattern for model {name} defined, use the following derived:\n"
 "{memory_pattern}"
 msgstr ""
 
-#: src/helper/classifier.py:1247
+#: src/helper/classifier.py:1258
 msgid "The auto batch settings resolved to a memory, that is not available, increase or decrease some paramaters: {batch_settings!s}"
 msgstr ""
 
-#: src/helper/classifier.py:1261
+#: src/helper/classifier.py:1272
 msgid "failed to calculate the seconds we can use with this available memory, this is likely an implementation error, or the memory_pattern was set incorrectly"
 msgstr ""
 
-#: src/helper/classifier.py:1269
+#: src/helper/classifier.py:1280
 msgid "Resolved auto batch settings to timestamp: {settings} -> {result}"
 msgstr ""
 
-#: src/helper/classifier.py:1296
+#: src/helper/classifier.py:1307
 msgid "Exceeded retry amount of {amount} for classify"
 msgstr ""
 
-#: src/helper/classifier.py:1307
+#: src/helper/classifier.py:1318
 msgid "Switching the classifier to the cpu"
 msgstr ""
 
-#: src/helper/classifier.py:1635
+#: src/helper/classifier.py:1672
 msgid "Couldn't get Language of '{path}': Best was {best}"
 msgstr ""
 
@@ -444,11 +638,11 @@ msgstr ""
 msgid "Video Language Detector"
 msgstr ""
 
-#: src/helper/devices.py:61
+#: src/helper/devices.py:62
 msgid "Got GPU error: {error}"
 msgstr ""
 
-#: src/helper/manager.py:204
+#: src/helper/manager.py:205
 msgid "UNREACHABLE (not runnable in notebooks)"
 msgstr ""
 
@@ -457,78 +651,142 @@ msgid "Long language doesn't match"
 msgstr ""
 
 #: src/helper/models.py:498
-msgid "This dataset has no such language"
+msgid "This dataset has no such language: {language}"
 msgstr ""
 
-#: src/helper/tui.py:58
+#: src/helper/tui.py:59
 msgid "Aborted scan"
 msgstr ""
 
-#: src/helper/validator.py:39
+#: src/helper/validator.py:60
 msgid "Collection {name}"
 msgstr ""
 
-#: src/helper/validator.py:41
+#: src/helper/validator.py:62
 msgid "Series {name}"
 msgstr ""
 
-#: src/helper/validator.py:46
+#: src/helper/validator.py:65
+msgid "File '{file}'"
+msgstr ""
+
+#: src/helper/validator.py:70
 msgid "Series {name} Season {season}"
 msgstr ""
 
-#: src/helper/validator.py:52
+#: src/helper/validator.py:76
 msgid "Series {name} Season {season} Episode {episode}"
 msgstr ""
 
-#: src/helper/validator.py:82
+#: src/helper/validator.py:107
 msgid "Validator '{name}' error at {where}: {err}"
 msgstr ""
 
-#: src/helper/validator.py:144 src/helper/validator.py:258
+#: src/helper/validator.py:276 src/helper/validator.py:581
 msgid "'SeasonContent' not valid for this state"
 msgstr ""
 
-#: src/helper/validator.py:147 src/helper/validator.py:261
+#: src/helper/validator.py:279 src/helper/validator.py:584
 msgid "'EpisodeContent' not valid for this state "
 msgstr ""
 
-#: src/helper/validator.py:150 src/helper/validator.py:264
+#: src/helper/validator.py:282 src/helper/validator.py:587
 msgid "invalid type for 'Content': {typ}"
 msgstr ""
 
-#: src/helper/validator.py:341
+#: src/helper/validator.py:327
+msgid "invalid append to ValidatorState: {v_name} != {name}"
+msgstr ""
+
+#: src/helper/validator.py:366
+msgid "Validator for {episode}"
+msgstr ""
+
+#: src/helper/validator.py:377
+msgid "validators"
+msgstr ""
+
+#: src/helper/validator.py:712
 msgid "Invalid language in episode: {err}"
 msgstr ""
 
-#: src/helper/validator.py:434
+#: src/helper/validator.py:760 src/helper/validator.py:947
+msgid "No options supported, but got: {options}"
+msgstr ""
+
+#: src/helper/validator.py:845
 msgid "Language in season is not consistent, the last episode had the language {lang1!s} but this one has {lang2!s}"
 msgstr ""
 
-#: src/helper/validator.py:447 src/helper/validator.py:468
+#: src/helper/validator.py:858 src/helper/validator.py:879
 msgid "no language detected in season"
 msgstr ""
 
-#: src/helper/validator.py:487
+#: src/helper/validator.py:898
 msgid "Language in series is not consistent, the last season had the language {lang1!s} but this one has {lang2!s}"
 msgstr ""
 
-#: src/helper/validator.py:506
+#: src/helper/validator.py:917
 msgid "no language detected in series"
 msgstr ""
 
-#: src/helper/video_tagger.py:418
-msgid "Unrecognized mutagen instance, this is an implementation error: {clazz}"
+#: src/helper/validator.py:1006
+msgid "File not tagged: can't get tagger handle: {err}"
 msgstr ""
 
-#: src/helper/video_tagger.py:454
-msgid "Not supported file type"
+#: src/helper/validator.py:1024
+msgid "File tag error: {err}"
 msgstr ""
 
-#: src/helper/video_tagger.py:459
-msgid "get tag handle {err}"
+#: src/helper/validator.py:1029
+msgid "File not tagged"
 msgstr ""
 
-#: src/helper/video_tagger.py:463
-msgid "get tag handle (mutagen impl error): {err}"
+#: src/helper/validator.py:1038
+msgid "File Language get error: {err}"
+msgstr ""
+
+#: src/helper/validator.py:1051
+msgid "File has no language, can't annotate it"
+msgstr ""
+
+#: src/helper/validator.py:1060
+msgid "File language annotate error"
+msgstr ""
+
+#: src/helper/validator.py:1065
+msgid "File has no annotated language"
+msgstr ""
+
+#: src/helper/validator.py:1071
+msgid "File not tagged: {err}"
+msgstr ""
+
+#: src/helper/validator.py:1129
+msgid "Invalid options flag: {flag}"
+msgstr ""
+
+#: src/helper/validator.py:1193
+msgid "Duplicate validator name: {name}"
+msgstr ""
+
+#: src/helper/validator.py:1211
+msgid "Not a valid validator name: {name}"
+msgstr ""
+
+#: src/helper/validator.py:1219
+msgid "Invalid options for validator {name}: {err}"
+msgstr ""
+
+#: src/helper/validator.py:1245
+msgid "Implementation error: no options should always return Ok, but got {err}"
+msgstr ""
+
+#: src/helper/validator.py:1299
+msgid "Validator get error: {err}"
+msgstr ""
+
+#: src/helper/validator.py:1307
+msgid "Validator is already present, duplicate is not allowed: {validator_name}"
 msgstr ""
 
