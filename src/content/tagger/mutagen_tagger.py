@@ -474,6 +474,12 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
         return False
 
     @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        return Err("Not Supported")
+
+    @override
     def get_tags(  # noqa: PLR0915
         self: Self,
     ) -> MetadataTagsRead:

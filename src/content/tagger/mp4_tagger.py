@@ -3528,6 +3528,12 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         return True
 
     @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        return Err("Not Implemented yet")
+
+    @override
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead:
@@ -3652,7 +3658,7 @@ class VideoTaggerMP4(VideoTagger):
                 manager: ManagerInterface,
                 writer: BinaryIO,
             ) -> VideoTaggerContextMP4:
-                return VideoTaggerContextMP4(manager, file,writer, streams, types)
+                return VideoTaggerContextMP4(manager, file, writer, streams, types)
 
         return VideoTaggerContextCtx()
 

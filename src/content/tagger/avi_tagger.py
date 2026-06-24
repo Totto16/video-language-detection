@@ -1764,7 +1764,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
     def __init__(
         self: Self,
         manager: ManagerInterface,
-        file:Path,
+        file: Path,
         writer: BinaryIO,
         streams: int,
         types: list[FOURCC],
@@ -1853,6 +1853,12 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
             bar.close(clear=True)
 
         return True
+
+    @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        return Err("Not Implemented yet")
 
     @override
     def get_tags(
@@ -1988,7 +1994,7 @@ class VideoTaggerAVI(VideoTagger):
                 manager: ManagerInterface,
                 writer: BinaryIO,
             ) -> VideoTaggerContextAVI:
-                return VideoTaggerContextAVI(manager, file,writer, streams, types)
+                return VideoTaggerContextAVI(manager, file, writer, streams, types)
 
         return VideoTaggerContextCtx()
 

@@ -24,6 +24,7 @@ from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.log import get_logger
 from helper.manager import ManagerInterface
+from helper.result import Err, Result
 from helper.translation import get_translator
 
 logger: Logger = get_logger()
@@ -80,6 +81,11 @@ class VideoTaggerContextReadable(VideoTaggerContextInterface):
     def get_tags(
         self: Self,
     ) -> MetadataTagsRead: ...
+
+    @abstractmethod
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]: ...
 
 
 @decorate_class(slots=True)
@@ -261,6 +267,16 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
 
         return self.__impl.get_tags()
 
+    @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        if self.__ctx not in ["r", "rw"]:
+            msg = f"Invalid context: can't read with the type '{self.__ctx}'"
+            raise RuntimeError(msg)
+
+        return self.__impl.read_language()
+
 
 @decorate_class(slots=True)
 class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW]):
@@ -416,6 +432,12 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     def get_tags(self: Self) -> MetadataTagsRead:
         msg = "Merging the tags is not implemented yet!"
         raise NotImplementedError(msg)
+
+    @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        return Err("Merging the languages is not implemented yet!")
 
 
 @decorate_class(slots=True)

@@ -1004,6 +1004,7 @@ class TagsValidator(Validator[None, None, None, None]):
         try:
             with handle.rw_ctx(manager=manager) as ctx:
                 tags = ctx.get_tags()
+
                 if tags.uuid is None:
                     if self.__options.write:
                         new_tags = episode.get_tags()
@@ -1018,6 +1019,39 @@ class TagsValidator(Validator[None, None, None, None]):
                             episode.scanned_file.path,
                             _("File not tagged"),
                         )
+
+                lang_res = ctx.read_language()
+                if lang_res.err():
+                    if self.__options.strict:
+                        self.emit_error(
+                            episode.scanned_file.path,
+                            _("File Language get error: {err}").format(
+                                err=lang_res.as_err(),
+                            ),
+                        )
+                else:
+                    lang = lang_res.as_ok()
+                    if lang is None:
+                        if self.__options.write:
+                            new_lang = episode.language
+                            if Language.is_default_value(new_lang):
+                                if self.__options.strict:
+                                    self.emit_error(
+                                        episode.scanned_file.path,
+                                        _("File has no language, can't annotate it"),
+                                    )
+                            else:
+                                lang_write_res = ctx.write_language(new_lang)
+                                if not lang_write_res:
+                                    self.emit_error(
+                                        episode.scanned_file.path,
+                                        _("File language annotate error"),
+                                    )
+                        else:
+                            self.emit_error(
+                                episode.scanned_file.path,
+                                _("File has no annotated language"),
+                            )
 
         except (RuntimeError, ValueError, TypeError) as err:
             self.emit_error(
