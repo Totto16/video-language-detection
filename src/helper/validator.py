@@ -6,7 +6,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, NewType, Optional, Self, assert_never, cast, override
 
-from content.base_class import Content
+from content.base_class import Content, DefaultStatusBarInfo
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
 from content.general import (
@@ -256,7 +256,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         root_content: list[SeriesContent | CollectionContent] = []
 
         amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
-        status_bar_manager.start(amount, directory.name, None)
+        status_bar_manager.start(amount, directory.name, DefaultStatusBarInfo())
 
         for content in contents:
             if isinstance(content, CollectionContent):
@@ -359,6 +359,19 @@ class Validator[ED, SD, S2D, CD](ABC):
         ]
 
         for episode in season.episodes:
+            v_bar_name = _("Validator for {episode}").format(
+                episode=episode.scanned_file.path.name,
+            )
+            v_amount = StartAmount(
+                total=len(validators),
+                processing=len(validators),
+                ignored=0,
+            )
+            status_bar_manager.start(
+                v_amount,
+                v_bar_name,
+                ("purple", _("validators")),
+            )
             for i, validator in enumerate(validators):
                 local_states[i].append(
                     validator.validate_episode(
@@ -369,7 +382,9 @@ class Validator[ED, SD, S2D, CD](ABC):
                     ),
                     validator.name,
                 )
+                status_bar_manager.progress(v_bar_name, amount=1)
 
+            status_bar_manager.finish(v_bar_name)
             status_bar_manager.progress(name, amount=1)
 
         state: list[Validator.__Any2] = []
@@ -525,7 +540,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         root_content: list[SeriesContent | CollectionContent] = []
 
         amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
-        status_bar_manager.start(amount, directory.name, None)
+        status_bar_manager.start(amount, directory.name, DefaultStatusBarInfo())
 
         for content in contents:
             if isinstance(content, CollectionContent):

@@ -43,7 +43,28 @@ from helper.translation import get_translator
 logger: Logger = get_logger()
 _ = get_translator()
 
-type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
+
+StatusBarColor = str
+
+StatusBarInfoRaw = tuple[StatusBarColor, str]
+
+
+class DefaultStatusBarInfo:
+    pass
+
+
+StatusBarInfo = ContentType | StatusBarInfoRaw | DefaultStatusBarInfo
+
+
+@dataclass(slots=True, repr=True)
+class ContentCharacteristic:
+    info: StatusBarInfo
+    file: ScannedFileType
+
+    def as_tuple(
+        self: Self,
+    ) -> tuple[StatusBarInfo, ScannedFileType]:
+        return (self.info, self.file)
 
 
 @decorate_class(slots=True)
@@ -414,7 +435,7 @@ def process_folder(
     handles: HandlesType,
     parent_folders: list[str],
     trailer_names: list[str],
-    parent_type: Optional[ContentType] = None,
+    parent_type: StatusBarInfo,
     rescan: Optional[list[Content]] = None,
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
@@ -431,7 +452,9 @@ def process_folder(
 
         temp.append((file_path, file_type, parent_folders))
 
-    value: ContentCharacteristic = (parent_type, ScannedFileType.folder)
+    value: ContentCharacteristic = ContentCharacteristic(
+        parent_type, ScannedFileType.folder
+    )
 
     #  total, processing, ignored
     amount: StartAmount = StartAmount(
@@ -452,15 +475,15 @@ def process_folder(
                 parent_folders_temp,
                 trailer_names=trailer_names,
             )
-            value = (
-                result.type if result is not None else None,
+            value = ContentCharacteristic(
+                result.type if result is not None else DefaultStatusBarInfo(),
                 ScannedFileType.from_path(file_path),
             )
             callback.progress(directory.name, parent_folders, value, amount=1)
             if result is not None:
                 results.append(result)
 
-        value = (parent_type, ScannedFileType.folder)
+        value = ContentCharacteristic(parent_type, ScannedFileType.folder)
         callback.finish(directory.name, parent_folders, 0, value)
 
         return results
@@ -486,8 +509,8 @@ def process_folder(
             rescan=is_rescan,
         )
 
-        value = (
-            result.type if result is not None else None,
+        value = ContentCharacteristic(
+            result.type if result is not None else DefaultStatusBarInfo(),
             ScannedFileType.from_path(file_path),
         )
 
@@ -519,7 +542,7 @@ def process_folder(
         del rescan[index]
         deleted += 1
 
-    value = (parent_type, ScannedFileType.folder)
+    value = ContentCharacteristic(parent_type, ScannedFileType.folder)
     callback.finish(directory.name, parent_folders, deleted, value)
 
     return rescan

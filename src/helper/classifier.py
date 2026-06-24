@@ -1358,7 +1358,11 @@ class ClassifierManager(AbstractContextManager[None]):
         ]
 
     def __del__(self: Self) -> None:
-        self.clear_cache()
+        try:
+            self.clear_cache()
+            # TODO: how to deal with e.g. KeyboardInterrupt in __del__ ?
+        except BaseException:
+            return
 
     def __decrease_batch_size(self: Self, percentage_decrease: float) -> None:
 
@@ -1458,7 +1462,7 @@ class Classifier:
                         "final_threshold",
                     )
 
-                use_picker_at_end =  (
+                use_picker_at_end = (
                     options.accuracy.use_picker_at_end
                     if isinstance(options.accuracy, AccuracySettingsData)
                     else options.accuracy.get("use_picker_at_end", None)
@@ -1467,7 +1471,7 @@ class Classifier:
                     total_options.accuracy.use_picker_at_end = use_picker_at_end
 
             if options.scan_config is not None:
-                minimum =  (
+                minimum = (
                     options.scan_config.minimum
                     if isinstance(options.scan_config, ScanConfigData)
                     else options.scan_config.get("minimum", None)
@@ -1573,8 +1577,7 @@ class Classifier:
         # This guards for cases, where scanning is useless, e.g. when you want 20 % to be scanned, for a valid result, but scan until 10 %
         scan_nothing: bool = (
             self.__options.scan_config.maximum is not None
-            and self.__options.scan_config.maximum
-            < self.__options.scan_config.minimum
+            and self.__options.scan_config.maximum < self.__options.scan_config.minimum
         )
 
         segments: list[tuple[Segment, Timestamp]] = (

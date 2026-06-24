@@ -312,7 +312,7 @@ class EpisodeContent(Content):
             analyze_vide_metadata,
         ]
 
-        characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
+        characteristic: ContentCharacteristic = ContentCharacteristic(self.type, self.scanned_file.type)
 
         callback.process_workload(
             callback_workload,
@@ -335,7 +335,7 @@ class EpisodeContent(Content):
 
         current_handles = self.__get_handles(handles)
 
-        characteristic: ContentCharacteristic = (self.type, self.scanned_file.type)
+        characteristic: ContentCharacteristic = ContentCharacteristic(self.type, self.scanned_file.type)
 
         if rescan:
             is_outdated: bool = self.scanned_file.is_outdated(manager)

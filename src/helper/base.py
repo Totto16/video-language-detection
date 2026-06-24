@@ -18,7 +18,10 @@ from content.base_class import (
     CallbackData,
     Content,
     ContentCharacteristic,
+    DefaultStatusBarInfo,
     Scanner,
+    StatusBarInfo,
+    StatusBarInfoRaw,
     process_folder,
 )
 from content.general import (
@@ -320,11 +323,13 @@ class StatusBarManager:
         self: Self,
         amount: StartAmount,
         name: str,
-        content_type: Optional[ContentType],
+        info: StatusBarInfo,
     ) -> None:
-        value: tuple[str, str]
+        value: StatusBarInfoRaw
 
-        match content_type:
+        match info:
+            case tuple():
+                value = info
             case ContentType.collection:
                 value = ("blue", _("series"))
             case ContentType.series:
@@ -439,9 +444,9 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
     ) -> None:
-        content_type, _i = characteristic
+        info, _i = characteristic.as_tuple()
 
-        self.__status_bar_manager.start(amount, name, content_type)
+        self.__status_bar_manager.start(amount, name, info)
 
     @override
     def progress(
@@ -641,6 +646,7 @@ def parse_contents(
             handles=[],
             parent_folders=[],
             trailer_names=options["trailer_names"],
+            parent_type=DefaultStatusBarInfo(),
         )
 
         save_to_file(
@@ -666,6 +672,7 @@ def parse_contents(
         rescan=contents,
         parent_folders=[],
         trailer_names=options["trailer_names"],
+        parent_type=DefaultStatusBarInfo(),
     )
 
     save_to_file(
