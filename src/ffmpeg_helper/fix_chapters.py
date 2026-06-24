@@ -15,6 +15,11 @@ def fix_chapters(files: list[Path]) -> list[str]:
 
 
 def fix_chapter(input_file: Path) -> Optional[str]:
+    temp_folder = Path(__file__).parent.parent.parent / "temp"
+
+    if not temp_folder.exists():
+        temp_folder.mkdir(parents=True, exist_ok=True)
+
     try:
         output: Path = input_file.parent / (
             input_file.stem + "_output" + input_file.suffix
@@ -40,9 +45,7 @@ def fix_chapter(input_file: Path) -> Optional[str]:
             output.unlink(missing_ok=True)
             return f"Process exited with status code: {ret_code}"
 
-        temp_result = (
-            Path(__file__).parent / (input_file.parent.parent.name) / input_file.name
-        )
+        temp_result = temp_folder / input_file.name
 
         shutil.move(input_file, temp_result)
         shutil.move(output, input_file)
