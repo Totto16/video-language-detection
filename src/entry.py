@@ -992,27 +992,40 @@ def subcommand_tagger_inspect(
     @decorate_class(slots=True)
     class JsonPrinter(InspectPrinter):
         __pos: int
+        __current_depth: int
 
         def __init__(self: Self) -> None:
             super().__init__()
 
             self.__pos = 0
+            self.__current_depth = 0
 
         @override
         def element(self: Self, element: InspectElement, depth: int) -> None:
 
             entry: dict[str, str | int] = {
-                "depth": depth,
                 "name": element.name,
                 "size": element.size,
+                "depth": depth,
             }
 
+            if self.__current_depth > depth:
+                for _ in range(self.__current_depth - depth):
+                    print("]", end="")  # noqa: T201
+
             if self.__pos != 0:
-                print(",")  # noqa: T201
+                print(",", end="\n")  # noqa: T201
+
+            print(" " * (depth + 1), end="")  # noqa: T201
+
+            if self.__current_depth < depth:
+                for _ in range(depth - self.__current_depth):
+                    print("[", end="")  # noqa: T201
 
             print(json.dumps(entry), end="")  # noqa: T201
 
             self.__pos = self.__pos + 1
+            self.__current_depth = depth
 
         @override
         def start(
@@ -1024,6 +1037,9 @@ def subcommand_tagger_inspect(
         def end(
             self: Self,
         ) -> None:
+            if self.__current_depth > 0:
+                for i in reversed(range(self.__current_depth)):
+                    print(f" {" " * i}]", end="")  # noqa: T201
             print("\n]")  # noqa: T201
 
     printer: InspectPrinter
