@@ -314,7 +314,23 @@ class Validator[ED, SD, S2D, CD](ABC):
 
     @dataclass(slots=True, repr=True)
     class __ValidatorState[S]:
-        data: list[S]
+        __data: list[S]
+        __v_name: str
+
+        def __init__(self: Self, v_name: str) -> None:
+            self.__data = []
+            self.__v_name = v_name
+
+        def append(self: Self, data: S, name: str) -> None:
+            if self.__v_name != name:
+                msg = f"invalid append to ValidatorState: {self.__v_name} != {name}"
+                raise RuntimeError(msg)
+
+            self.__data.append(data)
+
+        @property
+        def underlying(self: Self) -> list[S]:
+            return self.__data
 
     @staticmethod
     def __validate_multiple_season_impl(
@@ -339,18 +355,19 @@ class Validator[ED, SD, S2D, CD](ABC):
         )
 
         local_states: list[Validator.__ValidatorState[Validator.__Any1]] = [
-            Validator.__ValidatorState([]) for _ in validators
+            Validator.__ValidatorState(v.name) for v in validators
         ]
 
         for episode in season.episodes:
             for i, validator in enumerate(validators):
-                local_states[i].data.append(
+                local_states[i].append(
                     validator.validate_episode(
                         episode,
                         series=series,
                         season=season.description,
                         manager=status_bar_manager.manager,
                     ),
+                    validator.name,
                 )
 
             status_bar_manager.progress(name, amount=1)
@@ -365,7 +382,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 validator.validate_season(
                     season,
                     series=series,
-                    result=local_state.data,
+                    result=local_state.underlying,
                 ),
             )
         status_bar_manager.finish(name)
@@ -394,7 +411,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         )
 
         local_states: list[Validator.__ValidatorState[Validator.__Any2]] = [
-            Validator.__ValidatorState([]) for _ in validators
+            Validator.__ValidatorState(v.name) for v in validators
         ]
 
         for season in series.seasons:
@@ -407,8 +424,13 @@ class Validator[ED, SD, S2D, CD](ABC):
                 )
             )
 
-            for i, local_state_entry in enumerate(local_state_res):
-                local_states[i].data.append(local_state_entry)
+            for i, local_state_entry, v in zip(
+                range(len(validators)),
+                local_state_res,
+                validators,
+                strict=True,
+            ):
+                local_states[i].append(local_state_entry, v.name)
 
             status_bar_manager.progress(name, amount=1)
 
@@ -421,7 +443,7 @@ class Validator[ED, SD, S2D, CD](ABC):
             state.append(
                 validator.validate_series(
                     series,
-                    result=local_state.data,
+                    result=local_state.underlying,
                 ),
             )
         status_bar_manager.finish(name)
@@ -450,7 +472,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         )
 
         local_states: list[Validator.__ValidatorState[Validator.__Any3]] = [
-            Validator.__ValidatorState([]) for _ in validators
+            Validator.__ValidatorState(v.name) for v in validators
         ]
 
         for serie in collection.series:
@@ -462,8 +484,13 @@ class Validator[ED, SD, S2D, CD](ABC):
                 )
             )
 
-            for i, local_state_entry in enumerate(local_state_res):
-                local_states[i].data.append(local_state_entry)
+            for i, local_state_entry, v in zip(
+                range(len(validators)),
+                local_state_res,
+                validators,
+                strict=True,
+            ):
+                local_states[i].append(local_state_entry, v.name)
 
             status_bar_manager.progress(name, amount=1)
 
@@ -476,7 +503,7 @@ class Validator[ED, SD, S2D, CD](ABC):
             state.append(
                 validator.validate_collection(
                     collection,
-                    result=local_state.data,
+                    result=local_state.underlying,
                 ),
             )
         status_bar_manager.finish(name)
@@ -492,7 +519,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         status_bar_manager: StatusBarManager,
     ) -> None:
         state: list[Validator.__ValidatorState[Validator.__Any4 | Validator.__Any3]] = [
-            Validator.__ValidatorState([]) for _ in validators
+            Validator.__ValidatorState(v.name) for v in validators
         ]
 
         root_content: list[SeriesContent | CollectionContent] = []
@@ -508,8 +535,13 @@ class Validator[ED, SD, S2D, CD](ABC):
                     status_bar_manager=status_bar_manager,
                 )
 
-                for i, local_state_entry1 in enumerate(local_state1):
-                    state[i].data.append(local_state_entry1)
+                for i, local_state_entry1, v in zip(
+                    range(len(validators)),
+                    local_state1,
+                    validators,
+                    strict=True,
+                ):
+                    state[i].append(local_state_entry1, v.name)
 
             elif isinstance(content, SeriesContent):
                 local_state2 = Validator.__validate_multiple_series_impl(
@@ -518,8 +550,13 @@ class Validator[ED, SD, S2D, CD](ABC):
                     status_bar_manager=status_bar_manager,
                 )
 
-                for i, local_state_entry2 in enumerate(local_state2):
-                    state[i].data.append(local_state_entry2)
+                for i, local_state_entry2, v in zip(
+                    range(len(validators)),
+                    local_state2,
+                    validators,
+                    strict=True,
+                ):
+                    state[i].append(local_state_entry2, v.name)
 
             elif isinstance(content, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
@@ -539,7 +576,7 @@ class Validator[ED, SD, S2D, CD](ABC):
             state,
             strict=True,
         ):
-            validator.validate_all(root_content, root_state.data)
+            validator.validate_all(root_content, root_state.underlying)
 
         status_bar_manager.finish(directory.name)
 
@@ -1135,7 +1172,7 @@ def __get_default_validators_impl(
             msg = f"Implementation error: no options should always return Ok, but got {validator_res.as_err()}"
             raise RuntimeError(msg)
 
-        validator = validator_res.as_ok()
+        validator: Validator[Any, Any, Any, Any] = validator_res.as_ok()
 
         if validator.is_default():
             result.append(validator)
