@@ -90,7 +90,7 @@ def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
         case ".mp4":
             return get_tagger_for_mp4_file(file)
         case ".mkv":
-            return Err("MKv not yet supported")
+            return Err("MKV not yet supported")
         case ".avi":
             return get_tagger_for_avi_file(file)
         case _:
