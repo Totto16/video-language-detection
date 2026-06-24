@@ -3729,7 +3729,8 @@ class VideoTaggerMP4(VideoTagger):
     def get_handle(file: Path) -> Result["VideoTagger", str]:
 
         options: MP4DecodeOptions = MP4DecodeOptions(
-            strict=False, type=MP4DecodeType.Check,
+            strict=False,
+            type=MP4DecodeType.Check,
         )
 
         try:
@@ -3813,19 +3814,23 @@ class VideoTaggerMP4(VideoTagger):
     def inspect(
         self: Self,
         printer: InspectPrinter,
+        priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]:
 
         def print_box(box: MP4Box, *, depth: int) -> None:
 
-            priority = (
+            local_priority = (
                 InspectPriority.Important
                 if box.is_container
                 else InspectPriority.Normal
             )
 
+            if local_priority.as_int() > priority.as_int():
+                return
+
             name: str = f"{box.type}"
 
-            element = InspectElement(name, priority)
+            element = InspectElement(name, size=box.span.total.size)
 
             printer.element(element, depth)
 

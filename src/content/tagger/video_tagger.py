@@ -187,11 +187,31 @@ class InspectPriority(Enum):
     Normal = "normal"
     Ignore = "ignore"
 
+    def as_int(self: Self) -> int:
+        match self:
+            case InspectPriority.Important:
+                return 0
+            case InspectPriority.Normal:
+                return 1
+            case InspectPriority.Ignore:
+                return 2
+            case _:
+                assert_never(self)
+
+    @staticmethod
+    def from_str(inp: str) -> Optional["InspectPriority"]:
+        for level in InspectPriority:
+            if str(level).lower() == inp.lower():
+                return level
+
+        return None
+
+
 
 @dataclass(slots=True, repr=True)
 class InspectElement:
     name: str
-    priority: InspectPriority
+    size: int
 
 
 @decorate_class(slots=True)
@@ -251,6 +271,7 @@ class VideoTagger(ABC):
     def inspect(
         self: Self,
         printer: InspectPrinter,
+        priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]: ...
 
 
@@ -577,6 +598,7 @@ class VideoTaggerMultiple(VideoTagger):
     def inspect(
         self: Self,
         printer: InspectPrinter,
+        priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]:
         return InspectNotImplemented()
 

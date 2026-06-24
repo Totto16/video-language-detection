@@ -20,6 +20,7 @@ from content.tagger.video_tagger import (
     ContextType,
     InspectNotImplemented,
     InspectPrinter,
+    InspectPriority,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -746,5 +747,6 @@ class VideoTaggerMutagen(VideoTagger):
     def inspect(
         self: Self,
         printer: InspectPrinter,
+        priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]:
         return InspectNotImplemented()

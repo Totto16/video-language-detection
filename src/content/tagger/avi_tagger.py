@@ -1139,7 +1139,12 @@ def find_strh_chunks_with_type(
 
                 yield chunk
 
-            if chunk.fourcc == MOVI_FOURCC and options.type == AVIDecodeType.Check:
+            if (
+                chunk.fourcc == LIST_FOURCC
+                and isinstance(chunk, AVIList)
+                and chunk.type == MOVI_FOURCC
+                and options.type == AVIDecodeType.Check
+            ):
                 # skip movi chunk with maaaany data chunks, but nothing interesting
                 continue
 
@@ -1868,7 +1873,9 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         try:
             self.__writer.seek(0)
             for strh in find_strh_chunks_with_type(
-                self.__writer, self.__types, options,
+                self.__writer,
+                self.__types,
+                options,
             ):
 
                 should_write_language = True
@@ -1977,7 +1984,8 @@ class VideoTaggerAVI(VideoTagger):
     def get_handle(file: Path) -> Result["VideoTagger", str]:
 
         options: AVIDecodeOptions = AVIDecodeOptions(
-            strict=False, type=AVIDecodeType.Check,
+            strict=False,
+            type=AVIDecodeType.Check,
         )
 
         try:
@@ -1993,7 +2001,7 @@ class VideoTaggerAVI(VideoTagger):
                 types: list[FOURCC] = [AUDS_FOURCC, VIDS_FOURCC]
 
                 # read the file, so that we check if we can parse it correctly and that it is an avi file
-                for strh in find_strh_chunks_with_type(f, types,options):
+                for strh in find_strh_chunks_with_type(f, types, options):
                     streams = streams + 1
                     lang = strh.read_language(f)
                     # check if this lang is valid
@@ -2061,6 +2069,7 @@ class VideoTaggerAVI(VideoTagger):
     def inspect(
         self: Self,
         printer: InspectPrinter,
+        priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]:
 
         def is_data_chunk(chunk: AVIChunk) -> bool:
@@ -2075,7 +2084,7 @@ class VideoTaggerAVI(VideoTagger):
 
         def print_chunk(chunk: AVIChunk, *, depth: int) -> None:
 
-            priority = (
+            local_priority = (
                 InspectPriority.Important
                 if chunk.is_list
                 else (
@@ -2084,11 +2093,15 @@ class VideoTaggerAVI(VideoTagger):
                     else InspectPriority.Normal
                 )
             )
+
+            if local_priority.as_int() > priority.as_int():
+                return
+
             name: str = f"{chunk.fourcc}"
             if isinstance(chunk, AVIList):
                 name = f"{chunk.fourcc}({chunk.type})"
 
-            element = InspectElement(name, priority)
+            element = InspectElement(name, size=chunk.span.total.size)
 
             printer.element(element, depth)
 
@@ -2098,6 +2111,15 @@ class VideoTaggerAVI(VideoTagger):
                 for chunk in avi_iter_chunks(f, span):
 
                     print_chunk(chunk, depth=depth)
+
+                    if (
+                        chunk.fourcc == LIST_FOURCC
+                        and isinstance(chunk, AVIList)
+                        and chunk.type == MOVI_FOURCC
+                        and priority.as_int() <= InspectPriority.Normal.as_int()
+                    ):
+                        # skip movi chunk with maaaany data chunks, but nothing interesting
+                        continue
 
                     if chunk.is_list:
                         iterate_chunks_recursive(

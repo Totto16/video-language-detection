@@ -136,6 +136,7 @@ class TaggerInspectCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     file: Path
 
     output_format: InspectOutputFormat
+    priority: InspectPriority
 
 
 AllTaggerCommandParsedArgNamespace = (
@@ -507,6 +508,22 @@ def parse_args() -> AllParsedNameSpaces:  # noqa: PLR0915
         type=lambda s: InspectOutputFormat.from_str(s)
         or cast(InspectOutputFormat, s.lower()),
         help=_("The output format to use"),
+    )
+
+    priority_choices: list[InspectPriority] = [
+        InspectPriority.Ignore,
+        InspectPriority.Normal,
+        InspectPriority.Important,
+    ]
+    priority_default: InspectPriority = InspectPriority.Normal
+    tagger_inspect_parser.add_argument(
+        "-p",
+        "--priority",
+        choices=priority_choices,
+        default=priority_default,
+        dest="priority",
+        type=lambda s: InspectPriority.from_str(s) or cast(InspectPriority, s.lower()),
+        help=_("Which boxes to inspect"),
     )
 
     ffmpeg_parser = subparsers.add_parser(
@@ -958,9 +975,6 @@ def subcommand_tagger_inspect(
         @override
         def element(self: Self, element: InspectElement, depth: int) -> None:
 
-            if element.priority == InspectPriority.Ignore:
-                return
-
             print(f"{" " * depth}{element.name}")  # noqa: T201
 
         @override
@@ -990,7 +1004,7 @@ def subcommand_tagger_inspect(
             entry: dict[str, str | int] = {
                 "depth": depth,
                 "name": element.name,
-                "priority": element.priority.value,
+                "size": element.size,
             }
 
             if self.__pos != 0:
@@ -1010,7 +1024,7 @@ def subcommand_tagger_inspect(
         def end(
             self: Self,
         ) -> None:
-            print("]")  # noqa: T201
+            print("\n]")  # noqa: T201
 
     printer: InspectPrinter
     match args.output_format:
@@ -1021,7 +1035,7 @@ def subcommand_tagger_inspect(
         case _:
             assert_never(args.output_format)
 
-    inspect_res = handle.inspect(printer)
+    inspect_res = handle.inspect(printer, args.priority)
 
     if isinstance(inspect_res, InspectNotImplemented):
         logger.error(
