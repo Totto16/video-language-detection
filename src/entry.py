@@ -668,8 +668,21 @@ def subcommand_tagger_read(
     logger: Logger,
     file: Path,
 ) -> ExitCode:
+    from content.language import Language
     from content.tagger.tagger import get_tagger_for_file
     from helper.manager import NoopManager
+    from helper.result import Result
+
+    def read_language_str(lang_res: Result[Optional[Language], str]) -> str:
+        if lang_res.err():
+            return f"<Err: {lang_res.as_err()}>"
+
+        lang = lang_res.as_ok()
+
+        if lang is None:
+            return "<Nothing>"
+
+        return f"{lang}"
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -706,6 +719,9 @@ def subcommand_tagger_read(
             msg = f"{key}: {value}"
             logger.info(msg)
 
+        language = read_language_str(ctx.read_language())
+
+        logger.info(_("Read Language: {language}").format(language=language))
     return 0
 
 
@@ -720,6 +736,18 @@ def subcommand_tagger_write(  # noqa: PLR0915
     from content.tagger.tagger import get_tagger_for_file
     from content.tagger.video_tagger import MetadataTags
     from helper.manager import NoopManager, TuiManager
+    from helper.result import Result
+
+    def read_language_str(lang_res: Result[Optional[Language], str]) -> str:
+        if lang_res.err():
+            return f"<Err: {lang_res.as_err()}>"
+
+        lang = lang_res.as_ok()
+
+        if lang is None:
+            return "<Nothing>"
+
+        return f"{lang}"
 
     handle_result = get_tagger_for_file(file)
     if handle_result.err():
@@ -816,6 +844,10 @@ def subcommand_tagger_write(  # noqa: PLR0915
         for key, value in tags.unrecognized:
             msg = f"{key}: {value}"
             logger.info(msg)
+
+        read_language = read_language_str(r_ctx.read_language())
+
+        logger.info(_("Read Language: {language}").format(language=read_language))
 
     return 0
 
