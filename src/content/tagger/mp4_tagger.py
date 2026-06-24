@@ -1702,6 +1702,12 @@ class MetaBox(MP4FullBox, FinalMP4Box):
         return str(self)
 
 
+class AppleItunesFormatError(RuntimeError):
+
+    def __init__(self, msg: str) -> None:
+        super().__init__(msg)
+
+
 @final
 @decorate_class(slots=True)
 class AppleItunesItemList(MP4Box, FinalMP4Box):
@@ -1802,7 +1808,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         match type_indicator:
             case AppleItunesItemDataType.IMPLICIT | AppleItunesItemDataType.RESERVED:
                 msg = "No implicit type allowed here!"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
             case AppleItunesItemDataType.UTF8:
                 return value.decode("utf-8")
             case AppleItunesItemDataType.UTF16:
@@ -1815,22 +1821,21 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
             ):
                 if len(value) not in [1, 2, 4, 8]:
                     msg = f"Invalid integer conversion length: {len(value)}"
-                    raise RuntimeError(msg)
+                    raise AppleItunesFormatError(msg)
 
                 return int.from_bytes(value, byteorder="big", signed=True)
             case AppleItunesItemDataType.BE_UNSIGNED_INTEGER_VAR:
                 if len(value) not in [1, 2, 4, 8]:
                     msg = f"Invalid integer conversion length: {len(value)}"
-                    raise RuntimeError(msg)
+                    raise AppleItunesFormatError(msg)
 
                 return int.from_bytes(value, byteorder="big", signed=False)
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
     @staticmethod
     def __decode_value(
-        typ: ISOMAtomName,
         type_indicator: int,
         value: bytes,
         expected_type: Optional[AppleItunesItemDataType],
@@ -1839,9 +1844,9 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
             if expected_type is None:
                 msg = _(
-                    "No implicit type known for value: {value!r}of type {type}"  # noqa: COM812
-                ).format(value=value, type=typ)
-                raise RuntimeError(msg)
+                    "No implicit type known for value: {value!r}"  # noqa: COM812
+                ).format(value=value)
+                raise AppleItunesFormatError(msg)
 
             return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
 
@@ -1939,7 +1944,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
                 return Err(f"Can't encode value of type {type(value)} as int")
             case _:
                 msg = f"Not implemented type_indicator conversion: {type_indicator}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
     @staticmethod
     def __encode_value(
@@ -1952,7 +1957,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         )
         if encoded.err():
             msg = f"Encoding error: {encoded.as_err()}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return encoded.as_ok()
 
@@ -2014,7 +2019,6 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
             value_raw = f.read(value_size)
 
             value = AppleItunesItemDataBox.__decode_value(
-                parent.type,
                 type_indicator,
                 value_raw,
                 expected_type,
@@ -2024,7 +2028,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
             if parent.span.payload_span.size != 0:
                 msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             return AppleItunesItemDataBox(
                 parent,
@@ -2053,7 +2057,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != DATA_ATOM_NAME:
             msg = f"Invalid AppleItunesItemDataBox tag: {box.type}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return AppleItunesItemDataBox.__read_impl(
             box.payload_io(io),
@@ -2093,7 +2097,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
             msg = (
                 f"Implementation error: first byet not 0: {type_indicator_bytes_raw[0]}"
             )
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         type_indicator_bytes = type_indicator_bytes_raw[1:4]
 
@@ -2162,7 +2166,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
 
             if parent.version != 0:
                 msg = f"Invalid AppleItunesItemMeanBox version: {parent.version}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             data = f.read(parent.span.payload_span.size)
 
@@ -2172,7 +2176,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
 
             if parent.span.payload_span.size != 0:
                 msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             return AppleItunesItemMeanBox(parent, value)
 
@@ -2190,7 +2194,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
         box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != MEAN_ATOM_NAME:
             msg = f"Invalid AppleItunesItemMeanBox tag: {box.type}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return AppleItunesItemMeanBox.__read_impl(box.payload_io(io), box)
 
@@ -2263,7 +2267,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
 
             if parent.version != 0:
                 msg = f"Invalid AppleItunesItemNameBox version: {parent.version}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             data = f.read(parent.span.payload_span.size)
 
@@ -2273,7 +2277,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
 
             if parent.span.payload_span.size != 0:
                 msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             return AppleItunesItemNameBox(parent, value)
 
@@ -2291,7 +2295,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
         box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != NAME_ATOM_NAME:
             msg = f"Invalid AppleItunesItemNameBox tag: {box.type}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return AppleItunesItemNameBox.__read_impl(box.payload_io(io), box)
 
@@ -2365,7 +2369,7 @@ class AppleItunesItemBox(MP4Box, FinalMP4Box):
 
         if parent.span.payload_span.size != 0:
             msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return AppleItunesItemBox(parent, data)
 
@@ -2468,7 +2472,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
 
         if parent.span.payload_span.size != 0:
             msg = f"AppleItunesItemBox isn't fully filled by the data box: {parent.span.payload_span.size} leftover data"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return AppleItunesItemFreeformBox(parent, mean, name, data)
 
@@ -2550,7 +2554,7 @@ class ApplItunesTags:
         encode_res = AppleItunesItemDataBox.can_encode_value(data.type, data.value)
         if encode_res is not None:
             msg = f"Atom {key} not encodable: {encode_res}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return ApplItunesTags(key=key, data=data)
 
@@ -2562,7 +2566,7 @@ class ApplItunesTags:
         data_type = AppleItunesItemBoxAtoms.get(name, None)  # noqa: SIM910
         if data_type is None:
             msg = f"Atom name not known: {name}"
-            raise RuntimeError(msg)
+            raise AppleItunesFormatError(msg)
 
         return ApplItunesTags.validate_init(
             key=name,
@@ -2600,7 +2604,7 @@ class AppleItunesMetaBoxBuilder:
         if self.__tags.get(key, None) is not None:
             if duplicate_behavior == "error":
                 msg = f"Trying to add duplicate tag key: {key}"
-                raise RuntimeError(msg)
+                raise AppleItunesFormatError(msg)
 
             if duplicate_behavior == "overwrite":
                 self.__tags[key] = tag
