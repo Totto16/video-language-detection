@@ -288,19 +288,19 @@ class NonFinalMP4Box:
                     raise TypeError(msg)
 
 
-class Mp4DecodeType(Enum):
+class MP4DecodeType(Enum):
     Check = "check"
     Normal = "normal"
 
 
 @dataclass(slots=True, repr=True)
-class Mp4DecodeOptions:
+class MP4DecodeOptions:
     strict: bool
-    type: Mp4DecodeType
+    type: MP4DecodeType
 
     @staticmethod
-    def default() -> "Mp4DecodeOptions":
-        return Mp4DecodeOptions(strict=True, type=Mp4DecodeType.Normal)
+    def default() -> "MP4DecodeOptions":
+        return MP4DecodeOptions(strict=True, type=MP4DecodeType.Normal)
 
 
 # ruff: disable[ERA001]
@@ -1333,7 +1333,7 @@ class TrackBox(MP4Box, FinalMP4Box):
     def __read_impl(
         io: BoundedIO,
         parent: MP4Box,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "TrackBox":
         # spec: ISO/IEC 14496-12
         # ISO track box structure:
@@ -1379,7 +1379,7 @@ class TrackBox(MP4Box, FinalMP4Box):
     @staticmethod
     def read(
         io: BoundedIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "TrackBox":
         box = MP4Box.read_mp4_box(io)
         return TrackBox.__read_impl(box.payload_io(io), box, options)
@@ -1388,7 +1388,7 @@ class TrackBox(MP4Box, FinalMP4Box):
     def read_from_parent(
         io: BoundedIO,
         parent: MP4Box,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "TrackBox":
         return TrackBox.__read_impl(io, parent, options)
 
@@ -1889,14 +1889,14 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         type_indicator: int,
         value: bytes,
         expected_type: Optional[AppleItunesItemDataType],
-        decode_options: Mp4DecodeOptions,
+        decode_options: MP4DecodeOptions,
     ) -> AppleItunesItemDataContent:
 
         if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
             if expected_type is None:
                 if (
                     not decode_options.strict
-                    and decode_options.type != Mp4DecodeType.Check
+                    and decode_options.type != MP4DecodeType.Check
                 ):
                     return AppleItunesItemDataBox.__decode_value_impl(
                         AppleItunesItemDataType.UTF8,
@@ -2038,7 +2038,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         io: BoundedIO,
         parent: MP4FullBox,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemDataBox":
         # spec: https://developer.apple.com/documentation/quicktime-file-format/data_atom
         # Apple Itunes Item Data Box structure:
@@ -2103,7 +2103,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
     def read(
         io: BoundedIO,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemDataBox":
         box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         return AppleItunesItemDataBox.__read_impl(
@@ -2117,7 +2117,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
     def read_checked(
         io: BoundedIO,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemDataBox":
         box: MP4FullBox = MP4FullBox.read_mp4_full_box(io)
         if box.type != DATA_ATOM_NAME:
@@ -2136,7 +2136,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
         io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemDataBox":
         box: MP4FullBox
         if isinstance(parent, MP4FullBox):
@@ -2418,7 +2418,7 @@ class AppleItunesItemBox(MP4Box, FinalMP4Box):
         io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemBox":
         # spec: https://developer.apple.com/documentation/quicktime-file-format/value_atom
         # Apple Itunes Item Box structure:
@@ -2447,7 +2447,7 @@ class AppleItunesItemBox(MP4Box, FinalMP4Box):
     def read(
         io: BoundedIO,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemBox":
         box = MP4Box.read_mp4_box(io)
         return AppleItunesItemBox.__read_impl(
@@ -2462,7 +2462,7 @@ class AppleItunesItemBox(MP4Box, FinalMP4Box):
         io: BoundedIO,
         parent: MP4Box,
         expected_type: Optional[AppleItunesItemDataType],
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemBox":
         return AppleItunesItemBox.__read_impl(
             io,
@@ -2523,7 +2523,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
     def __read_impl(
         io: BoundedIO,
         parent: MP4Box,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemFreeformBox":
         # spec: N/A
         # Apple Itunes Item Freeform Box structure:
@@ -2559,7 +2559,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
     @staticmethod
     def read(
         io: BoundedIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemFreeformBox":
         box = MP4Box.read_mp4_box(io)
         return AppleItunesItemFreeformBox.__read_impl(
@@ -2572,7 +2572,7 @@ class AppleItunesItemFreeformBox(MP4Box, FinalMP4Box):
     def read_from_parent(
         io: BoundedIO,
         parent: MP4Box,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "AppleItunesItemFreeformBox":
         return AppleItunesItemFreeformBox.__read_impl(io, parent, options)
 
@@ -2820,7 +2820,7 @@ class SupportedBoxes:
 
 def read_box(
     io: BoundedIO,
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> MP4Box:
     box = MP4Box.read_mp4_box(io)
 
@@ -2868,7 +2868,7 @@ def read_box(
 def mp4_iter_boxes(
     io_base: BinaryIO,
     span: SimpleSpan,
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> Generator[MP4Box]:
     pos = span.start
 
@@ -2886,7 +2886,7 @@ def mp4_iter_boxes(
 
 def mp4_iter_boxes_io(
     io: BoundedIO,
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> Generator[MP4Box]:
     pos = io.span.start
     end = io.span.end
@@ -2906,7 +2906,7 @@ def mp4_iter_boxes_io(
 def find_mdhd_boxes_with_type(
     f: BinaryIO,
     types: list[ISOMAtomName],
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> Generator[MediaHeaderBox]:
     f.seek(0, 2)
     filesize = f.tell()
@@ -2950,7 +2950,7 @@ def find_mdhd_boxes_with_type(
 
 def is_mp4_file(
     f: BinaryIO,
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> Optional[str]:
     f.seek(0)
 
@@ -3175,7 +3175,7 @@ class MP4MetadataHandler:
         self: Self,
         box: MetaBox,
         f: BinaryIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> ReadMetadataImpl:
         metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
 
@@ -3330,7 +3330,7 @@ class MP4MetadataHandler:
     def read_metadata(
         self: Self,
         f: BinaryIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> ReadMetadataImpl:
         custom_boxes: list[JsonExtensionBox | UUIDExtensionBox] = []
         meta_box: Optional[MetaBox] = None
@@ -3375,7 +3375,7 @@ class MP4MetadataHandler:
     def __read_meta_box_info(
         meta_box: MetaBox,
         f: BinaryIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> ReadMetaBoxValues:
         meta_child_boxes = list(
             mp4_iter_boxes(f, meta_box.span.payload_span, options),
@@ -3429,7 +3429,7 @@ class MP4MetadataHandler:
     @staticmethod
     def get_metadata_handler(  # noqa: PLR0915
         f: BinaryIO,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> "MP4MetadataHandler":
 
         uuid_box: Optional[UUIDExtensionBox] = None
@@ -3579,7 +3579,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         )
         bar.update(0, force=True)
 
-        options = Mp4DecodeOptions.default()
+        options = MP4DecodeOptions.default()
 
         try:
             mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
@@ -3623,7 +3623,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
         )
         bar.update(0, force=True)
 
-        options = Mp4DecodeOptions.default()
+        options = MP4DecodeOptions.default()
 
         try:
             self.__writer.seek(0)
@@ -3671,7 +3671,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
 
             return value
 
-        options = Mp4DecodeOptions.default()
+        options = MP4DecodeOptions.default()
 
         mp4_metadata_handler = MP4MetadataHandler.get_metadata_handler(
             f=self.__writer,
@@ -3728,8 +3728,8 @@ class VideoTaggerMP4(VideoTagger):
     @staticmethod
     def get_handle(file: Path) -> Result["VideoTagger", str]:
 
-        options: Mp4DecodeOptions = Mp4DecodeOptions(
-            strict=False, type=Mp4DecodeType.Check
+        options: MP4DecodeOptions = MP4DecodeOptions(
+            strict=False, type=MP4DecodeType.Check,
         )
 
         try:
@@ -3829,7 +3829,7 @@ class VideoTaggerMP4(VideoTagger):
 
             printer.element(element, depth)
 
-        options: Mp4DecodeOptions = Mp4DecodeOptions.default()
+        options: MP4DecodeOptions = MP4DecodeOptions.default()
 
         with self.file.open(mode="rb") as f:
 

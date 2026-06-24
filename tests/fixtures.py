@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 import pytest
 import requests
 
-from content.tagger.mp4_tagger import Mp4DecodeOptions
+from content.tagger.mp4_tagger import MP4DecodeOptions
 from helper.decorator import decorate_class
 
 
@@ -252,8 +252,8 @@ def mp4_test_parse_files(
 
 
 @pytest.fixture(scope="package")
-def mp4_options() -> Mp4DecodeOptions:
-    return Mp4DecodeOptions.default()
+def mp4_options() -> MP4DecodeOptions:
+    return MP4DecodeOptions.default()
 
 
 @pytest.fixture(scope="package")

@@ -46,7 +46,7 @@ from content.tagger.mp4_tagger import (
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
-    Mp4DecodeOptions,
+    MP4DecodeOptions,
     VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
@@ -358,7 +358,7 @@ class RecursiveBoxes:
 
 def list_all_boxes_recursively(
     f: BinaryIO,
-    options: Mp4DecodeOptions,
+    options: MP4DecodeOptions,
 ) -> RecursiveBoxes:
     f.seek(0, 2)
     filesize = f.tell()
@@ -391,7 +391,7 @@ class MP4BoxStructure(FancyEq):
     @staticmethod
     def from_file(
         file: Path,
-        options: Mp4DecodeOptions,
+        options: MP4DecodeOptions,
     ) -> Result["MP4BoxStructure", str]:
         try:
             with file.open("rb") as f:
@@ -476,7 +476,7 @@ class MP4BoxStructure(FancyEq):
 def test_mp4_tagger_parsing(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
-    mp4_options: Mp4DecodeOptions,
+    mp4_options: MP4DecodeOptions,
 ) -> None:
 
     structure1 = MP4BoxStructure(
@@ -670,7 +670,7 @@ def test_mp4_tagger_parsing(
 
 def test_mp4_invalid_bytes(
     subtests: SubTests,
-    mp4_options: Mp4DecodeOptions,
+    mp4_options: MP4DecodeOptions,
 ) -> None:
 
     test_data: list[tuple[bytes, str]] = [
@@ -704,7 +704,7 @@ def test_mp4_invalid_bytes(
 def test_mp4_tagger_language_patching(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
-    mp4_options: Mp4DecodeOptions,
+    mp4_options: MP4DecodeOptions,
 ) -> None:
 
     test_files: list[tuple[Path, Language, Language]] = list(
@@ -758,7 +758,7 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
 
-def mp4_has_already_udta_box(file: Path, options: Mp4DecodeOptions) -> bool:
+def mp4_has_already_udta_box(file: Path, options: MP4DecodeOptions) -> bool:
     structure_res = MP4BoxStructure.from_file(file, options)
 
     assert structure_res == OkResult(), "structure not parsed correctly"
@@ -800,7 +800,7 @@ def get_raw_ffprobe_tags(
 def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
-    mp4_options: Mp4DecodeOptions,
+    mp4_options: MP4DecodeOptions,
     test_manager: ManagerInterface,
 ) -> None:
 
@@ -1190,7 +1190,7 @@ def test_mp4_tagger_metadata_tags_custom(
 def test_mp4_metadata_tags_apple_custom(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
-    mp4_options: Mp4DecodeOptions,
+    mp4_options: MP4DecodeOptions,
     test_manager: ManagerInterface,
 ) -> None:
 
