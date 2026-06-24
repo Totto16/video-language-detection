@@ -50,12 +50,6 @@ logger: Logger = get_logger()
 _ = get_translator()
 
 
-# see below on why this hacks is needed
-needs_migration_for_video_metadata: bool = os.getenv(
-    "VIDEO_LANG_DETECT_MIGRATION_FOR_VIDEO_METADATA",
-) in ["1", "true", "TRUE"]
-
-
 global_counter_wip = 1
 
 
@@ -313,7 +307,9 @@ class EpisodeContent(Content):
             analyze_vide_metadata,
         ]
 
-        characteristic: ContentCharacteristic = ContentCharacteristic(self.type, self.scanned_file.type)
+        characteristic: ContentCharacteristic = ContentCharacteristic(
+            self.type, self.scanned_file.type
+        )
 
         callback.process_workload(
             callback_workload,
@@ -336,37 +332,13 @@ class EpisodeContent(Content):
 
         current_handles = self.__get_handles(handles)
 
-        characteristic: ContentCharacteristic = ContentCharacteristic(self.type, self.scanned_file.type)
+        characteristic: ContentCharacteristic = ContentCharacteristic(
+            self.type, self.scanned_file.type
+        )
 
         if rescan:
             is_outdated: bool = self.scanned_file.is_outdated(manager)
             if not is_outdated:
-
-                # note: this is needed, as video and track metadata is only written on new files, to migrate older files, it is ugly, but it is like this unfortunately
-                if needs_migration_for_video_metadata:
-
-                    def update_video_metadata_migration() -> None:
-                        self.update_video_metadata(
-                            manager,
-                            callback,
-                            error_mode,
-                            only_update_file=False,
-                        )
-
-                    def generate_checksum_migration() -> None:
-                        self.generate_checksum_if_needed(manager)
-
-                    callback_workload_migration: list[CallbackWorkload] = [
-                        update_video_metadata_migration,
-                        generate_checksum_migration,
-                    ]
-
-                    callback.process_workload(
-                        callback_workload_migration,
-                        self.scanned_file.path.name,
-                        self.scanned_file.parents,
-                        characteristic,
-                    )
 
                 if Language.is_default_value(self.__language) or self._metadata is None:
 
