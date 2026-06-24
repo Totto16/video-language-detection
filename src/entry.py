@@ -497,7 +497,7 @@ def parse_args() -> AllParsedNameSpaces:  # noqa: PLR0915
         InspectOutputFormat.Json,
         InspectOutputFormat.Normal,
     ]
-    output_format_default: InspectOutputFormat = InspectOutputFormat.Json
+    output_format_default: InspectOutputFormat = InspectOutputFormat.Normal
     tagger_inspect_parser.add_argument(
         "-o",
         "--output",
