@@ -2026,7 +2026,20 @@ class VideoTaggerAVI(VideoTagger):
         print_fn: Callable[[str, int], None],
     ) -> Optional[InspectNotImplemented]:
 
+        def is_data_chunk(chunk: AVIChunk) -> bool:
+            fourcc = chunk.fourcc
+
+            data_type = fourcc.value[2:4]
+
+            if data_type not in [b"dc", b"wb", "tx"]:
+                return False
+
+            return all(bytes([c]).isdigit() for c in fourcc.value[0:2])
+
         def print_chunk(chunk: AVIChunk, *, depth: int) -> None:
+            if is_data_chunk(chunk):
+                return
+
             print_fn(f"{chunk.fourcc}:", depth)
 
         with self.file.open(mode="rb") as f:
