@@ -195,6 +195,29 @@ class InspectElement:
 
 
 @decorate_class(slots=True)
+class InspectPrinter(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def element(
+        self: Self,
+        element: InspectElement,
+        depth: int,
+    ) -> None: ...
+
+    @abstractmethod
+    def start(
+        self: Self,
+    ) -> None: ...
+
+    @abstractmethod
+    def end(
+        self: Self,
+    ) -> None: ...
+
+
+@decorate_class(slots=True)
 class VideoTagger(ABC):
     __file: Path
 
@@ -227,7 +250,7 @@ class VideoTagger(ABC):
     @abstractmethod
     def inspect(
         self: Self,
-        print_fn: Callable[[InspectElement, int], None],
+        printer: InspectPrinter,
     ) -> Optional[InspectNotImplemented]: ...
 
 
@@ -553,7 +576,7 @@ class VideoTaggerMultiple(VideoTagger):
     @override
     def inspect(
         self: Self,
-        print_fn: Callable[[InspectElement, int], None],
+        printer: InspectPrinter,
     ) -> Optional[InspectNotImplemented]:
         return InspectNotImplemented()
 

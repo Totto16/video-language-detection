@@ -5,6 +5,7 @@ import argparse
 import atexit
 import json
 import sys
+from enum import Enum
 from logging import Logger
 from pathlib import Path
 from typing import (
@@ -12,15 +13,18 @@ from typing import (
     Literal,
     Never,
     Optional,
+    Self,
     assert_never,
     assert_type,
     cast,
+    override,
 )
 
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
     InspectElement,
     InspectNotImplemented,
+    InspectPrinter,
     InspectPriority,
     SerializableDict,
     SerializableDictValue,
@@ -107,10 +111,31 @@ class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     language: Optional[ShortLanguageStrWrapper]
 
 
+class InspectOutputFormat(Enum):
+    Json = "json"
+    Normal = "normal"
+
+    @staticmethod
+    def from_str(inp: str) -> Optional["InspectOutputFormat"]:
+        for level in InspectOutputFormat:
+            if str(level).lower() == inp.lower():
+                return level
+
+        return None
+
+    def __str__(self: Self) -> str:
+        return str(self.name).lower()
+
+    def __repr__(self: Self) -> str:
+        return self.__str__()
+
+
 @decorate_class(slots=False, allow_defaults=False)
 class TaggerInspectCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     tag_action: Literal["inspect"]
     file: Path
+
+    output_format: InspectOutputFormat
 
 
 AllTaggerCommandParsedArgNamespace = (
@@ -196,7 +221,7 @@ def parse_short_language(arg: str) -> ShortLanguageStrWrapper:
     return ShortLanguageStr.from_str_unsafe(arg)
 
 
-def parse_args() -> AllParsedNameSpaces:
+def parse_args() -> AllParsedNameSpaces:  # noqa: PLR0915
 
     def help_cb() -> Never:
         raise SystemExit(0)
@@ -466,6 +491,22 @@ def parse_args() -> AllParsedNameSpaces:
         required=True,
         type=Path,
         help=_("The file to inspect"),
+    )
+
+    output_format_choices: list[InspectOutputFormat] = [
+        InspectOutputFormat.Json,
+        InspectOutputFormat.Normal,
+    ]
+    output_format_default: InspectOutputFormat = InspectOutputFormat.Json
+    tagger_inspect_parser.add_argument(
+        "-o",
+        "--output",
+        choices=output_format_choices,
+        default=output_format_default,
+        dest="output_format",
+        type=lambda s: InspectOutputFormat.from_str(s)
+        or cast(InspectOutputFormat, s.lower()),
+        help=_("The output format to use"),
     )
 
     ffmpeg_parser = subparsers.add_parser(
@@ -887,17 +928,17 @@ def subcommand_tagger_write(  # noqa: PLR0915
 
 def subcommand_tagger_inspect(
     logger: Logger,
-    file: Path,
+    args: TaggerInspectCommandParsedArgNamespace,
 ) -> ExitCode:
     from content.tagger.tagger import get_tagger_for_file
 
-    handle_result = get_tagger_for_file(file)
+    handle_result = get_tagger_for_file(args.file)
     if handle_result.err():
         logger.error(
             _(
                 "Can't inspect file '{file}': Opening a handle failed: {reason}"  # noqa: COM812
             ).format(
-                file=file,
+                file=args.file,
                 reason=handle_result.as_err(),
             ),
         )
@@ -905,22 +946,89 @@ def subcommand_tagger_inspect(
 
     handle = handle_result.as_ok()
 
-    logger.info(_("Inspect file: {file}").format(file=file.absolute()))
+    if args.output_format == InspectOutputFormat.Normal:
+        logger.info(_("Inspect file: {file}").format(file=args.file.absolute()))
 
-    def print_fn(element: InspectElement, depth: int) -> None:
-        if element.priority == InspectPriority.Ignore:
-            return
+    @decorate_class(slots=True)
+    class NormalPrinter(InspectPrinter):
 
-        print(f"{" " * depth}{element.name}")  # noqa: T201
+        def __init__(self: Self) -> None:
+            super().__init__()
 
-    inspect_res = handle.inspect(print_fn)
+        @override
+        def element(self: Self, element: InspectElement, depth: int) -> None:
+
+            if element.priority == InspectPriority.Ignore:
+                return
+
+            print(f"{" " * depth}{element.name}")  # noqa: T201
+
+        @override
+        def start(
+            self: Self,
+        ) -> None:
+            pass
+
+        @override
+        def end(
+            self: Self,
+        ) -> None:
+            pass
+
+    @decorate_class(slots=True)
+    class JsonPrinter(InspectPrinter):
+        __pos: int
+
+        def __init__(self: Self) -> None:
+            super().__init__()
+
+            self.__pos = 0
+
+        @override
+        def element(self: Self, element: InspectElement, depth: int) -> None:
+
+            entry: dict[str, str | int] = {
+                "depth": depth,
+                "name": element.name,
+                "priority": element.priority.value,
+            }
+
+            if self.__pos != 0:
+                print(",")  # noqa: T201
+
+            print(json.dumps(entry), end="")  # noqa: T201
+
+            self.__pos = self.__pos + 1
+
+        @override
+        def start(
+            self: Self,
+        ) -> None:
+            print("[")  # noqa: T201
+
+        @override
+        def end(
+            self: Self,
+        ) -> None:
+            print("]")  # noqa: T201
+
+    printer: InspectPrinter
+    match args.output_format:
+        case InspectOutputFormat.Normal:
+            printer = NormalPrinter()
+        case InspectOutputFormat.Json:
+            printer = JsonPrinter()
+        case _:
+            assert_never(args.output_format)
+
+    inspect_res = handle.inspect(printer)
 
     if isinstance(inspect_res, InspectNotImplemented):
         logger.error(
             _(
                 "Can't inspect file '{file}': Inspection not supported"  # noqa: COM812
             ).format(
-                file=file,
+                file=args.file,
             ),
         )
         return 1
@@ -945,7 +1053,7 @@ def subcommand_tagger(
         return subcommand_tagger_write(logger, args.file, args)
 
     if args.tag_action == "inspect":
-        return subcommand_tagger_inspect(logger, args.file)
+        return subcommand_tagger_inspect(logger, args)
 
     assert_never(args.tag_action)
 

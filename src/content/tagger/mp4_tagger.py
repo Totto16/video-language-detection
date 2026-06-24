@@ -40,6 +40,7 @@ from content.tagger.video_tagger import (
     ContextType,
     InspectElement,
     InspectNotImplemented,
+    InspectPrinter,
     InspectPriority,
     MetadataTags,
     MetadataTagsRead,
@@ -3698,7 +3699,7 @@ class VideoTaggerMP4(VideoTagger):
     @override
     def inspect(
         self: Self,
-        print_fn: Callable[[InspectElement, int], None],
+        printer: InspectPrinter,
     ) -> Optional[InspectNotImplemented]:
 
         def print_box(box: MP4Box, *, depth: int) -> None:
@@ -3713,7 +3714,7 @@ class VideoTaggerMP4(VideoTagger):
 
             element = InspectElement(name, priority)
 
-            print_fn(element, depth)
+            printer.element(element, depth)
 
         with self.file.open(mode="rb") as f:
 
@@ -3731,6 +3732,8 @@ class VideoTaggerMP4(VideoTagger):
             f.seek(0, 2)
             filesize = f.tell()
 
+            printer.start()
             iterate_boxes_recursive(SimpleSpan(0, filesize), depth=0)
+            printer.end()
 
         return None
