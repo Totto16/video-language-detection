@@ -4,6 +4,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
+import os
 from pathlib import Path
 from typing import (
     Any,
@@ -1779,6 +1780,12 @@ class AppleItunesItemDataType(Enum):
     BE_UNSIGNED_INTEGER_VAR = 22
 
 
+# see below on why this hacks is needed
+apple_allow_implict_freeform_to_resolved: bool = os.getenv(
+    "VIDEO_LANG_DETECT_APPLE_FREE_FORM_ALLOW_IMPLICT_VALUES",
+) in ["1", "true", "TRUE"]
+
+
 @final
 @decorate_class(slots=True)
 class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
@@ -1843,10 +1850,16 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
         if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
             if expected_type is None:
-                msg = _(
-                    "No implicit type known for value: {value!r}"  # noqa: COM812
-                ).format(value=value)
-                raise AppleItunesFormatError(msg)
+                if not apple_allow_implict_freeform_to_resolved:
+                    msg = _(
+                        "No implicit type known for value: {value!r}"  # noqa: COM812
+                    ).format(value=value)
+                    raise AppleItunesFormatError(msg)
+
+                return AppleItunesItemDataBox.__decode_value_impl(
+                    AppleItunesItemDataType.UTF8,
+                    value,
+                )
 
             return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
 
