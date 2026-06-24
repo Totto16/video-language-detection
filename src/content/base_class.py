@@ -45,6 +45,7 @@ _ = get_translator()
 
 type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
 
+
 @decorate_class(slots=True)
 class SummaryResult(ABC):
     __file: ScannedFile
@@ -80,6 +81,7 @@ type ScanSummary = dict[bool, int]
 class ScanSummaryDetailed:
     success: dict[Language, int]
     failure: dict[str, int]
+
 
 @decorate_class(slots=True)
 class SuccessSummaryManager:
@@ -124,6 +126,7 @@ class FailReason(Enum):
     exception = " exception"
     scan_failure = "scan_failure"
 
+
 @decorate_class(slots=True)
 class FailedFor(SummaryResult):
     __reason: FailReason
@@ -148,6 +151,7 @@ class FailedFor(SummaryResult):
     @property
     def reason(self: Self) -> FailReason:
         return self.__reason
+
 
 @decorate_class(slots=True)
 class FailedForWithLanguage(FailedFor):
@@ -187,6 +191,7 @@ class FailedForWithLanguage(FailedFor):
     def best(self: Self) -> Optional[PredictionBest]:
         return self.__best
 
+
 @decorate_class(slots=True)
 class SuccessFor(SummaryResult):
     __best: PredictionBest
@@ -211,6 +216,7 @@ class SuccessFor(SummaryResult):
     @property
     def best(self: Self) -> PredictionBest:
         return self.__best
+
 
 @decorate_class(slots=True)
 class LanguageScanner:
@@ -284,6 +290,7 @@ class LanguageScanner:
     @property
     def summary_manager(self: Self) -> SuccessSummaryManager:
         return self.__summary_manager
+
 
 @decorate_class(slots=True)
 class Scanner(ABC):
@@ -449,7 +456,7 @@ def process_folder(
                 result.type if result is not None else None,
                 ScannedFileType.from_path(file_path),
             )
-            callback.progress(directory.name, parent_folders, value)
+            callback.progress(directory.name, parent_folders, value, amount=1)
             if result is not None:
                 results.append(result)
 
@@ -484,7 +491,7 @@ def process_folder(
             ScannedFileType.from_path(file_path),
         )
 
-        callback.progress(directory.name, parent_folders, value)
+        callback.progress(directory.name, parent_folders, value, amount=1)
         if result is not None and is_rescan is None:
             rescan.append(result)
 

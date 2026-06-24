@@ -206,13 +206,11 @@ class EpisodeContent(Content):
 
         # NOTE: the uuid should be only written once, and not be overwritten on the next write, so that it is unique and doesn't change per write, so that files can be identifiers
 
-        tags = MetadataTags(
+        return MetadataTags(
             comment=comment,
             uuid=uuid4(),
             metadata=metadata,
         )
-
-        return tags
 
     def update_video_metadata(
         self: Self,

@@ -137,6 +137,7 @@ def launch_tui(
         Validator.validate_multiple(
             validators,
             contents,
+            config.parser.root_folder,
             manager=manager,
         )
 

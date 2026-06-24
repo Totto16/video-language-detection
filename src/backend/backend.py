@@ -1614,6 +1614,7 @@ class BackendScanner:
             Validator.validate_multiple(
                 validators,
                 contents,
+                config.parser.root_folder,
                 manager=manager,
             )
 

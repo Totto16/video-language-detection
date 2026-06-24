@@ -19,7 +19,6 @@ from content.metadata.metadata import (
 )
 from content.shared import ScanType
 from helper.apischema import OneOf
-from helper.decorator import decorate_class
 from helper.log import get_logger
 from helper.translation import get_translator
 
@@ -162,6 +161,7 @@ MetadataData = Annotated[
 class TMDBMetadataSchema:
     data: MetadataData
     provider: Literal["tmdb"]
+
 
 class TMDBProvider(Provider):
     __client: TMDb

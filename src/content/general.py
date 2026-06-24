@@ -354,7 +354,7 @@ class Callback[C, CT, RT](ABC):
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
         *,
-        amount: int = 1,  # noqa: ARG002
+        amount: int,  # noqa: ARG002
     ) -> None:
         return None
 
@@ -400,6 +400,7 @@ class Callback[C, CT, RT](ABC):
                 name=name,
                 parent_folders=parent_folders,
                 characteristic=characteristic,
+                amount=1,
             )
 
         self.finish(

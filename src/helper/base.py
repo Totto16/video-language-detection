@@ -299,13 +299,85 @@ def app_status_bar_manager(
 
 
 @decorate_class(slots=True)
+class StatusBarManager:
+    __progress_bars: dict[str, CounterInterface]
+    __manager: ManagerInterface
+
+    def __init__(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> None:
+        super().__init__()
+
+        self.__manager = manager
+        self.__progress_bars = {}
+
+    @property
+    def manager(self: Self) -> ManagerInterface:
+        return self.__manager
+
+    def start(
+        self: Self,
+        amount: StartAmount,
+        name: str,
+        content_type: Optional[ContentType],
+    ) -> None:
+        value: tuple[str, str]
+
+        match content_type:
+            case ContentType.collection:
+                value = ("blue", _("series"))
+            case ContentType.series:
+                value = ("cyan", _("seasons"))
+            case ContentType.season:
+                value = ("green", _("episodes"))
+            case ContentType.episode:
+                value = ("yellow", _("tasks"))
+            case _:
+                value = ("purple", _("folders"))
+
+        color, unit = value
+
+        self.__progress_bars[name] = self.__manager.counter(
+            total=amount.processing,
+            desc=name,
+            unit=unit,
+            leave=False,
+            color=color,
+        )
+        self.__progress_bars[name].update(0, force=True)
+
+    def progress(
+        self: Self,
+        name: str,
+        *,
+        amount: int,
+    ) -> None:
+        if self.__progress_bars.get(name) is None:
+            msg = _("No Progressbar, on progress callback")
+            raise RuntimeError(msg)
+
+        self.__progress_bars[name].update(amount)
+
+    def finish(
+        self: Self,
+        name: str,
+    ) -> None:
+        if self.__progress_bars.get(name) is None:
+            msg = _("No Progressbar, on progress finish")
+            raise RuntimeError(msg)
+
+        self.__progress_bars[name].close(clear=True)
+        del self.__progress_bars[name]
+
+
+@decorate_class(slots=True)
 class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     __options: ContentOptions
     __name_parser: NameParser
     __scanner: Scanner
-    __progress_bars: dict[str, CounterInterface]
+    __status_bar_manager: StatusBarManager
 
-    __manager: ManagerInterface
     __language_picker: LanguagePicker
     __error_mode: ErrorMode
 
@@ -323,9 +395,8 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
         self.__options = options
         self.__name_parser = name_parser
         self.__scanner = scanner
-        self.__progress_bars = {}
 
-        self.__manager = manager
+        self.__status_bar_manager = StatusBarManager(manager)
 
         self.__language_picker = language_picker
         self.__error_mode = error_mode
@@ -333,7 +404,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     @override
     def get_saved(self: Self) -> CallbackData:
         return CallbackData(
-            manager=self.__manager,
+            manager=self.__status_bar_manager.manager,
             scanner=self.__scanner,
             language_picker=self.__language_picker,
             error_mode=self.__error_mode,
@@ -370,30 +441,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
     ) -> None:
         content_type, _i = characteristic
 
-        value: tuple[str, str]
-
-        match content_type:
-            case ContentType.collection:
-                value = ("blue", _("series"))
-            case ContentType.series:
-                value = ("cyan", _("seasons"))
-            case ContentType.season:
-                value = ("green", _("episodes"))
-            case ContentType.episode:
-                value = ("yellow", _("tasks"))
-            case _:
-                value = ("purple", _("folders"))
-
-        color, unit = value
-
-        self.__progress_bars[name] = self.__manager.counter(
-            total=amount.processing,
-            desc=name,
-            unit=unit,
-            leave=False,
-            color=color,
-        )
-        self.__progress_bars[name].update(0, force=True)
+        self.__status_bar_manager.start(amount, name, content_type)
 
     @override
     def progress(
@@ -402,13 +450,9 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
         parent_folders: list[str],
         characteristic: ContentCharacteristic,
         *,
-        amount: int = 1,
+        amount: int,
     ) -> None:
-        if self.__progress_bars.get(name) is None:
-            msg = _("No Progressbar, on progress callback")
-            raise RuntimeError(msg)
-
-        self.__progress_bars[name].update(amount)
+        self.__status_bar_manager.progress(name, amount=amount)
 
     @override
     def finish(
@@ -418,12 +462,7 @@ class ContentCallback(Callback[Content, ContentCharacteristic, CallbackData]):
         deleted: int,
         characteristic: ContentCharacteristic,
     ) -> None:
-        if self.__progress_bars.get(name) is None:
-            msg = _("No Progressbar, on progress finish")
-            raise RuntimeError(msg)
-
-        self.__progress_bars[name].close(clear=True)
-        del self.__progress_bars[name]
+        self.__status_bar_manager.finish(name)
 
     @property
     def name_parser(self: Self) -> NameParser:

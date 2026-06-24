@@ -8,7 +8,6 @@ from logging import Logger
 from pathlib import Path
 from types import TracebackType
 from typing import (
-    TYPE_CHECKING,
     Annotated,
     Any,
     Literal,

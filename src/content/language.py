@@ -24,7 +24,6 @@ from content.iso_codes import (
     valid_iso_639_3_languages_list_partial,
 )
 from helper.apischema import OneOf, use_schema_from
-from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 __all__: list[str] = ["ExactLen", "Language"]

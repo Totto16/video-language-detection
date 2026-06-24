@@ -7,7 +7,6 @@ from apischema import alias, deserializer, schema, serialize, serializer
 from apischema.objects import ObjectField
 
 from helper.apischema import OneOf, define_schema_lazy
-from helper.decorator import decorate_class
 from helper.translation import get_translator
 
 _ = get_translator()
@@ -30,6 +29,7 @@ def make_provider_schema_imdb() -> Sequence[ObjectField]:
     from content.metadata.provider.imdb import IMDBProvider  # noqa: PLC0415
 
     return [v for k, v in IMDBProvider.get_metadata_schema().items()]
+
 
 class HandleImpl(ABC):
     __provider: str
@@ -94,6 +94,7 @@ class TmdbHandleImpl(HandleImpl):
 
 MetadataHandleSchema = Annotated[ImdbHandleImpl | TmdbHandleImpl, OneOf]
 
+
 @schema()
 @dataclass(slots=False, repr=True)
 class MetadataHandle:
@@ -130,6 +131,7 @@ class MetadataHandle:
 
     def __repr__(self: Self) -> str:
         return str(self)
+
 
 class SkipHandle:
     # serialize the same as None

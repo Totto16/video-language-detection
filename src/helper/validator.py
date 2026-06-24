@@ -9,11 +9,17 @@ from typing import Any, NewType, Optional, Self, assert_never, cast, override
 from content.base_class import Content
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
-from content.general import SeasonDescription, SeriesDescription
+from content.general import (
+    ContentType,
+    SeasonDescription,
+    SeriesDescription,
+    StartAmount,
+)
 from content.language import Language
 from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
+from helper.base import StatusBarManager
 from helper.classifier import ModelLanguage
 from helper.decorator import decorate_class
 from helper.filter import (
@@ -133,91 +139,138 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> None:
         self.__reporter.emit_error(self.__name, where, message)
 
-    def __validate_episodes_impl(
+    def __validate_season_impl(
         self: Self,
         series: SeriesDescription,
-        season: SeasonDescription,
-        contents: list[EpisodeContent],
+        season: SeasonContent,
         *,
-        manager: ManagerInterface,
-    ) -> list[ED]:
-        state: list[ED] = [
-            self.validate_episode(
-                content,
-                series=series,
-                season=season,
-                manager=manager,
-            )
-            for content in contents
-        ]
-        return state
+        status_bar_manager: StatusBarManager,
+    ) -> SD:
 
-    def __validate_seasons_impl(
-        self: Self,
-        series: SeriesDescription,
-        contents: list[SeasonContent],
-        *,
-        manager: ManagerInterface,
-    ) -> list[SD]:
-        state: list[SD] = []
+        amount = StartAmount(
+            total=len(season.episodes),
+            processing=len(season.episodes),
+            ignored=0,
+        )
+        name = season.scanned_file.path.name
 
-        for content in contents:
-            local_state = self.__validate_episodes_impl(
+        status_bar_manager.start(
+            amount,
+            name,
+            ContentType.season,
+        )
+
+        state: list[ED] = []
+
+        for episode in season.episodes:
+            local_state = self.validate_episode(
+                episode,
                 series=series,
-                season=content.description,
-                contents=content.episodes,
-                manager=manager,
+                season=season.description,
+                manager=status_bar_manager.manager,
             )
-            state.append(
-                self.validate_season(content, series=series, result=local_state),
-            )
-        return state
+
+            state.append(local_state)
+            status_bar_manager.progress(name, amount=1)
+
+        result = self.validate_season(season, series=series, result=state)
+        status_bar_manager.finish(name)
+
+        return result
 
     def __validate_series_impl(
         self: Self,
-        contents: list[SeriesContent],
+        series: SeriesContent,
         *,
-        manager: ManagerInterface,
-    ) -> list[S2D]:
+        status_bar_manager: StatusBarManager,
+    ) -> S2D:
+        amount = StartAmount(
+            total=len(series.seasons),
+            processing=len(series.seasons),
+            ignored=0,
+        )
+        name = series.scanned_file.path.name
+
+        status_bar_manager.start(amount, name, ContentType.series)
+
+        state: list[SD] = []
+
+        for season in series.seasons:
+            local_state = self.__validate_season_impl(
+                series=series.description,
+                season=season,
+                status_bar_manager=status_bar_manager,
+            )
+            state.append(local_state)
+            status_bar_manager.progress(name, amount=1)
+
+        result = self.validate_series(series, result=state)
+        status_bar_manager.finish(name)
+
+        return result
+
+    def __validate_collection_impl(
+        self: Self,
+        collection: CollectionContent,
+        *,
+        status_bar_manager: StatusBarManager,
+    ) -> CD:
+
+        amount = StartAmount(
+            total=len(collection.series),
+            processing=len(collection.series),
+            ignored=0,
+        )
+        name = collection.scanned_file.path.name
+
+        status_bar_manager.start(
+            amount,
+            name,
+            ContentType.collection,
+        )
+
         state: list[S2D] = []
 
-        for content in contents:
-            local_state = self.__validate_seasons_impl(
-                series=content.description,
-                contents=content.seasons,
-                manager=manager,
+        for serie in collection.series:
+            local_state = self.__validate_series_impl(
+                serie,
+                status_bar_manager=status_bar_manager,
             )
-            state.append(self.validate_series(content, local_state))
+            state.append(local_state)
+            status_bar_manager.progress(name, amount=1)
 
-        return state
+        result = self.validate_collection(collection, result=state)
+        status_bar_manager.finish(name)
+
+        return result
 
     def __validate_root_impl(
         self: Self,
         contents: list[Content],
+        directory: Path,
         *,
-        manager: ManagerInterface,
+        status_bar_manager: StatusBarManager,
     ) -> None:
-        # TODO: use manager
         state: list[S2D | CD] = []
 
         root_content: list[SeriesContent | CollectionContent] = []
 
+        amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
+        status_bar_manager.start(amount, directory.name, None)
+
         for content in contents:
             if isinstance(content, CollectionContent):
-                local_state = self.__validate_series_impl(
-                    content.series,
-                    manager=manager,
+                local_state1 = self.__validate_collection_impl(
+                    content,
+                    status_bar_manager=status_bar_manager,
                 )
-                state.append(self.validate_collection(content, local_state))
+                state.append(local_state1)
             elif isinstance(content, SeriesContent):
-                local_state = self.__validate_series_impl(
-                    [content],
-                    manager=manager,
+                local_state2 = self.__validate_series_impl(
+                    content,
+                    status_bar_manager=status_bar_manager,
                 )
-                if len(local_state) != 1:
-                    msg = "UNREACHABLE"
-                    raise RuntimeError(msg)
-                state.append(local_state[0])
+                state.append(local_state2)
             elif isinstance(content, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
                 raise TypeError(msg)
@@ -229,21 +282,27 @@ class Validator[ED, SD, S2D, CD](ABC):
                 raise TypeError(msg)
 
             root_content.append(content)
+            status_bar_manager.progress(directory.name, amount=1)
 
         self.validate_all(root_content, state)
+        status_bar_manager.finish(directory.name)
 
     def validate(
         self: Self,
         contents: list[Content],
+        directory: Path,
         *,
         manager: ManagerInterface,
     ) -> None:
+        status_bar_manager: StatusBarManager = StatusBarManager(manager)
+
         self.__validate_root_impl(
             contents,
-            manager=manager,
+            directory,
+            status_bar_manager=status_bar_manager,
         )
 
-    # helper for multipel validators to be typed correctly
+    # helper for multiple validators to be typed correctly
     @decorate_class(slots=True)
     class __AnyClass:
         pass
@@ -258,103 +317,169 @@ class Validator[ED, SD, S2D, CD](ABC):
         data: list[S]
 
     @staticmethod
-    def __validate_multiple_episodes_impl(
+    def __validate_multiple_season_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         series: SeriesDescription,
-        season: SeasonDescription,
-        contents: list[EpisodeContent],
+        season: SeasonContent,
         *,
-        manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any1]"]:
-        state: list[Validator.__ValidatorState[Validator.__Any1]] = [
+        status_bar_manager: StatusBarManager,
+    ) -> list["Validator.__Any2"]:
+
+        amount = StartAmount(
+            total=len(season.episodes),
+            processing=len(season.episodes),
+            ignored=0,
+        )
+        name = season.scanned_file.path.name
+
+        status_bar_manager.start(
+            amount,
+            name,
+            ContentType.season,
+        )
+
+        local_states: list[Validator.__ValidatorState[Validator.__Any1]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
 
-        for content in contents:
+        for episode in season.episodes:
             for i, validator in enumerate(validators):
-                state[i].data.append(
+                local_states[i].data.append(
                     validator.validate_episode(
-                        content,
+                        episode,
                         series=series,
-                        season=season,
-                        manager=manager,
+                        season=season.description,
+                        manager=status_bar_manager.manager,
                     ),
                 )
 
-        return state
+            status_bar_manager.progress(name, amount=1)
 
-    @staticmethod
-    def __validate_multiple_seasons_impl(
-        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
-        series: SeriesDescription,
-        contents: list[SeasonContent],
-        *,
-        manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any2]"]:
-        state: list[Validator.__ValidatorState[Validator.__Any2]] = [
-            Validator.__ValidatorState([]) for _ in validators
-        ]
-
-        for content in contents:
-            local_states: list[Validator.__ValidatorState[Validator.__Any1]] = (
-                Validator.__validate_multiple_episodes_impl(
-                    validators,
+        state: list[Validator.__Any2] = []
+        for validator, local_state in zip(
+            validators,
+            local_states,
+            strict=True,
+        ):
+            state.append(
+                validator.validate_season(
+                    season,
                     series=series,
-                    season=content.description,
-                    contents=content.episodes,
-                    manager=manager,
-                )
+                    result=local_state.data,
+                ),
             )
-
-            for i, validator, local_state in zip(
-                range(len(validators)),
-                validators,
-                local_states,
-                strict=True,
-            ):
-                state[i].data.append(
-                    validator.validate_season(
-                        content,
-                        series=series,
-                        result=local_state.data,
-                    ),
-                )
+        status_bar_manager.finish(name)
 
         return state
 
     @staticmethod
     def __validate_multiple_series_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
-        contents: list[SeriesContent],
+        series: SeriesContent,
         *,
-        manager: ManagerInterface,
-    ) -> list["Validator.__ValidatorState[Validator.__Any3]"]:
-        state: list[Validator.__ValidatorState[Validator.__Any3]] = [
+        status_bar_manager: StatusBarManager,
+    ) -> list["Validator.__Any3"]:
+
+        amount = StartAmount(
+            total=len(series.seasons),
+            processing=len(series.seasons),
+            ignored=0,
+        )
+        name = series.scanned_file.path.name
+
+        status_bar_manager.start(
+            amount,
+            name,
+            ContentType.series,
+        )
+
+        local_states: list[Validator.__ValidatorState[Validator.__Any2]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
 
-        for content in contents:
-            local_states: list[Validator.__ValidatorState[Validator.__Any2]] = (
-                Validator.__validate_multiple_seasons_impl(
+        for season in series.seasons:
+            local_state_res: list[Validator.__Any2] = (
+                Validator.__validate_multiple_season_impl(
                     validators,
-                    series=content.description,
-                    contents=content.seasons,
-                    manager=manager,
+                    series.description,
+                    season,
+                    status_bar_manager=status_bar_manager,
                 )
             )
 
-            for i, validator, local_state in zip(
-                range(len(validators)),
-                validators,
-                local_states,
-                strict=True,
-            ):
-                state[i].data.append(
-                    validator.validate_series(
-                        content,
-                        result=local_state.data,
-                    ),
+            for i, local_state_entry in enumerate(local_state_res):
+                local_states[i].data.append(local_state_entry)
+
+            status_bar_manager.progress(name, amount=1)
+
+        state: list[Validator.__Any3] = []
+        for validator, local_state in zip(
+            validators,
+            local_states,
+            strict=True,
+        ):
+            state.append(
+                validator.validate_series(
+                    series,
+                    result=local_state.data,
+                ),
+            )
+        status_bar_manager.finish(name)
+
+        return state
+
+    @staticmethod
+    def __validate_multiple_collection_impl(
+        validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
+        collection: CollectionContent,
+        *,
+        status_bar_manager: StatusBarManager,
+    ) -> list["Validator.__Any4"]:
+
+        amount = StartAmount(
+            total=len(collection.series),
+            processing=len(collection.series),
+            ignored=0,
+        )
+        name = collection.scanned_file.path.name
+
+        status_bar_manager.start(
+            amount,
+            name,
+            ContentType.collection,
+        )
+
+        local_states: list[Validator.__ValidatorState[Validator.__Any3]] = [
+            Validator.__ValidatorState([]) for _ in validators
+        ]
+
+        for serie in collection.series:
+            local_state_res: list[Validator.__Any3] = (
+                Validator.__validate_multiple_series_impl(
+                    validators,
+                    serie,
+                    status_bar_manager=status_bar_manager,
                 )
+            )
+
+            for i, local_state_entry in enumerate(local_state_res):
+                local_states[i].data.append(local_state_entry)
+
+            status_bar_manager.progress(name, amount=1)
+
+        state: list[Validator.__Any4] = []
+        for validator, local_state in zip(
+            validators,
+            local_states,
+            strict=True,
+        ):
+            state.append(
+                validator.validate_collection(
+                    collection,
+                    result=local_state.data,
+                ),
+            )
+        status_bar_manager.finish(name)
 
         return state
 
@@ -362,54 +487,39 @@ class Validator[ED, SD, S2D, CD](ABC):
     def __validate_multiple_root_impl(
         validators: list["Validator[__Any1, __Any2, __Any3, __Any4]"],
         contents: list[Content],
-        manager: ManagerInterface,
+        directory: Path,
+        *,
+        status_bar_manager: StatusBarManager,
     ) -> None:
-        # TODO: use manager
         state: list[Validator.__ValidatorState[Validator.__Any4 | Validator.__Any3]] = [
             Validator.__ValidatorState([]) for _ in validators
         ]
 
         root_content: list[SeriesContent | CollectionContent] = []
 
+        amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
+        status_bar_manager.start(amount, directory.name, None)
+
         for content in contents:
             if isinstance(content, CollectionContent):
-                local_states = Validator.__validate_multiple_series_impl(
+                local_state1 = Validator.__validate_multiple_collection_impl(
                     validators,
-                    content.series,
-                    manager=manager,
+                    content,
+                    status_bar_manager=status_bar_manager,
                 )
 
-                for i, validator, local_state in zip(
-                    range(len(validators)),
-                    validators,
-                    local_states,
-                    strict=True,
-                ):
-                    state[i].data.append(
-                        validator.validate_collection(
-                            content,
-                            result=local_state.data,
-                        ),
-                    )
+                for i, local_state_entry1 in enumerate(local_state1):
+                    state[i].data.append(local_state_entry1)
 
             elif isinstance(content, SeriesContent):
-                local_states = Validator.__validate_multiple_series_impl(
+                local_state2 = Validator.__validate_multiple_series_impl(
                     validators,
-                    [content],
-                    manager=manager,
+                    content,
+                    status_bar_manager=status_bar_manager,
                 )
 
-                for i, _validator, local_state in zip(
-                    range(len(validators)),
-                    validators,
-                    local_states,
-                    strict=True,
-                ):
-                    if len(local_state.data) != 1:
-                        msg = "UNREACHABLE"
-                        raise RuntimeError(msg)
-
-                    state[i].data.append(local_state.data[0])
+                for i, local_state_entry2 in enumerate(local_state2):
+                    state[i].data.append(local_state_entry2)
 
             elif isinstance(content, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
@@ -422,6 +532,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 raise TypeError(msg)
 
             root_content.append(content)
+            status_bar_manager.progress(directory.name, amount=1)
 
         for validator, root_state in zip(
             validators,
@@ -430,14 +541,24 @@ class Validator[ED, SD, S2D, CD](ABC):
         ):
             validator.validate_all(root_content, root_state.data)
 
+        status_bar_manager.finish(directory.name)
+
     @staticmethod
     def validate_multiple(
         validators: list["Validator[Any, Any, Any, Any]"],
         contents: list[Content],
+        directory: Path,
         *,
         manager: ManagerInterface,
     ) -> None:
-        Validator.__validate_multiple_root_impl(validators, contents, manager=manager)
+        status_bar_manager: StatusBarManager = StatusBarManager(manager)
+
+        Validator.__validate_multiple_root_impl(
+            validators,
+            contents,
+            directory,
+            status_bar_manager=status_bar_manager,
+        )
 
     @abstractmethod
     def validate_episode(
