@@ -1176,6 +1176,23 @@ class HandlerBox(MP4FullBox, FinalMP4Box):
         #     string name;
         # }
 
+        # or HandlerReferenceBox in the old quicktime format
+
+        # aligned(8) class HandlerReferenceBox extends FullBox(
+        #     'hdlr',
+        #     version = 0,
+        #     0)
+        # {
+        #     unsigned int(32) component_type;
+        #     unsigned int(32) component_subtype;
+        #     unsigned int(32) component_manufacturer;
+        #     unsigned int(32) component_flags;
+        #     unsigned int(32) component_flags_mask;
+        #     string component_name;
+        # }
+
+        # NOTE: that this is outdated and should never be written out,, but for backwards compatibility it needs to be accepted as valid, and the ISO spec reserves the same structure, for that reason there are 4 * 4 bytes unused in newer versions
+
         with io.r_ctx(force_entire_read=True) as f:
 
             if parent.version != 0:
@@ -1184,7 +1201,12 @@ class HandlerBox(MP4FullBox, FinalMP4Box):
 
             pre_defined = f.read(4)
 
-            if pre_defined != b"\x00" * 4:
+            old_quicktime_apple_hdlr_component_types: list[bytes] = [b"mhlr", b"dhlr"]
+
+            if pre_defined in old_quicktime_apple_hdlr_component_types:
+                # make exception for apples usage of these types
+                pass
+            elif pre_defined != b"\x00" * 4:
                 msg = f"HandlerBox: pre_defined has to be 0, but was: {pre_defined!r}"
                 raise ValueError(msg)
 
@@ -2881,6 +2903,8 @@ def is_mp4_file(
         return str(err)
     return None
 
+
+# see also: https://mp4ra.org/registered-types/boxes
 
 # see also: https://mpeggroup.github.io/FileFormatConformance/?query=%3D%22pitm%22
 META_BOX_VIDEO_LANGUAGE_DETECTION_ID: int = 0x41DC
