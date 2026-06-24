@@ -1365,7 +1365,7 @@ class AVIMetadataHandler:
             msg = f"Expected the RIFF top level chunk, to fill the entire file, but the size is too small: {top_level_chunk.span.total.size} != {filesize}"
             raise TypeError(msg)
 
-        # delete old metadata, this can be done, as the top level consists of one single box, but wee need to adjust that boes inner length, so that the next parser and patcher / writer will work
+        # delete old metadata, this can be done, as the top level consists of one single chunk, but wee need to adjust that boes inner length, so that the next parser and patcher / writer will work
         if len(self.__our_chunks) != 0:
             f.truncate(self.__our_chunks[0].span.total.start)
 
@@ -2038,7 +2038,8 @@ class VideoTaggerAVI(VideoTagger):
 
                     if chunk.is_list:
                         iterate_chunks_recursive(
-                            chunk.span.payload_span, depth=depth + 1,
+                            chunk.span.payload_span,
+                            depth=depth + 1,
                         )
 
             f.seek(0, 2)

@@ -876,7 +876,7 @@ class FreeSpaceBox(MP4Box, FinalMP4Box):
 @final
 @decorate_class(slots=True)
 class MediaHeaderBox(MP4FullBox, FinalMP4Box):
-    # offset from the own header start, not the start of the whole chunk!
+    # offset from the own header start, not the start of the whole box!
     language_offset: int
 
     def __init__(self: Self, parent: MP4FullBox, language_offset: int) -> None:
@@ -3693,9 +3693,31 @@ class VideoTaggerMP4(VideoTagger):
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
 
+
     @override
     def inspect(
         self: Self,
         print_fn: Callable[[str, int], None],
     ) -> Optional[InspectNotImplemented]:
-        return InspectNotImplemented()
+
+        def print_box(box:MP4Box, *, depth: int) -> None:
+            print_fn(f"{box.type}:", depth)
+
+        with self.file.open(mode="rb") as f:
+
+            def iterate_boxes_recursive(span: SimpleSpan, *, depth: int) -> None:
+                for box in mp4_iter_boxes(f, span):
+
+                    print_box(box, depth=depth)
+
+                    if box.is_container:
+                        iterate_boxes_recursive(
+                            box.span.payload_span, depth=depth + 1,
+                        )
+
+            f.seek(0, 2)
+            filesize = f.tell()
+
+            iterate_boxes_recursive(SimpleSpan(0, filesize), depth=0)
+
+        return None
