@@ -8,7 +8,13 @@ from unittest import mock
 from uuid import uuid4
 
 from conftest import FancyEq
-from fixtures import TempVideoFiles, mark_as_used, mp4_test_parse_files, test_manager
+from fixtures import (
+    TempVideoFiles,
+    mark_as_used,
+    mp4_options,
+    mp4_test_parse_files,
+    test_manager,
+)
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
 
@@ -40,6 +46,7 @@ from content.tagger.mp4_tagger import (
     ISOMAtomName,
     MP4Box,
     MP4BoxSpan,
+    Mp4DecodeOptions,
     VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
@@ -56,9 +63,11 @@ from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 mark_as_used(mp4_test_parse_files)
+mark_as_used(mp4_options)
 mark_as_used(test_manager)
 
 _ = get_translator()
+
 
 @decorate_class(slots=True)
 class PseudoMP4Box(MP4Box):
@@ -69,6 +78,7 @@ class PseudoMP4Box(MP4Box):
             span=MP4BoxSpan(SimpleSpan(0, size), 8),
             is_container=False,
         )
+
 
 @decorate_class(slots=True)
 class PseudoAppleItunesMP4Box(MP4Box):
@@ -91,6 +101,7 @@ class PseudoAppleItunesMP4Box(MP4Box):
         self.type_indicator = type_indicator
         self.value = value
 
+
 @decorate_class(slots=True)
 class PseudoAppleItunesMP4FreeformBox(PseudoAppleItunesMP4Box):
     mean: str
@@ -108,6 +119,7 @@ class PseudoAppleItunesMP4FreeformBox(PseudoAppleItunesMP4Box):
 
         self.mean = mean
         self.name = name
+
 
 @decorate_class(slots=True)
 class RecursiveBoxes:
@@ -344,7 +356,10 @@ class RecursiveBoxes:
         return hash(*self.__data)
 
 
-def list_all_boxes_recursively(f: BinaryIO) -> RecursiveBoxes:
+def list_all_boxes_recursively(
+    f: BinaryIO,
+    options: Mp4DecodeOptions,
+) -> RecursiveBoxes:
     f.seek(0, 2)
     filesize = f.tell()
 
@@ -355,7 +370,7 @@ def list_all_boxes_recursively(f: BinaryIO) -> RecursiveBoxes:
     while stack:
         span, current_target = stack.pop()
 
-        for box in mp4_iter_boxes(f, span):
+        for box in mp4_iter_boxes(f, span, options):
             if box.is_container:
                 target: tuple[MP4Box, RecursiveBoxes] = (box, RecursiveBoxes([]))
                 current_target.append(target)
@@ -365,6 +380,7 @@ def list_all_boxes_recursively(f: BinaryIO) -> RecursiveBoxes:
 
     return result
 
+
 @decorate_class(slots=True)
 class MP4BoxStructure(FancyEq):
     boxes: RecursiveBoxes
@@ -373,15 +389,18 @@ class MP4BoxStructure(FancyEq):
         self.boxes = boxes
 
     @staticmethod
-    def from_file(file: Path) -> Result["MP4BoxStructure", str]:
+    def from_file(
+        file: Path,
+        options: Mp4DecodeOptions,
+    ) -> Result["MP4BoxStructure", str]:
         try:
             with file.open("rb") as f:
-                mp4_res = is_mp4_file(f)
+                mp4_res = is_mp4_file(f, options)
 
                 if mp4_res is not None:
                     return Err(mp4_res)
 
-                boxes = list_all_boxes_recursively(f)
+                boxes = list_all_boxes_recursively(f, options=options)
                 return Ok(MP4BoxStructure(boxes))
         except RuntimeError as err:
             return Err(str(err))
@@ -457,6 +476,7 @@ class MP4BoxStructure(FancyEq):
 def test_mp4_tagger_parsing(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
+    mp4_options: Mp4DecodeOptions,
 ) -> None:
 
     structure1 = MP4BoxStructure(
@@ -604,7 +624,7 @@ def test_mp4_tagger_parsing(
 
     for file, result in test_files:
         with subtests.test("video gets parsed correctly"):
-            structure_res = MP4BoxStructure.from_file(file)
+            structure_res = MP4BoxStructure.from_file(file, mp4_options)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
 
@@ -650,6 +670,7 @@ def test_mp4_tagger_parsing(
 
 def test_mp4_invalid_bytes(
     subtests: SubTests,
+    mp4_options: Mp4DecodeOptions,
 ) -> None:
 
     test_data: list[tuple[bytes, str]] = [
@@ -673,7 +694,7 @@ def test_mp4_invalid_bytes(
     for data, err in test_data:
         with subtests.test("invalid video gets detected correctly"):
             io = BytesIO(data)
-            res = is_mp4_file(io)
+            res = is_mp4_file(io, mp4_options)
 
             assert res is not None, "valid mp4 is incorrect here"
 
@@ -683,6 +704,7 @@ def test_mp4_invalid_bytes(
 def test_mp4_tagger_language_patching(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
+    mp4_options: Mp4DecodeOptions,
 ) -> None:
 
     test_files: list[tuple[Path, Language, Language]] = list(
@@ -701,12 +723,12 @@ def test_mp4_tagger_language_patching(
 
     for file, old_lang, new_language in test_files:
         with subtests.test("video gets parsed correctly"):
-            structure_res = MP4BoxStructure.from_file(file)
+            structure_res = MP4BoxStructure.from_file(file, mp4_options)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
 
             with file.open("rb+") as f:
-                for mdhd in find_mdhd_boxes_with_type(f, types):
+                for mdhd in find_mdhd_boxes_with_type(f, types, mp4_options):
                     old_file_lang = mdhd.read_language(f)
 
                     assert old_lang.short == old_file_lang, "Old language should match"
@@ -715,7 +737,7 @@ def test_mp4_tagger_language_patching(
 
             # validate language
             with file.open("rb") as f:
-                for mdhd in find_mdhd_boxes_with_type(f, types):
+                for mdhd in find_mdhd_boxes_with_type(f, types, mp4_options):
                     old_file_lang = mdhd.read_language(f)
 
                     assert (
@@ -736,8 +758,8 @@ def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
     return [key for key, value in dict1.items() if value is not None]
 
 
-def mp4_has_already_udta_box(file: Path) -> bool:
-    structure_res = MP4BoxStructure.from_file(file)
+def mp4_has_already_udta_box(file: Path, options: Mp4DecodeOptions) -> bool:
+    structure_res = MP4BoxStructure.from_file(file, options)
 
     assert structure_res == OkResult(), "structure not parsed correctly"
 
@@ -778,6 +800,7 @@ def get_raw_ffprobe_tags(
 def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
+    mp4_options: Mp4DecodeOptions,
     test_manager: ManagerInterface,
 ) -> None:
 
@@ -812,7 +835,7 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                 # mutagen reqrite the udta, if it is already present, otherwise it creates its own, which is not recognized by ffprobe
                 # the reason for that is, that it writes the udta box before any trak box, so ffprobe ignores custom tags alias freeform keys
                 # see: https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/23427
-                is_recognized_by_ffprobe = mp4_has_already_udta_box(file)
+                is_recognized_by_ffprobe = mp4_has_already_udta_box(file, mp4_options)
 
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
@@ -1167,6 +1190,7 @@ def test_mp4_tagger_metadata_tags_custom(
 def test_mp4_metadata_tags_apple_custom(
     subtests: SubTests,
     mp4_test_parse_files: TempVideoFiles,
+    mp4_options: Mp4DecodeOptions,
     test_manager: ManagerInterface,
 ) -> None:
 
@@ -1402,7 +1426,7 @@ def test_mp4_metadata_tags_apple_custom(
 
                 # test the parsing of these apple tags
 
-                structure_res = MP4BoxStructure.from_file(file)
+                structure_res = MP4BoxStructure.from_file(file, mp4_options)
                 assert structure_res == OkResult(), "structure not parsed correctly"
 
                 structure = structure_res.as_ok()

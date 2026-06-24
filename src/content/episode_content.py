@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
@@ -308,7 +307,7 @@ class EpisodeContent(Content):
         ]
 
         characteristic: ContentCharacteristic = ContentCharacteristic(
-            self.type, self.scanned_file.type
+            self.type, self.scanned_file.type,
         )
 
         callback.process_workload(
@@ -319,7 +318,7 @@ class EpisodeContent(Content):
         )
 
     @override
-    def scan(  # noqa: PLR0915
+    def scan(
         self: Self,
         callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
@@ -333,7 +332,8 @@ class EpisodeContent(Content):
         current_handles = self.__get_handles(handles)
 
         characteristic: ContentCharacteristic = ContentCharacteristic(
-            self.type, self.scanned_file.type
+            self.type,
+            self.scanned_file.type,
         )
 
         if rescan:
