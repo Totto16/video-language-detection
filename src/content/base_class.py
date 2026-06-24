@@ -453,7 +453,7 @@ def process_folder(
         temp.append((file_path, file_type, parent_folders))
 
     value: ContentCharacteristic = ContentCharacteristic(
-        parent_type, ScannedFileType.folder
+        parent_type, ScannedFileType.folder,
     )
 
     #  total, processing, ignored

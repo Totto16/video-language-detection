@@ -2,7 +2,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
@@ -18,7 +18,6 @@ from content.tagger.parser import ISOM_BYTE_ORDER, uuid_from_bytes, uuid_to_byte
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
-    InspectElement,
     InspectNotImplemented,
     InspectPrinter,
     MetadataTags,
@@ -320,7 +319,8 @@ class MutagenFileWrapper(IOInterface):
             self.__impl.close()
 
     def __del__(self: Self) -> None:
-        self.close()
+        with suppress(BaseException):
+            self.close()
 
     def callback_ctx(self: Self, callback: OpCallback) -> AbstractContextManager[None]:
 

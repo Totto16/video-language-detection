@@ -3,7 +3,7 @@ import math
 import re
 import tempfile
 from abc import ABC, abstractmethod
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
@@ -1358,11 +1358,8 @@ class ClassifierManager(AbstractContextManager[None]):
         ]
 
     def __del__(self: Self) -> None:
-        try:
+        with suppress(BaseException):
             self.clear_cache()
-            # TODO: how to deal with e.g. KeyboardInterrupt in __del__ ?
-        except BaseException:
-            return
 
     def __decrease_batch_size(self: Self, percentage_decrease: float) -> None:
 
@@ -1678,8 +1675,9 @@ class Classifier:
         return PredictionFail(PredictionFailReason.normal_threshold_failed, best)
 
     def __del__(self: Self) -> None:
-        if self.__save_dir.exists():
-            if self.__save_dir.is_file():
-                self.__save_dir.rmdir()
-            else:
-                rmtree(str(self.__save_dir.absolute()), ignore_errors=True)
+        with suppress(BaseException):
+            if self.__save_dir.exists():
+                if self.__save_dir.is_file():
+                    self.__save_dir.rmdir()
+                else:
+                    rmtree(str(self.__save_dir.absolute()), ignore_errors=True)

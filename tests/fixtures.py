@@ -1,6 +1,7 @@
 import stat
 import tempfile
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
@@ -29,7 +30,8 @@ class FinalizerFixture[A]:
         return self.__data.data
 
     def __del__(self: Self) -> None:
-        self.__data.drop(self.__data.data)
+        with suppress(BaseException):
+            self.__data.drop(self.__data.data)
 
 
 TempVideoFiles = FinalizerFixture[list[Path]]

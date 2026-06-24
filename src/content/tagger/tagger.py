@@ -60,7 +60,6 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
 
         return Ok(mp4_handle.as_ok())
     except RuntimeError as err:
-        # except (KeyboardInterrupt) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )

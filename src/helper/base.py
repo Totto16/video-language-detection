@@ -1,5 +1,5 @@
 import json
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, suppress
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -263,7 +263,8 @@ class AppStatusBar:
             self.__manager.stop()
 
     def __del__(self: Self) -> None:
-        self.stop()
+        with suppress(BaseException):
+            self.stop()
 
 
 def app_status_bar_manager(
