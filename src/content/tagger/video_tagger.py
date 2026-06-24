@@ -175,6 +175,9 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 class VideoTaggerContextRW(VideoTaggerContextReadable, VideoTaggerContextWriteable):
     pass
 
+@decorate_class(slots=True)
+class InspectNotImplemented:
+    pass
 
 @decorate_class(slots=True)
 class VideoTagger(ABC):
@@ -205,6 +208,12 @@ class VideoTagger(ABC):
     @property
     def file(self: Self) -> Path:
         return self.__file
+
+    @abstractmethod
+    def inspect(
+        self: Self,
+        print_fn: Callable[[str, int], None],
+    ) -> Optional[InspectNotImplemented]: ...
 
 
 ContextType = Literal["r", "w", "rw"]
@@ -525,6 +534,13 @@ class VideoTaggerMultiple(VideoTagger):
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
+
+    @override
+    def inspect(
+        self: Self,
+        print_fn: Callable[[str, int], None],
+    ) -> Optional[InspectNotImplemented]:
+        return InspectNotImplemented()
 
 
 TAGGER_DOMAIN = "lt.totto.vld"

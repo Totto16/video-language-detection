@@ -13,11 +13,16 @@ from typing import (
     Never,
     Optional,
     assert_never,
+    assert_type,
     cast,
 )
 
 from content.tagger.utils import merge_dicts
-from content.tagger.video_tagger import SerializableDict, SerializableDictValue
+from content.tagger.video_tagger import (
+    InspectNotImplemented,
+    SerializableDict,
+    SerializableDictValue,
+)
 from helper.base import app_status_bar_manager
 from helper.decorator import decorate_class
 from helper.filter import Filter, FilterHelpOptions, FilterManager
@@ -71,7 +76,7 @@ class GuiCommandParsedArgNamespace(ParsedArgNamespace):
     backend_port: int
 
 
-TagCommand = Literal["read", "write"]
+TagCommand = Literal["read", "write", "inspect"]
 
 
 @decorate_class(slots=False, allow_defaults=False)
@@ -100,8 +105,16 @@ class TaggerWriteCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
     language: Optional[ShortLanguageStrWrapper]
 
 
+@decorate_class(slots=False, allow_defaults=False)
+class TaggerInspectCommandParsedArgNamespace(TaggerCommandParsedArgNamespace):
+    tag_action: Literal["inspect"]
+    file: Path
+
+
 AllTaggerCommandParsedArgNamespace = (
-    TaggerReadCommandParsedArgNamespace | TaggerWriteCommandParsedArgNamespace
+    TaggerReadCommandParsedArgNamespace
+    | TaggerWriteCommandParsedArgNamespace
+    | TaggerInspectCommandParsedArgNamespace
 )
 
 
@@ -439,6 +452,20 @@ def parse_args() -> AllParsedNameSpaces:
         ),
     )
 
+    tagger_inspect_parser = tagger_subparsers.add_parser(
+        "inspect",
+        description=_("read tags from a file"),
+    )
+
+    tagger_inspect_parser.add_argument(
+        "-f",
+        "--file",
+        dest="file",
+        required=True,
+        type=Path,
+        help=_("The file to inspect"),
+    )
+
     ffmpeg_parser = subparsers.add_parser(
         "ffmpeg",
         description=_("FFmpeg helper actions"),
@@ -675,12 +702,12 @@ def subcommand_tagger_read(
 
     def read_language_str(lang_res: Result[Optional[Language], str]) -> str:
         if lang_res.err():
-            return f"<Err: {lang_res.as_err()}>"
+            return _("<Err: {err}>").format(err=lang_res.as_err())
 
         lang = lang_res.as_ok()
 
         if lang is None:
-            return "<Nothing>"
+            return _("<Nothing>")
 
         return f"{lang}"
 
@@ -740,12 +767,12 @@ def subcommand_tagger_write(  # noqa: PLR0915
 
     def read_language_str(lang_res: Result[Optional[Language], str]) -> str:
         if lang_res.err():
-            return f"<Err: {lang_res.as_err()}>"
+            return _("<Err: {err}>").format(err=lang_res.as_err())
 
         lang = lang_res.as_ok()
 
         if lang is None:
-            return "<Nothing>"
+            return _("<Nothing>")
 
         return f"{lang}"
 
@@ -771,7 +798,9 @@ def subcommand_tagger_write(  # noqa: PLR0915
             return (temp[0], None)
 
         if len(temp) != 2:
-            msg = f"Implementation error, only two values expected, but got {len(temp)}"
+            msg = _(
+                "Implementation error, only two values expected, but got {length}"  # noqa: COM812
+            ).format(length=len(temp))
             raise RuntimeError(msg)
 
         key, val = temp
@@ -815,7 +844,9 @@ def subcommand_tagger_write(  # noqa: PLR0915
 
         if args.language is not None:
             if not isinstance(args.language, ShortLanguageStr):
-                msg = f"Implementation error: language is wrong type: {type(args.language)}"
+                msg = _("Implementation error: language is wrong type: {typ}").format(
+                    typ=type(args.language),
+                )
                 raise RuntimeError(msg)
 
             language = Language.from_values_unsafe(str(args.language), "Not applicable")
@@ -852,6 +883,49 @@ def subcommand_tagger_write(  # noqa: PLR0915
     return 0
 
 
+def subcommand_tagger_inspect(
+    logger: Logger,
+    file: Path,
+) -> ExitCode:
+    from content.tagger.tagger import get_tagger_for_file
+
+    handle_result = get_tagger_for_file(file)
+    if handle_result.err():
+        logger.error(
+            _(
+                "Can't inspect file '{file}': Opening a handle failed: {reason}"  # noqa: COM812
+            ).format(
+                file=file,
+                reason=handle_result.as_err(),
+            ),
+        )
+        return 1
+
+    handle = handle_result.as_ok()
+
+    logger.info(_("Inspect file: {file}").format(file=file.absolute()))
+
+    def print_fn(info: str, depth: int) -> None:
+        print(f"{" " * depth}{info}")  # noqa: T201
+
+    inspect_res = handle.inspect(print_fn)
+
+    if isinstance(inspect_res, InspectNotImplemented):
+        logger.error(
+            _(
+                "Can't inspect file '{file}': Inspection not supported"  # noqa: COM812
+            ).format(
+                file=file,
+                reason=handle_result.as_err(),
+            ),
+        )
+        return 1
+
+    assert_type(inspect_res, None)
+
+    return 0
+
+
 def subcommand_tagger(
     logger: Logger,
     args: AllTaggerCommandParsedArgNamespace,
@@ -866,6 +940,9 @@ def subcommand_tagger(
     if args.tag_action == "write":
         return subcommand_tagger_write(logger, args.file, args)
 
+    if args.tag_action == "inspect":
+        return subcommand_tagger_inspect(logger, args.file)
+
     assert_never(args.tag_action)
 
 
@@ -875,7 +952,7 @@ def subcommand_ffmpeg(
 ) -> ExitCode:
     files: list[Path] = [Path(file) for file in args.files]
     if len(files) == 0:
-        logger.error("No path given, using CWD")
+        logger.error(_("No path given, using CWD"))
         files = [Path.cwd().absolute()]
 
     from ffmpeg_helper.fix_chapters import fix_chapters

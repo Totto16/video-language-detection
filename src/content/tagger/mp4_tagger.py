@@ -1,5 +1,5 @@
 import json
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
@@ -38,6 +38,7 @@ from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     AppleItunesFreeformKey,
     ContextType,
+    InspectNotImplemented,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -1174,7 +1175,7 @@ class HandlerBox(MP4FullBox, FinalMP4Box):
         with io.r_ctx(force_entire_read=True) as f:
 
             if parent.version != 0:
-                msg = "Invalid hdlr version"
+                msg = f"Invalid hdlr version: {parent.version}"
                 raise RuntimeError(msg)
 
             pre_defined = f.read(4)
@@ -1423,7 +1424,7 @@ class PrimaryItemBox(MP4FullBox, FinalMP4Box):
         with io.r_ctx(force_entire_read=True) as f:
 
             if parent.version != 0:
-                msg = "Invalid pitm version"
+                msg = f"Invalid pitm version: {parent.version}"
                 raise RuntimeError(msg)
 
             item_id_raw = f.read(2)
@@ -1607,7 +1608,7 @@ class MetaBox(MP4FullBox, FinalMP4Box):
         # }
 
         if parent.version != 0:
-            msg = "Invalid meta version"
+            msg = f"Invalid meta version: {parent.version}"
             raise RuntimeError(msg)
 
         handler_box = HandlerBox.read(parent.payload_io(io))
@@ -1826,6 +1827,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
     @staticmethod
     def __decode_value(
+        typ: ISOMAtomName,
         type_indicator: int,
         value: bytes,
         expected_type: Optional[AppleItunesItemDataType],
@@ -1833,7 +1835,9 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
 
         if type_indicator == AppleItunesItemDataType.IMPLICIT.value:
             if expected_type is None:
-                msg = f"No implicit type known for value: {value!r}"
+                msg = _(
+                    "No implicit type known for value: {value!r}of type {type}"  # noqa: COM812
+                ).format(value=value, type=typ)
                 raise RuntimeError(msg)
 
             return AppleItunesItemDataBox.__decode_value_impl(expected_type, value)
@@ -2007,6 +2011,7 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
             value_raw = f.read(value_size)
 
             value = AppleItunesItemDataBox.__decode_value(
+                parent.type,
                 type_indicator,
                 value_raw,
                 expected_type,
@@ -2153,7 +2158,7 @@ class AppleItunesItemMeanBox(MP4FullBox, FinalMP4Box):
         with io.r_ctx(force_entire_read=True) as f:
 
             if parent.version != 0:
-                msg = "Invalid mean version"
+                msg = f"Invalid AppleItunesItemMeanBox version: {parent.version}"
                 raise RuntimeError(msg)
 
             data = f.read(parent.span.payload_span.size)
@@ -2254,7 +2259,7 @@ class AppleItunesItemNameBox(MP4FullBox, FinalMP4Box):
         with io.r_ctx(force_entire_read=True) as f:
 
             if parent.version != 0:
-                msg = "Invalid name version"
+                msg = f"Invalid AppleItunesItemNameBox version: {parent.version}"
                 raise RuntimeError(msg)
 
             data = f.read(parent.span.payload_span.size)
@@ -2760,6 +2765,8 @@ def read_box(io: BoundedIO) -> MP4Box:
         case SupportedBoxes.MEAN:
             return AppleItunesItemMeanBox.read_from_parent(box.payload_io(io), box)
         case SupportedBoxes.NAME:
+            with io.r_ctx(force_entire_read=True) as f:
+                print(f.read(io.span.size))
             return AppleItunesItemNameBox.read_from_parent(box.payload_io(io), box)
         case _:
             return box
@@ -2774,6 +2781,8 @@ def mp4_iter_boxes(
     while pos < span.end:
         io = BoundedIO.get_new(io_base, SimpleSpan(pos, span.end - pos))
         box = read_box(io)
+
+        # print(box.type)
 
         if pos + box.span.total.size > span.end:
             msg = f"Box {box.type!r} at {pos} extends past parent boundary"
@@ -3634,6 +3643,7 @@ class VideoTaggerMP4(VideoTagger):
                     VideoTaggerMP4(file, streams, types),
                 )
         except (RuntimeError, ValueError, TypeError) as err:
+            # except (KeyboardInterrupt) as err:
             return Err(str(err))
 
     def __context_impl(
@@ -3682,3 +3692,10 @@ class VideoTaggerMP4(VideoTagger):
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
+
+    @override
+    def inspect(
+        self: Self,
+        print_fn: Callable[[str, int], None],
+    ) -> Optional[InspectNotImplemented]:
+        return InspectNotImplemented()

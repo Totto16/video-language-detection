@@ -59,8 +59,8 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
             return Err(mp4_handle.as_err())
 
         return Ok(mp4_handle.as_ok())
-
     except RuntimeError as err:
+        # except (KeyboardInterrupt) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )
@@ -91,7 +91,7 @@ def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
         case ".mp4":
             return get_tagger_for_mp4_file(file)
         case ".mkv":
-            return Err("TODO")
+            return Err("MKv not yet supported")
         case ".avi":
             return get_tagger_for_avi_file(file)
         case _:

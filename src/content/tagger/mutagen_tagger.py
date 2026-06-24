@@ -18,6 +18,7 @@ from content.tagger.parser import ISOM_BYTE_ORDER, uuid_from_bytes, uuid_to_byte
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
+    InspectNotImplemented,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -738,3 +739,10 @@ class VideoTaggerMutagen(VideoTagger):
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
+
+    @override
+    def inspect(
+        self: Self,
+        print_fn: Callable[[str, int], None],
+    ) -> Optional[InspectNotImplemented]:
+        return InspectNotImplemented()

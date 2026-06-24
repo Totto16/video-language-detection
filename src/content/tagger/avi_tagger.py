@@ -1,5 +1,5 @@
 import json
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from io import BytesIO
@@ -35,6 +35,7 @@ from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
+    InspectNotImplemented,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -2018,3 +2019,10 @@ class VideoTaggerAVI(VideoTagger):
         manager: ManagerInterface,
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
+
+    @override
+    def inspect(
+        self: Self,
+        print_fn: Callable[[str, int], None],
+    ) -> Optional[InspectNotImplemented]:
+        return InspectNotImplemented()
