@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from enum import Enum
 from logging import Logger
 from pathlib import Path
 from types import TracebackType
@@ -175,9 +176,23 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 class VideoTaggerContextRW(VideoTaggerContextReadable, VideoTaggerContextWriteable):
     pass
 
+
 @decorate_class(slots=True)
 class InspectNotImplemented:
     pass
+
+
+class InspectPriority(Enum):
+    Important = "important"
+    Normal = "normal"
+    Ignore = "ignore"
+
+
+@dataclass(slots=True, repr=True)
+class InspectElement:
+    name: str
+    priority: InspectPriority
+
 
 @decorate_class(slots=True)
 class VideoTagger(ABC):
@@ -212,7 +227,7 @@ class VideoTagger(ABC):
     @abstractmethod
     def inspect(
         self: Self,
-        print_fn: Callable[[str, int], None],
+        print_fn: Callable[[InspectElement, int], None],
     ) -> Optional[InspectNotImplemented]: ...
 
 
@@ -538,7 +553,7 @@ class VideoTaggerMultiple(VideoTagger):
     @override
     def inspect(
         self: Self,
-        print_fn: Callable[[str, int], None],
+        print_fn: Callable[[InspectElement, int], None],
     ) -> Optional[InspectNotImplemented]:
         return InspectNotImplemented()
 

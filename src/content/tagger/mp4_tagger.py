@@ -38,7 +38,9 @@ from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     AppleItunesFreeformKey,
     ContextType,
+    InspectElement,
     InspectNotImplemented,
+    InspectPriority,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -3693,15 +3695,25 @@ class VideoTaggerMP4(VideoTagger):
     ) -> AbstractContextManager[VideoTaggerContextRW]:
         return self.__context_impl(manager, "rw")
 
-
     @override
     def inspect(
         self: Self,
-        print_fn: Callable[[str, int], None],
+        print_fn: Callable[[InspectElement, int], None],
     ) -> Optional[InspectNotImplemented]:
 
-        def print_box(box:MP4Box, *, depth: int) -> None:
-            print_fn(f"{box.type}:", depth)
+        def print_box(box: MP4Box, *, depth: int) -> None:
+
+            priority = (
+                InspectPriority.Important
+                if box.is_container
+                else InspectPriority.Normal
+            )
+
+            name: str = f"{box.type}"
+
+            element = InspectElement(name, priority)
+
+            print_fn(element, depth)
 
         with self.file.open(mode="rb") as f:
 
@@ -3712,7 +3724,8 @@ class VideoTaggerMP4(VideoTagger):
 
                     if box.is_container:
                         iterate_boxes_recursive(
-                            box.span.payload_span, depth=depth + 1,
+                            box.span.payload_span,
+                            depth=depth + 1,
                         )
 
             f.seek(0, 2)

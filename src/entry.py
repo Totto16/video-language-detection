@@ -19,7 +19,9 @@ from typing import (
 
 from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
+    InspectElement,
     InspectNotImplemented,
+    InspectPriority,
     SerializableDict,
     SerializableDictValue,
 )
@@ -905,8 +907,11 @@ def subcommand_tagger_inspect(
 
     logger.info(_("Inspect file: {file}").format(file=file.absolute()))
 
-    def print_fn(info: str, depth: int) -> None:
-        print(f"{" " * depth}{info}")  # noqa: T201
+    def print_fn(element: InspectElement, depth: int) -> None:
+        if element.priority == InspectPriority.Ignore:
+            return
+
+        print(f"{" " * depth}{element.name}")  # noqa: T201
 
     inspect_res = handle.inspect(print_fn)
 

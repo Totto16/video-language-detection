@@ -35,7 +35,9 @@ from content.tagger.utils import merge_dicts
 from content.tagger.video_tagger import (
     VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
+    InspectElement,
     InspectNotImplemented,
+    InspectPriority,
     MetadataTags,
     MetadataTagsRead,
     RestoreFileNotSupported,
@@ -2023,7 +2025,7 @@ class VideoTaggerAVI(VideoTagger):
     @override
     def inspect(
         self: Self,
-        print_fn: Callable[[str, int], None],
+        print_fn: Callable[[InspectElement, int], None],
     ) -> Optional[InspectNotImplemented]:
 
         def is_data_chunk(chunk: AVIChunk) -> bool:
@@ -2037,10 +2039,23 @@ class VideoTaggerAVI(VideoTagger):
             return all(bytes([c]).isdigit() for c in fourcc.value[0:2])
 
         def print_chunk(chunk: AVIChunk, *, depth: int) -> None:
-            if is_data_chunk(chunk):
-                return
 
-            print_fn(f"{chunk.fourcc}:", depth)
+            priority = (
+                InspectPriority.Important
+                if chunk.is_list
+                else (
+                    InspectPriority.Ignore
+                    if is_data_chunk(chunk)
+                    else InspectPriority.Normal
+                )
+            )
+            name: str = f"{chunk.fourcc}"
+            if isinstance(chunk, AVIList):
+                name = f"{chunk.fourcc}({chunk.type})"
+
+            element = InspectElement(name, priority)
+
+            print_fn(element, depth)
 
         with self.file.open(mode="rb") as f:
 
