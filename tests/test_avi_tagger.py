@@ -7,7 +7,7 @@ from typing import Any, BinaryIO, Optional, Self, cast, override
 from uuid import uuid4
 
 from conftest import FancyEq
-from fixtures import TempVideoFiles, avi_test_parse_files, mark_as_used, test_manager
+from fixtures import TempVideoFiles, avi_options, avi_test_parse_files, mark_as_used, test_manager
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
 
@@ -15,14 +15,22 @@ from content.language import Language
 from content.tagger.avi_tagger import (
     AUDS_FOURCC,
     AVI__FOURCC,
+    AVIH_FOURCC,
     FOURCC,
+    HDRL_FOURCC,
+    JUNK_FOURCC,
     LIST_FOURCC,
+    MOVI_FOURCC,
     RIFF_FOURCC,
+    STRF_FOURCC,
+    STRH_FOURCC,
+    STRL_FOURCC,
     VIDS_FOURCC,
     VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC,
     VLD_KEY_VALUE_FOURCC,
     AVIChunk,
     AVIChunkSpan,
+    AVIDecodeOptions,
     AVIList,
     VideoTaggerAVI,
     avi_iter_chunks,
@@ -39,7 +47,7 @@ from helper.result import Err, Ok, Result
 
 mark_as_used(avi_test_parse_files)
 mark_as_used(test_manager)
-
+mark_as_used(avi_options)
 
 @decorate_class(slots=True)
 class PseudoAVIChunk(AVIChunk):
@@ -64,7 +72,7 @@ class PseudoMOVIChunk(PseudoAVIList):
     children: int
 
     def __init__(self: Self, children: int, size: int) -> None:
-        super().__init__(LIST_FOURCC, size, FOURCC(b"movi"))
+        super().__init__(LIST_FOURCC, size, MOVI_FOURCC)
         self.children = children
 
 
@@ -94,7 +102,7 @@ class RecursiveChunks:
         indent_str: str = " ",
     ) -> str:
         if isinstance(data, tuple) and isinstance(data[0], AVIList):
-            if data[0].type == FOURCC(b"movi"):
+            if data[0].type == MOVI_FOURCC:
                 return f"{(indent_str * depth)}<MoviChunk children: {len(data[1])} span: {data[0].span}>"
 
             return f"{(indent_str * depth)}<NestedChunks\n{data[0]!s}\n{RecursiveChunks.__to_str(data[1], depth=depth+1)}>"
@@ -198,7 +206,7 @@ class RecursiveChunks:
             if res.err():
                 return res
 
-            if isinstance(c1, AVIList) and c1.type == FOURCC(b"movi"):
+            if isinstance(c1, AVIList) and c1.type == MOVI_FOURCC:
                 if not isinstance(c2, PseudoMOVIChunk):
                     return Err[list[str]](
                         [
@@ -391,19 +399,19 @@ def test_avi_tagger_parsing(
                                         PseudoAVIList(
                                             LIST_FOURCC,
                                             8902,
-                                            FOURCC(b"hdrl"),
+                                            HDRL_FOURCC,
                                         ),
                                         [
-                                            PseudoAVIChunk(FOURCC(b"avih"), 64),
+                                            PseudoAVIChunk(AVIH_FOURCC, 64),
                                             (
                                                 PseudoAVIList(
                                                     LIST_FOURCC,
                                                     4328,
-                                                    FOURCC(b"strl"),
+                                                    STRL_FOURCC,
                                                 ),
                                                 [
-                                                    PseudoAVIChunk(FOURCC(b"strh"), 64),
-                                                    PseudoAVIChunk(FOURCC(b"strf"), 48),
+                                                    PseudoAVIChunk(STRH_FOURCC, 64),
+                                                    PseudoAVIChunk(STRF_FOURCC, 48),
                                                     PseudoAVIChunk(
                                                         FOURCC(
                                                             b"JUNK",
@@ -417,11 +425,11 @@ def test_avi_tagger_parsing(
                                                 PseudoAVIList(
                                                     LIST_FOURCC,
                                                     4230,
-                                                    FOURCC(b"strl"),
+                                                    STRL_FOURCC,
                                                 ),
                                                 [
-                                                    PseudoAVIChunk(FOURCC(b"strh"), 64),
-                                                    PseudoAVIChunk(FOURCC(b"strf"), 26),
+                                                    PseudoAVIChunk(STRH_FOURCC, 64),
+                                                    PseudoAVIChunk(STRF_FOURCC, 26),
                                                     PseudoAVIChunk(
                                                         FOURCC(
                                                             b"JUNK",
@@ -444,7 +452,7 @@ def test_avi_tagger_parsing(
                                             PseudoAVIChunk(FOURCC(b"ISFT"), 22),
                                         ],
                                     ),
-                                    PseudoAVIChunk(FOURCC(b"JUNK"), 1024),
+                                    PseudoAVIChunk(JUNK_FOURCC, 1024),
                                     (PseudoMOVIChunk(2336, 695122), []),
                                     PseudoAVIChunk(FOURCC(b"idx1"), 37384),
                                 ],
@@ -544,6 +552,7 @@ def test_avi_invalid_bytes(
 def test_avi_tagger_language_patching(
     subtests: SubTests,
     avi_test_parse_files: TempVideoFiles,
+    avi_options: AVIDecodeOptions,
 ) -> None:
 
     test_files: list[tuple[Path, Language, Language]] = list(
@@ -564,7 +573,7 @@ def test_avi_tagger_language_patching(
             assert structure_res == OkResult(), "structure not parsed correctly"
 
             with file.open("rb+") as f:
-                for strh in find_strh_chunks_with_type(f, types):
+                for strh in find_strh_chunks_with_type(f, types, avi_options):
                     old_file_lang = strh.read_language(f)
 
                     assert old_lang.short == old_file_lang, "Old language should match"
@@ -573,7 +582,7 @@ def test_avi_tagger_language_patching(
 
             # validate language
             with file.open("rb") as f:
-                for strh in find_strh_chunks_with_type(f, types):
+                for strh in find_strh_chunks_with_type(f, types, avi_options):
                     old_file_lang = strh.read_language(f)
 
                     assert (

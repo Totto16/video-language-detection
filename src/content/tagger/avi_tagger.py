@@ -2,6 +2,7 @@ import json
 from collections.abc import Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from enum import Enum
 from io import BytesIO
 from pathlib import Path
 from typing import (
@@ -144,9 +145,14 @@ AVI__FOURCC: FOURCC = FOURCC(b"AVI ")
 AVIX_FOURCC: FOURCC = FOURCC(b"AVIX")
 LIST_FOURCC: FOURCC = FOURCC(b"LIST")
 STRH_FOURCC: FOURCC = FOURCC(b"strh")
+STRF_FOURCC: FOURCC = FOURCC(b"strf")
 STRL_FOURCC: FOURCC = FOURCC(b"strl")
 HDRL_FOURCC: FOURCC = FOURCC(b"hdrl")
 INFO_FOURCC: FOURCC = FOURCC(b"INFO")
+MOVI_FOURCC: FOURCC = FOURCC(b"movi")
+AVIH_FOURCC: FOURCC = FOURCC(b"avih")
+JUNK_FOURCC: FOURCC = FOURCC(b"JUNK")
+
 
 AUDS_FOURCC: FOURCC = FOURCC(b"auds")
 MIDS_FOURCC: FOURCC = FOURCC(b"mids")
@@ -304,6 +310,21 @@ class NonFinalAVIChunk:
                 if fn_name in cls.__dict__:
                     msg = f"{cls.__name__} defines {fn_name}(), but only final classes may do so"
                     raise TypeError(msg)
+
+
+class AVIDecodeType(Enum):
+    Check = "check"
+    Normal = "normal"
+
+
+@dataclass(slots=True, repr=True)
+class AVIDecodeOptions:
+    strict: bool
+    type: AVIDecodeType
+
+    @staticmethod
+    def default() -> "AVIDecodeOptions":
+        return AVIDecodeOptions(strict=True, type=AVIDecodeType.Normal)
 
 
 @decorate_class(slots=True)
@@ -1086,6 +1107,7 @@ def avi_iter_chunks(
 def find_strh_chunks_with_type(
     f: BinaryIO,
     types: list[FOURCC],
+    options: AVIDecodeOptions,
 ) -> Generator[AVIStreamHeader]:
     f.seek(0, 2)
     filesize = f.tell()
@@ -1116,6 +1138,10 @@ def find_strh_chunks_with_type(
                     raise RuntimeError(msg)
 
                 yield chunk
+
+            if chunk.fourcc == MOVI_FOURCC and options.type == AVIDecodeType.Check:
+                # skip movi chunk with maaaany data chunks, but nothing interesting
+                continue
 
             if chunk.is_list:
                 typ = chunk.fourcc
@@ -1837,9 +1863,13 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
         )
         bar.update(0, force=True)
 
+        options = AVIDecodeOptions.default()
+
         try:
             self.__writer.seek(0)
-            for strh in find_strh_chunks_with_type(self.__writer, self.__types):
+            for strh in find_strh_chunks_with_type(
+                self.__writer, self.__types, options,
+            ):
 
                 should_write_language = True
 
@@ -1946,6 +1976,10 @@ class VideoTaggerAVI(VideoTagger):
     @staticmethod
     def get_handle(file: Path) -> Result["VideoTagger", str]:
 
+        options: AVIDecodeOptions = AVIDecodeOptions(
+            strict=False, type=AVIDecodeType.Check,
+        )
+
         try:
 
             with file.open("rb") as f:
@@ -1959,7 +1993,7 @@ class VideoTaggerAVI(VideoTagger):
                 types: list[FOURCC] = [AUDS_FOURCC, VIDS_FOURCC]
 
                 # read the file, so that we check if we can parse it correctly and that it is an avi file
-                for strh in find_strh_chunks_with_type(f, types):
+                for strh in find_strh_chunks_with_type(f, types,options):
                     streams = streams + 1
                     lang = strh.read_language(f)
                     # check if this lang is valid

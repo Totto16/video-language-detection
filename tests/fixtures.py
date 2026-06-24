@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 import pytest
 import requests
 
+from content.tagger.avi_tagger import AVIDecodeOptions
 from content.tagger.mp4_tagger import MP4DecodeOptions
 from helper.decorator import decorate_class
 
@@ -267,6 +268,11 @@ def avi_test_parse_files(
     ]
 
     return TempVideoFiles(temp_video_files(video_urls, cached_file_manager))
+
+
+@pytest.fixture(scope="package")
+def avi_options() -> AVIDecodeOptions:
+    return AVIDecodeOptions.default()
 
 
 DummyFiles = FinalizerFixture[list[tuple[Path, bool]]]
