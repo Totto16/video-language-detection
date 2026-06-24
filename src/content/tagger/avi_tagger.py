@@ -2025,4 +2025,25 @@ class VideoTaggerAVI(VideoTagger):
         self: Self,
         print_fn: Callable[[str, int], None],
     ) -> Optional[InspectNotImplemented]:
-        return InspectNotImplemented()
+
+        def print_chunk(chunk: AVIChunk, *, depth: int) -> None:
+            print_fn(f"{chunk.fourcc}:", depth)
+
+        with self.file.open(mode="rb") as f:
+
+            def iterate_chunks_recursive(span: SimpleSpan, *, depth: int) -> None:
+                for chunk in avi_iter_chunks(f, span):
+
+                    print_chunk(chunk, depth=depth)
+
+                    if chunk.is_list:
+                        iterate_chunks_recursive(
+                            chunk.span.payload_span, depth=depth + 1,
+                        )
+
+            f.seek(0, 2)
+            filesize = f.tell()
+
+            iterate_chunks_recursive(SimpleSpan(0, filesize), depth=0)
+
+        return None

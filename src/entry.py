@@ -916,7 +916,6 @@ def subcommand_tagger_inspect(
                 "Can't inspect file '{file}': Inspection not supported"  # noqa: COM812
             ).format(
                 file=file,
-                reason=handle_result.as_err(),
             ),
         )
         return 1
