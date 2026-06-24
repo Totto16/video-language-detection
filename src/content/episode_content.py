@@ -257,7 +257,8 @@ class EpisodeContent(Content):
 
                         language_write_ok = ctx.write_language(self.language)
                         print("language_write_ok: ", language_write_ok)
-                        ctx.write_tags(tags)
+                        res = ctx.write_tags_safe(tags)
+                        print("write_tags_safe: ", res)
                         self.scanned_file.reset_file_data()
                         changed_file = True
             except (RuntimeError, ValueError, TypeError) as err:

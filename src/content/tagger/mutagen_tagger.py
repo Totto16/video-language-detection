@@ -20,6 +20,7 @@ from content.tagger.video_tagger import (
     ContextType,
     MetadataTags,
     MetadataTagsRead,
+    RestoreFileNotSupported,
     SerializableDict,
     TaggerDomain,
     VideoTagger,
@@ -183,6 +184,7 @@ IOOp = IOOpProgress | IOOpSeek | IOOpTruncate
 
 OpCallback = Callable[[IOOp], None]
 
+
 @decorate_class(slots=True)
 class MutagenFileWrapper(IOInterface):
     __file: Path
@@ -268,6 +270,10 @@ class MutagenFileWrapper(IOInterface):
     def name(self: Self) -> str:
         return self.__file.name
 
+    @property
+    def file(self: Self) -> Path:
+        return self.__file
+
     @override
     def write(self: Self, data: bytes) -> int:
 
@@ -343,6 +349,7 @@ class MutagenFileWrapper(IOInterface):
 
         return CallbackCtx()
 
+
 @decorate_class(slots=True)
 class VideoTaggerContextMutagen(VideoTaggerContextRW):
     __filething: MutagenFileWrapper
@@ -354,7 +361,7 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
         instance: mutagen.FileType,
         manager: ManagerInterface,
     ) -> None:
-        super().__init__(manager)
+        super().__init__(manager, filething.file)
         self.__instance = instance
         self.__filething = filething
 
@@ -452,6 +459,12 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
             raise TypeError(msg)
 
         self.__save_impl()
+
+    @override
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Optional[str]:
+        return RestoreFileNotSupported()
 
     @override
     def write_language(
@@ -587,6 +600,7 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
 
         return result
 
+
 @decorate_class(slots=True)
 class VideoTaggerMutagen(VideoTagger):
     __file: Path
@@ -681,6 +695,8 @@ class VideoTaggerMutagen(VideoTagger):
                         manager=manager,
                     ),
                     ctx,
+                    filething.file,
+                    RestoreFileNotSupported,
                 )
 
             @override

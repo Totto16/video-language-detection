@@ -1007,7 +1007,12 @@ class TagsValidator(Validator[None, None, None, None]):
                 if tags.uuid is None:
                     if self.__options.write:
                         new_tags = episode.get_tags()
-                        ctx.write_tags(new_tags)
+                        res = ctx.write_tags_safe(new_tags)
+                        if res is not None:
+                            self.emit_error(
+                                episode.scanned_file.path,
+                                _("File tag error: {err}").format(err=res),
+                            )
                     else:
                         self.emit_error(
                             episode.scanned_file.path,

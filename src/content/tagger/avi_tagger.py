@@ -4,7 +4,6 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from types import TracebackType
 from typing import (
     Any,
     BinaryIO,
@@ -38,6 +37,7 @@ from content.tagger.video_tagger import (
     ContextType,
     MetadataTags,
     MetadataTagsRead,
+    RestoreFileNotSupported,
     SerializableDict,
     SerializableDictValue,
     TaggerDomain,
@@ -45,7 +45,6 @@ from content.tagger.video_tagger import (
     VideoTaggerContextCtxGeneric,
     VideoTaggerContextReadable,
     VideoTaggerContextRW,
-    VideoTaggerContextWrapperGeneric,
     VideoTaggerContextWriteable,
     uuid_from_str,
     uuid_to_str,
@@ -1765,11 +1764,12 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
     def __init__(
         self: Self,
         manager: ManagerInterface,
+        file:Path,
         writer: BinaryIO,
         streams: int,
         types: list[FOURCC],
     ) -> None:
-        super().__init__(manager)
+        super().__init__(manager, file)
         self.__writer = writer
         self.__streams = streams
         self.__types = types
@@ -1808,6 +1808,12 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
             self.__writer.flush()
         finally:
             bar.close(clear=True)
+
+    @override
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Optional[str]:
+        return RestoreFileNotSupported()
 
     @override
     def write_language(
@@ -1982,7 +1988,7 @@ class VideoTaggerAVI(VideoTagger):
                 manager: ManagerInterface,
                 writer: BinaryIO,
             ) -> VideoTaggerContextAVI:
-                return VideoTaggerContextAVI(manager, writer, streams, types)
+                return VideoTaggerContextAVI(manager, file,writer, streams, types)
 
         return VideoTaggerContextCtx()
 

@@ -48,7 +48,7 @@ StatusBarColor = str
 
 StatusBarInfoRaw = tuple[StatusBarColor, str]
 
-
+@decorate_class(slots=True)
 class DefaultStatusBarInfo:
     pass
 

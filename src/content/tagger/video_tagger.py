@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from logging import Logger
@@ -11,6 +12,7 @@ from typing import (
     Optional,
     Self,
     assert_never,
+    assert_type,
     cast,
     final,
     override,
@@ -19,6 +21,7 @@ from uuid import UUID
 
 from content.language import Language
 from helper.decorator import decorate_class
+from helper.ffprobe import ffprobe
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.translation import get_translator
@@ -55,17 +58,20 @@ class MetadataTagsRead:
 @decorate_class(slots=True)
 class VideoTaggerContextInterface(ABC):
     __manager: ManagerInterface
+    __file: Path
 
-    def __init__(
-        self: Self,
-        manager: ManagerInterface,
-    ) -> None:
+    def __init__(self: Self, manager: ManagerInterface, file: Path) -> None:
         super().__init__()
         self.__manager = manager
+        self.__file = file
 
     @property
     def manager(self: Self) -> ManagerInterface:
         return self.__manager
+
+    @property
+    def file(self: Self) -> Path:
+        return self.__file
 
 
 @decorate_class(slots=True)
@@ -77,12 +83,57 @@ class VideoTaggerContextReadable(VideoTaggerContextInterface):
 
 
 @decorate_class(slots=True)
+class RestoreFileNotSupported:
+    pass
+
+
+@decorate_class(slots=True)
 class VideoTaggerContextWriteable(VideoTaggerContextInterface):
     @abstractmethod
     def write_tags(
         self: Self,
         tags: MetadataTags,
     ) -> None: ...
+
+    @final
+    def write_tags_safe(self: Self, tags: MetadataTags) -> Optional[str]:
+        try:
+            pre_write_res = ffprobe(self.file)
+            if pre_write_res.err():
+                return f"FFprobe err: {pre_write_res.as_err()}"
+
+            pre_write = pre_write_res.as_ok()
+
+            self.write_tags(tags)
+
+            after_write_res = ffprobe(self.file)
+            if after_write_res.err():
+                msg = f"FFprobe err: {after_write_res.as_err()}"
+                raise RuntimeError(msg)  # noqa: TRY301
+
+            after_write = after_write_res.as_ok()
+
+            raise RuntimeError(
+                f"{pre_write.file_info.raw} vs {after_write.file_info.raw}"
+            )
+
+            return None  # noqa: TRY300
+        except Exception as err:  # noqa: BLE001
+            restore_result = self.restore_file()
+            if isinstance(restore_result, RestoreFileNotSupported):
+                return f"Can't restore file, original error: {err!s}"
+
+            if restore_result is not None:
+                return f"Restore file error: {restore_result}, original error: {err!s}"
+
+            assert_type(restore_result, None)
+
+            return str(err)
+
+    @abstractmethod
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Optional[str]: ...
 
     @abstractmethod
     def write_language(
@@ -133,16 +184,20 @@ ContextType = Literal["r", "w", "rw"]
 class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
     __impl: VideoTaggerContextRW
     __ctx: ContextType
+    __restore_backup_fn: Callable[[], RestoreFileNotSupported | Optional[str]]
 
     def __init__(
         self: Self,
         manager: ManagerInterface,
         impl: VideoTaggerContextRW,
         ctx: ContextType,
+        file: Path,
+        restore_backup_fn: Callable[[], RestoreFileNotSupported | Optional[str]],
     ) -> None:
-        super().__init__(manager)
+        super().__init__(manager=manager, file=file)
         self.__impl = impl
         self.__ctx = ctx
+        self.__restore_backup_fn = restore_backup_fn
 
     @override
     def write_tags(self: Self, tags: MetadataTags) -> None:
@@ -151,6 +206,17 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
             raise RuntimeError(msg)
 
         return self.__impl.write_tags(tags)
+
+    @override
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Optional[str]:
+        res = self.__impl.restore_file()
+
+        if isinstance(res, RestoreFileNotSupported):
+            return self.__restore_backup_fn()
+
+        return res
 
     @override
     def write_language(
@@ -200,6 +266,28 @@ class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW])
         writer: BinaryIO,
     ) -> VideoTaggerContextRW: ...
 
+    def __restore_backup_impl(self: Self) -> Optional[str]:
+        if self.__backup is None:
+            return "Backup for file not present"
+
+        # restore file backup
+        if self.__ctx != "r":
+            restore_writer = self.__file.open("rb+")
+            restore_writer.truncate()
+            restore_writer.write(self.__backup)
+            restore_writer.close()
+            print(f"RESTORED BACKUP FOR FILE: '{self.__file}'")  # noqa: T201
+
+        self.__backup = None
+        return None
+
+    @final
+    def restore_backup(self: Self) -> None:
+        res = self.__restore_backup_impl()
+
+        if res is not None:
+            raise RuntimeError(res)
+
     @final
     @override
     def __enter__(self: Self) -> VideoTaggerContextRW:
@@ -228,23 +316,9 @@ class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW])
                 self.__writer,
             ),
             self.__ctx,
+            self.__file,
+            self.__restore_backup_impl,
         )
-
-    @final
-    def restore_backup(self: Self) -> None:
-        if self.__backup is None:
-            msg = "Backup for file not present"
-            raise RuntimeError(msg)
-
-        # restore file backup
-        if self.__ctx != "r":
-            restore_writer = self.__file.open("rb+")
-            restore_writer.truncate()
-            restore_writer.write(self.__backup)
-            restore_writer.close()
-            print(f"RESTORED BACKUP FOR FILE: '{self.__file}'")  # noqa: T201
-
-        self.__backup = None
 
     @final
     @override
@@ -274,9 +348,10 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     def __init__(
         self: Self,
         manager: ManagerInterface,
+        file: Path,
         contexts: list[AbstractContextManager[VideoTaggerContextRW]],
     ) -> None:
-        super().__init__(manager)
+        super().__init__(manager, file=file)
         self.__contexts = contexts
 
     @override
@@ -284,6 +359,21 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
         for context in self.__contexts:
             with context as ctx:
                 ctx.write_tags(tags)
+
+    @override
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Optional[str]:
+        for context in self.__contexts:
+            with context as ctx:
+                res = ctx.restore_file()
+                if isinstance(res, RestoreFileNotSupported):
+                    continue
+
+                if res is None:
+                    return res
+
+        return RestoreFileNotSupported()
 
     @override
     def write_language(
@@ -333,6 +423,8 @@ class VideoTaggerMultiple(VideoTagger):
 
         contexts = [get_context(tagger) for tagger in self.__tagger]
 
+        file = self.file
+
         @decorate_class(slots=True)
         class VideoTaggerContextCtx(AbstractContextManager[VideoTaggerContextRW]):
 
@@ -345,12 +437,15 @@ class VideoTaggerMultiple(VideoTagger):
                     manager,
                     VideoTaggerContextMultipleRW(
                         manager,
+                        file,
                         cast(
                             list[AbstractContextManager[VideoTaggerContextRW]],
                             contexts,
                         ),
                     ),
                     ctx,
+                    file,
+                    RestoreFileNotSupported,
                 )
 
             @override
