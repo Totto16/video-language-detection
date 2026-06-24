@@ -1055,7 +1055,7 @@ class TagsValidator(Validator[None, None, None, None]):
         for c in options:
             if c == "s":
                 result.strict = True
-            if c == "w":
+            elif c == "w":
                 result.write = True
             else:
                 return Err(f"Invalid options flag: {c}")
