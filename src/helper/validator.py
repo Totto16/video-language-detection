@@ -608,7 +608,6 @@ class Validator[ED, SD, S2D, CD](ABC):
         def sort_content(content: Content) -> str:
             return str(content.scanned_file.path)
 
-        root_content: list[SeriesContent | CollectionContent] = []
 
         contents_to_scan: list[SeriesContent | CollectionContent] = []
         ignored: int = 0
@@ -649,6 +648,9 @@ class Validator[ED, SD, S2D, CD](ABC):
         state: list[Validator.__ValidatorState[Validator.__Any4 | Validator.__Any3]] = [
             Validator.__ValidatorState(v.name) for v in validators
         ]
+
+        root_content: list[SeriesContent | CollectionContent] = []
+
 
         for content in contents_to_scan:
             if isinstance(content, CollectionContent):

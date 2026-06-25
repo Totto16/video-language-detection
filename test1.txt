@@ -1,0 +1,11 @@
+
+
+RESTORED BACKUP FOR FILE: '/media/totto/Totto_4/Serien/Beendet/Donna Leon (2000)/Staffel 01/Episode 05 - Venezianisches Finale [S01E05].avi'
+2026-06-24 19:47:14,221 - ERROR - validator - Validator 'tags' error at File '/media/totto/Totto_4/Serien/Beendet/Donna Leon (2000)/Staffel 01/Episode 05 - Venezianisches Finale [S01E05].avi': File not tagged: Expected only one RIFF top level chunk, but got 2
+
+
+
+'/media/totto/Totto_4/Serien/DC/Vixen (2015)/Specials/Episode 01 - 01 [S00E01].mp4'
+
+
+pipenv run check -t no -f "e:validate" -f "c:0" -f "v:~" -f "v:tags:sw" -f "p:+~:^/media/totto/Totto_4/Serien/DC(/Vixen \(2015\)(/Specials(/Episode 01 - 01 \[S00E01\].mp4)?)?)?$"
