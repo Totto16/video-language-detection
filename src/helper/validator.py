@@ -608,7 +608,6 @@ class Validator[ED, SD, S2D, CD](ABC):
         def sort_content(content: Content) -> str:
             return str(content.scanned_file.path)
 
-
         contents_to_scan: list[SeriesContent | CollectionContent] = []
         ignored: int = 0
         sorted_content: list[Content] = sorted(contents, key=sort_content)
@@ -650,7 +649,6 @@ class Validator[ED, SD, S2D, CD](ABC):
         ]
 
         root_content: list[SeriesContent | CollectionContent] = []
-
 
         for content in contents_to_scan:
             if isinstance(content, CollectionContent):
@@ -1119,6 +1117,7 @@ class TagsValidator(Validator[None, None, None, None]):
 
                 if tags.uuid is None:
                     if self.__options.write:
+                        # TODO: the episode can't be written to, but we need to update checksum and stat mtime, so that the next scan doesn't remove the language :(
                         new_tags = episode.get_tags()
                         res = ctx.write_tags_safe(new_tags)
                         if res is not None:
