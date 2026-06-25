@@ -63,6 +63,10 @@ class NonFinalEBMLElement:
 class Bit:
     value: bool
 
+    @property
+    def int(self: Self) -> int:
+        return 1 if self.value else 0
+
 
 @decorate_class(slots=True)
 class BitIterator(Iterator[Bit]):
@@ -77,7 +81,21 @@ class BitIterator(Iterator[Bit]):
 
     @override
     def __next__(self: Self) -> Bit:
-        return 1
+        if self.__bit_index >= (8 * len(self.__data)):
+            raise StopIteration
+
+        byte_idx = self.__bit_index // 8
+        bit_idx = self.__bit_index % 8
+
+        bit = (self.__data[byte_idx] >> (7 - bit_idx)) & 0x01
+
+        if bit not in [0, 1]:
+            msg: str = f"Invalid bit calculated: {bit}"
+            raise ValueError(msg)
+
+        self.__bit_index = self.__bit_index + 1
+
+        return Bit(bit != 0)
 
     @property
     def bit_index(self: Self) -> int:
@@ -157,12 +175,14 @@ class EBMLElementSpan:
             msg = f"Invalid chunk size {self.__total.size} at {self.__total.start}"
             raise RuntimeError(msg)
 
+    varIntTimes2 = "TODO"
+
     @staticmethod
     def from_ebml_specified_size(
         span: SimpleSpan, header_size: int, todo: varIntTimes2  # size + id?
     ) -> "EBMLElementSpan":
         return EBMLElementSpan(
-            SimpleSpan(span.start, span.size + todo.size), header_size
+            SimpleSpan(span.start, span.size + len(todo)), header_size
         )
 
     def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
@@ -331,6 +351,9 @@ class EBMLHeader(EBMLElement):
 
 class EBMLBody(EBMLElement):
     pass
+
+
+MKV_FOURCC = "TODO"
 
 
 @decorate_class(slots=True)
