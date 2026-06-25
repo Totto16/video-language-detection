@@ -1,6 +1,7 @@
 import re
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Self, assert_never
+from typing import Self, assert_never, override
 
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
@@ -17,6 +18,51 @@ from helper.filter import (
 from helper.translation import get_translator
 
 _ = get_translator()
+
+
+class ContentFilterStatus(ABC):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def should_ignore(self: Self) -> bool: ...
+
+
+class NoContentFilterStatus(ContentFilterStatus):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def should_ignore(self: Self) -> bool:
+        return False
+
+
+class ContentFilterStatusMatch(ContentFilterStatus):
+    __type: PathFilterType
+
+    def __init__(self: Self, typ: PathFilterType) -> None:
+        super().__init__()
+
+        self.__type = typ
+
+    @override
+    def should_ignore(self: Self) -> bool:
+        match self.__type:
+            case PathFilterType.Negative:
+                return True
+            case PathFilterType.Positive:
+                return False
+            case _:
+                assert_never(self.__type)
+
+
+class ContentFilterStatusNoMatch(ContentFilterStatus):
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @override
+    def should_ignore(self: Self) -> bool:
+        return True
 
 
 @decorate_class(slots=True)
@@ -77,72 +123,83 @@ class ContentFilter:
         resolved_filters = ContentFilter.__get_suitable_filters(suitable_filter)
         return ContentFilter(resolved_filters)
 
-    def __should_ignore_dir(self: Self, directory: Path) -> bool:
+    def __dir_status(self: Self, directory: Path) -> ContentFilterStatus:
         if not directory.is_dir():
             msg = f"Not a dir: {directory}"
             raise RuntimeError(msg)
 
         for flt in self.__filter:
             if flt.pattern.match(str(object=directory.absolute())) is not None:
-                return flt.type == PathFilterType.Negative
+                return ContentFilterStatusMatch(flt.type)
 
-        return True
+        return ContentFilterStatusNoMatch()
 
-    def __should_ignore_file(self: Self, file: Path) -> bool:
+    def __file_status(self: Self, file: Path) -> ContentFilterStatus:
         if not file.is_file():
             msg = f"Not a file: {file}"
             raise RuntimeError(msg)
 
         for flt in self.__filter:
             if flt.pattern.match(str(object=file.absolute())) is not None:
-                return flt.type == PathFilterType.Negative
+                return ContentFilterStatusMatch(flt.type)
 
-        return True
+        return ContentFilterStatusNoMatch()
 
-    def should_ignore_collection(self: Self, collection: CollectionContent) -> bool:
+    def collection_status(
+        self: Self,
+        collection: CollectionContent,
+    ) -> ContentFilterStatus:
 
         if len(self.__filter) == 0:
-            return False
+            return NoContentFilterStatus()
 
-        if self.__should_ignore_dir(collection.scanned_file.path):
-            return True
+        status = self.__dir_status(collection.scanned_file.path)
+
+        if not isinstance(status, ContentFilterStatusNoMatch):
+            return status
 
         # TODO: use collection filter
 
-        return False
+        return ContentFilterStatusNoMatch()
 
-    def should_ignore_series(self: Self, series: SeriesContent) -> bool:
+    def series_status(self: Self, series: SeriesContent) -> ContentFilterStatus:
 
         if len(self.__filter) == 0:
-            return False
+            return NoContentFilterStatus()
 
-        if self.__should_ignore_dir(series.scanned_file.path):
-            return True
+        status = self.__dir_status(series.scanned_file.path)
+
+        if not isinstance(status, ContentFilterStatusNoMatch):
+            return status
 
         # TODO: use series filter
 
-        return False
+        return ContentFilterStatusNoMatch()
 
-    def should_ignore_season(self: Self, series: SeasonContent) -> bool:
-
-        if len(self.__filter) == 0:
-            return False
-
-        if self.__should_ignore_dir(series.scanned_file.path):
-            return True
-
-        # TODO: use series filter
-
-        return False
-
-    def should_ignore_episode(self: Self, series: EpisodeContent) -> bool:
+    def season_status(self: Self, series: SeasonContent) -> ContentFilterStatus:
 
         if len(self.__filter) == 0:
-            return False
+            return NoContentFilterStatus()
 
-        if self.__should_ignore_file(series.scanned_file.path):
-            return True
+        status = self.__dir_status(series.scanned_file.path)
 
-        # TODO: use series filter
+        if not isinstance(status, ContentFilterStatusNoMatch):
+            return status
 
-        return False
+        # TODO: use season filter
+
+        return ContentFilterStatusNoMatch()
+
+    def episode_status(self: Self, series: EpisodeContent) -> ContentFilterStatus:
+
+        if len(self.__filter) == 0:
+            return NoContentFilterStatus()
+
+        status = self.__file_status(series.scanned_file.path)
+
+        if not isinstance(status, ContentFilterStatusNoMatch):
+            return status
+
+        # TODO: use episode filter
+
+        return ContentFilterStatusNoMatch()

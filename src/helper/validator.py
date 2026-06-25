@@ -21,7 +21,7 @@ from content.series_content import SeriesContent
 from content.tagger.tagger import get_tagger_for_file
 from helper.base import StatusBarManager
 from helper.classifier import ModelLanguage
-from helper.content_filter import ContentFilter
+from helper.content_filter import ContentFilter, ContentFilterStatus
 from helper.decorator import decorate_class
 from helper.filter import (
     Filter,
@@ -360,9 +360,9 @@ class Validator[ED, SD, S2D, CD](ABC):
             key=sort_content,
         )
         for cont in sorted_content:
-            should_ignore: bool = content_filter.should_ignore_episode(cont)
+            status = content_filter.episode_status(cont)
 
-            if should_ignore:
+            if status.should_ignore():
                 ignored += 1
                 continue
 
@@ -451,9 +451,9 @@ class Validator[ED, SD, S2D, CD](ABC):
             key=sort_content,
         )
         for cont in sorted_content:
-            should_ignore: bool = content_filter.should_ignore_season(cont)
+            status = content_filter.season_status(cont)
 
-            if should_ignore:
+            if status.should_ignore():
                 ignored += 1
                 continue
 
@@ -533,9 +533,9 @@ class Validator[ED, SD, S2D, CD](ABC):
             key=sort_content,
         )
         for cont in sorted_content:
-            should_ignore: bool = content_filter.should_ignore_series(cont)
+            status = content_filter.series_status(cont)
 
-            if should_ignore:
+            if status.should_ignore():
                 ignored += 1
                 continue
 
@@ -614,12 +614,12 @@ class Validator[ED, SD, S2D, CD](ABC):
         ignored: int = 0
         sorted_content: list[Content] = sorted(contents, key=sort_content)
         for cont in sorted_content:
-            should_ignore: bool
+            status: ContentFilterStatus
 
             if isinstance(cont, CollectionContent):
-                should_ignore = content_filter.should_ignore_collection(cont)
+                status = content_filter.collection_status(cont)
             elif isinstance(cont, SeriesContent):
-                should_ignore = content_filter.should_ignore_series(cont)
+                status = content_filter.series_status(cont)
             elif isinstance(cont, SeasonContent):
                 msg = _("'SeasonContent' not valid for this state")
                 raise TypeError(msg)
@@ -630,7 +630,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                 msg = _("invalid type for 'Content': {typ}").format(typ=type(cont))
                 raise TypeError(msg)
 
-            if should_ignore:
+            if status.should_ignore():
                 ignored += 1
                 continue
 
