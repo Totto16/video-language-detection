@@ -151,6 +151,22 @@ class EBMLVarInt:
                 ),
             )
 
+    def minmum_bytes_required(self: Self) -> int:
+
+        # each byte has 7 bits of information
+
+        acc = self.__value
+        amount = 1
+        while True:
+            acc = acc // 0b10000000
+
+            if acc == 0:
+                break
+
+            amount = amount + 1
+
+        return amount
+
 
 @final
 @decorate_class(slots=True)
