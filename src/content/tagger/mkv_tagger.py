@@ -137,7 +137,7 @@ class EBMLVarInt:
                 rest = f.read(varint_byte_length - 1)
 
             byte_value = (
-                bytes(first_byte[0] & ((1 << (8 - varint_byte_length)) - 1)) + rest
+                bytes([first_byte[0] & ((1 << (8 - varint_byte_length)) - 1)]) + rest
             )
 
             int_value = int.from_bytes(byte_value, byteorder="big", signed=False)
@@ -166,6 +166,28 @@ class EBMLVarInt:
             amount = amount + 1
 
         return amount
+
+    @property
+    def value(self: Self) -> int:
+        return self.__value
+
+    def __str__(self: Self) -> str:
+        return f"<VarInt {self.__value}>"
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__value)
+
+    def __hash__(self: Self) -> int:
+        return hash(("VarInt", self.__value))
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, EBMLVarInt):
+            return self.__value == other.__value
+
+        if isinstance(other, int):
+            return self.__value == other
+
+        return False
 
 
 @final

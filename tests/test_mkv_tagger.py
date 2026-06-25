@@ -1,8 +1,10 @@
-from tkinter import Variable
+from io import BytesIO
 
 from pytest_subtests import SubTests
+from test_helper import OkResult
 
 from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
+from content.tagger.parser import BoundedIO, SimpleSpan
 
 
 def test_mkv_tagger_bit_iterator(
@@ -41,3 +43,31 @@ def test_mkv_tagger_var_int_bytes_required(
             var_int = EBMLVarInt(int_val)
 
             assert var_int.minmum_bytes_required() == amount
+
+
+def test_mkv_tagger_parse_var_int(
+    subtests: SubTests,
+) -> None:
+    tests: list[tuple[bytes, int]] = [
+        (b"\x82", 2),
+        (b"\x40\x02", 2),
+        (b"\x20\x00\x02", 2),
+        (b"\x01\x00\x00\x00\x00\x00\x00\x02", 2),
+    ]
+
+    for byte, result in tests:
+        with subtests.test("VarInt parsing"):
+            buf_io = BytesIO(byte)
+            io = BoundedIO.get_new(
+                buf_io,
+                span=SimpleSpan(0, len(byte)),
+            )
+            var_int_res = EBMLVarInt.from_io(io)
+
+            assert var_int_res == OkResult()
+
+            var_int, bytes_used = var_int_res.as_ok()
+
+            assert bytes_used == len(byte)
+
+            assert var_int == result
