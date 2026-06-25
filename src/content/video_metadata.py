@@ -229,3 +229,9 @@ class VideoMetadata:
         VideoMetadata.__check_ffprobe()
 
         return VideoMetadata.__read_metadata(file=file, error_mode=error_mode)
+
+    def __str__(self: Self) -> str:
+        return f"<VideoMetadata duration: {self.__duration} streams: {self.__streams} dimensions: {self.__dimensions} size: {self.__size}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
