@@ -299,6 +299,8 @@ class Validator[ED, SD, S2D, CD](ABC):
     ) -> None:
         status_bar_manager: StatusBarManager = StatusBarManager(manager)
 
+        # TODO: use content_filter
+
         self.__validate_root_impl(
             contents,
             directory,
@@ -345,13 +347,33 @@ class Validator[ED, SD, S2D, CD](ABC):
         season: SeasonContent,
         *,
         status_bar_manager: StatusBarManager,
+        content_filter: ContentFilter,
     ) -> list["Validator.__Any2"]:
 
-        amount = StartAmount(
-            total=len(season.episodes),
-            processing=len(season.episodes),
-            ignored=0,
+        def sort_content(content: EpisodeContent) -> str:
+            return str(content.scanned_file.path)
+
+        contents_to_scan: list[EpisodeContent] = []
+        ignored: int = 0
+        sorted_content: list[EpisodeContent] = sorted(
+            season.episodes,
+            key=sort_content,
         )
+        for cont in sorted_content:
+            should_ignore: bool = content_filter.should_ignore_episode(cont)
+
+            if should_ignore:
+                ignored += 1
+                continue
+
+            contents_to_scan.append(cont)
+
+        amount: StartAmount = StartAmount(
+            total=len(contents_to_scan) + ignored,
+            processing=len(contents_to_scan),
+            ignored=ignored,
+        )
+
         name = season.scanned_file.path.name
 
         status_bar_manager.start(
@@ -364,7 +386,7 @@ class Validator[ED, SD, S2D, CD](ABC):
             Validator.__ValidatorState(v.name) for v in validators
         ]
 
-        for episode in season.episodes:
+        for episode in contents_to_scan:
             v_bar_name = _("Validator for {episode}").format(
                 episode=episode.scanned_file.path.name,
             )
@@ -416,13 +438,33 @@ class Validator[ED, SD, S2D, CD](ABC):
         series: SeriesContent,
         *,
         status_bar_manager: StatusBarManager,
+        content_filter: ContentFilter,
     ) -> list["Validator.__Any3"]:
 
-        amount = StartAmount(
-            total=len(series.seasons),
-            processing=len(series.seasons),
-            ignored=0,
+        def sort_content(content: SeasonContent) -> str:
+            return str(content.scanned_file.path)
+
+        contents_to_scan: list[SeasonContent] = []
+        ignored: int = 0
+        sorted_content: list[SeasonContent] = sorted(
+            series.seasons,
+            key=sort_content,
         )
+        for cont in sorted_content:
+            should_ignore: bool = content_filter.should_ignore_season(cont)
+
+            if should_ignore:
+                ignored += 1
+                continue
+
+            contents_to_scan.append(cont)
+
+        amount: StartAmount = StartAmount(
+            total=len(contents_to_scan) + ignored,
+            processing=len(contents_to_scan),
+            ignored=ignored,
+        )
+
         name = series.scanned_file.path.name
 
         status_bar_manager.start(
@@ -435,13 +477,14 @@ class Validator[ED, SD, S2D, CD](ABC):
             Validator.__ValidatorState(v.name) for v in validators
         ]
 
-        for season in series.seasons:
+        for season in contents_to_scan:
             local_state_res: list[Validator.__Any2] = (
                 Validator.__validate_multiple_season_impl(
                     validators,
                     series.description,
                     season,
                     status_bar_manager=status_bar_manager,
+                    content_filter=content_filter,
                 )
             )
 
@@ -477,13 +520,33 @@ class Validator[ED, SD, S2D, CD](ABC):
         collection: CollectionContent,
         *,
         status_bar_manager: StatusBarManager,
+        content_filter: ContentFilter,
     ) -> list["Validator.__Any4"]:
 
-        amount = StartAmount(
-            total=len(collection.series),
-            processing=len(collection.series),
-            ignored=0,
+        def sort_content(content: SeriesContent) -> str:
+            return str(content.scanned_file.path)
+
+        contents_to_scan: list[SeriesContent] = []
+        ignored: int = 0
+        sorted_content: list[SeriesContent] = sorted(
+            collection.series,
+            key=sort_content,
         )
+        for cont in sorted_content:
+            should_ignore: bool = content_filter.should_ignore_series(cont)
+
+            if should_ignore:
+                ignored += 1
+                continue
+
+            contents_to_scan.append(cont)
+
+        amount: StartAmount = StartAmount(
+            total=len(contents_to_scan) + ignored,
+            processing=len(contents_to_scan),
+            ignored=ignored,
+        )
+
         name = collection.scanned_file.path.name
 
         status_bar_manager.start(
@@ -496,12 +559,13 @@ class Validator[ED, SD, S2D, CD](ABC):
             Validator.__ValidatorState(v.name) for v in validators
         ]
 
-        for serie in collection.series:
+        for serie in contents_to_scan:
             local_state_res: list[Validator.__Any3] = (
                 Validator.__validate_multiple_series_impl(
                     validators,
                     serie,
                     status_bar_manager=status_bar_manager,
+                    content_filter=content_filter,
                 )
             )
 
@@ -538,22 +602,61 @@ class Validator[ED, SD, S2D, CD](ABC):
         directory: Path,
         *,
         status_bar_manager: StatusBarManager,
+        content_filter: ContentFilter,
     ) -> None:
+
+        def sort_content(content: Content) -> str:
+            return str(content.scanned_file.path)
+
+        root_content: list[SeriesContent | CollectionContent] = []
+
+        contents_to_scan: list[SeriesContent | CollectionContent] = []
+        ignored: int = 0
+        sorted_content: list[Content] = sorted(contents, key=sort_content)
+        for cont in sorted_content:
+            should_ignore: bool
+
+            if isinstance(cont, CollectionContent):
+                should_ignore = content_filter.should_ignore_collection(cont)
+            elif isinstance(cont, SeriesContent):
+                should_ignore = content_filter.should_ignore_series(cont)
+            elif isinstance(cont, SeasonContent):
+                msg = _("'SeasonContent' not valid for this state")
+                raise TypeError(msg)
+            elif isinstance(cont, EpisodeContent):
+                msg = _("'EpisodeContent' not valid for this state ")
+                raise TypeError(msg)
+            else:
+                msg = _("invalid type for 'Content': {typ}").format(typ=type(cont))
+                raise TypeError(msg)
+
+            if should_ignore:
+                ignored += 1
+                continue
+
+            contents_to_scan.append(cont)
+
+        amount: StartAmount = StartAmount(
+            total=len(contents_to_scan) + ignored,
+            processing=len(contents_to_scan),
+            ignored=ignored,
+        )
+
+        name = directory.name
+
+        status_bar_manager.start(amount, name, DefaultStatusBarInfo())
+
         state: list[Validator.__ValidatorState[Validator.__Any4 | Validator.__Any3]] = [
             Validator.__ValidatorState(v.name) for v in validators
         ]
 
-        root_content: list[SeriesContent | CollectionContent] = []
-
-        amount = StartAmount(total=len(contents), processing=len(contents), ignored=0)
-        status_bar_manager.start(amount, directory.name, DefaultStatusBarInfo())
-
-        for content in contents:
+        for content in contents_to_scan:
             if isinstance(content, CollectionContent):
                 local_state1 = Validator.__validate_multiple_collection_impl(
                     validators,
                     content,
                     status_bar_manager=status_bar_manager,
+                    content_filter=content_filter,
                 )
 
                 for i, local_state_entry1, v in zip(
@@ -569,6 +672,7 @@ class Validator[ED, SD, S2D, CD](ABC):
                     validators,
                     content,
                     status_bar_manager=status_bar_manager,
+                    content_filter=content_filter,
                 )
 
                 for i, local_state_entry2, v in zip(
@@ -579,18 +683,11 @@ class Validator[ED, SD, S2D, CD](ABC):
                 ):
                     state[i].append(local_state_entry2, v.name)
 
-            elif isinstance(content, SeasonContent):
-                msg = _("'SeasonContent' not valid for this state")
-                raise TypeError(msg)
-            elif isinstance(content, EpisodeContent):
-                msg = _("'EpisodeContent' not valid for this state ")
-                raise TypeError(msg)
             else:
-                msg = _("invalid type for 'Content': {typ}").format(typ=type(content))
-                raise TypeError(msg)
+                assert_never(content)
 
             root_content.append(content)
-            status_bar_manager.progress(directory.name, amount=1)
+            status_bar_manager.progress(name, amount=1)
 
         for validator, root_state in zip(
             validators,
@@ -599,7 +696,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         ):
             validator.validate_all(root_content, root_state.underlying)
 
-        status_bar_manager.finish(directory.name)
+        status_bar_manager.finish(name)
 
     @staticmethod
     def validate_multiple(
@@ -617,6 +714,7 @@ class Validator[ED, SD, S2D, CD](ABC):
             contents,
             directory,
             status_bar_manager=status_bar_manager,
+            content_filter=content_filter,
         )
 
     @abstractmethod

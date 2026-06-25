@@ -108,6 +108,8 @@ def launch_tui(
     _kb: KeyBindings = get_keybindings(logger, config.keybindings, scanner)
 
     status_bar.stage = _("Scanning")
+
+    # TODO: also accept content_filter to parse_contents, they filter out some files!
     contents: list[Content] = parse_contents(
         root_folder=config.parser.root_folder,
         options={

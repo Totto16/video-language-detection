@@ -48,6 +48,7 @@ StatusBarColor = str
 
 StatusBarInfoRaw = tuple[StatusBarColor, str]
 
+
 @decorate_class(slots=True)
 class DefaultStatusBarInfo:
     pass
@@ -445,6 +446,7 @@ def process_folder(
         file_path: Path = directory / file
 
         file_type: ScannedFileType = ScannedFileType.from_path(file_path)
+        # TODO: should ignore, should also use content_filter
         should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
         if should_ignore:
             ignored += 1
@@ -453,10 +455,10 @@ def process_folder(
         temp.append((file_path, file_type, parent_folders))
 
     value: ContentCharacteristic = ContentCharacteristic(
-        parent_type, ScannedFileType.folder,
+        parent_type,
+        ScannedFileType.folder,
     )
 
-    #  total, processing, ignored
     amount: StartAmount = StartAmount(
         total=len(temp) + ignored,
         processing=len(temp),
