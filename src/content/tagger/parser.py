@@ -50,6 +50,13 @@ class SimpleSpan:
 
         return SimpleSpan(self.start, new_size)
 
+    def next_span(self: Self, advance_by: int) -> "SimpleSpan":
+        if advance_by > self.size:
+            msg = f"New span has not enough bytes to advance by: {advance_by} > {self.size}"
+            raise RuntimeError(msg)
+
+        return SimpleSpan(self.start + advance_by, self.size - advance_by)
+
     def __str__(self: Self) -> str:
         return f"<SimpleSpan start: {self.start} size: {self.size}>"
 
@@ -71,6 +78,7 @@ class BoundedIOWriteable(Protocol):
 
 class BoundedIORW(BoundedIOReadable, BoundedIOWriteable):
     pass
+
 
 @decorate_class(slots=True)
 class ExclusiveIOBase:
@@ -147,6 +155,7 @@ class ExclusiveIOBase:
             msg = f"ExclusiveIOBase release error: released with different class, than acquired: {self.__holder} != {id(cls)}"
             raise RuntimeError(msg)
         self.__holder = id(None)
+
 
 @decorate_class(slots=True)
 class BoundedIO:
@@ -449,6 +458,7 @@ def uuid_to_bytes(order: ByteOrder, uuid: UUID) -> bytes:
 
     return result
 
+
 @decorate_class(slots=True)
 class Packable[Type, Underlying = Type](ABC):
     @property
@@ -464,6 +474,7 @@ class Packable[Type, Underlying = Type](ABC):
 
     @abstractmethod
     def from_underlying(self: Self, value: Underlying) -> Type: ...
+
 
 @decorate_class(slots=True)
 class UnsignedInt(Packable[int]):
@@ -485,6 +496,7 @@ class UnsignedInt(Packable[int]):
     def from_underlying(self: Self, value: int) -> int:
         return value
 
+
 @decorate_class(slots=True)
 class UnsignedLongLong(Packable[int]):
     @property
@@ -505,6 +517,7 @@ class UnsignedLongLong(Packable[int]):
     def from_underlying(self: Self, value: int) -> int:
         return value
 
+
 @decorate_class(slots=True)
 class UnsignedShort(Packable[int]):
     @property
@@ -524,6 +537,7 @@ class UnsignedShort(Packable[int]):
     @override
     def from_underlying(self: Self, value: int) -> int:
         return value
+
 
 @decorate_class(slots=True)
 class Unpacker:
@@ -605,6 +619,7 @@ class Unpacker:
         )
 
         return cast(tuple[Type1, Type2], result)
+
 
 @decorate_class(slots=True)
 class Packer:

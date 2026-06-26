@@ -3,7 +3,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, BinaryIO, Optional, Self, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, final, override
 
 from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.video_tagger import (
@@ -22,6 +22,11 @@ from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 
 
+@dataclass(slots=True, repr=True)
+class EBMLDecodeOptions:
+    max_id_length: int | Literal["header"]
+
+
 class MKVDecodeType(Enum):
     Check = "check"
     Normal = "normal"
@@ -31,10 +36,15 @@ class MKVDecodeType(Enum):
 class MKVDecodeOptions:
     strict: bool
     type: MKVDecodeType
+    ebml_options: EBMLDecodeOptions
 
     @staticmethod
     def default() -> "MKVDecodeOptions":
-        return MKVDecodeOptions(strict=True, type=MKVDecodeType.Normal)
+        return MKVDecodeOptions(
+            strict=True,
+            type=MKVDecodeType.Normal,
+            ebml_options=EBMLDecodeOptions(max_id_length="header"),
+        )
 
 
 @decorate_class(slots=True)
@@ -112,6 +122,9 @@ class EBMLVarInt:
     @staticmethod
     def from_io(io: BoundedIO) -> Result[tuple["EBMLVarInt", int], str]:
 
+        if io.span.size < 1:
+            return Err("Not enough data for VarInt")
+
         with io.r_ctx(force_entire_read=False) as f:
 
             first_byte = f.read(1)
@@ -134,6 +147,11 @@ class EBMLVarInt:
 
             rest: bytes = b""
             if varint_byte_length > 1:
+                if io.span.size < varint_byte_length:
+                    return Err(
+                        f"Not enough data for VarInt: need {varint_byte_length} bytes but got {io.span.size}",
+                    )
+
                 rest = f.read(varint_byte_length - 1)
 
             byte_value = (
@@ -166,6 +184,43 @@ class EBMLVarInt:
             amount = amount + 1
 
         return amount
+
+    def is_valid_element_id(self: Self, bytes_used: int) -> Optional[str]:
+        # The bits of the
+        # VINT_DATA component of the Element ID MUST NOT be all 0 values or all 1 values. The
+        # VINT_DATA component of the Element ID MUST be encoded at the shortest valid length. For
+        # example, an Element ID with binary encoding of 1011 1111 is valid, whereas an Element ID with
+        # binary encoding of 0100 0000 0011 1111 stores a semantically equal VINT_DATA but is invalid,
+        # because a shorter VINT encoding is possible. Additionally, an Element ID with binary encoding of
+        # 1111 1111 is invalid, since the VINT_DATA section is set to all one values, whereas an Element ID
+        # with binary encoding of 0100 0000 0111 1111 stores a semantically equal VINT_DATA and is the
+        # shortest-possible VINT encoding.
+
+        if self.__value == 0:
+            return "Value is NULL"
+
+        if bytes_used == 0:
+            msg = f"IMPLEMENTATION error: bytes_used {bytes_used}"
+            raise RuntimeError(msg)
+
+        if self.__value == ((1 << (bytes_used * 7)) - 1):
+            return "Value is 0xFF..FF"
+
+        minmum_bytes_required = self.minmum_bytes_required()
+
+        if minmum_bytes_required != bytes_used:
+            if minmum_bytes_required > bytes_used:
+                msg = f"IMPLEMENTATION ERROR: minmum_bytes_required  calculated incorrectly: {minmum_bytes_required} {self.__value}"
+                raise RuntimeError(msg)
+
+            if self.__value == ((1 << ((bytes_used - 1) * 7)) - 1):
+                if minmum_bytes_required + 1 == bytes_used:
+                    return None
+                return f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}"
+
+            return f"Value {self.__value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
+
+        return None
 
     @property
     def value(self: Self) -> int:
@@ -213,17 +268,18 @@ class EBMLElementSpan:
             raise RuntimeError(msg)
 
         if self.__total.size < header_size:
-            msg = f"Invalid chunk size {self.__total.size} at {self.__total.start}"
+            msg = f"Invalid element size {self.__total.size} at {self.__total.start}"
             raise RuntimeError(msg)
-
-    varIntTimes2 = "TODO"
 
     @staticmethod
     def from_ebml_specified_size(
-        span: SimpleSpan, header_size: int, todo: varIntTimes2  # size + id?
+        span: SimpleSpan,
+        header_ints: tuple[int, int],
     ) -> "EBMLElementSpan":
+        header_size = sum(header_ints)
         return EBMLElementSpan(
-            SimpleSpan(span.start, span.size + len(todo)), header_size
+            SimpleSpan(span.start, span.size + header_size),
+            header_size,
         )
 
     def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
@@ -253,12 +309,7 @@ class EBMLElementSpan:
         if interval_size > self.__total.size or interval_size < 0:
             msg = f"Implementation error, interval_size out of bounds [0, {self.__total.size}]: {interval_size}"
 
-        span = SimpleSpan(interval_start, interval_size)
-        if (span.start % 2) != 0 and span.size != 0:
-            msg = f"SimpleSpan for AVI is not aligned by the WORD (16 bit): {span}"
-            raise RuntimeError(msg)
-
-        return span
+        return SimpleSpan(interval_start, interval_size)
 
     def header_span(self: Self, depth: int = 0) -> SimpleSpan:
         if depth == -1:
@@ -285,20 +336,6 @@ class EBMLElementSpan:
     def total(self: Self) -> SimpleSpan:
         return self.__total
 
-    def validate_truncation(self: Self, new_total_size: int) -> None:
-        # NOTE: ATM only supported for filelevel spans, alias starting at 0!
-        if self.__total.start != 0:
-            msg = f"validate_truncation only supported for spans starting at 0, but this starts at {self.__total.start }"
-            raise RuntimeError(msg)
-
-        last_span = self.__interval_span_impl(len(self.__intervals))
-
-        if last_span.start > new_total_size:
-            msg = f"truncation would remove too much of the size: {last_span.start} > {new_total_size}"
-            raise RuntimeError(msg)
-
-        self.__total = self.__total.sub_span(new_total_size)
-
     def __str__(self: Self) -> str:
         header_string = ", ".join(
             str(self.header_span(i)) for i in range(len(self.__intervals))
@@ -323,39 +360,61 @@ class EBMLElement(NonFinalEBMLElement):
         self.span = span
 
     @staticmethod
-    def read_avi_chunk(io: BoundedIO) -> "AVIChunk":
-        # spec https://learn.microsoft.com/en-us/previous-versions/ms779636(v=vs.85)
-        # AVI Chunk structure:
-        # fourcc | 4 bytes | char[4]
-        # size   | 4 bytes | unsigned int
-        # ... data
+    def read_ebml_element(io: BoundedIO, options: MKVDecodeOptions) -> "EBMLElement":
+        # spec: RFC 8794
+        # EBML Element structure:
+        # element_id | 1-8 bytes | <varint>
+        # size   | 1-8 bytes | <varint>
+        # ... data (payload or children or both)
 
-        # Note: size is the size after it, so 8 bytes less then the whole size
+        # Note: size is the size after it, so the <size of both varints> bytes less then the whole size
 
         # typedef struct {
-        #     DWORD dwFourCC
-        #     DWORD dwSize
-        #     BYTE data[dwSize]
-        # } CHUNK;
+        #     VarInt element_id
+        #     BarInt data_size
+        #     Byte data[data_size]
+        # } EBMLElement;
 
-        with io.r_ctx(force_entire_read=False) as f:
-            hdr = f.read(8)
+        element_id_res = EBMLVarInt.from_io(io)
 
-            fourcc, size = Unpacker.unpack_two(
-                AVI_BYTE_ORDER,
-                (PackableFOURCC(), UnsignedInt()),
-                hdr,
-            )
+        if element_id_res.err():
+            msg = f"Element ID Parse error: {element_id_res.as_err()}"
+            raise RuntimeError(msg)
 
-            if size + 8 > io.span.size:
-                msg = f"Invalid AVI Chunk size: It overflows the parent chunk: {size+ 8} > {io.span.size}"
-                raise RuntimeError(msg)
+        element_id, element_id_bytes = element_id_res.as_ok()
 
-            span = EBMLElementSpan.from_avi_specified_size(
-                io.span.sub_span(size),
-                header_size=8,
-            )
-            return AVIChunk(fourcc, span, is_list=False)
+        # An Element ID is a Variable-Size Integer. By default, Element IDs are from one octet to four octets
+        # in length, although Element IDs of greater lengths MAY be used if the EBMLMaxIDLength
+        # Element of the EBML Header is set to a value greater than four (see Section 11.2.4).
+
+        EBMLMaxIDLength = (
+            4
+            if options.ebml_options.max_id_length == "header"
+            else options.ebml_options.max_id_length
+        )
+        if element_id_bytes > EBMLMaxIDLength:
+            msg = f"ELement ID varint exceeds allowed size of {EBMLMaxIDLength}: {element_id_bytes}"
+            raise RuntimeError(msg)
+
+        if not element_id.is_valid_element_id(element_id_bytes):
+            msg = f"Invalid Element ID: {element_id}"
+            raise RuntimeError(msg)
+
+        size_span = io.span.next_span(element_id_bytes)
+
+        data_size_res = EBMLVarInt.from_io(io.new_span_io(size_span))
+
+        if data_size_res.err():
+            msg = f"Data Size Parse error: {data_size_res.as_err()}"
+            raise RuntimeError(msg)
+
+        data_size, data_size_bytes = data_size_res.as_ok()
+
+        span = EBMLElementSpan.from_ebml_specified_size(
+            io.span.sub_span(data_size.value),
+            header_ints=(element_id_bytes, data_size_bytes),
+        )
+        return EBMLElement(element_id, span)
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
@@ -377,9 +436,8 @@ class EBMLElement(NonFinalEBMLElement):
 
 
 class EBMLHeader(EBMLElement):
-    pass
 
-    def __parse():
+    def __parse() -> "TODO":
         pass
         # The EBML Header MUST contain a single Master Element with an Element Name of EBML and
         # Element ID of 0x1A45DFA3 (see Section 11.2.1); the Master Element may have any number of
@@ -392,6 +450,11 @@ class EBMLHeader(EBMLElement):
 
 class EBMLBody(EBMLElement):
     pass
+
+
+class EBMLDocument:
+    pass
+    # needs header + body
 
 
 MKV_FOURCC = "TODO"
