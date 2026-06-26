@@ -389,8 +389,6 @@ class MP4Box(NonFinalMP4Box):
                 # TODO: check if we are at the top level, otherwise this is invalid!
                 msg = "size == 0 not supported, patching and checking, if this is a toplevel is too complicated"
                 raise RuntimeError(msg)
-                final_size = io.special_checked_filesize()
-                header_size = 8
 
             if final_size > io.span.size:
                 msg = f"Invalid MP4 Box size: It overflows the parent box: {final_size} > {io.span.size}"

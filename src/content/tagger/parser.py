@@ -106,20 +106,6 @@ class ExclusiveIOBase:
         self.__f.seek(0, 2)
         return self.__f.tell()
 
-    def size_no_seek(self: Self) -> int:
-        self.__assert_holder()
-
-        try:
-            fileno = self.__f.fileno()
-            return os.fstat(fileno).st_size
-        except UnsupportedOperation:
-            # use double seek instead of fstat
-            current_pos = self.__f.tell()
-            self.__f.seek(0, 2)
-            filesize = self.__f.tell()
-            self.__f.seek(current_pos)
-            return filesize
-
     def tell(self: Self) -> int:
         self.__assert_holder()
         return self.__f.tell()
@@ -396,15 +382,6 @@ class BoundedIO:
             raise RuntimeError(msg)
 
         return BoundedIO(self.__io, span)
-
-    def special_checked_filesize(self: Self) -> int:
-        filesize = self.__io.size_no_seek()
-
-        if self.__span.end != filesize:
-            msg = f"can only span to the filesize end, if the current bound also ends at the end: {self.__span.end} != {filesize}"
-            raise RuntimeError(msg)
-
-        return filesize
 
 
 class ByteOrder(StrEnum):
