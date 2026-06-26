@@ -1,9 +1,10 @@
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, final, override
 
 from content.tagger.parser import (
     BoundedIO,
@@ -752,7 +753,7 @@ class EBMLStringElement(EBMLElement, FinalEBMLElement):
         # spec: RFC 8794
         # EBML String structure:
         # element     | <variable element size> bytes | parent element
-        # ... data (0-8 bytes)
+        # ... data (* bytes)
 
         # class EBMLStringElement extends EBMLElement {
         #     Byte str_data[*]
@@ -827,7 +828,7 @@ class EBMLUTF8Element(EBMLElement, FinalEBMLElement):
         # spec: RFC 8794
         # EBML UTF-8 structure:
         # element     | <variable element size> bytes | parent element
-        # ... data (0-8 bytes)
+        # ... data (* bytes)
 
         # class EBMLUTF8Element extends EBMLElement {
         #     Byte str_data[*]
@@ -872,7 +873,97 @@ class EBMLUTF8Element(EBMLElement, FinalEBMLElement):
         return EBMLUTF8Element.__read_impl(io, parent)
 
     def __str__(self: Self) -> str:
-        return f"<EBMLUTF8Element parent: {EBMLElement.__str__(self)} value: {self.value}>"
+        return (
+            f"<EBMLUTF8Element parent: {EBMLElement.__str__(self)} value: {self.value}>"
+        )
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+# 2001-01-01T00:00:00.000000000 UTC
+EBML_DATE_EPOCH = datetime(2001, 1, 1, 0, 0, 0, tzinfo=UTC)
+
+
+@final
+@decorate_class(slots=True)
+class EBMLDateElement(EBMLElement, FinalEBMLElement):
+    value: datetime
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: datetime,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLDateElement":
+        # spec: RFC 8794
+        # EBML Date structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLDateElement extends EBMLElement {
+        #     Byte date_data[0-8]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLDateElement(parent, EBML_DATE_EPOCH)
+
+        if payload_size != 8:
+            msg = f"Invalid payload size for EBMLDateElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            date_int_value_raw = f.read(payload_size)
+
+            # in nanoseconds
+            date_int_value = int.from_bytes(
+                date_int_value_raw,
+                byteorder=EBML_NUMBER_BYTE_ORDER_STR,
+                signed=True,
+            )
+
+            date_value = EBML_DATE_EPOCH + timedelta(
+                microseconds=date_int_value // 1000,
+            )
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLDateElement(parent, date_value)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLDateElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLDateElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLDateElement":
+        return EBMLDateElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return (
+            f"<EBMLDateElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
+        )
 
     def __repr__(self: Self) -> str:
         return str(self)
