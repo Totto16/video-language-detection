@@ -180,6 +180,9 @@ class EBMLVarInt:
     def __hash__(self: Self) -> int:
         return hash(("VarInt", self.__value))
 
+    def __int__(self: Self) -> int:
+        return self.__value
+
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, EBMLVarInt):
             return self.__value == other.__value
