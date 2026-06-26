@@ -1027,6 +1027,79 @@ class EBMLMasterElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
+@final
+@decorate_class(slots=True)
+class EBMLBinaryElement(EBMLElement, FinalEBMLElement):
+    value: bytes
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: bytes,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLBinaryElement":
+        # spec: RFC 8794
+        # EBML Binary structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (* bytes)
+
+        # class EBMLBinaryElement extends EBMLElement {
+        #     Byte binary_data[*]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLBinaryElement(parent, b"")
+
+        if payload_size > VINTMAX:
+            msg = f"Invalid payload size for EBMLBinaryElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            binary_value = f.read(payload_size)
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLBinaryElement(parent, binary_value)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLBinaryElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLBinaryElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLBinaryElement":
+        return EBMLBinaryElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLBinaryElement parent: {EBMLElement.__str__(self)} value: {self.value!r}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 class MKVDecodeType(Enum):
     Check = "check"
     Normal = "normal"
