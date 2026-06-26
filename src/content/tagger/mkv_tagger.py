@@ -349,16 +349,20 @@ class EBMLElement(NonFinalEBMLElement):
     element_id: EBMLVarInt
     span: EBMLElementSpan
     header_sizes: tuple[int, int]
+    is_container: bool
 
     def __init__(
         self: Self,
         element_id: EBMLVarInt,
         span: EBMLElementSpan,
         header_sizes: tuple[int, int],
+        *,
+        is_container: bool,
     ) -> None:
         self.element_id = element_id
         self.span = span
         self.header_sizes = header_sizes
+        self.is_container = is_container
 
     @staticmethod
     def read_ebml_element(io: BoundedIO, options: EBMLDecodeOptions) -> "EBMLElement":
@@ -370,11 +374,11 @@ class EBMLElement(NonFinalEBMLElement):
 
         # Note: size is the size after it, so the <size of both varints> bytes less then the whole size
 
-        # typedef struct {
+        # class EBMLElement {
         #     VarInt element_id
         #     BarInt data_size
         #     Byte data[data_size]
-        # } EBMLElement;
+        # };
 
         element_id_res = EBMLVarInt.from_io(io)
 
@@ -420,7 +424,7 @@ class EBMLElement(NonFinalEBMLElement):
             io.span.sub_span(data_size.value),
             header_sizes=header_sizes,
         )
-        return EBMLElement(element_id, span, header_sizes)
+        return EBMLElement(element_id, span, header_sizes, is_container=False)
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
@@ -461,6 +465,85 @@ class EBMLBody(EBMLElement):
 class EBMLDocument:
     pass
     # needs header + body
+
+
+EBML_NUMBER_BYTE_ORDER: Literal["big"] = "big"
+
+
+@final
+@decorate_class(slots=True)
+class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
+    value: int
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: int,
+    ) -> None:
+        super().__init__(
+            parent.element_id, parent.span, parent.header_sizes, is_container=False
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLSignedIntegerElement":
+        # spec: RFC 8794
+        # EBML Signed Integer Element structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLSignedIntegerElement extends EBMLElement {
+        #     Byte s_integer_data[0-8]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLSignedIntegerElement(parent, 0)
+
+        if payload_size > 8 or payload_size < 0:
+            msg = f"Invalid payload size for EBMLSignedIntegerElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            s_integer_value_raw = f.read(payload_size)
+
+            s_int_val = int.from_bytes(
+                s_integer_value_raw,
+                byteorder=EBML_NUMBER_BYTE_ORDER,
+                signed=True,
+            )
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLSignedIntegerElement(parent, s_int_val)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLSignedIntegerElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLSignedIntegerElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLSignedIntegerElement":
+        return EBMLSignedIntegerElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLSignedIntegerElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class MKVDecodeType(Enum):
