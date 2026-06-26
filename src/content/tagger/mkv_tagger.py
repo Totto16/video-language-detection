@@ -969,6 +969,64 @@ class EBMLDateElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
+@final
+@decorate_class(slots=True)
+class EBMLMasterElement(EBMLElement, FinalEBMLElement):
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=True,
+        )
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLMasterElement":
+        # spec: RFC 8794
+        # EBML Master structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (* bytes), children elements
+
+        # class EBMLMasterElement extends EBMLElement {
+        #     EBMLElement children[*]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLMasterElement(parent)
+
+        if payload_size > VINTMAX:
+            msg = f"Invalid payload size for EBMLMasterElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        return EBMLMasterElement(parent)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLMasterElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLMasterElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLMasterElement":
+        return EBMLMasterElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLMasterElement parent: {EBMLElement.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 class MKVDecodeType(Enum):
     Check = "check"
     Normal = "normal"
