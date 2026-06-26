@@ -728,6 +728,81 @@ class EBMLFloatElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
+@final
+@decorate_class(slots=True)
+class EBMLStringElement(EBMLElement, FinalEBMLElement):
+    value: str
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: str,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLStringElement":
+        # spec: RFC 8794
+        # EBML String structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLStringElement extends EBMLElement {
+        #     Byte str_data[*]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLStringElement(parent, "")
+
+        if payload_size > VINTMAX:
+            msg = f"Invalid payload size for EBMLStringElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            str_value_raw = f.read(payload_size)
+
+            str_value = str_value_raw.decode("ascii").rstrip("\x00")
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLStringElement(parent, str_value)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLStringElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLStringElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLStringElement":
+        return EBMLStringElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLStringElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 class MKVDecodeType(Enum):
     Check = "check"
     Normal = "normal"
