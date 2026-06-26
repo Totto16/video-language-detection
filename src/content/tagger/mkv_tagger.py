@@ -803,6 +803,81 @@ class EBMLStringElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
+@final
+@decorate_class(slots=True)
+class EBMLUTF8Element(EBMLElement, FinalEBMLElement):
+    value: str
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: str,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLUTF8Element":
+        # spec: RFC 8794
+        # EBML UTF-8 structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLUTF8Element extends EBMLElement {
+        #     Byte str_data[*]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLUTF8Element(parent, "")
+
+        if payload_size > VINTMAX:
+            msg = f"Invalid payload size for EBMLUTF8Element:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            str_value_raw = f.read(payload_size)
+
+            str_value = str_value_raw.decode("utf-8").rstrip("\x00")
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLUTF8Element(parent, str_value)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLUTF8Element":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLUTF8Element.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLUTF8Element":
+        return EBMLUTF8Element.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLUTF8Element parent: {EBMLElement.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 class MKVDecodeType(Enum):
     Check = "check"
     Normal = "normal"
