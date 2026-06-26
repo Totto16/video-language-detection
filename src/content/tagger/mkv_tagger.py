@@ -481,7 +481,10 @@ class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
         value: int,
     ) -> None:
         super().__init__(
-            parent.element_id, parent.span, parent.header_sizes, is_container=False
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
         )
 
         self.value = value
@@ -541,6 +544,87 @@ class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
 
     def __str__(self: Self) -> str:
         return f"<EBMLSignedIntegerElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+@decorate_class(slots=True)
+class EBMLUnsignedIntegerElement(EBMLElement, FinalEBMLElement):
+    value: int
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: int,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLUnsignedIntegerElement":
+        # spec: RFC 8794
+        # EBML Unsigned Integer Element structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLUnsignedIntegerElement extends EBMLElement {
+        #     Byte u_integer_data[0-8]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLUnsignedIntegerElement(parent, 0)
+
+        if payload_size > 8 or payload_size < 0:
+            msg = (
+                f"Invalid payload size for EBMLUnsignedIntegerElement:  {payload_size}"
+            )
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            u_integer_value_raw = f.read(payload_size)
+
+            u_int_val = int.from_bytes(
+                u_integer_value_raw,
+                byteorder=EBML_NUMBER_BYTE_ORDER,
+                signed=False,
+            )
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLUnsignedIntegerElement(parent, u_int_val)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLUnsignedIntegerElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLUnsignedIntegerElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLUnsignedIntegerElement":
+        return EBMLUnsignedIntegerElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLUnsignedIntegerElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
