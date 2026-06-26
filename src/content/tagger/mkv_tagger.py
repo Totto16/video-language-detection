@@ -3,9 +3,16 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, BinaryIO, Literal, Optional, Self, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
 
-from content.tagger.parser import BoundedIO, SimpleSpan
+from content.tagger.parser import (
+    BoundedIO,
+    ByteOrder,
+    Float32,
+    Float64,
+    SimpleSpan,
+    Unpacker,
+)
 from content.tagger.video_tagger import (
     ContextType,
     InspectNotImplemented,
@@ -467,7 +474,8 @@ class EBMLDocument:
     # needs header + body
 
 
-EBML_NUMBER_BYTE_ORDER: Literal["big"] = "big"
+EBML_NUMBER_BYTE_ORDER_STR: Literal["big"] = "big"
+EBML_NUMBER_BYTE_ORDER = ByteOrder.Big
 
 
 @final
@@ -515,7 +523,7 @@ class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
 
             s_int_val = int.from_bytes(
                 s_integer_value_raw,
-                byteorder=EBML_NUMBER_BYTE_ORDER,
+                byteorder=EBML_NUMBER_BYTE_ORDER_STR,
                 signed=True,
             )
 
@@ -596,7 +604,7 @@ class EBMLUnsignedIntegerElement(EBMLElement, FinalEBMLElement):
 
             u_int_val = int.from_bytes(
                 u_integer_value_raw,
-                byteorder=EBML_NUMBER_BYTE_ORDER,
+                byteorder=EBML_NUMBER_BYTE_ORDER_STR,
                 signed=False,
             )
 
@@ -625,6 +633,96 @@ class EBMLUnsignedIntegerElement(EBMLElement, FinalEBMLElement):
 
     def __str__(self: Self) -> str:
         return f"<EBMLUnsignedIntegerElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@final
+@decorate_class(slots=True)
+class EBMLFloatElement(EBMLElement, FinalEBMLElement):
+    value: float
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+        value: float,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            parent.header_sizes,
+            is_container=False,
+        )
+
+        self.value = value
+
+    @staticmethod
+    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLFloatElement":
+        # spec: RFC 8794
+        # EBML Float Element structure:
+        # element     | <variable element size> bytes | parent element
+        # ... data (0-8 bytes)
+
+        # class EBMLFloatElement extends EBMLElement {
+        #     Byte float_data[0-8]
+        # } ;
+
+        payload_size = parent.span.payload_span.size
+
+        if payload_size == 0:
+            return EBMLFloatElement(parent, 0)
+
+        if payload_size not in [4, 8]:
+            msg = f"Invalid payload size for EBMLFloatElement:  {payload_size}"
+            raise RuntimeError(msg)
+
+        with io.r_ctx(force_entire_read=True) as f:
+
+            float_value_raw = f.read(payload_size)
+
+            float_val: float
+            if payload_size == 4:
+                float_val = Unpacker.unpack_one(
+                    EBML_NUMBER_BYTE_ORDER,
+                    Float32(),
+                    float_value_raw,
+                )
+            elif payload_size == 8:
+                float_val = Unpacker.unpack_one(
+                    EBML_NUMBER_BYTE_ORDER,
+                    Float64(),
+                    float_value_raw,
+                )
+            else:
+                msg = "Implementation error: float size not checked correctly"
+                raise RuntimeError(msg)
+
+            parent.span.add_header(payload_size)
+
+            if parent.span.payload_span.size != 0:
+                msg = f"Expected empty payload but got:{parent.span.payload_span.size}"
+                raise RuntimeError(msg)
+
+            return EBMLFloatElement(parent, float_val)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+    ) -> "EBMLFloatElement":
+        element = EBMLElement.read_ebml_element(io, options)
+        return EBMLFloatElement.__read_impl(element.payload_io(io), element)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLElement,
+    ) -> "EBMLFloatElement":
+        return EBMLFloatElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLFloatElement parent: {EBMLElement.__str__(self)} value: {self.value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)

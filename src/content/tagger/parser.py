@@ -540,6 +540,48 @@ class UnsignedShort(Packable[int]):
 
 
 @decorate_class(slots=True)
+class Float32(Packable[float]):
+    @property
+    @override
+    def pack_str(self: Self) -> str:
+        return "f"
+
+    @property
+    @override
+    def pack_size(self: Self) -> int:
+        return 4
+
+    @override
+    def to_underlying(self: Self, value: float) -> float:
+        return value
+
+    @override
+    def from_underlying(self: Self, value: float) -> float:
+        return value
+
+
+@decorate_class(slots=True)
+class Float64(Packable[float]):
+    @property
+    @override
+    def pack_str(self: Self) -> str:
+        return "d"
+
+    @property
+    @override
+    def pack_size(self: Self) -> int:
+        return 8
+
+    @override
+    def to_underlying(self: Self, value: float) -> float:
+        return value
+
+    @override
+    def from_underlying(self: Self, value: float) -> float:
+        return value
+
+
+@decorate_class(slots=True)
 class Unpacker:
 
     @staticmethod
