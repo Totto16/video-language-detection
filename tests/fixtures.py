@@ -104,7 +104,7 @@ def video_file_dict() -> dict[str, VideoFile]:
         ),
         "Big_Buck_Bunny_360_10s_1MB.mkv": VideoFileURL(
             "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
-            "video/mp4",
+            "video/x-matroska",
         ),
         # separator
         "file_example_MP4_480_1_5MG.mp4": VideoFileLocal(
@@ -128,6 +128,11 @@ def video_file_dict() -> dict[str, VideoFile]:
         # see: https://gpac.github.io/mp4box.js/test/filereader.html?https://mpeggroup.github.io/FileFormatConformance/files/published/isobmff/02_dref_edts_img.mp4
         # file with mdhd version 1
         "02_dref_edts_img.mp4": VideoFileLocal("02_dref_edts_img.mp4"),
+        # see: https://filesamples.com/formats/mkv
+        "sample_640x360.mkv": VideoFileURL(
+            "https://filesamples.com/samples/video/mkv/sample_640x360.mkv",
+            "application/octet-stream",  # "video/x-matroska",
+        ),
     }
 
     return video
@@ -203,7 +208,7 @@ TempFFProbeVideoFiles = FinalizerFixture[list[tuple[Path, FFprobeData]]]
 
 
 @pytest.fixture(scope="package")
-def ffprobe_temp_mp4_files(
+def ffprobe_temp_video_files(
     video_file_dict: dict[str, VideoFile],
     cached_file_manager: CachedFileManager,
 ) -> TempFFProbeVideoFiles:
@@ -214,6 +219,7 @@ def ffprobe_temp_mp4_files(
         at_video_dict(video_file_dict, "Big_Buck_Bunny_1080_10s_30MB.mp4"),
         at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.webm"),
         at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mkv"),
+        at_video_dict(video_file_dict, "sample_640x360.mkv"),
     ]
 
     files = temp_video_files(video_urls, cached_file_manager)
@@ -224,6 +230,7 @@ def ffprobe_temp_mp4_files(
         FFprobeData("h264", 10.0),
         FFprobeData("vp9", None),
         FFprobeData("h264", 10.0),
+        FFprobeData("h264", 8.89),
     ]
 
     def delete_results(_: list[tuple[Path, FFprobeData]]) -> None:
@@ -273,6 +280,19 @@ def avi_test_parse_files(
 @pytest.fixture(scope="package")
 def avi_options() -> AVIDecodeOptions:
     return AVIDecodeOptions.default()
+
+
+@pytest.fixture(scope="package")
+def mkv_test_parse_files(
+    video_file_dict: dict[str, VideoFile],
+    cached_file_manager: CachedFileManager,
+) -> TempVideoFiles:
+
+    video_urls = [
+        at_video_dict(video_file_dict, "sample_640x360.mkv"),
+    ]
+
+    return TempVideoFiles(temp_video_files(video_urls, cached_file_manager))
 
 
 DummyFiles = FinalizerFixture[list[tuple[Path, bool]]]

@@ -1,11 +1,15 @@
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
+from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
 from test_helper import ErrResult, OkResult
 
 from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
 from content.tagger.parser import BoundedIO, SimpleSpan
+
+mark_as_used(mkv_test_parse_files)
 
 
 def test_mkv_tagger_bit_iterator(
@@ -146,3 +150,21 @@ def test_mkv_tagger_parse_element_id(
             is_valid_element_id = var_int.is_valid_element_id(bytes_used)
 
             assert is_valid_element_id == result
+
+
+def test_mkv_tagger_todo(
+    subtests: SubTests,
+    mkv_test_parse_files: TempVideoFiles,
+) -> None:
+
+    test_files: list[tuple[Path, int]] = list(
+        zip(
+            mkv_test_parse_files.data,
+            [42],
+            strict=True,
+        ),
+    )
+
+    for file, result in test_files:
+        with subtests.test("video gets parsed correctly"):
+            assert file != ""

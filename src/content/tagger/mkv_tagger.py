@@ -24,27 +24,8 @@ from helper.result import Err, Ok, Result
 
 @dataclass(slots=True, repr=True)
 class EBMLDecodeOptions:
-    max_id_length: int | Literal["header"]
-
-
-class MKVDecodeType(Enum):
-    Check = "check"
-    Normal = "normal"
-
-
-@dataclass(slots=True, repr=True)
-class MKVDecodeOptions:
-    strict: bool
-    type: MKVDecodeType
-    ebml_options: EBMLDecodeOptions
-
-    @staticmethod
-    def default() -> "MKVDecodeOptions":
-        return MKVDecodeOptions(
-            strict=True,
-            type=MKVDecodeType.Normal,
-            ebml_options=EBMLDecodeOptions(max_id_length="header"),
-        )
+    max_id_length: int
+    max_size_length: int
 
 
 @decorate_class(slots=True)
@@ -134,9 +115,15 @@ class EBMLVarInt:
 
             bits = BitIterator(first_byte)
 
+            found_end = False
+
             for b in bits:
                 if b.value:
+                    found_end = True
                     break
+
+            if not found_end:
+                return Err("more than 8 byte VarInt not supported atm")
 
             varint_byte_length = bits.bit_index
 
@@ -274,9 +261,9 @@ class EBMLElementSpan:
     @staticmethod
     def from_ebml_specified_size(
         span: SimpleSpan,
-        header_ints: tuple[int, int],
+        header_sizes: tuple[int, int],
     ) -> "EBMLElementSpan":
-        header_size = sum(header_ints)
+        header_size = sum(header_sizes)
         return EBMLElementSpan(
             SimpleSpan(span.start, span.size + header_size),
             header_size,
@@ -346,21 +333,35 @@ class EBMLElementSpan:
         return str(self)
 
 
+def vint_max_for_bytes(amount: int) -> int:
+    if amount == 0:
+        msg = f"Invalid amount: {amount}"
+        raise RuntimeError(msg)
+
+    return (1 << (7 * amount)) - 2
+
+
+VINTMAX: int = vint_max_for_bytes(8)
+
+
 @decorate_class(slots=True)
 class EBMLElement(NonFinalEBMLElement):
     element_id: EBMLVarInt
     span: EBMLElementSpan
+    header_sizes: tuple[int, int]
 
     def __init__(
         self: Self,
         element_id: EBMLVarInt,
         span: EBMLElementSpan,
+        header_sizes: tuple[int, int],
     ) -> None:
         self.element_id = element_id
         self.span = span
+        self.header_sizes = header_sizes
 
     @staticmethod
-    def read_ebml_element(io: BoundedIO, options: MKVDecodeOptions) -> "EBMLElement":
+    def read_ebml_element(io: BoundedIO, options: EBMLDecodeOptions) -> "EBMLElement":
         # spec: RFC 8794
         # EBML Element structure:
         # element_id | 1-8 bytes | <varint>
@@ -387,13 +388,8 @@ class EBMLElement(NonFinalEBMLElement):
         # in length, although Element IDs of greater lengths MAY be used if the EBMLMaxIDLength
         # Element of the EBML Header is set to a value greater than four (see Section 11.2.4).
 
-        EBMLMaxIDLength = (
-            4
-            if options.ebml_options.max_id_length == "header"
-            else options.ebml_options.max_id_length
-        )
-        if element_id_bytes > EBMLMaxIDLength:
-            msg = f"ELement ID varint exceeds allowed size of {EBMLMaxIDLength}: {element_id_bytes}"
+        if element_id_bytes > options.max_id_length:
+            msg = f"ELement ID VarInt exceeds allowed size of {options.max_id_length}: {element_id_bytes}"
             raise RuntimeError(msg)
 
         if not element_id.is_valid_element_id(element_id_bytes):
@@ -410,11 +406,21 @@ class EBMLElement(NonFinalEBMLElement):
 
         data_size, data_size_bytes = data_size_res.as_ok()
 
+        if data_size_bytes > options.max_size_length:
+            msg = f"Data Size VarInt exceeds allowed size of {options.max_size_length}: {data_size_bytes}"
+            raise RuntimeError(msg)
+
+        if data_size == ((1 << (data_size_bytes * 7)) - 1):
+            msg = f"Unknown data size not supported: {data_size} ({data_size_bytes})"
+            raise RuntimeError(msg)
+
+        header_sizes = (element_id_bytes, data_size_bytes)
+
         span = EBMLElementSpan.from_ebml_specified_size(
             io.span.sub_span(data_size.value),
-            header_ints=(element_id_bytes, data_size_bytes),
+            header_sizes=header_sizes,
         )
-        return EBMLElement(element_id, span)
+        return EBMLElement(element_id, span, header_sizes)
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
@@ -455,6 +461,24 @@ class EBMLBody(EBMLElement):
 class EBMLDocument:
     pass
     # needs header + body
+
+
+class MKVDecodeType(Enum):
+    Check = "check"
+    Normal = "normal"
+
+
+@dataclass(slots=True, repr=True)
+class MKVDecodeOptions:
+    strict: bool
+    type: MKVDecodeType
+
+    @staticmethod
+    def default() -> "MKVDecodeOptions":
+        return MKVDecodeOptions(
+            strict=True,
+            type=MKVDecodeType.Normal,
+        )
 
 
 MKV_FOURCC = "TODO"

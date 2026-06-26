@@ -386,6 +386,9 @@ class MP4Box(NonFinalMP4Box):
                 final_size = largesize
                 header_size = 16
             elif size == 0:
+                # TODO: check if we are at the top level, otherwise this is invalid!
+                msg = "size == 0 not supported, patching and checking, if this is a toplevel is too complicated"
+                raise RuntimeError(msg)
                 final_size = io.special_checked_filesize()
                 header_size = 8
 

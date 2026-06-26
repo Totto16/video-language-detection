@@ -7,7 +7,7 @@ from fixtures import (
     DummyFiles,
     TempFFProbeVideoFiles,
     ffprobe_dummy_files,
-    ffprobe_temp_mp4_files,
+    ffprobe_temp_video_files,
     mark_as_used,
 )
 from pytest_subtests import SubTests
@@ -16,7 +16,7 @@ from test_helper import OkResult, re_exact_string
 from helper.ffprobe import ffprobe, parse_float_safely
 
 mark_as_used(ffprobe_dummy_files)
-mark_as_used(ffprobe_temp_mp4_files)
+mark_as_used(ffprobe_temp_video_files)
 
 
 def test_float_parsing_correct(subtests: SubTests) -> None:
@@ -75,9 +75,9 @@ def test_raw_int_parse(subtests: SubTests) -> None:
 
 def test_ffprobe_with_intact_videos(
     subtests: SubTests,
-    ffprobe_temp_mp4_files: TempFFProbeVideoFiles,
+    ffprobe_temp_video_files: TempFFProbeVideoFiles,
 ) -> None:
-    for video, ffprobe_data in ffprobe_temp_mp4_files.data:
+    for video, ffprobe_data in ffprobe_temp_video_files.data:
         with subtests.test("video get's parsed correctly"):
             err_result = ffprobe(video)
             assert err_result == OkResult(), "FFProbe error"
