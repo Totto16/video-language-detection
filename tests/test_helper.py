@@ -68,6 +68,28 @@ class OkResult:
     def __hash__(self: Self) -> int:
         return hash(id(self))
 
+@decorate_class(slots=True)
+class ErrResult:
+
+    def __eq__(self, value: object) -> bool:
+        if isinstance(value, Err):
+            return True
+        if isinstance(value, Ok):
+            return False
+
+        msg = f"Invalid comapre type for ErrResult and {type(value)}"
+        raise ValueError(msg)
+
+    def __str__(self: Self) -> str:
+        return "<ErrResult>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(id(self))
+
+
 
 def re_exact_string(value: str) -> re.Pattern[str]:
     base = re.escape(value)

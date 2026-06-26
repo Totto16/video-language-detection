@@ -1,7 +1,8 @@
 from io import BytesIO
 
+import pytest
 from pytest_subtests import SubTests
-from test_helper import OkResult
+from test_helper import ErrResult, OkResult, re_exact_string
 
 from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
 from content.tagger.parser import BoundedIO, SimpleSpan
@@ -71,3 +72,45 @@ def test_mkv_tagger_parse_var_int(
             assert bytes_used == len(byte)
 
             assert var_int == result
+
+
+def test_mkv_tagger_parse_var_int_errors(
+    subtests: SubTests,
+) -> None:
+    with subtests.test("VarInt parsing errors: invalid start byte"):
+        byte = b"\x00"
+        buf_io = BytesIO(byte)
+        io = BoundedIO.get_new(
+            buf_io,
+            span=SimpleSpan(0, len(byte)),
+        )
+        var_int_res = EBMLVarInt.from_io(io)
+
+        assert var_int_res == ErrResult()
+
+        err = var_int_res.as_err()
+
+        assert err == "The first byte of a VarInt can't be 0x00"
+
+    with subtests.test("VarInt parsing errors: not enough bytes"):
+
+        def not_enough_bytes() -> None:
+            byte = b"\x01\x00"
+            buf_io = BytesIO(byte)
+            io = BoundedIO.get_new(
+                buf_io,
+                span=SimpleSpan(0, len(byte)),
+            )
+            var_int_res = EBMLVarInt.from_io(io)
+
+            assert var_int_res == ErrResult()
+
+            err = var_int_res.as_err()
+
+            assert err == "<TEST ASSERT UNREACHABLE>"
+
+        with pytest.raises(
+            RuntimeError,
+            match=re_exact_string("Read would overflow bounds [0, 2]: 8 (1 + 7)"),
+        ):
+            not_enough_bytes()
