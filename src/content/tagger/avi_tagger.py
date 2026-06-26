@@ -202,7 +202,7 @@ class AVIChunkSpan:
         span: SimpleSpan,
         header_size: int,
     ) -> "AVIChunkSpan":
-        return AVIChunkSpan(SimpleSpan(span.start, span.size + 8), header_size)
+        return AVIChunkSpan(SimpleSpan(span.start, span.size + header_size), header_size)
 
     def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
         if len(self.__intervals) == 0:
