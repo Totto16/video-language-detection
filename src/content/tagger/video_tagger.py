@@ -99,11 +99,8 @@ def is_the_same_file(pre_res: FFProbeResult, after_res: FFProbeResult) -> Option
         if len(pre_res.streams) != len(after_res.streams):
             return f"Number of streams differs: {len(pre_res.streams)} != {len(after_res.streams)}"
 
-        if (
-            pre_res.file_info.duration_seconds()
-            != after_res.file_info.duration_seconds()
-        ):
-            return f"Duration differs: {pre_res.file_info.duration_seconds()} != {after_res.file_info.duration_seconds()}"
+        if pre_res.file_info.duration() != after_res.file_info.duration():
+            return f"Duration differs: {pre_res.file_info.duration()} != {after_res.file_info.duration()}"
 
         if (
             pre_res.file_info.raw["format_name"]
@@ -205,7 +202,6 @@ class InspectPriority(Enum):
                 return level
 
         return None
-
 
 
 @dataclass(slots=True, repr=True)

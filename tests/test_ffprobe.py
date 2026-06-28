@@ -85,7 +85,7 @@ def test_ffprobe_with_intact_videos(
             result = err_result.as_ok()
 
             assert (
-                result.file_info.duration_seconds() is not None
+                result.file_info.duration() is not None
             ), "duration is defined"
 
             assert len(result.streams) > 0, "at least one stream was detected"
@@ -94,7 +94,7 @@ def test_ffprobe_with_intact_videos(
             for stream in result.streams:
                 assert stream.codec() == ffprobe_data.codec, "codec is correct"
                 assert (
-                    stream.duration_seconds() == ffprobe_data.duration
+                    stream.duration() == ffprobe_data.duration
                 ), "duration is correct"
 
                 assert stream.is_attachment() is False, "has no attachments"
@@ -139,5 +139,5 @@ def test_ffprobe_errors_with_files(
                 assert result.ok(), "pass status is correct"
                 for stream in result.as_ok().streams:
                     assert (
-                        stream.duration_seconds() is None
+                        stream.duration() is None
                     ), "dummy files have no duration"

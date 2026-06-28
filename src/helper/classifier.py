@@ -1,3 +1,4 @@
+from datetime import timedelta
 import gc
 import math
 import re
@@ -583,7 +584,7 @@ class WAVFile:
 
         metadata = metadata_res.as_ok()
 
-        file_duration: Optional[float] = metadata.file_info.duration_seconds()
+        file_duration: Optional[timedelta] = metadata.file_info.duration()
 
         if metadata.is_video():
             video_streams = metadata.video_streams()
@@ -594,7 +595,7 @@ class WAVFile:
                 ).format(video_streams=len(video_streams))
                 raise RuntimeError(msg)
 
-            duration = video_streams[0].duration_seconds()
+            duration: Optional[timedelta] = video_streams[0].duration()
             if duration is None:
                 if file_duration is None:
                     return Err("No video duration was found")
@@ -612,7 +613,7 @@ class WAVFile:
                             type=FileType.video,
                             status=ConversionStatus.raw,
                         ),
-                        Timestamp.from_seconds(duration),
+                        Timestamp(duration),
                     ),
                 )
 
@@ -640,7 +641,7 @@ class WAVFile:
                 )
                 raise RuntimeError(msg)
 
-            duration = audio_streams[0].duration_seconds()
+            duration = audio_streams[0].duration()
             if duration is None:
                 if file_duration is None:
                     return Err("No audio duration was found")
@@ -651,14 +652,14 @@ class WAVFile:
                 return Ok(
                     (
                         WavFile(),
-                        Timestamp.from_seconds(duration),
+                        Timestamp(duration),
                     ),
                 )
 
             return Ok(
                 (
                     FileAnnotation(type=FileType.audio, status=ConversionStatus.raw),
-                    Timestamp.from_seconds(duration),
+                    Timestamp(duration),
                 ),
             )
 

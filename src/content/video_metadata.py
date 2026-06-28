@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from logging import Logger
 from pathlib import Path
@@ -45,16 +46,23 @@ class VideoStreamInterface:
         return self.__type
 
 
+class TimeDeltaCompat:
+    value: float
+
+    def __init__(self: Self, value: float | timedelta) -> None:
+        raise NotImplementedError("TODO")
+
+
 @schema(extra=narrow_type(("type", Literal[VideoStreamType.video])))
 @dataclass(slots=True, repr=True)
 class VideoStreamVideo(VideoStreamInterface):
-    duration: float
+    duration: TimeDeltaCompat
 
 
 @schema(extra=narrow_type(("type", Literal[VideoStreamType.audio])))
 @dataclass(slots=True, repr=True)
 class VideoStreamAudio(VideoStreamInterface):
-    duration: float
+    duration: TimeDeltaCompat
 
 
 @schema(extra=narrow_type(("type", Literal[VideoStreamType.subtitle])))
@@ -93,7 +101,7 @@ class VideoDimension:
 
 @dataclass(slots=True, repr=True)
 class VideoMetadata:
-    __duration: float = field(metadata=alias("duration"))
+    __duration: TimeDeltaCompat = field(metadata=alias("duration"))
     __streams: list[VideoStream] = field(metadata=alias("streams"))
     __dimensions: VideoDimension = field(metadata=alias("dimensions"))
     __size: int = field(
@@ -105,7 +113,7 @@ class VideoMetadata:
     )
 
     @property
-    def duration(self: Self) -> float:
+    def duration(self: Self) -> TimeDeltaCompat:
         return self.__duration
 
     @property
@@ -173,7 +181,7 @@ class VideoMetadata:
                 ),
             )
 
-        file_duration: Optional[float] = metadata.file_info.duration_seconds()
+        file_duration: Optional[timedelta] = metadata.file_info.duration()
 
         if file_duration is None:
             return Err(_("No video duration was found"))
@@ -181,11 +189,15 @@ class VideoMetadata:
         def map_stream(stream: FFprobeStream) -> VideoStream:
             match stream.type():
                 case StreamType.video:
-                    duration = stream.duration_seconds() or file_duration
-                    return VideoStreamVideo(VideoStreamType.video, duration)
+                    duration = stream.duration() or file_duration
+                    return VideoStreamVideo(
+                        VideoStreamType.video, TimeDeltaCompat(duration)
+                    )
                 case StreamType.audio:
-                    duration = stream.duration_seconds() or file_duration
-                    return VideoStreamAudio(VideoStreamType.audio, duration)
+                    duration = stream.duration() or file_duration
+                    return VideoStreamAudio(
+                        VideoStreamType.audio, TimeDeltaCompat(duration)
+                    )
                 case StreamType.subtitle:
                     return VideoStreamSubtitle(VideoStreamType.subtitle)
                 case StreamType.attachment:
@@ -207,7 +219,7 @@ class VideoMetadata:
 
             return Ok(
                 VideoMetadata(
-                    file_duration,
+                    TimeDeltaCompat(file_duration),
                     streams,
                     dimensions,
                     size,

@@ -228,9 +228,9 @@ def ffprobe_temp_video_files(
         FFprobeData("av1", 10.0),
         FFprobeData("h264", 10.0),
         FFprobeData("h264", 10.0),
-        FFprobeData("vp9", None),
+        FFprobeData("vp9", 10.0),
         FFprobeData("h264", 10.0),
-        FFprobeData("h264", 8.89),
+        FFprobeData("h264", 13.346),
     ]
 
     def delete_results(_: list[tuple[Path, FFprobeData]]) -> None:

@@ -3,6 +3,7 @@ import os
 import platform
 import shlex
 import subprocess
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Self, TypedDict, cast
@@ -21,6 +22,32 @@ def parse_float_safely(inp: str) -> Optional[float]:
         return float(inp)
     except ValueError:
         return None
+
+
+def parse_duration_safely(inp: str) -> Optional[timedelta]:
+    try:
+        date = datetime.strptime(inp, "%H:%M:%S.%f")  # noqa: DTZ007
+        return timedelta(
+            hours=date.hour,
+            minutes=date.minute,
+            seconds=date.second,
+            microseconds=date.microsecond,
+        )
+    except ValueError:
+        return None
+
+
+def impl_parse_duration(dct: dict[str, Any]) -> Optional[timedelta]:
+    val: Optional[Any] = dct.get("duration", None)
+    if val is None:
+        val = dct.get("DURATION", None)
+        return optional_duration(val)
+
+    val_float = optional_float(val)
+    if val_float is None:
+        return None
+
+    return timedelta(seconds=val_float)
 
 
 class StreamType(Enum):
@@ -89,14 +116,13 @@ class FFprobeStream:
         val: Optional[Any] = self.__stream.get("codec_name", None)
         return val if isinstance(val, str) else None
 
-    def duration_seconds(self: Self) -> Optional[float]:
+    def duration(self: Self) -> Optional[timedelta]:
         """
-        Returns the runtime duration of the video stream as a floating point number of seconds.
+        Returns the runtime duration of the video stream as a timedelta.
         Returns None not a video or audio stream.
         """
         if self.is_video() or self.is_audio():
-            val: Optional[Any] = self.__stream.get("duration", None)
-            return optional_float(val)
+            return impl_parse_duration(cast(dict[str, Any], self.__stream))
 
         return None
 
@@ -136,10 +162,27 @@ def optional_float(val: Any) -> Optional[float]:
     if isinstance(val, int):
         return float(val)
 
+    if isinstance(val, float):
+        return val
+
     if isinstance(val, str):
         return parse_float_safely(val)
 
     return None
+
+
+def optional_duration(val: Any) -> Optional[timedelta]:
+    if isinstance(val, int):
+        return timedelta(seconds=float(val))
+
+    if isinstance(val, float):
+        return timedelta(seconds=val)
+
+    if isinstance(val, str):
+        return parse_duration_safely(val)
+
+    return None
+
 
 @decorate_class(slots=True)
 class FFProbeFormatInfo:
@@ -152,13 +195,12 @@ class FFProbeFormatInfo:
     def raw(self: Self) -> dict[str, Any]:
         return self.__raw
 
-    def duration_seconds(self: Self) -> Optional[float]:
+    def duration(self: Self) -> Optional[timedelta]:
         """
-        Returns the runtime duration of the file as a floating point number of seconds.
+        Returns the runtime duration of the file as a timedelta
         Returns None if the information is not present
         """
-        val: Optional[Any] = self.__raw.get("duration", None)
-        return optional_float(val)
+        return impl_parse_duration(self.__raw)
 
     def size(self: Self) -> Optional[int]:
         val: Optional[Any] = self.__raw.get("size", None)
@@ -174,9 +216,11 @@ class FFProbeFormatInfo:
     def __repr__(self: Self) -> str:
         return json.dumps(self.__raw)
 
+
 class FFProbeRawResult(TypedDict):
     streams: list[FFprobeRawStream]
     format: dict[str, Any]
+
 
 @decorate_class(slots=True)
 class FFProbeResult:
