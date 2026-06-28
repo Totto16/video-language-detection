@@ -3,6 +3,7 @@ import os
 import platform
 import shlex
 import subprocess
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
@@ -26,7 +27,8 @@ def parse_float_safely(inp: str) -> Optional[float]:
 
 def parse_duration_safely(inp: str) -> Optional[timedelta]:
     try:
-        date = datetime.strptime(inp, "%H:%M:%S.%f")  # noqa: DTZ007
+        inp_val = inp[:-3]
+        date = datetime.strptime(inp_val, "%H:%M:%S.%f")  # noqa: DTZ007
         return timedelta(
             hours=date.hour,
             minutes=date.minute,
@@ -37,17 +39,30 @@ def parse_duration_safely(inp: str) -> Optional[timedelta]:
         return None
 
 
+type DurationTag = tuple[list[str], Callable[[Any], Optional[timedelta]]]
+
+
 def impl_parse_duration(dct: dict[str, Any]) -> Optional[timedelta]:
-    val: Optional[Any] = dct.get("duration", None)
-    if val is None:
-        val = dct.get("DURATION", None)
-        return optional_duration(val)
 
-    val_float = optional_float(val)
-    if val_float is None:
-        return None
+    valid_duration_tags: list[DurationTag] = [
+        (["duration"], optional_float_duration),
+        (["DURATION"], optional_duration),
+        (["tags", "DURATION"], optional_duration),
+    ]
 
-    return timedelta(seconds=val_float)
+    for valid_tags, cb in valid_duration_tags:
+        val: Optional[Any] = dct
+        for tag in valid_tags:
+            if val is None:
+                break
+            val = val.get(tag, None)
+
+        if val is None:
+            continue
+
+        return cb(val)
+
+    return None
 
 
 class StreamType(Enum):
@@ -184,6 +199,15 @@ def optional_duration(val: Any) -> Optional[timedelta]:
     return None
 
 
+def optional_float_duration(val: Any) -> Optional[timedelta]:
+
+    val_float = optional_float(val)
+    if val_float is None:
+        return None
+
+    return timedelta(seconds=val_float)
+
+
 @decorate_class(slots=True)
 class FFProbeFormatInfo:
     __raw: dict[str, Any]
@@ -281,6 +305,31 @@ def ffprobe_check() -> bool:
     except FileNotFoundError:
         return False
     return True
+
+
+def ffprobe_version() -> Result[str, str]:
+    commands: list[str] = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_program_version",
+    ]
+
+    if platform.system() != "Windows":
+        commands = [" ".join(commands)]
+
+    result = subprocess.run(  # noqa: PLW1510, S602
+        commands,
+        capture_output=True,
+        shell=True,
+    )
+    if result.returncode == 0:
+        dct = json.loads(result.stdout)
+        return Ok(dct["program_version"]["version"])
+
+    return Err(f"FFProbe failed in getting version, output:\n{result.stderr.decode()}")
 
 
 def ffprobe(file_path: Path) -> Result[FFProbeResult, str]:

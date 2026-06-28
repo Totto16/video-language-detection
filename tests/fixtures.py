@@ -3,6 +3,7 @@ import tempfile
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Self
 
@@ -201,7 +202,7 @@ def temp_video_files(
 @dataclass(slots=True, repr=True)
 class FFprobeData:
     codec: str
-    duration: Optional[float]
+    duration: Optional[timedelta]
 
 
 TempFFProbeVideoFiles = FinalizerFixture[list[tuple[Path, FFprobeData]]]
@@ -225,12 +226,12 @@ def ffprobe_temp_video_files(
     files = temp_video_files(video_urls, cached_file_manager)
 
     metadatas = [
-        FFprobeData("av1", 10.0),
-        FFprobeData("h264", 10.0),
-        FFprobeData("h264", 10.0),
-        FFprobeData("vp9", 10.0),
-        FFprobeData("h264", 10.0),
-        FFprobeData("h264", 13.346),
+        FFprobeData("av1", timedelta(seconds=10.0)),
+        FFprobeData("h264", timedelta(seconds=10.0)),
+        FFprobeData("h264", timedelta(seconds=10.0)),
+        FFprobeData("vp9", timedelta(seconds=10.0)),
+        FFprobeData("h264", timedelta(seconds=10.0)),
+        FFprobeData("h264", timedelta(seconds=13.346)),
     ]
 
     def delete_results(_: list[tuple[Path, FFprobeData]]) -> None:

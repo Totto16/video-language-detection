@@ -435,7 +435,7 @@
             "type": "object",
             "properties": {
                 "duration": {
-                    "type": "number"
+                    "$ref": "#/$defs/TimeDeltaCompat"
                 },
                 "streams": {
                     "type": "array",
@@ -477,6 +477,10 @@
             ],
             "additionalProperties": false
         },
+        "TimeDeltaCompat": {
+            "type": "number",
+            "minimum": 0.0
+        },
         "VideoStreamVideo": {
             "type": "object",
             "properties": {
@@ -485,7 +489,7 @@
                     "const": "video"
                 },
                 "duration": {
-                    "type": "number"
+                    "$ref": "#/$defs/TimeDeltaCompat"
                 }
             },
             "required": [
@@ -502,7 +506,7 @@
                     "const": "audio"
                 },
                 "duration": {
-                    "type": "number"
+                    "$ref": "#/$defs/TimeDeltaCompat"
                 }
             },
             "required": [

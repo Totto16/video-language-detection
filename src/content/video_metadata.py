@@ -5,7 +5,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Self
 
-from apischema import alias, schema
+from apischema import alias, deserializer, schema, serializer
 from apischema.metadata import none_as_undefined
 
 from helper.apischema import OneOf, narrow_type
@@ -46,11 +46,28 @@ class VideoStreamInterface:
         return self.__type
 
 
+@schema(min=0.0)
 class TimeDeltaCompat:
-    value: float
+    __value: timedelta
 
     def __init__(self: Self, value: float | timedelta) -> None:
-        raise NotImplementedError("TODO")
+
+        self.__value = (
+            value if isinstance(value, timedelta) else timedelta(seconds=value)
+        )
+
+    @property
+    def value(self: Self) -> timedelta:
+        return self.__value
+
+    @serializer
+    def serialize(self: Self) -> float:
+        return self.__value.total_seconds()
+
+    @deserializer
+    @staticmethod
+    def deserialize_float(inp: float) -> "TimeDeltaCompat":
+        return TimeDeltaCompat(inp)
 
 
 @schema(extra=narrow_type(("type", Literal[VideoStreamType.video])))
