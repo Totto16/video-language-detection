@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, BinaryIO, Literal, Optional, Self, final, override
+from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
 
 from content.tagger.parser import (
     BoundedIO,
@@ -222,7 +222,7 @@ class EBMLVarInt:
         return self.__value
 
     def __str__(self: Self) -> str:
-        return f"<VarInt {self.__value}>"
+        return f"<VarInt {hex(self.__value)}>"
 
     def __repr__(self: Self) -> str:
         return repr(self.__value)
@@ -451,28 +451,6 @@ class EBMLElement(NonFinalEBMLElement):
 
     def __repr__(self: Self) -> str:
         return str(self)
-
-
-class EBMLHeader(EBMLElement):
-
-    def __parse() -> "TODO":
-        pass
-        # The EBML Header MUST contain a single Master Element with an Element Name of EBML and
-        # Element ID of 0x1A45DFA3 (see Section 11.2.1); the Master Element may have any number of
-        # additional EBML Elements within it. The EBML Header of an EBML Document that uses an
-        # EBMLVersion of 1 MUST only contain EBML Elements that are deﬁned as part of this document.
-        # Elements within an EBML Header can be at most 4 octets long, except for the EBML Element with
-        # Element Name EBML and Element ID 0x1A45DFA3 (see Section 11.2.1); this Element can be up to 8
-        # octets long.
-
-
-class EBMLBody(EBMLElement):
-    pass
-
-
-class EBMLDocument:
-    pass
-    # needs header + body
 
 
 EBML_NUMBER_BYTE_ORDER_STR: Literal["big"] = "big"
@@ -969,9 +947,8 @@ class EBMLDateElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
-@final
 @decorate_class(slots=True)
-class EBMLMasterElement(EBMLElement, FinalEBMLElement):
+class EBMLMasterElement(EBMLElement):
     def __init__(
         self: Self,
         parent: EBMLElement,
@@ -1006,7 +983,7 @@ class EBMLMasterElement(EBMLElement, FinalEBMLElement):
         return EBMLMasterElement(parent)
 
     @staticmethod
-    def read(
+    def read_ebml_master_element(
         io: BoundedIO,
         options: EBMLDecodeOptions,
     ) -> "EBMLMasterElement":
@@ -1014,7 +991,7 @@ class EBMLMasterElement(EBMLElement, FinalEBMLElement):
         return EBMLMasterElement.__read_impl(element.payload_io(io), element)
 
     @staticmethod
-    def read_from_parent(
+    def read_ebml_master_element_from_parent(
         io: BoundedIO,
         parent: EBMLElement,
     ) -> "EBMLMasterElement":
@@ -1100,22 +1077,166 @@ class EBMLBinaryElement(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
-class MKVDecodeType(Enum):
-    Check = "check"
-    Normal = "normal"
+class EBMLHeader(EBMLElement):
+
+    def __parse() -> "TODO":
+        pass
+        # The EBML Header MUST contain a single Master Element with an Element Name of EBML and
+        # Element ID of 0x1A45DFA3 (see Section 11.2.1); the Master Element may have any number of
+        # additional EBML Elements within it. The EBML Header of an EBML Document that uses an
+        # EBMLVersion of 1 MUST only contain EBML Elements that are deﬁned as part of this document.
+        # Elements within an EBML Header can be at most 4 octets long, except for the EBML Element with
+        # Element Name EBML and Element ID 0x1A45DFA3 (see Section 11.2.1); this Element can be up to 8
+        # octets long.
+
+
+class EBMLBody(EBMLElement):
+    pass
+
+
+class EBMLDocument:
+    pass
+    # needs header + body
+
+
+type EBMLStream = list[EBMLDocument]
+
+
+@final
+@decorate_class(slots=True)
+class EBMLEmptyMasterElement(EBMLMasterElement, FinalEBMLElement):
+
+    def __init__(
+        self: Self,
+        parent: EBMLMasterElement,
+    ) -> None:
+        super().__init__(
+            parent,
+        )
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        parent: EBMLMasterElement,
+    ) -> "EBMLEmptyMasterElement":
+        # empty master element, just skip everything
+
+        return EBMLEmptyMasterElement(parent)
+
+    @staticmethod
+    def read_from_parent(
+        io: BoundedIO,
+        parent: EBMLMasterElement,
+    ) -> "EBMLEmptyMasterElement":
+        return EBMLEmptyMasterElement.__read_impl(io, parent)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLEmptyMasterElement parent: {EBMLMasterElement.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+class EBMLElementType(Enum):
+    SignedInteger = "si"
+    UnsignedInteger = "ui"
+    Float = "f"
+    String = "s"
+    UTF8 = "utf-8"
+    Date = "d"
+    Master = "m"
+    Binary = "b"
 
 
 @dataclass(slots=True, repr=True)
-class MKVDecodeOptions:
-    strict: bool
-    type: MKVDecodeType
+class EBMLSchema:
+    elements: dict[int, EBMLElementType]
 
-    @staticmethod
-    def default() -> "MKVDecodeOptions":
-        return MKVDecodeOptions(
-            strict=True,
-            type=MKVDecodeType.Normal,
-        )
+
+@decorate_class(slots=True)
+class SupportedMasterElements:
+    pass
+
+
+def read_element(
+    io: BoundedIO,
+    options: EBMLDecodeOptions,
+    schema: EBMLSchema,
+) -> EBMLElement:
+    element = EBMLElement.read_ebml_element(io, options)
+
+    element_type = schema.elements.get(element.element_id.value, None)
+
+    if element_type is None:
+        msg = f"Invalid EBML Element ID, not defined by schema: {element.element_id}"
+        raise RuntimeError(msg)
+
+    match element_type:
+        case EBMLElementType.SignedInteger:
+            return EBMLSignedIntegerElement.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.UnsignedInteger:
+            return EBMLUnsignedIntegerElement.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.Float:
+            return EBMLFloatElement.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.String:
+            return EBMLStringElement.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.UTF8:
+            return EBMLUTF8Element.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.Date:
+            return EBMLDateElement.read_from_parent(
+                element.payload_io(io),
+                element,
+            )
+        case EBMLElementType.Master:
+            master_element = EBMLMasterElement.read_ebml_master_element_from_parent(
+                element.payload_io(io),
+                element,
+            )
+            match element.element_id:
+                # TODO: use SupportedMasterElements
+                case _:
+                    return EBMLEmptyMasterElement.read_from_parent(
+                        master_element.payload_io(io), master_element,
+                    )
+        case EBMLElementType.Binary:
+            return EBMLSignedIntegerElement.read_from_parent(
+                element.payload_io(io), element,
+            )
+        case _:
+            assert_never(element_type)
+
+
+# class MKVDecodeType(Enum):
+#     Check = "check"
+#     Normal = "normal"
+
+
+# @dataclass(slots=True, repr=True)
+# class MKVDecodeOptions:
+#     strict: bool
+#     type_TODO: MKVDecodeType
+
+#     @staticmethod
+#     def default() -> "MKVDecodeOptions":
+#         return MKVDecodeOptions(
+#             strict=True,
+#             type=MKVDecodeType.Normal,
+#         )
 
 
 MKV_FOURCC = "TODO"
