@@ -111,6 +111,15 @@ class EBMLVarInt:
     @staticmethod
     def from_io(io: BoundedIO) -> Result[tuple["EBMLVarInt", int], str]:
 
+        # spec: RFC 8794
+        # chapter 4
+
+        # VINT_WIDTH VINT_MARKER VINT_DATA
+
+        # VINT_WIDTH: 0 bits [0,*]
+        # VINT_MARKER: 1 bit [1,1]
+        # VINT_DATA: <data>, length determined by VINT_WIDTH
+
         if io.span.size < 1:
             return Err("Not enough data for VarInt")
 
@@ -181,6 +190,9 @@ class EBMLVarInt:
         return amount
 
     def is_valid_element_id(self: Self, bytes_used: int) -> Optional[str]:
+        # spec: RFC 8794
+        # chapter 5
+
         # The bits of the
         # VINT_DATA component of the Element ID MUST NOT be all 0 values or all 1 values. The
         # VINT_DATA component of the Element ID MUST be encoded at the shortest valid length. For
@@ -375,6 +387,8 @@ class EBMLElement(NonFinalEBMLElement):
     @staticmethod
     def read_ebml_element(io: BoundedIO, options: EBMLDecodeOptions) -> "EBMLElement":
         # spec: RFC 8794
+        # chapter 3
+
         # EBML Element structure:
         # element_id | 1-8 bytes | <varint>
         # size   | 1-8 bytes | <varint>
@@ -395,6 +409,9 @@ class EBMLElement(NonFinalEBMLElement):
             raise RuntimeError(msg)
 
         element_id, element_id_bytes = element_id_res.as_ok()
+
+        # spec: RFC 8794
+        # chapter 5
 
         # An Element ID is a Variable-Size Integer. By default, Element IDs are from one octet to four octets
         # in length, although Element IDs of greater lengths MAY be used if the EBMLMaxIDLength
@@ -418,9 +435,21 @@ class EBMLElement(NonFinalEBMLElement):
 
         data_size, data_size_bytes = data_size_res.as_ok()
 
+        # spec: RFC 8794
+        # chapter 6
+
+        # spec: RFC 8794
+        # chapter 6.1
+        # special values and constraints of the data size
+
         if data_size_bytes > options.max_size_length:
             msg = f"Data Size VarInt exceeds allowed size of {options.max_size_length}: {data_size_bytes}"
             raise RuntimeError(msg)
+
+        # spec: RFC 8794
+        # chapter 6.2
+
+        # unknown data size
 
         if data_size == ((1 << (data_size_bytes * 7)) - 1):
             msg = f"Unknown data size not supported: {data_size} ({data_size_bytes})"
@@ -479,6 +508,8 @@ class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLSignedIntegerElement":
         # spec: RFC 8794
+        # chapter 7.1
+
         # EBML Signed Integer Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (0-8 bytes)
@@ -558,6 +589,8 @@ class EBMLUnsignedIntegerElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLUnsignedIntegerElement":
         # spec: RFC 8794
+        # chapter 7.2
+
         # EBML Unsigned Integer Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (0-8 bytes)
@@ -639,6 +672,8 @@ class EBMLFloatElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLFloatElement":
         # spec: RFC 8794
+        # chapter 7.3
+
         # EBML Float Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (0-8 bytes)
@@ -729,7 +764,9 @@ class EBMLStringElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLStringElement":
         # spec: RFC 8794
-        # EBML String structure:
+        # chapter 7.4
+
+        # EBML String Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (* bytes)
 
@@ -804,7 +841,9 @@ class EBMLUTF8Element(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLUTF8Element":
         # spec: RFC 8794
-        # EBML UTF-8 structure:
+        # chapter 7.5
+
+        # EBML UTF-8 Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (* bytes)
 
@@ -885,7 +924,9 @@ class EBMLDateElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLDateElement":
         # spec: RFC 8794
-        # EBML Date structure:
+        # chapter 7.6
+
+        # EBML Date Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (0-8 bytes)
 
@@ -963,7 +1004,9 @@ class EBMLMasterElement(EBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLMasterElement":
         # spec: RFC 8794
-        # EBML Master structure:
+        # chapter 7.7
+
+        # EBML Master Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (* bytes), children elements
 
@@ -1026,7 +1069,9 @@ class EBMLBinaryElement(EBMLElement, FinalEBMLElement):
     @staticmethod
     def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLBinaryElement":
         # spec: RFC 8794
-        # EBML Binary structure:
+        # chapter 7.8
+
+        # EBML Binary Element structure:
         # element     | <variable element size> bytes | parent element
         # ... data (* bytes)
 
@@ -1123,6 +1168,7 @@ class EBMLElementType(Enum):
     Binary = "b"
 
 
+# TODO: more things
 @dataclass(slots=True, repr=True)
 class EBMLSchema:
     elements: dict[int, EBMLElementType]
@@ -1198,6 +1244,33 @@ def read_element(
             assert_never(element_type)
 
 
+type EBMLOccurrences = int | tuple[int, int] | Literal["any"]
+
+
+@dataclass(slots=True, repr=True)
+class EBMLElementDescription:
+    name: str
+    id: int
+    occurrences: EBMLOccurrences
+    type: EBMLElementType
+    description: str
+
+
+# spec: RFC 8794
+# chapter 11.2
+
+# EBML Header Elements
+EBMLHeaderElements: list[EBMLElementDescription] = [
+    EBMLElementDescription(
+        name="EBML",
+        id=0x1A45DFA3,
+        occurrences=1,
+        type=EBMLElementType.Master,
+        description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
+    ),
+]
+
+
 @final
 @decorate_class(slots=True)
 class EBMLHeader(EBMLElement, FinalEBMLElement):
@@ -1214,16 +1287,17 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         )
 
     @staticmethod
-    def __read_impl(io: BoundedIO, parent: EBMLElement) -> "EBMLHeader":
+    def __read_impl(io: BoundedIO) -> "EBMLHeader":
         # spec: RFC 8794
-        # EBML Signed Integer Element structure:
-        # element     | <variable element size> bytes | parent element
-        # ... data (0-8 bytes)
+        # chapter 8.1
 
-        # class EBMLHeader extends EBMLElement {
-        #     Byte s_integer_data[0-8]
-        # } ;
-
+        # The EBML Header is a declaration that provides processing instructions and identiﬁcation of the
+        # EBML Body. The EBML Header of an EBML Document is analogous to the XML Declaration of an
+        # XML Document.
+        # The EBML Header documents the EBML Schema (also known as the EBML DocType) that is used
+        # to semantically interpret the structure and meaning of the EBML Document. Additionally, the
+        # EBML Header documents the versions of both EBML and the EBML Schema that were used to
+        # write the EBML Document and the versions required to read the EBML Document.
         # The EBML Header MUST contain a single Master Element with an Element Name of EBML and
         # Element ID of 0x1A45DFA3 (see Section 11.2.1); the Master Element may have any number of
         # additional EBML Elements within it. The EBML Header of an EBML Document that uses an
@@ -1231,22 +1305,20 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         # Elements within an EBML Header can be at most 4 octets long, except for the EBML Element with
         # Element Name EBML and Element ID 0x1A45DFA3 (see Section 11.2.1); this Element can be up to 8
         # octets long.
+
+        ebml_header_options = EBMLDecodeOptions()
+        element = EBMLElement.read_ebml_element(io, ebml_header_options)
+
+        if element.element_id != EBML:
+            pass
+
         raise "TODO"
 
     @staticmethod
     def read(
         io: BoundedIO,
-        options: EBMLDecodeOptions,
     ) -> "EBMLHeader":
-        element = EBMLElement.read_ebml_element(io, options)
-        return EBMLHeader.__read_impl(element.payload_io(io), element)
-
-    @staticmethod
-    def read_from_parent(
-        io: BoundedIO,
-        parent: EBMLElement,
-    ) -> "EBMLHeader":
-        return EBMLHeader.__read_impl(io, parent)
+        return EBMLHeader.__read_impl(io)
 
     def __str__(self: Self) -> str:
         return f"<EBMLHeader parent: {EBMLElement.__str__(self)}>"
@@ -1259,9 +1331,68 @@ class EBMLBody(EBMLElement):
     pass
 
 
-class EBMLDocument:
-    pass
-    # needs header + body
+@final
+@decorate_class(slots=True)
+class EBMLDocument(FinalEBMLElement):
+    header: EBMLHeader
+    body: EBMLBody
+    span: EBMLElementSpan
+
+    def __init__(
+        self: Self,
+        header: EBMLHeader,
+        body: EBMLBody,
+        span: EBMLElementSpan,
+    ) -> None:
+        super().__init__()
+
+        self.header = header
+        self.body = body
+        self.span = span
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+    ) -> "EBMLDocument":
+        # spec: RFC 8794
+        # chapter 8
+
+        # An EBML Document is composed of only two components, an EBML Header and an EBML Body.
+        # An EBML Document MUST start with an EBML Header that declares signiﬁcant characteristics of
+        # the entire EBML Body. An EBML Document consists of EBML Elements and MUST NOT contain
+        # any data that is not part of an EBML Element.
+
+        header = EBMLHeader.read(io)
+        body_io = io.new_span_io(io.span.next_span(header.span.total.size))
+        body = EBMLBody.read(body_io, header.options)
+
+        total_span = SimpleSpan(
+            header.span.total.start,
+            header.span.total.size + body.span.total.size,
+        )
+        span = EBMLElementSpan(total_span, header.span.total.size)
+
+        span.add_header(body.span.total.size)
+
+        if span.payload_span.size != 0:
+            msg = f"Expected empty last span but got:{span.payload_span.size}"
+            raise RuntimeError(msg)
+
+        return EBMLDocument(header, body, span)
+
+    @staticmethod
+    def read_from_io(
+        io: BoundedIO,
+    ) -> "EBMLDocument":
+        return EBMLDocument.__read_impl(io)
+
+    def __str__(self: Self) -> str:
+        return (
+            f"<EBMLDocument span: {self.span} header: {self.header} body: {self.body}>"
+        )
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 @final
@@ -1283,6 +1414,7 @@ class EBMLStream(FinalEBMLElement):
         span: SimpleSpan,
     ) -> "EBMLStream":
         # spec: RFC 8794
+        # chapter 9
 
         # An EBML Stream is a ﬁle that consists of one or more EBML Documents that are concatenated
         # together. An occurrence of an EBML Header at the Root Level marks the beginning of an EBML
@@ -1317,7 +1449,7 @@ class EBMLStream(FinalEBMLElement):
         filesize = f.tell()
 
         span = SimpleSpan(0, filesize)
-        return EBMLStream.__read_from_io_impl(f, span)
+        return EBMLStream.__read_from_span_impl(f, span)
 
     @staticmethod
     def read_from_file(
@@ -1326,7 +1458,7 @@ class EBMLStream(FinalEBMLElement):
         return EBMLStream.__read_from_file_impl(f)
 
     def __str__(self: Self) -> str:
-        return f"<EBMLStream documents: {documents}>"
+        return f"<EBMLStream documents: {self.documents}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
