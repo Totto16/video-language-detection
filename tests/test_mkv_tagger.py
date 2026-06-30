@@ -168,3 +168,16 @@ def test_mkv_tagger_todo(
     for file, result in test_files:
         with subtests.test("video gets parsed correctly"):
             assert file != ""
+
+
+# TODO: test schema extraction
+# EBML Header Elements
+EBMLHeaderElements: list[EBMLElementDescription] = [
+    EBMLElementDescription(
+        name="EBML",
+        id=0x1A45DFA3,
+        occurrences=1,
+        type=EBMLElementType.Master,
+        description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
+    ),
+]

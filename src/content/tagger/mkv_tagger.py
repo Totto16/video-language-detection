@@ -14,6 +14,13 @@ from content.tagger.parser import (
     SimpleSpan,
     Unpacker,
 )
+from content.tagger.schema.parser import (
+    EBMLElementDescription,
+    EBMLElementType,
+    EBMLSpec,
+    ebml_read_spec_xml,
+    filter_spec_elements,
+)
 from content.tagger.video_tagger import (
     ContextType,
     InspectNotImplemented,
@@ -1157,23 +1164,6 @@ class EBMLEmptyMasterElement(EBMLMasterElement, FinalEBMLElement):
         return str(self)
 
 
-class EBMLElementType(Enum):
-    SignedInteger = "si"
-    UnsignedInteger = "ui"
-    Float = "f"
-    String = "s"
-    UTF8 = "utf-8"
-    Date = "d"
-    Master = "m"
-    Binary = "b"
-
-
-# TODO: more things
-@dataclass(slots=True, repr=True)
-class EBMLSchema:
-    elements: dict[int, EBMLElementType]
-
-
 @decorate_class(slots=True)
 class SupportedMasterElements:
     pass
@@ -1182,46 +1172,61 @@ class SupportedMasterElements:
 def read_element(
     io: BoundedIO,
     options: EBMLDecodeOptions,
-    schema: EBMLSchema,
-) -> EBMLElement:
+    spec: EBMLSpec.EBMLSpecById,
+) -> tuple[EBMLElement, EBMLElementDescription]:
     element = EBMLElement.read_ebml_element(io, options)
 
-    element_type = schema.elements.get(element.element_id.value, None)
+    element_desc = spec.get(element.element_id.value, None)
 
-    if element_type is None:
+    if element_desc is None:
         msg = f"Invalid EBML Element ID, not defined by schema: {element.element_id}"
         raise RuntimeError(msg)
 
-    match element_type:
+    def wrap(result: EBMLElement) -> tuple[EBMLElement, EBMLElementDescription]:
+        return (result, element_desc)
+
+    match element_desc.type:
         case EBMLElementType.SignedInteger:
-            return EBMLSignedIntegerElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLSignedIntegerElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.UnsignedInteger:
-            return EBMLUnsignedIntegerElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLUnsignedIntegerElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.Float:
-            return EBMLFloatElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLFloatElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.String:
-            return EBMLStringElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLStringElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.UTF8:
-            return EBMLUTF8Element.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLUTF8Element.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.Date:
-            return EBMLDateElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLDateElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case EBMLElementType.Master:
             master_element = EBMLMasterElement.read_ebml_master_element_from_parent(
@@ -1231,44 +1236,63 @@ def read_element(
             match element.element_id:
                 # TODO: use SupportedMasterElements
                 case _:
-                    return EBMLEmptyMasterElement.read_from_parent(
-                        master_element.payload_io(io),
-                        master_element,
+                    return wrap(
+                        EBMLEmptyMasterElement.read_from_parent(
+                            master_element.payload_io(io),
+                            master_element,
+                        ),
                     )
         case EBMLElementType.Binary:
-            return EBMLSignedIntegerElement.read_from_parent(
-                element.payload_io(io),
-                element,
+            return wrap(
+                EBMLSignedIntegerElement.read_from_parent(
+                    element.payload_io(io),
+                    element,
+                ),
             )
         case _:
-            assert_never(element_type)
+            assert_never(element_desc)
 
 
-type EBMLOccurrences = int | tuple[int, int] | Literal["any"]
+EBMLMainSpec = ebml_read_spec_xml("ebml/ebml.xml")
 
 
-@dataclass(slots=True, repr=True)
-class EBMLElementDescription:
-    name: str
-    id: int
-    occurrences: EBMLOccurrences
-    type: EBMLElementType
-    description: str
+def filter_ebml_global_element(element: EBMLElementDescription) -> bool:
+    return element.name in ["Void", "CRC-32"]
 
 
 # spec: RFC 8794
 # chapter 11.2
 
+
 # EBML Header Elements
-EBMLHeaderElements: list[EBMLElementDescription] = [
-    EBMLElementDescription(
-        name="EBML",
-        id=0x1A45DFA3,
-        occurrences=1,
-        type=EBMLElementType.Master,
-        description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
-    ),
-]
+EBMLHeaderElementsSpec = filter_spec_elements(
+    EBMLMainSpec,
+    lambda element: not filter_ebml_global_element(element),
+)
+
+EBMLHeaderMasterSpec = EBMLHeaderElementsSpec.elements_by_name()["EBML"]
+
+# spec: RFC 8794
+# chapter 11.3
+
+# EBML Global Elements
+# EBML allows some special Elements to be found within more than one parent in an EBML
+# Document or optionally at the Root Level of an EBML Body. These Elements are called Global
+# Elements. There are two Global Elements that can be found in any EBML Document: the CRC-32
+# Element and the Void Element. An EBML Schema MAY add other Global Elements to the format it
+# deﬁnes. These extra elements apply only to the EBML Body, not the EBML Header.
+# Global Elements are EBML Elements whose EBMLLastParent part of the path has a
+# GlobalPlaceholder. Because it is the last Parent part of the path, a Global Element might also have
+# EBMLParentPath parts in its path. In this case, the Global Element can only be found within this
+# EBMLParentPath path -- i.e., it's not fully "global".
+# A Global Element can be found in many Parent Elements, allowing the same number of
+# occurrences in each Parent where this Element is found.
+
+
+EBMLGlobalElementsSpec = filter_spec_elements(
+    EBMLMainSpec,
+    filter_ebml_global_element,
+)
 
 
 @final
@@ -1306,11 +1330,21 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         # Element Name EBML and Element ID 0x1A45DFA3 (see Section 11.2.1); this Element can be up to 8
         # octets long.
 
-        ebml_header_options = EBMLDecodeOptions()
-        element = EBMLElement.read_ebml_element(io, ebml_header_options)
+        ebml_header_master_options = EBMLDecodeOptions(
+            max_id_length=8,
+            max_size_length=8,
+        )
+        element = EBMLElement.read_ebml_element(io, ebml_header_master_options)
 
-        if element.element_id != EBML:
-            pass
+        if element.element_id != EBMLHeaderMasterSpec.id:
+            raise "TODO"
+
+        ebml_header_children_options = EBMLDecodeOptions(
+            max_id_length=4,
+            max_size_length=8,
+        )
+
+        todo = ebml_iter_elements(ebml_header_children_options)
 
         raise "TODO"
 
