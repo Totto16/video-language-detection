@@ -15,6 +15,12 @@ from content.tagger.parser import (
     Unpacker,
 )
 from content.tagger.schema.parser import (
+    EBMLAdvancedElementTypeBinary,
+    EBMLAdvancedElementTypeDate,
+    EBMLAdvancedElementTypeFloat,
+    EBMLAdvancedElementTypeInteger,
+    EBMLAdvancedElementTypeMaster,
+    EBMLAdvancedElementTypeString,
     EBMLElementDescription,
     EBMLElementType,
     EBMLSpec,
@@ -1169,11 +1175,15 @@ class SupportedMasterElements:
     pass
 
 
+# TODO: check minOccurs and maxOccurs in iter function
+
+
 def read_element(
     io: BoundedIO,
     options: EBMLDecodeOptions,
     spec: EBMLSpec.EBMLSpecById,
 ) -> tuple[EBMLElement, EBMLElementDescription]:
+
     element = EBMLElement.read_ebml_element(io, options)
 
     element_desc = spec.get(element.element_id.value, None)
@@ -1182,73 +1192,108 @@ def read_element(
         msg = f"Invalid EBML Element ID, not defined by schema: {element.element_id}"
         raise RuntimeError(msg)
 
-    def wrap(result: EBMLElement) -> tuple[EBMLElement, EBMLElementDescription]:
-        return (result, element_desc)
+    def assert_valid(res: Result[Any, str]) -> None:
+        if res.ok():
+            return
+
+        msg = f"Failed to validate element {element_desc.name} of type {element_desc.type.type.name}: {res.as_err()}"
+        raise RuntimeError(msg)
 
     match element_desc.type:
-        case EBMLElementType.SignedInteger:
-            return wrap(
-                EBMLSignedIntegerElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
+        case EBMLAdvancedElementTypeInteger() as int_type:
+            match int_type.type:
+                case EBMLElementType.SignedInteger:
+                    element = EBMLSignedIntegerElement.read_from_parent(
+                        element.payload_io(io),
+                        element,
+                    )
+
+                    validate_res = int_type.validate(element.value)
+                    assert_valid(validate_res)
+
+                    return (element, element_desc)
+                case EBMLElementType.UnsignedInteger:
+                    element = EBMLUnsignedIntegerElement.read_from_parent(
+                        element.payload_io(io),
+                        element,
+                    )
+
+                    validate_res = int_type.validate(element.value)
+                    assert_valid(validate_res)
+
+                    return (element, element_desc)
+                case _:
+                    assert_never(int_type)
+
+        case EBMLAdvancedElementTypeFloat() as float_type:
+            element = EBMLFloatElement.read_from_parent(
+                element.payload_io(io),
+                element,
             )
-        case EBMLElementType.UnsignedInteger:
-            return wrap(
-                EBMLUnsignedIntegerElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
+
+            validate_res = float_type.validate(element.value)
+            assert_valid(validate_res)
+
+            return (element, element_desc)
+        case EBMLAdvancedElementTypeString() as str_type:
+            match str_type.type:
+                case EBMLElementType.String:
+                    element = EBMLStringElement.read_from_parent(
+                        element.payload_io(io),
+                        element,
+                    )
+
+                    validate_res = str_type.validate(element.value)
+                    assert_valid(validate_res)
+
+                    return (element, element_desc)
+                case EBMLElementType.UTF8:
+                    element = EBMLUTF8Element.read_from_parent(
+                        element.payload_io(io),
+                        element,
+                    )
+
+                    validate_res = str_type.validate(element.value)
+                    assert_valid(validate_res)
+
+                    return (element, element_desc)
+                case _:
+                    assert_never(str_type)
+
+        case EBMLAdvancedElementTypeDate() as date_type:
+            element = EBMLDateElement.read_from_parent(
+                element.payload_io(io),
+                element,
             )
-        case EBMLElementType.Float:
-            return wrap(
-                EBMLFloatElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
-            )
-        case EBMLElementType.String:
-            return wrap(
-                EBMLStringElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
-            )
-        case EBMLElementType.UTF8:
-            return wrap(
-                EBMLUTF8Element.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
-            )
-        case EBMLElementType.Date:
-            return wrap(
-                EBMLDateElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
-            )
-        case EBMLElementType.Master:
+            validate_res = date_type.validate(element.value)
+            assert_valid(validate_res)
+
+            return (element, element_desc)
+        case EBMLAdvancedElementTypeMaster() as master_type:
             master_element = EBMLMasterElement.read_ebml_master_element_from_parent(
                 element.payload_io(io),
                 element,
             )
             match element.element_id:
                 # TODO: use SupportedMasterElements
+                # NOTE: only needed if a master element has some payload, and not just children
                 case _:
-                    return wrap(
-                        EBMLEmptyMasterElement.read_from_parent(
-                            master_element.payload_io(io),
-                            master_element,
-                        ),
+                    element = EBMLEmptyMasterElement.read_from_parent(
+                        master_element.payload_io(io),
+                        master_element,
                     )
-        case EBMLElementType.Binary:
-            return wrap(
-                EBMLSignedIntegerElement.read_from_parent(
-                    element.payload_io(io),
-                    element,
-                ),
+                    return (element, element_desc)
+        case EBMLAdvancedElementTypeBinary() as binary_type:
+            element = EBMLBinaryElement.read_from_parent(
+                element.payload_io(io),
+                element,
             )
+
+            validate_res = binary_type.validate(element.value)
+            assert_valid(validate_res)
+
+            return (element, element_desc)
+
         case _:
             assert_never(element_desc)
 
