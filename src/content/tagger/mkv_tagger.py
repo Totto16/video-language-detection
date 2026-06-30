@@ -1389,7 +1389,12 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             max_size_length=8,
         )
 
-        todo = ebml_iter_elements(ebml_header_children_options)
+        todo = ebml_iter_elements(
+            element.payload_io(io), ebml_header_children_options, EBMLHeaderElementsSpec
+        )
+
+        if todo.type == "master":
+            raise "not allowed"
 
         raise "TODO"
 

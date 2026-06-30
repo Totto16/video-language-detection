@@ -42,7 +42,21 @@ class EBMLAdvancedElementTypeInteger:
     range: Optional[tuple[int, int]]
 
     def validate(self: Self, value: int) -> Result[None, str]:
-        pass
+        if self.range is None:
+            return Ok(None)
+
+        min_inclusive, max_exclusive = self.range
+        if value < min_inclusive:
+            return Err(
+                f"value needs to be between [{min_inclusive},{max_exclusive}] but was below it: {value}",
+            )
+
+        if value >= max_exclusive:
+            return Err(
+                f"value needs to be between [{min_inclusive},{max_exclusive}] but was above it: {value}",
+            )
+
+        return Ok(None)
 
 
 @dataclass(slots=True, repr=True)
@@ -52,7 +66,21 @@ class EBMLAdvancedElementTypeFloat:
     range: Optional[tuple[float, float]]
 
     def validate(self: Self, value: float) -> Result[None, str]:
-        pass
+        if self.range is None:
+            return Ok(None)
+
+        min_inclusive, max_exclusive = self.range
+        if value < min_inclusive:
+            return Err(
+                f"value needs to be between [{min_inclusive},{max_exclusive}] but was below it: {value}",
+            )
+
+        if value >= max_exclusive:
+            return Err(
+                f"value needs to be between [{min_inclusive},{max_exclusive}] but was above it: {value}",
+            )
+
+        return Ok(None)
 
 
 class IntRange:
@@ -92,7 +120,15 @@ class EBMLAdvancedElementTypeString:
     length: Optional[IntRange]
 
     def validate(self: Self, value: str) -> Result[None, str]:
-        pass
+        if self.length is None:
+            return Ok(None)
+
+        range_valid = self.length.valid(value)
+
+        if range_valid.err():
+            return Err(range_valid.as_err())
+
+        return Ok(None)
 
 
 @dataclass(slots=True, repr=True)
@@ -101,7 +137,7 @@ class EBMLAdvancedElementTypeDate:
     default: datetime | DefaultOptions
 
     def validate(self: Self, value: datetime) -> Result[None, str]:
-        pass
+        return Ok(None)
 
 
 @dataclass(slots=True, repr=True)
@@ -116,7 +152,15 @@ class EBMLAdvancedElementTypeBinary:
     length: Optional[IntRange]
 
     def validate(self: Self, value: bytes) -> Result[None, str]:
+        if self.length is None:
+            return Ok(None)
+
         range_valid = self.length.valid(value)
+
+        if range_valid.err():
+            return Err(range_valid.as_err())
+
+        return Ok(None)
 
 
 EBMLAdvancedElementType = (
