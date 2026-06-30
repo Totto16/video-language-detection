@@ -2884,6 +2884,10 @@ def mp4_iter_boxes(
         yield box
         pos += box.span.total.size
 
+    if pos != span.end:
+        msg = f"Boxes didn't reach to the end of the parent span: {pos} != {span.end}"
+        raise RuntimeError(msg)
+
 
 def mp4_iter_boxes_io(
     io: BoundedIO,
@@ -2902,6 +2906,10 @@ def mp4_iter_boxes_io(
 
         yield box
         pos += box.span.total.size
+
+    if pos != end:
+        msg = f"Boxes didn't reach to the end of the parent span: {pos} != {end}"
+        raise RuntimeError(msg)
 
 
 def find_mdhd_boxes_with_type(

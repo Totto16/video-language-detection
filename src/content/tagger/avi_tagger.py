@@ -202,7 +202,9 @@ class AVIChunkSpan:
         span: SimpleSpan,
         header_size: int,
     ) -> "AVIChunkSpan":
-        return AVIChunkSpan(SimpleSpan(span.start, span.size + header_size), header_size)
+        return AVIChunkSpan(
+            SimpleSpan(span.start, span.size + header_size), header_size
+        )
 
     def __interval_span_impl(self: Self, depth: int = 0) -> SimpleSpan:
         if len(self.__intervals) == 0:
@@ -1102,6 +1104,10 @@ def avi_iter_chunks(
                     raise RuntimeError(msg)
 
                 pos += 1
+
+    if pos != span.end:
+        msg = f"Chunks didn't reach to the end of the parent span: {pos} != {span.end}"
+        raise RuntimeError(msg)
 
 
 def find_strh_chunks_with_type(
