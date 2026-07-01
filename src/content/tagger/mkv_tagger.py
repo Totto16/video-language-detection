@@ -1339,6 +1339,10 @@ EBMLGlobalElementsSpec = filter_spec_elements(
     filter_ebml_global_element,
 )
 
+EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+
+
+
 
 @final
 @decorate_class(slots=True)

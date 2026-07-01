@@ -2,6 +2,12 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
+from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
+from pytest_subtests import SubTests
+from test_helper import ErrResult, OkResult
+
+from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
+from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.schema.parser import (
     EBMLElementDescription,
     EBMLElementType,
@@ -11,15 +17,7 @@ from content.tagger.schema.parser import (
     EBMLSchemaRangeNot,
     WrapperInt,
     xml_any_range_result,
-    xml_int_range_optional,
 )
-from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
-from pytest_subtests import SubTests
-from helper.utils import parse_int_safely
-from test_helper import ErrResult, OkResult
-
-from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
-from content.tagger.parser import BoundedIO, SimpleSpan
 
 mark_as_used(mkv_test_parse_files)
 

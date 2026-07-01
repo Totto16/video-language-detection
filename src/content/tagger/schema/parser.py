@@ -360,6 +360,7 @@ class EBMLElementDescription:
     occurrences: EBMLOccurrences
     type: EBMLAdvancedElementType
     description: Optional[str]
+    unknown_size_allowed: bool
 
 
 @dataclass(slots=True, repr=True)
@@ -407,6 +408,33 @@ def xml_int(value: str | int, base: int = 10) -> int:
 
     if result is None:
         msg = f"Invalid number: {value}"
+        raise RuntimeError(msg)
+
+    return result
+
+
+def parse_bool_safely(inp: str) -> Optional[bool]:
+    match inp:
+        case "1":
+            return True
+        case "0":
+            return False
+        case "true":
+            return True
+        case "false":
+            return False
+        case _:
+            return None
+
+
+def xml_boolean(value: str | bool) -> bool:  # noqa: FBT001
+    if isinstance(value, bool):
+        return value
+
+    result = parse_bool_safely(value)
+
+    if result is None:
+        msg = f"Invalid boolean: {value}"
         raise RuntimeError(msg)
 
     return result
@@ -574,13 +602,41 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
 
     match bound_b:
         case Bound.LE:
-            return Ok(EBMLSchemaRange((None, EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Inclusive))))
+            return Ok(
+                EBMLSchemaRange(
+                    (
+                        None,
+                        EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Inclusive),
+                    )
+                )
+            )
         case Bound.LT:
-            return Ok(EBMLSchemaRange((None, EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Exclusive))))
+            return Ok(
+                EBMLSchemaRange(
+                    (
+                        None,
+                        EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Exclusive),
+                    )
+                )
+            )
         case Bound.GE:
-            return Ok(EBMLSchemaRange((EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Inclusive), None)))
+            return Ok(
+                EBMLSchemaRange(
+                    (
+                        EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Inclusive),
+                        None,
+                    )
+                )
+            )
         case Bound.GT:
-            return Ok(EBMLSchemaRange((EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Exclusive), None)))
+            return Ok(
+                EBMLSchemaRange(
+                    (
+                        EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Exclusive),
+                        None,
+                    )
+                )
+            )
         case _:
             assert_never(bound_b)
 
@@ -744,8 +800,25 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             xml_required(element_entry.attrib, "type"),
         )
 
+        unknown_size_allowed = min_occurs = xml_boolean(
+            element_entry.attrib.get("unknownsizeallowed", False),
+        )
+
+        _recurring = min_occurs = xml_boolean(
+            element_entry.attrib.get("recurring", False),
+        )
+
         allowed_attributes.update(
-            ["name", "path", "id", "minOccurs", "maxOccurs", "type"]
+            [
+                "name",
+                "path",
+                "id",
+                "minOccurs",
+                "maxOccurs",
+                "type",
+                "unknownsizeallowed",
+                "recurring",
+            ],
         )
 
         advanced_type: EBMLAdvancedElementType
@@ -846,6 +919,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             occurrences=occurrences,
             type=advanced_type,
             description=description,
+            unknown_size_allowed=unknown_size_allowed,
         )
 
         append_element(element)
