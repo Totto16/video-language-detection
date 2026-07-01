@@ -163,7 +163,7 @@ def test_mkv_tagger_parse_element_id(
 def test_mkv_tagger_parse_ebml_schema_range(
     subtests: SubTests,
 ) -> None:
-    tests: list[tuple[str, Optional[EBMLSchemaRange[int]]]] = [("", None)]
+    tests: list[tuple[str, EBMLSchemaRange[int]]] = [("1", EBMLSchemaRange(1))]
 
     for inp, result in tests:
         with subtests.test("EBML Element Schema Range parsing"):
@@ -177,7 +177,10 @@ def test_mkv_tagger_parse_ebml_schema_range(
 def test_mkv_tagger_parse_ebml_schema_range_errors(
     subtests: SubTests,
 ) -> None:
-    tests: list[tuple[str, str]] = [("not 1 not", "Duplicate not")]
+    tests: list[tuple[str, str]] = [
+        ("", "Invalid bound: Invalid bounded number: ''"),
+        ("not 1 not", "Invalid number after not: '1not'"),
+    ]
 
     for inp, result in tests:
         with subtests.test("EBML Element Schema Range parsing errors"):

@@ -97,6 +97,21 @@ DefaultOptions = DefaultRequired | DefaultEmpty
 class EBMLSchemaRangeNot[A]:
     value: A
 
+    def __str__(self: Self) -> str:
+        return f"<EBMLSchemaRangeNot: {self.value}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.value)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, EBMLSchemaRangeNot):
+            return self.value == other.value
+
+        return False
+
 
 class EBMLSchemaRange[A: (int, float)]:
     # range is start inclusive, end exclusive
@@ -113,7 +128,6 @@ class EBMLSchemaRange[A: (int, float)]:
         self.__underlying = value
 
     def valid(self: Self, value: A) -> Result[None, str]:
-
         if isinstance(self.__underlying, (float, int)):
             if value != self.__underlying:
                 return Err(f"Value needs to be {self.__underlying} but was {value}")
@@ -137,6 +151,45 @@ class EBMLSchemaRange[A: (int, float)]:
             assert_never(self.__underlying)
 
         return Ok(None)
+
+    def __str__(self: Self) -> str:
+        if isinstance(self.__underlying, (float, int)):
+            return f"<EBMLSchemaRange exact value: {self.__underlying}>"
+
+        if isinstance(self.__underlying, tuple):
+            min_inclusive, max_exclusive = self.__underlying
+            return f"<EBMLSchemaRange range: [{"*" if min_inclusive is None else min_inclusive}, {"*" if max_exclusive is None else max_exclusive}]>"
+
+        if isinstance(self.__underlying, EBMLSchemaRangeNot):
+            return f"<EBMLSchemaRange not value: {self.__underlying.value}>"
+
+        assert_never(self.__underlying)
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(self.__underlying)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, EBMLSchemaRange):
+            return self.__underlying == other.__underlying
+
+        if isinstance(self.__underlying, (float, int)):
+            if isinstance(other, (float, int)):
+                return self.__underlying == other
+            return False
+
+        if isinstance(self.__underlying, tuple):
+            if isinstance(other, tuple) and len(other) == 2:
+                return self.__underlying == other
+            return False
+        if isinstance(self.__underlying, EBMLSchemaRangeNot):
+            if isinstance(other, EBMLSchemaRangeNot):
+                return self.__underlying == other
+            return False
+
+        assert_never(self.__underlying)
 
 
 @dataclass(slots=True, repr=True)
@@ -301,7 +354,7 @@ def xml_int(value: str | int, base: int = 10) -> int:
     result = parse_int_safely(value, base)
 
     if result is None:
-        msg = f"Invlaid number: {value}"
+        msg = f"Invalid number: {value}"
         raise RuntimeError(msg)
 
     return result
@@ -335,7 +388,7 @@ def xml_any_range_result[A: (int, float)](
         raw_num = parse_fn(normal_val)
 
         if raw_num is None:
-            return Err(f"Invlaid number after not: {normal_val}")
+            return Err(f"Invalid number after not: '{normal_val}'")
 
         return Ok(EBMLSchemaRange(EBMLSchemaRangeNot(raw_num)))
 
@@ -343,17 +396,17 @@ def xml_any_range_result[A: (int, float)](
         # Case 3: old syntax <num>-<num>
         num1, num2 = val.split("-", 2)
         if "-" in num2:
-            return Err(f"Invalid syntax, only one '-' allowed: {val}")
+            return Err(f"Invalid syntax, only one '-' allowed: '{val}'")
 
         num1_v = parse_fn(num1)
 
         if num1_v is None:
-            return Err(f"Invalid starting number: {num1}")
+            return Err(f"Invalid starting number: '{num1}'")
 
         num2_v = parse_fn(num1)
 
         if num2_v is None:
-            return Err(f"Invalid starting number: {num2}")
+            return Err(f"Invalid starting number: '{num2}'")
 
         old_range: tuple[A, A] = (num1_v, num2_v + 1)
         return Ok(EBMLSchemaRange(old_range))
@@ -372,7 +425,7 @@ def xml_any_range_result[A: (int, float)](
             num_v = parse_fn(raw_inp)
 
             if num_v is None:
-                return Err(f"Invalid bound number: {raw_inp}")
+                return Err(f"Invalid bound number: '{raw_inp}'")
 
             return Ok((bound, num_v))
 
@@ -385,23 +438,23 @@ def xml_any_range_result[A: (int, float)](
         if inp.startswith(">"):
             return parse_bound_impl(Bound.GT, inp[len(">") :])
 
-        return Err(f"Invlaid bounded number: {inp}")
+        return Err(f"Invalid bounded number: '{inp}'")
 
     if "," in val:
         # Case 4: new syntax <bound_num>, <bound_num>
         num1, num2 = val.split(",", 2)
         if "," in num2:
-            return Err(f"Invalid syntax, only one ',' allowed: {val}")
+            return Err(f"Invalid syntax, only one ',' allowed: '{val}'")
 
         bound1_v = parse_bound(num1)
 
         if bound1_v.err():
-            return Err(f"Invalid starting bound: {bound1_v.as_err()}")
+            return Err(f"Invalid starting bound: '{bound1_v.as_err()}'")
 
         bound2_v = parse_bound(num2)
 
         if bound2_v.err():
-            return Err(f"Invalid starting bound: {bound2_v.as_err()}")
+            return Err(f"Invalid starting bound: '{bound2_v.as_err()}'")
 
         bound1_b, bound1_num = bound1_v.as_ok()
 
@@ -414,7 +467,7 @@ def xml_any_range_result[A: (int, float)](
                 new_range_start_inclusive = bound1_num + 1
             case _:
                 return Err(
-                    f"First boundary has to be the lower boundary: but was: {bound1_b}: {val}",
+                    f"First boundary has to be the lower boundary: but was: {bound1_b}: '{val}'",
                 )
 
         bound2_b, bound2_num = bound2_v.as_ok()
@@ -428,7 +481,7 @@ def xml_any_range_result[A: (int, float)](
                 new_range_end_exclusive = bound2_num + 1
             case _:
                 return Err(
-                    f"Second boundary has to be the upper boundary: but was: {bound2_b}: {val}",
+                    f"Second boundary has to be the upper boundary: but was: {bound2_b}: '{val}'",
                 )
 
         new_range: tuple[A, A] = (new_range_start_inclusive, new_range_end_exclusive)
@@ -465,7 +518,7 @@ def xml_any_range_optional[A: (int, float)](
     result = xml_any_range_result(value, parse_fn)
 
     if result.err():
-        msg = f"Invaldi range:  {result.as_err()}"
+        msg = f"Invalid range: {result.as_err()}"
         raise RuntimeError(msg)
 
     return result.as_ok()
@@ -480,10 +533,12 @@ def xml_float_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[f
 
 
 def xml_length_range_optional(value: Optional[str]) -> Optional[LengthRange]:
-    if value is None:
+    result = xml_int_range_optional(value)
+
+    if result is None:
         return None
 
-    raise NotImplementedError("TODO")
+    return LengthRange(result)
 
 
 def xml_float(value: str | float) -> float:
@@ -493,7 +548,7 @@ def xml_float(value: str | float) -> float:
     result = parse_float_safely(value)
 
     if result is None:
-        msg = f"Invlaid number: {value}"
+        msg = f"Invalid number: {value}"
         raise RuntimeError(msg)
 
     return result
