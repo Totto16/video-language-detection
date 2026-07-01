@@ -429,7 +429,12 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         if num2_v is None:
             return Err(f"Invalid ending number: '{num2}'")
 
-        old_range: tuple[A, A] = (num1_v, num2_v + 1)
+        if num1_v > num2_v:
+            return Err(
+                f"Invalid range order: first number is bigger: {num1_v} > {num2_v}",
+            )
+
+        old_range: tuple[A, A] = (generic.ge(num1_v), generic.le(num2_v))
         return Ok(EBMLSchemaRange(old_range))
 
     class Bound(Enum):
@@ -488,7 +493,7 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                 new_range_start_inclusive = generic.gt(bound1_num)
             case _:
                 return Err(
-                    f"First boundary has to be the lower boundary: but was: {bound1_b}: '{val}'",
+                    f"First boundary has to be the lower boundary: but was: {bound1_b.name}: '{val}'",
                 )
 
         bound2_b, bound2_num = bound2_v.as_ok()
@@ -502,7 +507,7 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                 new_range_end_exclusive = generic.lt(bound2_num)
             case _:
                 return Err(
-                    f"Second boundary has to be the upper boundary: but was: {bound2_b}: '{val}'",
+                    f"Second boundary has to be the upper boundary: but was: {bound2_b.name}: '{val}'",
                 )
 
         new_range: tuple[A, A] = (new_range_start_inclusive, new_range_end_exclusive)
@@ -561,11 +566,11 @@ class WrapperInt(RangeWrapper[int]):
 
     @override
     def le(self: Self, value: int) -> int:
-        return value
+        return value + 1
 
     @override
     def lt(self: Self, value: int) -> int:
-        return value + 1
+        return value
 
 
 def xml_int_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[int]]:
@@ -590,11 +595,11 @@ class WrapperFloat(RangeWrapper[float]):
 
     @override
     def le(self: Self, value: float) -> float:
-        return value
+        return value + self.__eps
 
     @override
     def lt(self: Self, value: float) -> float:
-        return value + self.__eps
+        return value
 
 
 def xml_float_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[float]]:

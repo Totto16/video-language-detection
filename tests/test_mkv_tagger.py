@@ -172,17 +172,17 @@ def test_mkv_tagger_parse_ebml_schema_range(
         ("2-4", EBMLSchemaRange((2, 5))),
         (">=2", EBMLSchemaRange((2, None))),
         (">2", EBMLSchemaRange((3, None))),
-        ("<2", EBMLSchemaRange((None, 3))),
-        ("<=2", EBMLSchemaRange((None, 2))),
-        (">2,<4", EBMLSchemaRange((3, 5))),
-        (">=2,<=4", EBMLSchemaRange((2, 4))),
+        ("<2", EBMLSchemaRange((None, 2))),
+        ("<=2", EBMLSchemaRange((None, 3))),
+        (">2,<4", EBMLSchemaRange((3, 4))),
+        (">=2,<=4", EBMLSchemaRange((2, 5))),
     ]
 
     for inp, result in tests:
         with subtests.test("EBML Element Schema Range parsing"):
             value = xml_any_range_result(inp, WrapperInt())
 
-            assert value == OkResult(result)
+            assert value == OkResult(result), f"Input was {inp}"
 
 
 def test_mkv_tagger_parse_ebml_schema_range_errors(
@@ -199,6 +199,15 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
         ("1,3,4", "Invalid syntax, only one ',' allowed: '1,3,4'"),
         ("h,>2", "Invalid starting bound: Invalid bounded number: 'h'"),
         (">1,g", "Invalid ending bound: Invalid bounded number: 'g'"),
+        (
+            "<=2,<=4",
+            "First boundary has to be the lower boundary: but was: LE: '<=2,<=4'",
+        ),
+        (
+            ">=2,>=4",
+            "Second boundary has to be the upper boundary: but was: GE: '>=2,>=4'",
+        ),
+        ("4-1", "Invalid range order: first number is bigger: 4 > 1"),
     ]
 
     for inp, result in tests:
