@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sized
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,6 +11,7 @@ from typing import (
     TypeIs,
     assert_never,
     assert_type,
+    override,
 )
 from xml.etree.ElementTree import XMLParser
 from xml.etree.ElementTree import parse as parse_xml
@@ -128,7 +130,8 @@ class EBMLSchemaRange[A: (int, float)]:
         self.__underlying = value
 
     def valid(self: Self, value: A) -> Result[None, str]:
-        if isinstance(self.__underlying, (float, int)):
+        if isinstance(self.__underlying, (int, float)):
+            # TODO. check if the value is the same type as A
             if value != self.__underlying:
                 return Err(f"Value needs to be {self.__underlying} but was {value}")
         elif isinstance(self.__underlying, tuple):
@@ -153,7 +156,7 @@ class EBMLSchemaRange[A: (int, float)]:
         return Ok(None)
 
     def __str__(self: Self) -> str:
-        if isinstance(self.__underlying, (float, int)):
+        if isinstance(self.__underlying, (int, float)):
             return f"<EBMLSchemaRange exact value: {self.__underlying}>"
 
         if isinstance(self.__underlying, tuple):
@@ -175,8 +178,8 @@ class EBMLSchemaRange[A: (int, float)]:
         if isinstance(other, EBMLSchemaRange):
             return self.__underlying == other.__underlying
 
-        if isinstance(self.__underlying, (float, int)):
-            if isinstance(other, (float, int)):
+        if isinstance(self.__underlying, (int, float)):
+            if isinstance(other, (int, float)):
                 return self.__underlying == other
             return False
 
@@ -367,16 +370,34 @@ def xml_int_optional(value: Optional[str | int], base: int = 10) -> Optional[int
     return xml_int(value, base)
 
 
-def xml_any_range_result[A: (int, float)](
+class RangeWrapper[A](ABC):
+
+    @abstractmethod
+    def parse(self: Self, value: str) -> Optional[A]: ...
+
+    @abstractmethod
+    def ge(self: Self, value: A) -> A: ...
+
+    @abstractmethod
+    def gt(self: Self, value: A) -> A: ...
+
+    @abstractmethod
+    def le(self: Self, value: A) -> A: ...
+
+    @abstractmethod
+    def lt(self: Self, value: A) -> A: ...
+
+
+def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
     value: str,
-    parse_fn: Callable[[str], Optional[A]],
+    generic: RangeWrapper[A],
 ) -> Result[EBMLSchemaRange[A], str]:
     # spec: RFC 8794
     # chapter 11.1.6.6.1
 
     val = value.replace(" ", "")
 
-    raw_num = parse_fn(val)
+    raw_num = generic.parse(val)
 
     if raw_num is not None:
         # Case 1: just a number
@@ -385,7 +406,7 @@ def xml_any_range_result[A: (int, float)](
     if val.startswith("not"):
         # Case 2: not <number>
         normal_val = val[len("not") :]
-        raw_num = parse_fn(normal_val)
+        raw_num = generic.parse(normal_val)
 
         if raw_num is None:
             return Err(f"Invalid number after not: '{normal_val}'")
@@ -394,19 +415,19 @@ def xml_any_range_result[A: (int, float)](
 
     if "-" in val:
         # Case 3: old syntax <num>-<num>
-        num1, num2 = val.split("-", 2)
+        num1, num2 = val.split("-", 1)
         if "-" in num2:
             return Err(f"Invalid syntax, only one '-' allowed: '{val}'")
 
-        num1_v = parse_fn(num1)
+        num1_v = generic.parse(num1)
 
         if num1_v is None:
             return Err(f"Invalid starting number: '{num1}'")
 
-        num2_v = parse_fn(num1)
+        num2_v = generic.parse(num2)
 
         if num2_v is None:
-            return Err(f"Invalid starting number: '{num2}'")
+            return Err(f"Invalid ending number: '{num2}'")
 
         old_range: tuple[A, A] = (num1_v, num2_v + 1)
         return Ok(EBMLSchemaRange(old_range))
@@ -422,7 +443,7 @@ def xml_any_range_result[A: (int, float)](
             bound: Bound,
             raw_inp: str,
         ) -> Result[tuple[Bound, A], str]:
-            num_v = parse_fn(raw_inp)
+            num_v = generic.parse(raw_inp)
 
             if num_v is None:
                 return Err(f"Invalid bound number: '{raw_inp}'")
@@ -442,19 +463,19 @@ def xml_any_range_result[A: (int, float)](
 
     if "," in val:
         # Case 4: new syntax <bound_num>, <bound_num>
-        num1, num2 = val.split(",", 2)
+        num1, num2 = val.split(",", 1)
         if "," in num2:
             return Err(f"Invalid syntax, only one ',' allowed: '{val}'")
 
         bound1_v = parse_bound(num1)
 
         if bound1_v.err():
-            return Err(f"Invalid starting bound: '{bound1_v.as_err()}'")
+            return Err(f"Invalid starting bound: {bound1_v.as_err()}")
 
         bound2_v = parse_bound(num2)
 
         if bound2_v.err():
-            return Err(f"Invalid starting bound: '{bound2_v.as_err()}'")
+            return Err(f"Invalid ending bound: {bound2_v.as_err()}")
 
         bound1_b, bound1_num = bound1_v.as_ok()
 
@@ -462,9 +483,9 @@ def xml_any_range_result[A: (int, float)](
 
         match bound1_b:
             case Bound.GE:
-                new_range_start_inclusive = bound1_num
+                new_range_start_inclusive = generic.ge(bound1_num)
             case Bound.GT:
-                new_range_start_inclusive = bound1_num + 1
+                new_range_start_inclusive = generic.gt(bound1_num)
             case _:
                 return Err(
                     f"First boundary has to be the lower boundary: but was: {bound1_b}: '{val}'",
@@ -476,9 +497,9 @@ def xml_any_range_result[A: (int, float)](
 
         match bound2_b:
             case Bound.LE:
-                new_range_end_exclusive = bound2_num
+                new_range_end_exclusive = generic.le(bound2_num)
             case Bound.LT:
-                new_range_end_exclusive = bound2_num + 1
+                new_range_end_exclusive = generic.lt(bound2_num)
             case _:
                 return Err(
                     f"Second boundary has to be the upper boundary: but was: {bound2_b}: '{val}'",
@@ -497,25 +518,25 @@ def xml_any_range_result[A: (int, float)](
 
     match bound_b:
         case Bound.LE:
-            return Ok(EBMLSchemaRange((None, bound_num)))
+            return Ok(EBMLSchemaRange((None, generic.le(bound_num))))
         case Bound.LT:
-            return Ok(EBMLSchemaRange((None, bound_num + 1)))
+            return Ok(EBMLSchemaRange((None, generic.lt(bound_num))))
         case Bound.GE:
-            return Ok(EBMLSchemaRange((bound_num, None)))
+            return Ok(EBMLSchemaRange((generic.ge(bound_num), None)))
         case Bound.GT:
-            return Ok(EBMLSchemaRange((bound_num + 1, None)))
+            return Ok(EBMLSchemaRange((generic.gt(bound_num), None)))
         case _:
             assert_never(bound_b)
 
 
 def xml_any_range_optional[A: (int, float)](
     value: Optional[str],
-    parse_fn: Callable[[str], Optional[A]],
+    generic: RangeWrapper[A],
 ) -> Optional[EBMLSchemaRange[A]]:
     if value is None:
         return None
 
-    result = xml_any_range_result(value, parse_fn)
+    result = xml_any_range_result(value, generic)
 
     if result.err():
         msg = f"Invalid range: {result.as_err()}"
@@ -524,12 +545,60 @@ def xml_any_range_optional[A: (int, float)](
     return result.as_ok()
 
 
+class WrapperInt(RangeWrapper[int]):
+
+    @override
+    def parse(self: Self, value: str) -> Optional[int]:
+        return parse_int_safely(value)
+
+    @override
+    def ge(self: Self, value: int) -> int:
+        return value
+
+    @override
+    def gt(self: Self, value: int) -> int:
+        return value + 1
+
+    @override
+    def le(self: Self, value: int) -> int:
+        return value
+
+    @override
+    def lt(self: Self, value: int) -> int:
+        return value + 1
+
+
 def xml_int_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[int]]:
-    return xml_any_range_optional(value, parse_int_safely)
+    return xml_any_range_optional(value, WrapperInt())
+
+
+class WrapperFloat(RangeWrapper[float]):
+    # TODO: use better representation, don't use epsilon, use proper >= > differentiation and math intervals
+    __eps: float = 0.00000001
+
+    @override
+    def parse(self: Self, value: str) -> Optional[float]:
+        return parse_float_safely(value)
+
+    @override
+    def ge(self: Self, value: float) -> float:
+        return value
+
+    @override
+    def gt(self: Self, value: float) -> float:
+        return value + self.__eps
+
+    @override
+    def le(self: Self, value: float) -> float:
+        return value
+
+    @override
+    def lt(self: Self, value: float) -> float:
+        return value + self.__eps
 
 
 def xml_float_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[float]]:
-    return xml_any_range_optional(value, parse_float_safely)
+    return xml_any_range_optional(value, WrapperFloat())
 
 
 def xml_length_range_optional(value: Optional[str]) -> Optional[LengthRange]:

@@ -6,6 +6,8 @@ from content.tagger.schema.parser import (
     EBMLElementDescription,
     EBMLElementType,
     EBMLSchemaRange,
+    EBMLSchemaRangeNot,
+    WrapperInt,
     xml_any_range_result,
     xml_int_range_optional,
 )
@@ -163,11 +165,22 @@ def test_mkv_tagger_parse_element_id(
 def test_mkv_tagger_parse_ebml_schema_range(
     subtests: SubTests,
 ) -> None:
-    tests: list[tuple[str, EBMLSchemaRange[int]]] = [("1", EBMLSchemaRange(1))]
+    tests: list[tuple[str, EBMLSchemaRange[int]]] = [
+        ("1", EBMLSchemaRange(1)),
+        ("    2   ", EBMLSchemaRange(2)),
+        ("   not  2   ", EBMLSchemaRange(EBMLSchemaRangeNot(2))),
+        ("2-4", EBMLSchemaRange((2, 5))),
+        (">=2", EBMLSchemaRange((2, None))),
+        (">2", EBMLSchemaRange((3, None))),
+        ("<2", EBMLSchemaRange((None, 3))),
+        ("<=2", EBMLSchemaRange((None, 2))),
+        (">2,<4", EBMLSchemaRange((3, 5))),
+        (">=2,<=4", EBMLSchemaRange((2, 4))),
+    ]
 
     for inp, result in tests:
         with subtests.test("EBML Element Schema Range parsing"):
-            value = xml_any_range_result(inp, parse_int_safely)
+            value = xml_any_range_result(inp, WrapperInt())
 
             assert value == OkResult(result)
 
@@ -178,11 +191,19 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
     tests: list[tuple[str, str]] = [
         ("", "Invalid bound: Invalid bounded number: ''"),
         ("not 1 not", "Invalid number after not: '1not'"),
+        ("1-3-4", "Invalid syntax, only one '-' allowed: '1-3-4'"),
+        ("h-2", "Invalid starting number: 'h'"),
+        ("1-g", "Invalid ending number: 'g'"),
+        ("<=r2", "Invalid bound: Invalid bound number: 'r2'"),
+        ("2,4", "Invalid starting bound: Invalid bounded number: '2'"),
+        ("1,3,4", "Invalid syntax, only one ',' allowed: '1,3,4'"),
+        ("h,>2", "Invalid starting bound: Invalid bounded number: 'h'"),
+        (">1,g", "Invalid ending bound: Invalid bounded number: 'g'"),
     ]
 
     for inp, result in tests:
         with subtests.test("EBML Element Schema Range parsing errors"):
-            value = xml_any_range_result(inp, parse_int_safely)
+            value = xml_any_range_result(inp, WrapperInt())
 
             assert value == ErrResult()
 
