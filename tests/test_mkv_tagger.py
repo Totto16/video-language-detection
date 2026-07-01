@@ -220,6 +220,15 @@ def test_mkv_tagger_parse_ebml_schema_range(
                 ),
             ),
         ),
+        (
+            ">=-2,<=4",
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(-2, EBMLSchemaRangeBound.Inclusive),
+                    EBMLSchemaRangeElem(4, EBMLSchemaRangeBound.Inclusive),
+                ),
+            ),
+        ),
     ]
 
     for inp, result in tests:

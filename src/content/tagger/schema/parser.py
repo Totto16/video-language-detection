@@ -517,33 +517,6 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
 
         return Ok(EBMLSchemaRange(EBMLSchemaRangeNot(raw_num)))
 
-    if "-" in val:
-        # Case 3: old syntax <num>-<num>
-        num1, num2 = val.split("-", 1)
-        if "-" in num2:
-            return Err(f"Invalid syntax, only one '-' allowed: '{val}'")
-
-        num1_v = generic.parse(num1)
-
-        if num1_v is None:
-            return Err(f"Invalid starting number: '{num1}'")
-
-        num2_v = generic.parse(num2)
-
-        if num2_v is None:
-            return Err(f"Invalid ending number: '{num2}'")
-
-        if num1_v > num2_v:
-            return Err(
-                f"Invalid range order: first number is bigger: {num1_v} > {num2_v}",
-            )
-
-        old_range: tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]] = (
-            EBMLSchemaRangeElem(num1_v, EBMLSchemaRangeBound.Inclusive),
-            EBMLSchemaRangeElem(num2_v, EBMLSchemaRangeBound.Inclusive),
-        )
-        return Ok(EBMLSchemaRange(old_range))
-
     class Bound(Enum):
         LT = "<"
         LE = "<="
@@ -574,7 +547,7 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         return Err(f"Invalid bounded number: '{inp}'")
 
     if "," in val:
-        # Case 4: new syntax <bound_num>, <bound_num>
+        # Case 3: new syntax <bound_num>, <bound_num>
         num1, num2 = val.split(",", 1)
         if "," in num2:
             return Err(f"Invalid syntax, only one ',' allowed: '{val}'")
@@ -630,6 +603,33 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
             new_range_end,
         )
         return Ok(EBMLSchemaRange(new_range))
+
+    if "-" in val:
+        # Case 4: old syntax <num>-<num>
+        num1, num2 = val.split("-", 1)
+        if "-" in num2:
+            return Err(f"Invalid syntax, only one '-' allowed: '{val}'")
+
+        num1_v = generic.parse(num1)
+
+        if num1_v is None:
+            return Err(f"Invalid starting number: '{num1}'")
+
+        num2_v = generic.parse(num2)
+
+        if num2_v is None:
+            return Err(f"Invalid ending number: '{num2}'")
+
+        if num1_v > num2_v:
+            return Err(
+                f"Invalid range order: first number is bigger: {num1_v} > {num2_v}",
+            )
+
+        old_range: tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]] = (
+            EBMLSchemaRangeElem(num1_v, EBMLSchemaRangeBound.Inclusive),
+            EBMLSchemaRangeElem(num2_v, EBMLSchemaRangeBound.Inclusive),
+        )
+        return Ok(EBMLSchemaRange(old_range))
 
     # Case 5: <bound_num>
     bound_v = parse_bound(val)
