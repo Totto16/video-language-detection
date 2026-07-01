@@ -400,6 +400,9 @@ class EBMLElementDescription:
     description: Optional[str]
     unknown_size_allowed: bool
     versions: EBMLVersions
+    path: str
+    recurring: bool
+    recursive: bool
 
 
 @dataclass(slots=True, repr=True)
@@ -847,7 +850,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
         allowed_attributes: set[str] = set()
 
         name = xml_required(element_entry.attrib, "name")
-        _path = xml_required(element_entry.attrib, "path")
+        path = xml_required(element_entry.attrib, "path")
         element_id = xml_int(xml_required(element_entry.attrib, "id"), 16)
         min_occurs = xml_int(element_entry.attrib.get("minOccurs", 0))
         max_occurs = xml_int_optional(element_entry.attrib.get("maxOccurs", None))
@@ -859,13 +862,16 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             element_entry.attrib.get("unknownsizeallowed", False),
         )
 
-        _recurring = min_occurs = xml_boolean(
+        recurring = min_occurs = xml_boolean(
             element_entry.attrib.get("recurring", False),
         )
 
         min_ver = xml_int(element_entry.attrib.get("minver", 1))
         max_ver = xml_int_optional(element_entry.attrib.get("maxver", None))
 
+        recursive = min_occurs = xml_boolean(
+            element_entry.attrib.get("recursive", False),
+        )
         allowed_attributes.update(
             [
                 "name",
@@ -878,6 +884,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
                 "recurring",
                 "minver",
                 "maxver",
+                "recursive",
             ],
         )
 
@@ -983,6 +990,9 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             description=description,
             unknown_size_allowed=unknown_size_allowed,
             versions=versions,
+            path=path,
+            recurring=recurring,
+            recursive=recursive,
         )
 
         append_element(element)
