@@ -2,9 +2,16 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
-from content.tagger.schema.parser import EBMLElementDescription, EBMLElementType
+from content.tagger.schema.parser import (
+    EBMLElementDescription,
+    EBMLElementType,
+    EBMLSchemaRange,
+    xml_any_range_result,
+    xml_int_range_optional,
+)
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
+from helper.utils import parse_int_safely
 from test_helper import ErrResult, OkResult
 
 from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
@@ -153,6 +160,34 @@ def test_mkv_tagger_parse_element_id(
             assert is_valid_element_id == result
 
 
+def test_mkv_tagger_parse_ebml_schema_range(
+    subtests: SubTests,
+) -> None:
+    tests: list[tuple[str, Optional[EBMLSchemaRange[int]]]] = [("", None)]
+
+    for inp, result in tests:
+        with subtests.test("EBML Element Schema Range parsing"):
+            value = xml_any_range_result(inp, parse_int_safely)
+
+            assert value == OkResult()
+
+            assert value.as_ok() == result
+
+
+def test_mkv_tagger_parse_ebml_schema_range_errors(
+    subtests: SubTests,
+) -> None:
+    tests: list[tuple[str, str]] = [("not 1 not", "Duplicate not")]
+
+    for inp, result in tests:
+        with subtests.test("EBML Element Schema Range parsing errors"):
+            value = xml_any_range_result(inp, parse_int_safely)
+
+            assert value == ErrResult()
+
+            assert value.as_err() == result
+
+
 def test_mkv_tagger_todo(
     subtests: SubTests,
     mkv_test_parse_files: TempVideoFiles,
@@ -171,14 +206,18 @@ def test_mkv_tagger_todo(
             assert file != ""
 
 
-# TODO: test schema extraction
-# EBML Header Elements
-EBMLHeaderElements: list[EBMLElementDescription] = [
-    EBMLElementDescription(
-        name="EBML",
-        id=0x1A45DFA3,
-        occurrences=1,
-        type=EBMLElementType.Master,
-        description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
-    ),
-]
+def test_mkv_tagger_ebml_schema_test_schema_parse(
+    subtests: SubTests,
+    mkv_test_parse_files: TempVideoFiles,
+) -> None:
+    # TODO: test schema extraction
+    # EBML Header Elements
+    EBMLHeaderElements: list[EBMLElementDescription] = [
+        EBMLElementDescription(
+            name="EBML",
+            id=0x1A45DFA3,
+            occurrences=1,
+            type=EBMLElementType.Master,
+            description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
+        ),
+    ]
