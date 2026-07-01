@@ -1,4 +1,3 @@
-from datetime import timedelta
 import gc
 import math
 import re
@@ -60,6 +59,8 @@ setup_global_logger()
 from speechbrain.inference.classifiers import EncoderClassifier  # noqa: E402
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from helper.gpu import AvailableMemory
 
 WAV_FILE_BAR_FMT = "{desc}{desc_pad}{percentage:3.0f}%|{bar}| {count:2n}/{total:2n} [{elapsed}<{eta}, {rate:.2f}{unit_pad}{unit}/s]"

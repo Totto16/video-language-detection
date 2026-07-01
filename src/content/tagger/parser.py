@@ -1,10 +1,8 @@
-import os
 import struct
 import sys
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from enum import StrEnum
-from io import UnsupportedOperation
 from types import TracebackType
 from typing import (
     BinaryIO,

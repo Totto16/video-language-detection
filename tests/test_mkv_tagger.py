@@ -1,6 +1,5 @@
 from io import BytesIO
-from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
@@ -18,6 +17,9 @@ from content.tagger.schema.parser import (
     WrapperInt,
     xml_any_range_result,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 mark_as_used(mkv_test_parse_files)
 

@@ -295,7 +295,7 @@ class Validator[ED, SD, S2D, CD](ABC):
         directory: Path,
         *,
         manager: ManagerInterface,
-        content_filter: ContentFilter,
+        content_filter: ContentFilter,  # noqa: ARG002
     ) -> None:
         status_bar_manager: StatusBarManager = StatusBarManager(manager)
 

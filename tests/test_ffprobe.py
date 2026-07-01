@@ -11,10 +11,10 @@ from fixtures import (
     mark_as_used,
 )
 from pytest_subtests import SubTests
-from helper.utils import parse_float_safely
 from test_helper import OkResult, re_exact_string
 
 from helper.ffprobe import ffprobe
+from helper.utils import parse_float_safely
 
 mark_as_used(ffprobe_dummy_files)
 mark_as_used(ffprobe_temp_video_files)

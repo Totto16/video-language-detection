@@ -354,7 +354,7 @@ class EBMLAdvancedElementTypeDate:
     type: Literal[EBMLElementType.Date]
     default: datetime | DefaultOptions
 
-    def validate(self: Self, value: datetime) -> Result[None, str]:
+    def validate(self: Self, value: datetime) -> Result[None, str]:  # noqa: ARG002
         return Ok(None)
 
 
@@ -572,11 +572,11 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         match bound1_b:
             case Bound.GE:
                 new_range_start = EBMLSchemaRangeElem(
-                    bound1_num, EBMLSchemaRangeBound.Inclusive
+                    bound1_num, EBMLSchemaRangeBound.Inclusive,
                 )
             case Bound.GT:
                 new_range_start = EBMLSchemaRangeElem(
-                    bound1_num, EBMLSchemaRangeBound.Exclusive
+                    bound1_num, EBMLSchemaRangeBound.Exclusive,
                 )
             case _:
                 return Err(
@@ -590,11 +590,11 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         match bound2_b:
             case Bound.LE:
                 new_range_end = EBMLSchemaRangeElem(
-                    bound2_num, EBMLSchemaRangeBound.Inclusive
+                    bound2_num, EBMLSchemaRangeBound.Inclusive,
                 )
             case Bound.LT:
                 new_range_end = EBMLSchemaRangeElem(
-                    bound2_num, EBMLSchemaRangeBound.Exclusive
+                    bound2_num, EBMLSchemaRangeBound.Exclusive,
                 )
             case _:
                 return Err(
@@ -649,8 +649,8 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                     (
                         None,
                         EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Inclusive),
-                    )
-                )
+                    ),
+                ),
             )
         case Bound.LT:
             return Ok(
@@ -658,8 +658,8 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                     (
                         None,
                         EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Exclusive),
-                    )
-                )
+                    ),
+                ),
             )
         case Bound.GE:
             return Ok(
@@ -667,8 +667,8 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                     (
                         EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Inclusive),
                         None,
-                    )
-                )
+                    ),
+                ),
             )
         case Bound.GT:
             return Ok(
@@ -676,8 +676,8 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                     (
                         EBMLSchemaRangeElem(bound_num, EBMLSchemaRangeBound.Exclusive),
                         None,
-                    )
-                )
+                    ),
+                ),
             )
         case _:
             assert_never(bound_b)
@@ -801,7 +801,7 @@ def xml_default_value[A](value: Optional[A]) -> A | DefaultOptions:
     return value
 
 
-def ebml_read_spec_xml(name: str) -> EBMLSpec:
+def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
 
     file = Path(__file__).parent / name
 

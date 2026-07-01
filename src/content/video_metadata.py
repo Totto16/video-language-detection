@@ -208,12 +208,12 @@ class VideoMetadata:
                 case StreamType.video:
                     duration = stream.duration() or file_duration
                     return VideoStreamVideo(
-                        VideoStreamType.video, TimeDeltaCompat(duration)
+                        VideoStreamType.video, TimeDeltaCompat(duration),
                     )
                 case StreamType.audio:
                     duration = stream.duration() or file_duration
                     return VideoStreamAudio(
-                        VideoStreamType.audio, TimeDeltaCompat(duration)
+                        VideoStreamType.audio, TimeDeltaCompat(duration),
                     )
                 case StreamType.subtitle:
                     return VideoStreamSubtitle(VideoStreamType.subtitle)
