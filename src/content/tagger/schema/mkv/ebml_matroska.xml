@@ -468,10 +468,10 @@ see [@?I-D.ietf-cellar-codec] for more info.</documentation>
   <element name="CodecDownloadURL" path="\Segment\Tracks\TrackEntry\CodecDownloadURL" id="0x26B240" type="string" minver="0" maxver="0">
     <documentation lang="en" purpose="definition">A URL to download information about the codec used.</documentation>
   </element>
-  <element name="CodecDecodeAll" path="\Segment\Tracks\TrackEntry\CodecDecodeAll" id="0xAA" type="uinteger" maxver="0" range="0-1" default="1" minOccurs="1" maxOccurs="1">
+  <element name="CodecDecodeAll" path="\Segment\Tracks\TrackEntry\CodecDecodeAll" id="0xAA" type="uinteger" minver="0" maxver="0" range="0-1" default="1" minOccurs="1" maxOccurs="1">
     <documentation lang="en" purpose="definition">Set to 1 if the codec can decode potentially damaged data.</documentation>
   </element>
-  <element name="TrackOverlay" path="\Segment\Tracks\TrackEntry\TrackOverlay" id="0x6FAB" type="uinteger" maxver="0">
+  <element name="TrackOverlay" path="\Segment\Tracks\TrackEntry\TrackOverlay" id="0x6FAB" type="uinteger" minver="0" maxver="0">
     <documentation lang="en" purpose="definition">Specify that this track is an overlay track for the `Track` specified (in the u-integer).
 This means that when this track has a gap on `SilentTracks`, the overlay track should be used instead. The order of multiple `TrackOverlay` matters; the first one is the one that should be used.
 If the first one is not found, it should be the second, etc.</documentation>
@@ -1272,20 +1272,20 @@ A `Matroska Player` **MAY** support encryption.</documentation>
     <extension type="webmproject.org" webm="1"/>
     <extension type="stream copy" keep="1"/>
   </element>
-  <element name="ContentSignature" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSignature" id="0x47E3" type="binary" maxver="0" maxOccurs="1">
+  <element name="ContentSignature" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSignature" id="0x47E3" type="binary" minver="0" maxver="0" maxOccurs="1">
     <documentation lang="en" purpose="definition">A cryptographic signature of the contents.</documentation>
   </element>
-  <element name="ContentSigKeyID" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigKeyID" id="0x47E4" type="binary" maxver="0" maxOccurs="1">
+  <element name="ContentSigKeyID" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigKeyID" id="0x47E4" type="binary" minver="0" maxver="0" maxOccurs="1">
     <documentation lang="en" purpose="definition">This is the ID of the private key that the data was signed with.</documentation>
   </element>
-  <element name="ContentSigAlgo" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigAlgo" id="0x47E5" type="uinteger" maxver="0" default="0" maxOccurs="1">
+  <element name="ContentSigAlgo" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigAlgo" id="0x47E5" type="uinteger" minver="0" maxver="0" default="0" maxOccurs="1">
     <documentation lang="en" purpose="definition">The algorithm used for the signature.</documentation>
     <restriction>
       <enum value="0" label="Not signed"/>
       <enum value="1" label="RSA"/>
     </restriction>
   </element>
-  <element name="ContentSigHashAlgo" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigHashAlgo" id="0x47E6" type="uinteger" maxver="0" default="0" maxOccurs="1">
+  <element name="ContentSigHashAlgo" path="\Segment\Tracks\TrackEntry\ContentEncodings\ContentEncoding\ContentEncryption\ContentSigHashAlgo" id="0x47E6" type="uinteger" minver="0" maxver="0" default="0" maxOccurs="1">
     <documentation lang="en" purpose="definition">The hash algorithm used for the signature.</documentation>
     <restriction>
       <enum value="0" label="Not signed"/>
