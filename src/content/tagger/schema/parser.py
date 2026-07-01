@@ -197,6 +197,44 @@ def ebml_occurrences_from_values(
     )
 
 
+type EBMLVersions = EBMLSchemaRange[int]
+
+
+def ebml_versions_from_values(
+    min_ver: int,
+    max_ver: Optional[int],
+) -> EBMLVersions:
+    if min_ver < 0:
+        msg = f"min version is negative: {min_ver}"
+        raise RuntimeError(msg)
+
+    if max_ver is None:
+        return EBMLSchemaRange(
+            (
+                EBMLSchemaRangeElem(min_ver, EBMLSchemaRangeBound.Inclusive),
+                None,
+            ),
+        )
+
+    if max_ver < 0:
+        msg = f"max version is negative: {max_ver}"
+        raise RuntimeError(msg)
+
+    if min_ver == max_ver:
+        return EBMLSchemaRange(min_ver)
+
+    if min_ver > max_ver:
+        msg = f"min version is greater than max version: {min_ver} > {max_ver}"
+        raise RuntimeError(msg)
+
+    return EBMLSchemaRange(
+        (
+            EBMLSchemaRangeElem(min_ver, EBMLSchemaRangeBound.Inclusive),
+            EBMLSchemaRangeElem(max_ver, EBMLSchemaRangeBound.Inclusive),
+        ),
+    )
+
+
 class EBMLElementType(Enum):
     SignedInteger = "si"
     UnsignedInteger = "ui"
@@ -361,6 +399,7 @@ class EBMLElementDescription:
     type: EBMLAdvancedElementType
     description: Optional[str]
     unknown_size_allowed: bool
+    versions: EBMLVersions
 
 
 @dataclass(slots=True, repr=True)
@@ -824,6 +863,9 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             element_entry.attrib.get("recurring", False),
         )
 
+        min_ver = xml_int(element_entry.attrib.get("minver", 1))
+        max_ver = xml_int_optional(element_entry.attrib.get("maxver", None))
+
         allowed_attributes.update(
             [
                 "name",
@@ -834,6 +876,8 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
                 "type",
                 "unknownsizeallowed",
                 "recurring",
+                "minver",
+                "maxver",
             ],
         )
 
@@ -929,6 +973,8 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
 
         occurrences = ebml_occurrences_from_values(min_occurs, max_occurs)
 
+        versions = ebml_versions_from_values(min_ver, max_ver)
+
         element: EBMLElementDescription = EBMLElementDescription(
             name=name,
             id=element_id,
@@ -936,6 +982,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
             type=advanced_type,
             description=description,
             unknown_size_allowed=unknown_size_allowed,
+            versions=versions,
         )
 
         append_element(element)
