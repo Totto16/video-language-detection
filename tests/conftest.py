@@ -15,7 +15,7 @@ mark_as_used(cached_file_manager)
 class FancyEq(ABC):
 
     @abstractmethod
-    def support_fancy_eq(self: Self, other: object) -> bool: ...
+    def supports_fancy_eq(self: Self, other: object) -> bool: ...
 
     @abstractmethod
     def fancy_eq(self: Self, other: object) -> Optional[list[str]]: ...
@@ -27,10 +27,14 @@ def pytest_assertrepr_compare(
     left: object,
     right: object,
 ) -> Optional[list[str]]:
-    if op == "==" and isinstance(left, FancyEq) and left.support_fancy_eq(right):
+    if op == "==" and isinstance(left, FancyEq) and left.supports_fancy_eq(right):
         return left.fancy_eq(right)
 
+    if op == "==" and isinstance(right, FancyEq) and right.supports_fancy_eq(left):
+        return right.fancy_eq(left)
+
     return None
+
 
 def fixed_translator() -> None:
     import gettext  # noqa: PLC0415
