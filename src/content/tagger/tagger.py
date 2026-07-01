@@ -1,8 +1,5 @@
 from pathlib import Path
 
-from content.tagger.avi_tagger import VideoTaggerAVI
-from content.tagger.mp4_tagger import VideoTaggerMP4
-from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.video_tagger import (
     VideoTagger,
     VideoTaggerMultiple,
@@ -14,6 +11,9 @@ _ = get_translator()
 
 
 def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]:
+
+    from content.tagger.mp4_tagger import VideoTaggerMP4  # noqa: PLC0415
+    from content.tagger.mutagen_tagger import VideoTaggerMutagen  # noqa: PLC0415
 
     try:
 
@@ -51,6 +51,8 @@ def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]
 
 def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
 
+    from content.tagger.mp4_tagger import VideoTaggerMP4  # noqa: PLC0415
+
     try:
 
         mp4_handle = VideoTaggerMP4.get_handle(file)
@@ -67,6 +69,8 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
 
 def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
 
+    from content.tagger.avi_tagger import VideoTaggerAVI  # noqa: PLC0415
+
     try:
 
         avi_handle = VideoTaggerAVI.get_handle(file)
@@ -82,6 +86,25 @@ def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
         )
 
 
+def get_tagger_for_mkv_file(file: Path) -> Result["VideoTagger", str]:
+
+    from content.tagger.mkv_tagger import VideoTaggerMKV  # noqa: PLC0415
+
+    try:
+
+        mkv_handle = VideoTaggerMKV.get_handle(file)
+
+        if mkv_handle.err():
+            return Err(mkv_handle.as_err())
+
+        return Ok(mkv_handle.as_ok())
+
+    except RuntimeError as err:
+        return Err(
+            _("get tagger {err}").format(err=err),
+        )
+
+
 def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
 
     ext = file.suffix
@@ -90,7 +113,7 @@ def get_tagger_for_file(file: Path) -> Result["VideoTagger", str]:
         case ".mp4":
             return get_tagger_for_mp4_file(file)
         case ".mkv":
-            return Err("MKV not yet supported")
+            return get_tagger_for_mkv_file(file)
         case ".avi":
             return get_tagger_for_avi_file(file)
         case _:
