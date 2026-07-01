@@ -169,9 +169,7 @@ def test_mkv_tagger_parse_ebml_schema_range(
         with subtests.test("EBML Element Schema Range parsing"):
             value = xml_any_range_result(inp, parse_int_safely)
 
-            assert value == OkResult()
-
-            assert value.as_ok() == result
+            assert value == OkResult(result)
 
 
 def test_mkv_tagger_parse_ebml_schema_range_errors(

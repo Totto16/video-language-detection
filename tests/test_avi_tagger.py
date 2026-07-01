@@ -7,7 +7,13 @@ from typing import Any, BinaryIO, Optional, Self, cast, override
 from uuid import uuid4
 
 from conftest import FancyEq
-from fixtures import TempVideoFiles, avi_options, avi_test_parse_files, mark_as_used, test_manager
+from fixtures import (
+    TempVideoFiles,
+    avi_options,
+    avi_test_parse_files,
+    mark_as_used,
+    test_manager,
+)
 from pytest_subtests import SubTests
 from test_helper import OkResult, file_duplicates
 
@@ -48,6 +54,7 @@ from helper.result import Err, Ok, Result
 mark_as_used(avi_test_parse_files)
 mark_as_used(test_manager)
 mark_as_used(avi_options)
+
 
 @decorate_class(slots=True)
 class PseudoAVIChunk(AVIChunk):
@@ -361,13 +368,13 @@ class AVIChunkStructure(FancyEq):
         if isinstance(other, AVIChunkStructure):
             return (True, lambda: self.chunks.eq_impl(other.chunks))
 
-        return (False, lambda: Err([]))
+        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
 
     def __eq__(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[1]().ok()
 
     @override
-    def support_fancy_eq(self: Self, other: object) -> bool:
+    def supports_fancy_eq(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[0]
 
     @override

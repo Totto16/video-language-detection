@@ -421,13 +421,13 @@ class MP4BoxStructure(FancyEq):
         if isinstance(other, MP4BoxStructure):
             return (True, lambda: self.boxes.eq_impl(other.boxes))
 
-        return (False, lambda: Err([]))
+        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
 
     def __eq__(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[1]().ok()
 
     @override
-    def support_fancy_eq(self: Self, other: object) -> bool:
+    def supports_fancy_eq(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[0]
 
     @override
