@@ -20,80 +20,6 @@ from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 from helper.utils import parse_float_safely, parse_int_safely
 
-type EBMLOccurrences = int | tuple[int, int] | tuple[int, None]
-
-
-def ebml_occurrences_from_values(
-    min_occurrences: int,
-    max_occurrences: Optional[int],
-) -> EBMLOccurrences:
-    if min_occurrences < 0:
-        msg = f"min occurrences is negative: {min_occurrences}"
-        raise RuntimeError(msg)
-
-    if max_occurrences is None:
-        return (min_occurrences, None)
-
-    if max_occurrences < 0:
-        msg = f"max occurrences is negative: {max_occurrences}"
-        raise RuntimeError(msg)
-
-    if min_occurrences == max_occurrences:
-        return min_occurrences
-
-    if min_occurrences > max_occurrences:
-        msg = f"min occurrences is greater than max occurrences: {min_occurrences} > {max_occurrences}"
-        raise RuntimeError(msg)
-
-    return (min_occurrences, max_occurrences)
-
-
-class EBMLElementType(Enum):
-    SignedInteger = "si"
-    UnsignedInteger = "ui"
-    Float = "f"
-    String = "s"
-    UTF8 = "utf-8"
-    Date = "d"
-    Master = "m"
-    Binary = "b"
-
-    @staticmethod
-    def from_str(inp: str) -> "EBMLElementType":
-        match inp:
-            case "integer":
-                return EBMLElementType.SignedInteger
-            case "uinteger":
-                return EBMLElementType.UnsignedInteger
-            case "float":
-                return EBMLElementType.Float
-            case "string":
-                return EBMLElementType.String
-            case "date":
-                return EBMLElementType.Date
-            case "utf-8":
-                return EBMLElementType.UTF8
-            case "master":
-                return EBMLElementType.Master
-            case "binary":
-                return EBMLElementType.Binary
-            case _:
-                msg = f"Invalid EBMLElementType: {inp}"
-                raise RuntimeError(msg)
-
-
-@decorate_class(slots=True)
-class DefaultRequired:
-    pass
-
-
-@decorate_class(slots=True)
-class DefaultEmpty:
-    pass
-
-
-DefaultOptions = DefaultRequired | DefaultEmpty
-
 
 @dataclass(slots=True, repr=True)
 class EBMLSchemaRangeNot[A]:
@@ -115,16 +41,54 @@ class EBMLSchemaRangeNot[A]:
         return False
 
 
+class EBMLSchemaRangeBound(Enum):
+    Inclusive = "i"
+    Exclusive = "e"
+
+
+@dataclass(slots=True, repr=True)
+class EBMLSchemaRangeElem[A: (int, float)]:
+    value: A
+    bound: EBMLSchemaRangeBound
+
+    def check(self: Self, value: A, *, start: bool) -> bool:
+        if start:
+            if self.bound == EBMLSchemaRangeBound.Inclusive:
+                return value >= self.value
+            return value > self.value
+
+        if self.bound == EBMLSchemaRangeBound.Inclusive:
+            return value <= self.value
+        return value < self.value
+
+    def format(self: Self, *, start: bool) -> str:
+        if start:
+            if self.bound == EBMLSchemaRangeBound.Inclusive:
+                return f"[{self.value}"
+            return f"({self.value}"
+
+        if self.bound == EBMLSchemaRangeBound.Inclusive:
+            return f"{self.value}]"
+        return f"{self.value})"
+
+
 class EBMLSchemaRange[A: (int, float)]:
-    # range is start inclusive, end exclusive
     __underlying: (
-        A | EBMLSchemaRangeNot[A] | tuple[A, A] | tuple[A, None] | tuple[None, A]
+        A
+        | EBMLSchemaRangeNot[A]
+        | tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]]
+        | tuple[EBMLSchemaRangeElem[A], None]
+        | tuple[None, EBMLSchemaRangeElem[A]]
     )
 
     def __init__(
         self: Self,
         value: (
-            A | EBMLSchemaRangeNot[A] | tuple[A, A] | tuple[A, None] | tuple[None, A]
+            A
+            | EBMLSchemaRangeNot[A]
+            | tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]]
+            | tuple[EBMLSchemaRangeElem[A], None]
+            | tuple[None, EBMLSchemaRangeElem[A]]
         ),
     ) -> None:
         self.__underlying = value
@@ -135,15 +99,15 @@ class EBMLSchemaRange[A: (int, float)]:
             if value != self.__underlying:
                 return Err(f"Value needs to be {self.__underlying} but was {value}")
         elif isinstance(self.__underlying, tuple):
-            min_inclusive, max_exclusive = self.__underlying
-            if min_inclusive is not None and value < min_inclusive:
+            min_val, max_val = self.__underlying
+            if min_val is not None and not min_val.check(value, start=True):
                 return Err(
-                    f"Value needs to be between [{min_inclusive}, {max_exclusive}] but was below it: {value}",
+                    f"Value needs to be between {min_val.format(start=True)}, {max_val.format(start=False) if max_val is not None else "*)"} but was below it: {value}",
                 )
 
-            if max_exclusive is not None and value >= max_exclusive:
+            if max_val is not None and not max_val.check(value, start=False):
                 return Err(
-                    f"Value needs to be between [{min_inclusive}, {max_exclusive}] but was above it: {value}",
+                    f"Value needs to be between {min_val.format(start=True)if min_val is not None else "(*"}, {max_val.format(start=False)} but was above it: {value}",
                 )
         elif isinstance(self.__underlying, EBMLSchemaRangeNot):
             if value == self.__underlying:
@@ -193,6 +157,91 @@ class EBMLSchemaRange[A: (int, float)]:
             return False
 
         assert_never(self.__underlying)
+
+
+type EBMLOccurrences = EBMLSchemaRange[int]
+
+
+def ebml_occurrences_from_values(
+    min_occurrences: int,
+    max_occurrences: Optional[int],
+) -> EBMLOccurrences:
+    if min_occurrences < 0:
+        msg = f"min occurrences is negative: {min_occurrences}"
+        raise RuntimeError(msg)
+
+    if max_occurrences is None:
+        return EBMLSchemaRange(
+            (
+                EBMLSchemaRangeElem(min_occurrences, EBMLSchemaRangeBound.Inclusive),
+                None,
+            ),
+        )
+
+    if max_occurrences < 0:
+        msg = f"max occurrences is negative: {max_occurrences}"
+        raise RuntimeError(msg)
+
+    if min_occurrences == max_occurrences:
+        return EBMLSchemaRange(min_occurrences)
+
+    if min_occurrences > max_occurrences:
+        msg = f"min occurrences is greater than max occurrences: {min_occurrences} > {max_occurrences}"
+        raise RuntimeError(msg)
+
+    return EBMLSchemaRange(
+        (
+            EBMLSchemaRangeElem(min_occurrences, EBMLSchemaRangeBound.Inclusive),
+            EBMLSchemaRangeElem(max_occurrences, EBMLSchemaRangeBound.Inclusive),
+        ),
+    )
+
+
+class EBMLElementType(Enum):
+    SignedInteger = "si"
+    UnsignedInteger = "ui"
+    Float = "f"
+    String = "s"
+    UTF8 = "utf-8"
+    Date = "d"
+    Master = "m"
+    Binary = "b"
+
+    @staticmethod
+    def from_str(inp: str) -> "EBMLElementType":
+        match inp:
+            case "integer":
+                return EBMLElementType.SignedInteger
+            case "uinteger":
+                return EBMLElementType.UnsignedInteger
+            case "float":
+                return EBMLElementType.Float
+            case "string":
+                return EBMLElementType.String
+            case "date":
+                return EBMLElementType.Date
+            case "utf-8":
+                return EBMLElementType.UTF8
+            case "master":
+                return EBMLElementType.Master
+            case "binary":
+                return EBMLElementType.Binary
+            case _:
+                msg = f"Invalid EBMLElementType: {inp}"
+                raise RuntimeError(msg)
+
+
+@decorate_class(slots=True)
+class DefaultRequired:
+    pass
+
+
+@decorate_class(slots=True)
+class DefaultEmpty:
+    pass
+
+
+DefaultOptions = DefaultRequired | DefaultEmpty
 
 
 @dataclass(slots=True, repr=True)
@@ -375,18 +424,6 @@ class RangeWrapper[A](ABC):
     @abstractmethod
     def parse(self: Self, value: str) -> Optional[A]: ...
 
-    @abstractmethod
-    def ge(self: Self, value: A) -> A: ...
-
-    @abstractmethod
-    def gt(self: Self, value: A) -> A: ...
-
-    @abstractmethod
-    def le(self: Self, value: A) -> A: ...
-
-    @abstractmethod
-    def lt(self: Self, value: A) -> A: ...
-
 
 def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
     value: str,
@@ -434,7 +471,10 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
                 f"Invalid range order: first number is bigger: {num1_v} > {num2_v}",
             )
 
-        old_range: tuple[A, A] = (generic.ge(num1_v), generic.le(num2_v))
+        old_range: tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]] = (
+            EBMLSchemaRangeElem(num1_v, EBMLSchemaRangeBound.Inclusive),
+            EBMLSchemaRangeElem(num2_v, EBMLSchemaRangeBound.Inclusive),
+        )
         return Ok(EBMLSchemaRange(old_range))
 
     class Bound(Enum):
@@ -484,13 +524,17 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
 
         bound1_b, bound1_num = bound1_v.as_ok()
 
-        new_range_start_inclusive: A
+        new_range_start: EBMLSchemaRangeElem[A]
 
         match bound1_b:
             case Bound.GE:
-                new_range_start_inclusive = generic.ge(bound1_num)
+                new_range_start = EBMLSchemaRangeElem(
+                    bound1_num, EBMLSchemaRangeBound.Inclusive
+                )
             case Bound.GT:
-                new_range_start_inclusive = generic.gt(bound1_num)
+                new_range_start = EBMLSchemaRangeElem(
+                    bound1_num, EBMLSchemaRangeBound.Exclusive
+                )
             case _:
                 return Err(
                     f"First boundary has to be the lower boundary: but was: {bound1_b.name}: '{val}'",
@@ -498,19 +542,26 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
 
         bound2_b, bound2_num = bound2_v.as_ok()
 
-        new_range_end_exclusive: A
+        new_range_end: EBMLSchemaRangeElem[A]
 
         match bound2_b:
             case Bound.LE:
-                new_range_end_exclusive = generic.le(bound2_num)
+                new_range_end = EBMLSchemaRangeElem(
+                    bound2_num, EBMLSchemaRangeBound.Inclusive
+                )
             case Bound.LT:
-                new_range_end_exclusive = generic.lt(bound2_num)
+                new_range_end = EBMLSchemaRangeElem(
+                    bound2_num, EBMLSchemaRangeBound.Exclusive
+                )
             case _:
                 return Err(
                     f"Second boundary has to be the upper boundary: but was: {bound2_b.name}: '{val}'",
                 )
 
-        new_range: tuple[A, A] = (new_range_start_inclusive, new_range_end_exclusive)
+        new_range: tuple[EBMLSchemaRangeElem[A], EBMLSchemaRangeElem[A]] = (
+            new_range_start,
+            new_range_end,
+        )
         return Ok(EBMLSchemaRange(new_range))
 
     # Case 5: <bound_num>
@@ -523,13 +574,13 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
 
     match bound_b:
         case Bound.LE:
-            return Ok(EBMLSchemaRange((None, generic.le(bound_num))))
+            return Ok(EBMLSchemaRange((None, EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Inclusive))))
         case Bound.LT:
-            return Ok(EBMLSchemaRange((None, generic.lt(bound_num))))
+            return Ok(EBMLSchemaRange((None, EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Exclusive))))
         case Bound.GE:
-            return Ok(EBMLSchemaRange((generic.ge(bound_num), None)))
+            return Ok(EBMLSchemaRange((EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Inclusive), None)))
         case Bound.GT:
-            return Ok(EBMLSchemaRange((generic.gt(bound_num), None)))
+            return Ok(EBMLSchemaRange((EBMLSchemaRangeElem(bound_num,EBMLSchemaRangeBound.Exclusive), None)))
         case _:
             assert_never(bound_b)
 
@@ -556,50 +607,16 @@ class WrapperInt(RangeWrapper[int]):
     def parse(self: Self, value: str) -> Optional[int]:
         return parse_int_safely(value)
 
-    @override
-    def ge(self: Self, value: int) -> int:
-        return value
-
-    @override
-    def gt(self: Self, value: int) -> int:
-        return value + 1
-
-    @override
-    def le(self: Self, value: int) -> int:
-        return value + 1
-
-    @override
-    def lt(self: Self, value: int) -> int:
-        return value
-
 
 def xml_int_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[int]]:
     return xml_any_range_optional(value, WrapperInt())
 
 
 class WrapperFloat(RangeWrapper[float]):
-    # TODO: use better representation, don't use epsilon, use proper >= > differentiation and math intervals
-    __eps: float = 0.00000001
 
     @override
     def parse(self: Self, value: str) -> Optional[float]:
         return parse_float_safely(value)
-
-    @override
-    def ge(self: Self, value: float) -> float:
-        return value
-
-    @override
-    def gt(self: Self, value: float) -> float:
-        return value + self.__eps
-
-    @override
-    def le(self: Self, value: float) -> float:
-        return value + self.__eps
-
-    @override
-    def lt(self: Self, value: float) -> float:
-        return value
 
 
 def xml_float_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[float]]:

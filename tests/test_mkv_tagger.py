@@ -6,6 +6,8 @@ from content.tagger.schema.parser import (
     EBMLElementDescription,
     EBMLElementType,
     EBMLSchemaRange,
+    EBMLSchemaRangeBound,
+    EBMLSchemaRangeElem,
     EBMLSchemaRangeNot,
     WrapperInt,
     xml_any_range_result,
@@ -169,13 +171,57 @@ def test_mkv_tagger_parse_ebml_schema_range(
         ("1", EBMLSchemaRange(1)),
         ("    2   ", EBMLSchemaRange(2)),
         ("   not  2   ", EBMLSchemaRange(EBMLSchemaRangeNot(2))),
-        ("2-4", EBMLSchemaRange((2, 5))),
-        (">=2", EBMLSchemaRange((2, None))),
-        (">2", EBMLSchemaRange((3, None))),
-        ("<2", EBMLSchemaRange((None, 2))),
-        ("<=2", EBMLSchemaRange((None, 3))),
-        (">2,<4", EBMLSchemaRange((3, 4))),
-        (">=2,<=4", EBMLSchemaRange((2, 5))),
+        (
+            "2-4",
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Inclusive),
+                    EBMLSchemaRangeElem(4, EBMLSchemaRangeBound.Inclusive),
+                ),
+            ),
+        ),
+        (
+            ">=2",
+            EBMLSchemaRange(
+                (EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Inclusive), None),
+            ),
+        ),
+        (
+            ">2",
+            EBMLSchemaRange(
+                (EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Exclusive), None),
+            ),
+        ),
+        (
+            "<2",
+            EBMLSchemaRange(
+                (None, EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Exclusive)),
+            ),
+        ),
+        (
+            "<=2",
+            EBMLSchemaRange(
+                (None, EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Inclusive)),
+            ),
+        ),
+        (
+            ">2,<4",
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Exclusive),
+                    EBMLSchemaRangeElem(4, EBMLSchemaRangeBound.Exclusive),
+                ),
+            ),
+        ),
+        (
+            ">=2,<=4",
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(2, EBMLSchemaRangeBound.Inclusive),
+                    EBMLSchemaRangeElem(4, EBMLSchemaRangeBound.Inclusive),
+                ),
+            ),
+        ),
     ]
 
     for inp, result in tests:
