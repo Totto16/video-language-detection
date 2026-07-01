@@ -3,12 +3,40 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Self
+from typing import Literal, Optional, Self, TypeIs, assert_never, assert_type
+from xml.etree.ElementTree import XMLParser
+from xml.etree.ElementTree import parse as parse_xml
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
+from helper.utils import parse_float_safely, parse_int_safely
 
-type EBMLOccurrences = int | tuple[int, int] | Literal["any"]
+type EBMLOccurrences = int | tuple[int, int] | tuple[int, None]
+
+
+def ebml_occurrences_from_values(
+    min_occurrences: int,
+    max_occurrences: Optional[int],
+) -> EBMLOccurrences:
+    if min_occurrences < 0:
+        msg = f"min occurrences is negative: {min_occurrences}"
+        raise RuntimeError(msg)
+
+    if max_occurrences is None:
+        return (min_occurrences, None)
+
+    if max_occurrences < 0:
+        msg = f"max occurrences is negative: {max_occurrences}"
+        raise RuntimeError(msg)
+
+    if min_occurrences == max_occurrences:
+        return min_occurrences
+
+    if min_occurrences > max_occurrences:
+        msg = f"min occurrences is greater than max occurrences: {min_occurrences} > {max_occurrences}"
+        raise RuntimeError(msg)
+
+    return (min_occurrences, max_occurrences)
 
 
 class EBMLElementType(Enum):
@@ -20,6 +48,29 @@ class EBMLElementType(Enum):
     Date = "d"
     Master = "m"
     Binary = "b"
+
+    @staticmethod
+    def from_str(inp: str) -> "EBMLElementType":
+        match inp:
+            case "integer":
+                return EBMLElementType.SignedInteger
+            case "uinteger":
+                return EBMLElementType.UnsignedInteger
+            case "float":
+                return EBMLElementType.Float
+            case "string":
+                return EBMLElementType.String
+            case "date":
+                return EBMLElementType.Date
+            case "utf-8":
+                return EBMLElementType.UTF8
+            case "master":
+                return EBMLElementType.Master
+            case "binary":
+                return EBMLElementType.Binary
+            case _:
+                msg = f"Invalid EBMLElementType: {inp}"
+                raise RuntimeError(msg)
 
 
 @decorate_class(slots=True)
@@ -83,7 +134,7 @@ class EBMLAdvancedElementTypeFloat:
         return Ok(None)
 
 
-class IntRange:
+class LengthRange:
     # range is start inclusive, end exclusive
     type Underlying = int | tuple[int, int]
 
@@ -117,7 +168,7 @@ class IntRange:
 class EBMLAdvancedElementTypeString:
     type: Literal[EBMLElementType.String, EBMLElementType.UTF8]
     default: str | DefaultOptions
-    length: Optional[IntRange]
+    length: Optional[LengthRange]
 
     def validate(self: Self, value: str) -> Result[None, str]:
         if self.length is None:
@@ -149,7 +200,7 @@ class EBMLAdvancedElementTypeMaster:
 class EBMLAdvancedElementTypeBinary:
     type: Literal[EBMLElementType.Binary]
     default: bytes | DefaultOptions
-    length: Optional[IntRange]
+    length: Optional[LengthRange]
 
     def validate(self: Self, value: bytes) -> Result[None, str]:
         if self.length is None:
@@ -179,7 +230,7 @@ class EBMLElementDescription:
     id: int
     occurrences: EBMLOccurrences
     type: EBMLAdvancedElementType
-    description: str
+    description: Optional[str]
 
 
 @dataclass(slots=True, repr=True)
@@ -190,12 +241,129 @@ class EBMLSpec:
     EBMLSpecByName = dict[str, EBMLElementDescription]
 
     def elements_by_name(self: Self) -> EBMLSpecByName:
-        raise "TODO"
+        return {element.name: element for element in self.elements}
 
     EBMLSpecById = dict[int, EBMLElementDescription]
 
     def elements_by_id(self: Self) -> EBMLSpecById:
-        raise "TODO"
+        return {element.id: element for element in self.elements}
+
+
+@decorate_class(slots=True)
+class _MISSING:
+    pass
+
+
+def is_missing[A](value: A | type[_MISSING]) -> TypeIs[type[_MISSING]]:
+    return isinstance(value, _MISSING)
+
+
+def xml_required[A](dct: dict[str, A], key: str) -> A:
+    value = dct.get(key, _MISSING)
+
+    if is_missing(value):
+        msg = f"Missing XML Require attribute '{key}': {dct}"
+        raise TypeError(msg)
+
+    assert_type(value, A)
+
+    return value
+
+
+def xml_int(value: str | int, base: int = 10) -> int:
+    if isinstance(value, int):
+        return value
+
+    result = parse_int_safely(value, base)
+
+    if result is None:
+        msg = f"Invlaid number: {value}"
+        raise RuntimeError(msg)
+
+    return result
+
+
+def xml_int_optional(value: Optional[str | int], base: int = 10) -> Optional[int]:
+    if value is None:
+        return None
+
+    return xml_int(value, base)
+
+
+def xml_int_range_optional(value: Optional[str]) -> Optional[tuple[int, int]]:
+    if value is None:
+        return None
+
+    raise NotImplementedError("TODO")
+
+
+def xml_float_range_optional(value: Optional[str]) -> Optional[tuple[float, float]]:
+    if value is None:
+        return None
+
+    raise NotImplementedError("TODO")
+
+
+def xml_length_range_optional(value: Optional[str]) -> Optional[LengthRange]:
+    if value is None:
+        return None
+
+    raise NotImplementedError("TODO")
+
+
+def xml_float(value: str | float) -> float:
+    if isinstance(value, float):
+        return value
+
+    result = parse_float_safely(value)
+
+    if result is None:
+        msg = f"Invlaid number: {value}"
+        raise RuntimeError(msg)
+
+    return result
+
+
+def xml_float_optional(value: Optional[str | float]) -> Optional[float]:
+    if value is None:
+        return None
+
+    return xml_float(value)
+
+
+def xml_datetime(value: str | datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value
+
+    raise NotImplementedError("TODO")
+
+
+def xml_datetime_optional(value: Optional[str | datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+
+    return xml_datetime(value)
+
+
+def xml_bytes(value: str | bytes) -> bytes:
+    if isinstance(value, bytes):
+        return value
+
+    return value.encode()
+
+
+def xml_bytes_optional(value: Optional[str | bytes]) -> Optional[bytes]:
+    if value is None:
+        return None
+
+    return xml_bytes(value)
+
+
+def xml_default_value[A](value: Optional[A]) -> A | DefaultOptions:
+    if value is None:
+        return DefaultEmpty()
+
+    return value
 
 
 def ebml_read_spec_xml(name: str) -> EBMLSpec:
@@ -206,24 +374,162 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:
         msg = f"Spec XMl file '{file}' doesn't exist"
         raise RuntimeError(msg)
 
-    result: EBMLSpec("TODO")
+    xml_content = parse_xml(file, XMLParser())  # noqa: S314
 
-    for element_entry in element_entries:
-        name = element_entry["name"]
-        _path = element_entry["path"]
-        id = element_entry["id"]
-        minOccurs = element_entry.get("minOccurs", 0)
-        maxOccurs = element_entry.get("maxOccurs", "unbounded")
-        type = element_entry["type"]
+    root = xml_content.getroot()
 
-        # match type:
-        #     <xs:attribute name="range"/>
-        #     <xs:attribute name="length"/>
-        #     <xs:attribute name="default"/>
+    def xml_local_name(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1]
 
-        description = element_entry.children["documentation"].text
+    root_tag = xml_local_name(root.tag)
 
-    raise "TODO"
+    if root_tag != "EBMLSchema":
+        msg = f"Invalid root xml tag: {root_tag}: {root!s}"
+        raise RuntimeError(msg)
+
+    version = xml_int(xml_required(root.attrib, "version"))
+
+    result: EBMLSpec = EBMLSpec(version=version, elements=[])
+
+    def append_element(element: EBMLElementDescription) -> None:
+        id_value = result.elements_by_id().get(element.id, None)
+        if id_value is not None:
+            msg = f"Duplicate ID: {id_value}: {element}"
+            raise RuntimeError(msg)
+
+        name_value = result.elements_by_name().get(element.name, None)
+        if name_value is not None:
+            msg = f"Duplicate name: {name_value}: {element}"
+            raise RuntimeError(msg)
+
+        result.elements.append(element)
+
+    for element_entry in root:
+
+        element_entry_tag = xml_local_name(element_entry.tag)
+
+        if element_entry_tag != "element":
+            msg = f"Invalid element xml tag: {element_entry_tag}: {element_entry!s}"
+            raise RuntimeError(msg)
+
+        allowed_attributes: set[str] = set()
+
+        name = xml_required(element_entry.attrib, "name")
+        _path = xml_required(element_entry.attrib, "path")
+        element_id = xml_int(xml_required(element_entry.attrib, "id"), 16)
+        min_occurs = xml_int(element_entry.attrib.get("minOccurs", 0))
+        max_occurs = xml_int_optional(element_entry.attrib.get("maxOccurs", None))
+        element_type = EBMLElementType.from_str(
+            xml_required(element_entry.attrib, "type"),
+        )
+
+        allowed_attributes.update(
+            ["name", "path", "id", "minOccurs", "maxOccurs", "type"]
+        )
+
+        advanced_type: EBMLAdvancedElementType
+        match element_type:
+            case EBMLElementType.SignedInteger | EBMLElementType.UnsignedInteger:
+                default_int: int | DefaultOptions = xml_default_value(
+                    xml_int_optional(element_entry.attrib.get("default", None)),
+                )
+                range_int = xml_int_range_optional(
+                    element_entry.attrib.get("range", None),
+                )
+
+                allowed_attributes.update(["default", "range"])
+                advanced_type = EBMLAdvancedElementTypeInteger(
+                    type=element_type,
+                    default=default_int,
+                    range=range_int,
+                )
+            case EBMLElementType.Float:
+                default_float: float | DefaultOptions = xml_default_value(
+                    xml_float_optional(element_entry.attrib.get("default", None)),
+                )
+                range_float = xml_float_range_optional(
+                    element_entry.attrib.get("range", None),
+                )
+
+                allowed_attributes.update(["default", "range"])
+                advanced_type = EBMLAdvancedElementTypeFloat(
+                    type=element_type,
+                    default=default_float,
+                    range=range_float,
+                )
+            case EBMLElementType.String | EBMLElementType.UTF8:
+                default_str: str | DefaultOptions = xml_default_value(
+                    element_entry.attrib.get("default", None),
+                )
+                length = xml_length_range_optional(
+                    element_entry.attrib.get("length", None),
+                )
+
+                allowed_attributes.update(["default", "length"])
+                advanced_type = EBMLAdvancedElementTypeString(
+                    type=element_type,
+                    default=default_str,
+                    length=length,
+                )
+            case EBMLElementType.Date:
+                default_datetime: datetime | DefaultOptions = xml_default_value(
+                    xml_datetime_optional(
+                        element_entry.attrib.get("default", None),
+                    ),
+                )
+
+                allowed_attributes.update(["default"])
+                advanced_type = EBMLAdvancedElementTypeDate(
+                    type=element_type,
+                    default=default_datetime,
+                )
+            case EBMLElementType.Master:
+                advanced_type = EBMLAdvancedElementTypeMaster(
+                    type=element_type,
+                )
+            case EBMLElementType.Binary:
+                default_binary: bytes | DefaultOptions = xml_default_value(
+                    xml_bytes_optional(
+                        element_entry.attrib.get("default", None),
+                    ),
+                )
+                length = xml_length_range_optional(
+                    element_entry.attrib.get("length", None),
+                )
+
+                allowed_attributes.update(["default", "length"])
+                advanced_type = EBMLAdvancedElementTypeBinary(
+                    type=element_type,
+                    default=default_binary,
+                    length=length,
+                )
+            case _:
+                assert_never(element_type)
+
+        description_elem = element_entry.find("documentation")
+        description = None if description_elem is None else description_elem.text
+
+        not_processed_attributes = set(element_entry.attrib.keys()).difference(
+            allowed_attributes,
+        )
+
+        if len(not_processed_attributes) != 0:
+            msg = f"Encountered some not allowed attributes: {not_processed_attributes}"
+            raise RuntimeError(msg)
+
+        occurrences = ebml_occurrences_from_values(min_occurs, max_occurs)
+
+        element: EBMLElementDescription = EBMLElementDescription(
+            name=name,
+            id=element_id,
+            occurrences=occurrences,
+            type=advanced_type,
+            description=description,
+        )
+
+        append_element(element)
+
+    return result
 
 
 def filter_spec_elements(

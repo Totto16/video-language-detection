@@ -11,18 +11,11 @@ from typing import Any, Optional, Self, TypedDict, cast
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
-from helper.utils import parse_int_safely
+from helper.utils import parse_float_safely, parse_int_safely
 
 
 class FFprobeRawStream(TypedDict):
     pass
-
-
-def parse_float_safely(inp: str) -> Optional[float]:
-    try:
-        return float(inp)
-    except ValueError:
-        return None
 
 
 def parse_duration_safely(inp: str) -> Optional[timedelta]:

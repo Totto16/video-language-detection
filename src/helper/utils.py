@@ -6,3 +6,10 @@ def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
         return int(inp, base)
     except ValueError:
         return None
+
+
+def parse_float_safely(inp: str) -> Optional[float]:
+    try:
+        return float(inp)
+    except ValueError:
+        return None

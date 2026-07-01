@@ -2,6 +2,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
+from content.tagger.schema.parser import EBMLElementDescription, EBMLElementType
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
 from test_helper import ErrResult, OkResult

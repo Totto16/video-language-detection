@@ -11,9 +11,10 @@ from fixtures import (
     mark_as_used,
 )
 from pytest_subtests import SubTests
+from helper.utils import parse_float_safely
 from test_helper import OkResult, re_exact_string
 
-from helper.ffprobe import ffprobe, parse_float_safely
+from helper.ffprobe import ffprobe
 
 mark_as_used(ffprobe_dummy_files)
 mark_as_used(ffprobe_temp_video_files)
@@ -84,18 +85,14 @@ def test_ffprobe_with_intact_videos(
 
             result = err_result.as_ok()
 
-            assert (
-                result.file_info.duration() is not None
-            ), "duration is defined"
+            assert result.file_info.duration() is not None, "duration is defined"
 
             assert len(result.streams) > 0, "at least one stream was detected"
             assert len(result.streams) == 1, "correct amount of streams"
 
             for stream in result.streams:
                 assert stream.codec() == ffprobe_data.codec, "codec is correct"
-                assert (
-                    stream.duration() == ffprobe_data.duration
-                ), "duration is correct"
+                assert stream.duration() == ffprobe_data.duration, "duration is correct"
 
                 assert stream.is_attachment() is False, "has no attachments"
                 assert stream.is_subtitle() is False, "has no subtitles"
@@ -138,6 +135,4 @@ def test_ffprobe_errors_with_files(
             else:
                 assert result.ok(), "pass status is correct"
                 for stream in result.as_ok().streams:
-                    assert (
-                        stream.duration() is None
-                    ), "dummy files have no duration"
+                    assert stream.duration() is None, "dummy files have no duration"
