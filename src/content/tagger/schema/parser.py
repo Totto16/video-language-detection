@@ -18,7 +18,7 @@ from xml.etree.ElementTree import parse as parse_xml
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
-from helper.utils import parse_float_safely, parse_int_safely
+from helper.utils import parse_int_safely
 
 
 @dataclass(slots=True, repr=True)
@@ -668,11 +668,27 @@ def xml_int_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[int
     return xml_any_range_optional(value, WrapperInt())
 
 
+def xml_parse_float_safely(inp: str) -> Optional[float]:
+
+    # spec: RFC 8794
+    # chapter 11.1.18
+
+    # When a ﬂoat value is represented textually in an EBML Schema, such as within a default or
+    # range value, the ﬂoat values MUST be expressed as Hexadecimal Floating-Point Constants as
+    # deﬁned in the C11 standard [ISO9899] (see Section 6.4.4.2 on Floating Constants). Table 9
+    # provides examples of expressions of ﬂoat ranges.
+
+    try:
+        return float.fromhex(inp)
+    except ValueError:
+        return None
+
+
 class WrapperFloat(RangeWrapper[float]):
 
     @override
     def parse(self: Self, value: str) -> Optional[float]:
-        return parse_float_safely(value)
+        return xml_parse_float_safely(value)
 
 
 def xml_float_range_optional(value: Optional[str]) -> Optional[EBMLSchemaRange[float]]:
@@ -692,7 +708,7 @@ def xml_float(value: str | float) -> float:
     if isinstance(value, float):
         return value
 
-    result = parse_float_safely(value)
+    result = xml_parse_float_safely(value)
 
     if result is None:
         msg = f"Invalid number: {value}"
