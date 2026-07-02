@@ -5,7 +5,6 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any,
     Literal,
     Optional,
     Self,
@@ -270,12 +269,12 @@ class EBMLElementType(Enum):
                 raise RuntimeError(msg)
 
 
-@decorate_class(slots=True)
+@dataclass(slots=True, repr=True)
 class DefaultRequired:
     pass
 
 
-@decorate_class(slots=True)
+@dataclass(slots=True, repr=True)
 class DefaultEmpty:
     pass
 
@@ -327,9 +326,14 @@ class EBMLAdvancedElementTypeFloat(EBMLAdvancedElementTypeAbstract[float]):
         return Ok(None)
 
 
+@decorate_class(slots=True)
 class LengthRange:
 
     __range: EBMLSchemaRange[int]
+
+    @property
+    def range(self: Self) -> EBMLSchemaRange[int]:
+        return self.__range
 
     def __init__(self: Self, value: EBMLSchemaRange[int]) -> None:
         self.__range = value
@@ -338,6 +342,23 @@ class LengthRange:
         length = len(value)
 
         return self.__range.valid(length)
+
+    def __str__(self: Self) -> str:
+        return f"<LengthRange range: {self.__range!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(("LengthRange", self.__range))
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, LengthRange):
+            return self.__range == other.range
+
+        if isinstance(other, EBMLSchemaRange):
+            return self.__range == other
+        return False
 
 
 @dataclass(slots=True, repr=True)
@@ -907,18 +928,18 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
             xml_required(element_entry.attrib, "type"),
         )
 
-        unknown_size_allowed = min_occurs = xml_boolean(
+        unknown_size_allowed = xml_boolean(
             element_entry.attrib.get("unknownsizeallowed", False),
         )
 
-        recurring = min_occurs = xml_boolean(
+        recurring = xml_boolean(
             element_entry.attrib.get("recurring", False),
         )
 
         min_ver = xml_int(element_entry.attrib.get("minver", 1))
         max_ver = xml_int_optional(element_entry.attrib.get("maxver", None))
 
-        recursive = min_occurs = xml_boolean(
+        recursive = xml_boolean(
             element_entry.attrib.get("recursive", False),
         )
         allowed_attributes.update(
