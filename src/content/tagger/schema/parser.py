@@ -421,19 +421,39 @@ type EBMLElementDescription = EBMLElementDescriptionGeneric[EBMLAdvancedElementT
 
 
 @dataclass(slots=True, repr=True)
-class EBMLSpec:
-    elements: list[EBMLElementDescription]
+class DocType:
+    type: str
     version: int
+
+    def __str__(self: Self) -> str:
+        return f"<DocType type: {self.type} version: {self.version}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@decorate_class(slots=True)
+class EBMLSpec:
+    __elements: list[EBMLElementDescription]
+    doc_type: DocType
+
+    def __init__(self: Self, doc_type: DocType) -> None:
+        self.__elements = []
+        self.doc_type = doc_type
+
+    @property
+    def elements(self: Self) -> list[EBMLElementDescription]:
+        return self.__elements
 
     EBMLSpecByName = dict[str, EBMLElementDescription]
 
     def elements_by_name(self: Self) -> EBMLSpecByName:
-        return {element.name: element for element in self.elements}
+        return {element.name: element for element in self.__elements}
 
     EBMLSpecById = dict[int, EBMLElementDescription]
 
     def elements_by_id(self: Self) -> EBMLSpecById:
-        return {element.id: element for element in self.elements}
+        return {element.id: element for element in self.__elements}
 
     def append(self: Self, element: EBMLElementDescription) -> None:
         id_value = self.elements_by_id().get(element.id, None)
@@ -446,7 +466,13 @@ class EBMLSpec:
             msg = f"Duplicate name: {name_value}: {element}"
             raise RuntimeError(msg)
 
-        self.elements.append(element)
+        self.__elements.append(element)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLSpec doc_type: {self.doc_type}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 @decorate_class(slots=True)
@@ -856,7 +882,11 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
 
     version = xml_int(xml_required(root.attrib, "version"))
 
-    result: EBMLSpec = EBMLSpec(version=version, elements=[])
+    doc_type_str = xml_required(root.attrib, "docType")
+
+    doc_type = DocType(type=doc_type_str, version=version)
+
+    result: EBMLSpec = EBMLSpec(doc_type=doc_type)
 
     for element_entry in root:
 
@@ -1024,12 +1054,12 @@ def filter_spec_elements(
     cb: Callable[[EBMLElementDescription], bool],
 ) -> EBMLSpec:
 
-    result = EBMLSpec(elements=[], version=spec.version)
+    result = EBMLSpec(doc_type=spec.doc_type)
     for element in spec.elements:
 
         should_include = cb(element)
 
         if should_include:
-            result.elements.append(element)
+            result.append(element)
 
     return result

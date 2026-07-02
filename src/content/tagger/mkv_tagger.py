@@ -26,6 +26,7 @@ from content.tagger.schema.parser import (
     DefaultEmpty,
     DefaultOptions,
     DefaultRequired,
+    DocType,
     EBMLAdvancedElementType,
     EBMLAdvancedElementTypeAbstract,
     EBMLAdvancedElementTypeBinary,
@@ -1491,12 +1492,6 @@ EBMLGlobalElementsSpec = filter_spec_elements(
 
 
 @dataclass(slots=True, repr=True)
-class DocType:
-    type: str
-    version: int
-
-
-@dataclass(slots=True, repr=True)
 class EBMLHeaderOptions:
     options: EBMLDecodeOptions
     doc_type: DocType
@@ -1723,15 +1718,35 @@ class EBMLBody(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
+EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+
+
 def get_spec_by_doc_type(doc_type: DocType) -> Result[EBMLSpec, str]:
 
-    EBMLGlobalElementsSpec = filter_spec_elements(
-        EBMLMainSpec,
-        filter_ebml_global_element,
-    )
+    available_specs: list[EBMLSpec] = [EBMLMKVSpec]
 
-    EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
-    return "TODO"
+    for spec in available_specs:
+        if doc_type.type == spec.doc_type.type:
+            if doc_type.version > spec.doc_type.version:
+                return Err(
+                    f"Unsupported version: max supported version is {spec.doc_type.version}",
+                )
+
+            result = EBMLSpec(doc_type=doc_type)
+
+            for elem in EBMLGlobalElementsSpec.elements:
+                result.append(elem)
+
+            for element in spec.elements:
+
+                should_include = element.versions.valid(doc_type.version)
+
+                if should_include:
+                    result.append(element)
+
+            return Ok(result)
+
+    return Err("No such DocType")
 
 
 @final
