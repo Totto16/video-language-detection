@@ -109,7 +109,7 @@ def is_the_same_file(pre_res: FFProbeResult, after_res: FFProbeResult) -> Option
             return f"Format name differs: {pre_res.file_info.raw["format_name"] } != {after_res.file_info.raw["format_name"] }"
 
         return None  # noqa: TRY300
-    except (KeyError, RuntimeError, ValueError) as err:
+    except (KeyError, RuntimeError, ValueError, TypeError) as err:
         return f"Excpetion occurred: {err!s}"
 
 

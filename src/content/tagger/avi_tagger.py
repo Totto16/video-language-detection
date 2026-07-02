@@ -1185,7 +1185,7 @@ def is_avi_file(
             ).format(list_type=first_chunk.type)
 
         f.seek(0)
-    except (RuntimeError, ValueError) as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return str(err)
     return None
 

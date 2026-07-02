@@ -274,7 +274,7 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
             assert value.as_err() == result
 
 
-def test_mkv_tagger_todo(
+def test_mkv_tagger_parsing(
     subtests: SubTests,
     mkv_test_parse_files: TempVideoFiles,
 ) -> None:
@@ -290,6 +290,38 @@ def test_mkv_tagger_todo(
     for file, result in test_files:
         with subtests.test("video gets parsed correctly"):
             assert file != ""
+
+
+def test_mkv_invalid_bytes(
+    subtests: SubTests,
+) -> None:
+
+    test_data: list[tuple[bytes, str]] = [
+        (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
+        (
+            b"helloworld",
+            _("Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10"),
+        ),
+        (b"ftyp    ", "Atom name not valid b'    '"),
+        (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
+        (
+            b"\x00\x00\x00\x0eftypabcddcba",
+            "Read would overflow bounds [8, 14]: 16 (12 + 4)",
+        ),
+        (
+            b"\x00\x00\x00\x10ftypabcddcba",
+            "ISOM/MP42 file has valid box, but invalid major_brand: b'abcd'",
+        ),
+    ]
+
+    for data, err in test_data:
+        with subtests.test("invalid video gets detected correctly"):
+            io = BytesIO(data)
+            res = is_mkv_file(io)
+
+            assert res is not None, "valid mp4 is incorrect here"
+
+            assert res == err, "incorrect error"
 
 
 def test_mkv_tagger_ebml_schema_test_schema_parse(

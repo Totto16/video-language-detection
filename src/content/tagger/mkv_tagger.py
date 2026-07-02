@@ -1789,6 +1789,7 @@ class EBMLDocument(FinalEBMLElement):
 
         if spec_res.err():
             msg = f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
+            raise RuntimeError(msg)
 
         spec = spec_res.as_ok()
 
@@ -1895,17 +1896,27 @@ class EBMLStream(FinalEBMLElement):
 def is_mkv_file(
     f: BinaryIO,
 ) -> Optional[str]:
+    f.seek(0)
 
     try:
-        ebml_stream = EBMLStream.read_from_file(f)
+        f.seek(0, 2)
+        filesize = f.tell()
+        header = EBMLHeader.read(BoundedIO.get_new(f, SimpleSpan(0, filesize)))
 
-        if len(ebml_stream.documents) == 0:
-            return "TODO"
+        header_options = header.options
 
-        for doc in ebml_stream.documents:
-            return "TODO"
+        spec_res = get_spec_by_doc_type(header_options.doc_type)
 
-    except (RuntimeError, ValueError) as err:
+        if spec_res.err():
+            return f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
+
+        spec = spec_res.as_ok()
+
+        if spec.doc_type.type != EBMLMKVSpec.doc_type.type:
+            return "Not a matroska EBML file"
+
+        f.seek(0)
+    except (RuntimeError, ValueError, TypeError) as err:
         return str(err)
     return None
 

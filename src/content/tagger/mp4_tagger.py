@@ -2977,7 +2977,7 @@ def is_mp4_file(
             ).format(major_brand=first_box.major_brand)
 
         f.seek(0)
-    except (RuntimeError, ValueError) as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return str(err)
     return None
 
