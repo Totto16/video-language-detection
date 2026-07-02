@@ -12,7 +12,7 @@ def sync_collection():
 
     # sync/collection/
 
-    # type: media
+    # "type": media
     # extended=full,images,available_on&
     # available_on=other
 

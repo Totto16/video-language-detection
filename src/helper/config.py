@@ -246,7 +246,7 @@ def parse_target_file(tgt: TargetFile) -> ParsedTargetFile:
 
 
 @dataclass(slots=True, repr=True)
-class ConfigGeneric:
+class ConfigGenericV2:
     general: Annotated[Optional[GeneralConfig], OneOf] = field(
         default=None,
         metadata=none_as_undefined,
@@ -305,10 +305,10 @@ class ConfigGeneric:
         )
 
     @staticmethod
-    def fill_defaults(configs: "Config | list[Config]") -> list[FinalConfig]:
+    def fill_defaults(configs: "ConfigV2 | list[ConfigV2]") -> list[FinalConfig]:
 
-        def fill_one_default(config: "Config") -> FinalConfig:
-            defaults = Config.__defaults()  # noqa: SLF001
+        def fill_one_default(config: "ConfigV2") -> FinalConfig:
+            defaults = ConfigV2.__defaults()  # noqa: SLF001
 
             # TODO this is done manually atm, it can be done more automated, by checking for none on every key and replacing it with the key in defaults, if the key is none!
             parsed_general = defaults.general
@@ -386,12 +386,13 @@ class ConfigGeneric:
 
 
 @dataclass(slots=True, repr=True)
-class TemplateConfig(ConfigGeneric):
+class TemplateConfig(ConfigGenericV2):
     pass
 
 
 @dataclass(slots=True, repr=True)
-class Config(ConfigGeneric):
+class ConfigV2(ConfigGenericV2):
+    version: Literal["2"] = field(metadata=required, default="2")
     config_name: str = field(metadata=required, default="<ERROR>")
     config_type: ConfigType = field(metadata=required, default=ConfigType.normal)
 
@@ -408,8 +409,8 @@ class ConfigTemplateSettings:
 
 
 @dataclass(slots=True, repr=True)
-class ConfigTemplates:
-    defaults: list[Config] | Config
+class ConfigTemplatesV2:
+    defaults: list[ConfigV2] | ConfigV2
     names: dict[str, TemplateConfig]
     use: Optional[str | UseFromCLI] = field(
         default=None,
@@ -426,11 +427,12 @@ class ConfigTemplates:
 
 
 @dataclass(slots=True, repr=True)
-class ConfigTemplate:
-    templates: ConfigTemplates
+class ConfigTemplateV2:
+    version: Literal["2"]
+    templates: ConfigTemplatesV2
 
 
-RawConfig = Config | list[Config] | ConfigTemplate
+RawConfig = ConfigV2 | list[ConfigV2] | ConfigTemplateV2
 
 
 SchemaConfig = Annotated[RawConfig, OneOf]
@@ -568,7 +570,7 @@ class AdvancedConfig:
 
     @staticmethod
     def __resolve_template_to_use(
-        templates: ConfigTemplates,
+        templates: ConfigTemplatesV2,
         cli_name_to_use: Optional[str],
     ) -> tuple[TemplateConfig, str]:
         all_names: dict[str, TemplateConfig] = templates.names
@@ -622,12 +624,12 @@ class AdvancedConfig:
 
     @staticmethod
     def __resolve_advance_config(
-        config: ConfigTemplate,
+        config: ConfigTemplateV2,
         cli_name_to_use: Optional[str],
     ) -> Result[tuple[list[FinalConfig], str], str]:
         templates = config.templates
 
-        defaults: list[FinalConfig] = Config.fill_defaults(templates.defaults)
+        defaults: list[FinalConfig] = ConfigV2.fill_defaults(templates.defaults)
 
         template_to_use, name_used = AdvancedConfig.__resolve_template_to_use(
             templates,
@@ -666,17 +668,17 @@ class AdvancedConfig:
         cli_name_to_use: Optional[str],
     ) -> Result[tuple[list[FinalConfig], str], str]:
 
-        if isinstance(raw_config, Config):
-            final_config = Config.fill_defaults(raw_config)
+        if isinstance(raw_config, ConfigV2):
+            final_config = ConfigV2.fill_defaults(raw_config)
             return Ok(
                 (final_config, "Normal Config"),
             )
         if isinstance(raw_config, list):
-            final_config = Config.fill_defaults(raw_config)
+            final_config = ConfigV2.fill_defaults(raw_config)
             return Ok(
                 (final_config, "Normal Configs"),
             )
-        if isinstance(raw_config, ConfigTemplate):
+        if isinstance(raw_config, ConfigTemplateV2):
             resolved_config: Result[tuple[list[FinalConfig], str], str] = (
                 AdvancedConfig.__resolve_advance_config(
                     raw_config,
