@@ -40,6 +40,7 @@ questionary = "*"
 colorlog = "*"
 pyperclip = "*"
 annotated-types = "*"
+jsonschema = "*"
 
 # fastapi for the backend, using standard feature / configuration
 "fastapi[standard]" = "*"
@@ -101,6 +102,7 @@ types-requests = "*"
 requests = "*"
 chardet = "*"
 types-pyyaml = "*"
+types-jsonschema = "*"
 
 [scripts]
 check = "python src/entry.py run"
