@@ -1,22 +1,28 @@
+from collections.abc import Callable
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Self, override
 
+from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
 from test_helper import ErrResult, OkResult
 
-from content.tagger.mkv_tagger import BitIterator, EBMLVarInt
+from content.tagger.mkv_tagger import BitIterator, EBMLVarInt, is_mkv_file
 from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.schema.parser import (
+    DocType,
     EBMLElementDescription,
-    EBMLElementType,
     EBMLSchemaRange,
     EBMLSchemaRangeBound,
     EBMLSchemaRangeElem,
     EBMLSchemaRangeNot,
+    EBMLSpec,
     WrapperInt,
+    ebml_read_spec_xml,
     xml_any_range_result,
 )
+from helper.decorator import decorate_class
+from helper.result import Err, Ok, Result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -300,7 +306,7 @@ def test_mkv_invalid_bytes(
         (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
         (
             b"helloworld",
-            _("Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10"),
+            "Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10",
         ),
         (b"ftyp    ", "Atom name not valid b'    '"),
         (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
@@ -324,18 +330,178 @@ def test_mkv_invalid_bytes(
             assert res == err, "incorrect error"
 
 
+@decorate_class(slots=True)
+class EBMLTestSpec(FancyEq):
+    __spec: EBMLSpec
+
+    def __init__(self: Self, doc_type: DocType) -> None:
+        self.__spec = EBMLSpec(doc_type)
+
+    @property
+    def spec(self: Self) -> EBMLSpec:
+        return self.__spec
+
+    @staticmethod
+    def __is_elem_eq(
+        elem1: EBMLElementDescription,
+        elem2: EBMLElementDescription,
+    ) -> Result[None, list[str]]:
+
+        if elem1.type.type != elem2.type.type:
+            return Err(
+                [
+                    "Element type doesn't match:",
+                    str(elem1.type.type),
+                    str(elem2.type.type),
+                ],
+            )
+
+        if elem1.type != elem2.type:
+            return Err(
+                [
+                    "Element type doesn't match:",
+                    str(elem1.type),
+                    str(elem2.type),
+                ],
+            )
+
+        if elem1.name != elem2.name:
+            return Err(
+                [
+                    "Element name doesn't match:",
+                    str(elem1.name),
+                    str(elem2.name),
+                ],
+            )
+
+        if elem1.id != elem2.id:
+            return Err(
+                [
+                    "Element id doesn't match:",
+                    str(elem1.id),
+                    str(elem2.id),
+                ],
+            )
+
+        values1 = (
+            elem1.occurrences,
+            elem1.description,
+            elem1.unknown_size_allowed,
+            elem1.versions,
+            elem1.path,
+            elem1.recurring,
+            elem1.recursive,
+        )
+
+        values2 = (
+            elem2.occurrences,
+            elem2.description,
+            elem2.unknown_size_allowed,
+            elem2.versions,
+            elem2.path,
+            elem2.recurring,
+            elem2.recursive,
+        )
+
+        if values1 != values2:
+            return Err(
+                [
+                    "Element values doesn't match:",
+                    str(values1),
+                    str(values2),
+                ],
+            )
+
+        return Ok(None)
+
+    def __eq_other(self: Self, other_value: EBMLSpec) -> Result[None, list[str]]:
+
+        if self.spec.doc_type != other_value.doc_type:
+            return Err(
+                [
+                    "DocType doesn't match:",
+                    str(self.spec.doc_type),
+                    str(other_value.doc_type),
+                ],
+            )
+
+        if len(self.__spec.elements) != len(other_value.elements):
+            return Err(
+                [
+                    "Length of elements is not eq:",
+                    str(len(self.__spec.elements)),
+                    str(len(other_value.elements)),
+                ],
+            )
+
+        for e1, e2 in zip(self.__spec.elements, other_value.elements, strict=True):
+            res = EBMLTestSpec.__is_elem_eq(e1, e2)
+            if res.err():
+                return res
+
+        return Ok(None)
+
+    def __eq_impl(
+        self: Self,
+        other: object,
+    ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
+        if isinstance(other, EBMLSpec):
+            return (True, lambda: self.__eq_other(other))
+
+        if isinstance(other, EBMLTestSpec):
+            return (True, lambda: self.__eq_other(other.spec))
+
+        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
+
+    def __eq__(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[1]().ok()
+
+    @override
+    def supports_fancy_eq(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[0]
+
+    @override
+    def fancy_eq(self: Self, other: object) -> Optional[list[str]]:
+        supports_fancy_eq, cb = self.__eq_impl(other)
+        assert supports_fancy_eq
+        return cb().err_or(None)
+
+    def __str__(self: Self) -> str:
+        return "<EBMLTestSpec {self.__spec}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __hash__(self: Self) -> int:
+        return hash(("EBMLTestSpec", self.__spec))
+
+
 def test_mkv_tagger_ebml_schema_test_schema_parse(
     subtests: SubTests,
-    mkv_test_parse_files: TempVideoFiles,
 ) -> None:
-    # TODO: test schema extraction
-    # EBML Header Elements
-    EBMLHeaderElements: list[EBMLElementDescription] = [
-        EBMLElementDescription(
-            name="EBML",
-            id=0x1A45DFA3,
-            occurrences=1,
-            type=EBMLElementType.Master,
-            description="Set the EBML characteristics of the data to follow. Each EBML Document has to start with this.",
-        ),
-    ]
+
+    with subtests.test("EBML schema parser: MKV schema is correct"):
+
+        def get_mkv_spec() -> EBMLTestSpec:
+
+            result = EBMLTestSpec(doc_type=DocType(type="matroska", version=4))
+
+            return result
+
+        EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+
+        mkv_spec = get_mkv_spec()
+        assert EBMLMKVSpec == mkv_spec
+
+    with subtests.test("EBML schema parser: EBML schema is correct"):
+
+        def get_ebml_spec() -> EBMLTestSpec:
+
+            result = EBMLTestSpec(doc_type=DocType(type="ebml", version=1))
+
+            return result
+
+        ebml_spec = get_ebml_spec()
+        EBMLMainSpec = ebml_read_spec_xml("ebml/ebml.xml")
+
+        assert EBMLMainSpec == ebml_spec
