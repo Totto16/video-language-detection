@@ -10,13 +10,21 @@ from test_helper import ErrResult, OkResult
 from content.tagger.mkv_tagger import BitIterator, EBMLVarInt, is_mkv_file
 from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.schema.parser import (
+    DefaultEmpty,
     DocType,
+    EBMLAdvancedElementTypeBinary,
+    EBMLAdvancedElementTypeInteger,
+    EBMLAdvancedElementTypeMaster,
+    EBMLAdvancedElementTypeString,
     EBMLElementDescription,
+    EBMLElementDescriptionGeneric,
+    EBMLElementType,
     EBMLSchemaRange,
     EBMLSchemaRangeBound,
     EBMLSchemaRangeElem,
     EBMLSchemaRangeNot,
     EBMLSpec,
+    LengthRange,
     WrapperInt,
     ebml_read_spec_xml,
     xml_any_range_result,
@@ -341,29 +349,18 @@ class EBMLTestSpec(FancyEq):
     def spec(self: Self) -> EBMLSpec:
         return self.__spec
 
+    def append(self: Self, element: EBMLElementDescription) -> None:
+        self.__spec.append(element)
+
+    def extend(self: Self, elements: list[EBMLElementDescription]) -> None:
+        for elem in elements:
+            self.__spec.append(elem)
+
     @staticmethod
     def __is_elem_eq(
         elem1: EBMLElementDescription,
         elem2: EBMLElementDescription,
     ) -> Result[None, list[str]]:
-
-        if elem1.type.type != elem2.type.type:
-            return Err(
-                [
-                    "Element type doesn't match:",
-                    str(elem1.type.type),
-                    str(elem2.type.type),
-                ],
-            )
-
-        if elem1.type != elem2.type:
-            return Err(
-                [
-                    "Element type doesn't match:",
-                    str(elem1.type),
-                    str(elem2.type),
-                ],
-            )
 
         if elem1.name != elem2.name:
             return Err(
@@ -374,43 +371,59 @@ class EBMLTestSpec(FancyEq):
                 ],
             )
 
+        if elem1.type.type != elem2.type.type:
+            return Err(
+                [
+                    "Element type doesn't match:",
+                    f"Element name: {elem1.name}",
+                    str(elem1.type.type),
+                    str(elem2.type.type),
+                ],
+            )
+
+        if elem1.type != elem2.type:
+            return Err(
+                [
+                    "Element type doesn't match:",
+                    f"Element name: {elem1.name}",
+                    str(elem1.type),
+                    str(elem2.type),
+                ],
+            )
+
         if elem1.id != elem2.id:
             return Err(
                 [
                     "Element id doesn't match:",
+                    f"Element name: {elem1.name}",
                     str(elem1.id),
                     str(elem2.id),
                 ],
             )
 
-        values1 = (
-            elem1.occurrences,
-            elem1.description,
-            elem1.unknown_size_allowed,
-            elem1.versions,
-            elem1.path,
-            elem1.recurring,
-            elem1.recursive,
-        )
+        keys: list[str] = [
+            "occurrences",
+            "description",
+            "unknown_size_allowed",
+            "versions",
+            "path",
+            "recurring",
+            "recursive",
+        ]
 
-        values2 = (
-            elem2.occurrences,
-            elem2.description,
-            elem2.unknown_size_allowed,
-            elem2.versions,
-            elem2.path,
-            elem2.recurring,
-            elem2.recursive,
-        )
+        for key in keys:
+            value1 = getattr(elem1, key)
+            value2 = getattr(elem2, key)
 
-        if values1 != values2:
-            return Err(
-                [
-                    "Element values doesn't match:",
-                    str(values1),
-                    str(values2),
-                ],
-            )
+            if value1 != value2:
+                return Err(
+                    [
+                        f"Element attributes {key} doesn't match:",
+                        f"Element name: {elem1.name}",
+                        str(value1),
+                        str(value2),
+                    ],
+                )
 
         return Ok(None)
 
@@ -498,6 +511,353 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
         def get_ebml_spec() -> EBMLTestSpec:
 
             result = EBMLTestSpec(doc_type=DocType(type="ebml", version=1))
+
+            result.extend(
+                [
+                    EBMLElementDescriptionGeneric(
+                        name="EBML",
+                        id=440786851,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeMaster(type=EBMLElementType.Master),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
+                                ),
+                                None,
+                            ),
+                        ),
+                        path="\\EBML",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="EBMLVersion",
+                        id=17030,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=1,
+                            range=EBMLSchemaRange(EBMLSchemaRangeNot(0)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\EBMLVersion",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="EBMLReadVersion",
+                        id=17143,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=1,
+                            range=EBMLSchemaRange(1),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\EBMLReadVersion",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="EBMLMaxIDLength",
+                        id=17138,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=4,
+                            range=EBMLSchemaRange(
+                                (
+                                    EBMLSchemaRangeElem(
+                                        value=4, bound=EBMLSchemaRangeBound.Inclusive
+                                    ),
+                                    None,
+                                ),
+                            ),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\EBMLMaxIDLength",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="EBMLMaxSizeLength",
+                        id=17139,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=8,
+                            range=EBMLSchemaRange(EBMLSchemaRangeNot(0)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\EBMLMaxSizeLength",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocType",
+                        id=17026,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeString(
+                            type=EBMLElementType.String,
+                            default=DefaultEmpty(),
+                            length=LengthRange(
+                                EBMLSchemaRange(
+                                    (
+                                        EBMLSchemaRangeElem(
+                                            value=0,
+                                            bound=EBMLSchemaRangeBound.Exclusive,
+                                        ),
+                                        None,
+                                    )
+                                )
+                            ),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocType",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocTypeVersion",
+                        id=17031,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=1,
+                            range=EBMLSchemaRange(EBMLSchemaRangeNot(0)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocTypeVersion",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocTypeReadVersion",
+                        id=17029,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=1,
+                            range=EBMLSchemaRange(EBMLSchemaRangeNot(0)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocTypeReadVersion",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocTypeExtension",
+                        id=17025,
+                        occurrences=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        type=EBMLAdvancedElementTypeMaster(type=EBMLElementType.Master),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocTypeExtension",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocTypeExtensionName",
+                        id=17027,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeString(
+                            type=EBMLElementType.String,
+                            default=DefaultEmpty(),
+                            length=LengthRange(
+                                EBMLSchemaRange(
+                                    (
+                                        EBMLSchemaRangeElem(
+                                            value=0,
+                                            bound=EBMLSchemaRangeBound.Exclusive,
+                                        ),
+                                        None,
+                                    )
+                                ),
+                            ),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocTypeExtension\\DocTypeExtensionName",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="DocTypeExtensionVersion",
+                        id=17028,
+                        occurrences=EBMLSchemaRange(1),
+                        type=EBMLAdvancedElementTypeInteger(
+                            type=EBMLElementType.UnsignedInteger,
+                            default=DefaultEmpty(),
+                            range=EBMLSchemaRange(EBMLSchemaRangeNot(0)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\EBML\\DocTypeExtension\\DocTypeExtensionVersion",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="Void",
+                        id=236,
+                        occurrences=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        type=EBMLAdvancedElementTypeBinary(
+                            type=EBMLElementType.Binary,
+                            default=DefaultEmpty(),
+                            length=None,
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\(-\\)Void",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                    EBMLElementDescriptionGeneric(
+                        name="CRC-32",
+                        id=191,
+                        occurrences=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                            )
+                        ),
+                        type=EBMLAdvancedElementTypeBinary(
+                            type=EBMLElementType.Binary,
+                            default=DefaultEmpty(),
+                            length=LengthRange(EBMLSchemaRange(4)),
+                        ),
+                        description=None,
+                        unknown_size_allowed=False,
+                        versions=EBMLSchemaRange(
+                            (
+                                EBMLSchemaRangeElem(
+                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                ),
+                                None,
+                            )
+                        ),
+                        path="\\(1-\\)CRC-32",
+                        recurring=False,
+                        recursive=False,
+                    ),
+                ]
+            )
 
             return result
 
