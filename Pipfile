@@ -54,6 +54,9 @@ siphash24 = "*"
 mutagen = "*"
 pymkv2 = "*"
 
+# extensions
+trakt = "*"
+
 ##no dedicated gpu
 [integrated]
 torchaudio = {version = "*", index="torch-cpu", markers = "sys_platform == 'linux' and python_version == '3.13'"}

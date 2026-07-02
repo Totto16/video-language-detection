@@ -24,6 +24,7 @@ from apischema import (
 from apischema.metadata import none_as_undefined, required
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
+from content.extensions import ExtensionsConfig
 from content.language_picker import (
     LanguagePickerConfig,
     NoLanguagePickerConfig,
@@ -225,6 +226,7 @@ class FinalConfig:
     metadata: MetadataConfig
     picker: LanguagePickerConfig
     keybindings: KeyBoardConfig
+    extensions: ExtensionsConfig
 
 
 logger: Logger = get_logger()
@@ -273,6 +275,10 @@ class ConfigGeneric:
         default=None,
         metadata=none_as_undefined,
     )
+    extensions: Annotated[Optional[ExtensionsConfig], OneOf] = field(
+        default=None,
+        metadata=none_as_undefined,
+    )
 
     @staticmethod
     def __defaults() -> "FinalConfig":
@@ -295,6 +301,7 @@ class ConfigGeneric:
             metadata=MissingProviderMetadataConfig(type="none"),
             picker=NoLanguagePickerConfig(picker_type="none"),
             keybindings=KeyBoardConfig.default(),
+            extensions=ExtensionsConfig.default(),
         )
 
     @staticmethod
@@ -351,6 +358,10 @@ class ConfigGeneric:
             if config.keybindings is not None:
                 parsed_keybindings = config.keybindings
 
+            parsed_extensions = defaults.extensions
+            if config.extensions is not None:
+                parsed_extensions = config.extensions
+
             return FinalConfig(
                 config_name=config.config_name,
                 config_type=config.config_type,
@@ -361,6 +372,7 @@ class ConfigGeneric:
                 metadata=parsed_metadata,
                 picker=parsed_picker,
                 keybindings=parsed_keybindings,
+                extensions=parsed_extensions,
             )
 
         results: list[FinalConfig] = []
@@ -523,6 +535,10 @@ class AdvancedConfig:
             if template.keybindings is not None:
                 parsed_keybindings = template.keybindings
 
+            parsed_extensions = defaults.extensions
+            if template.extensions is not None:
+                parsed_extensions = template.extensions
+
             return FinalConfig(
                 config_name=defaults.config_name,
                 config_type=defaults.config_type,
@@ -533,6 +549,7 @@ class AdvancedConfig:
                 metadata=parsed_metadata,
                 picker=parsed_picker,
                 keybindings=parsed_keybindings,
+                extensions=parsed_extensions,
             )
 
         results: list[FinalConfig] = []
