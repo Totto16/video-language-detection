@@ -1,10 +1,18 @@
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
-from pathlib import Path
-from typing import Any, BinaryIO, Literal, Optional, Self, assert_never, final, override
+from typing import (
+    Any,
+    BinaryIO,
+    Literal,
+    Optional,
+    Self,
+    assert_never,
+    cast,
+    final,
+    override,
+)
 
 from content.tagger.parser import (
     BoundedIO,
@@ -15,6 +23,11 @@ from content.tagger.parser import (
     Unpacker,
 )
 from content.tagger.schema.parser import (
+    DefaultEmpty,
+    DefaultOptions,
+    DefaultRequired,
+    EBMLAdvancedElementType,
+    EBMLAdvancedElementTypeAbstract,
     EBMLAdvancedElementTypeBinary,
     EBMLAdvancedElementTypeDate,
     EBMLAdvancedElementTypeFloat,
@@ -22,6 +35,7 @@ from content.tagger.schema.parser import (
     EBMLAdvancedElementTypeMaster,
     EBMLAdvancedElementTypeString,
     EBMLElementDescription,
+    EBMLElementDescriptionGeneric,
     EBMLElementType,
     EBMLSpec,
     ebml_read_spec_xml,
@@ -1175,10 +1189,7 @@ class SupportedMasterElements:
     pass
 
 
-# TODO: check minOccurs and maxOccurs in iter function
-
-
-def read_element(
+def read_element(  # noqa: PLR0915
     io: BoundedIO,
     options: EBMLDecodeOptions,
     spec: EBMLSpec.EBMLSpecById,
@@ -1269,7 +1280,7 @@ def read_element(
             assert_valid(validate_res)
 
             return (element, element_desc)
-        case EBMLAdvancedElementTypeMaster() as master_type:
+        case EBMLAdvancedElementTypeMaster():
             master_element = EBMLMasterElement.read_ebml_master_element_from_parent(
                 element.payload_io(io),
                 element,
@@ -1298,6 +1309,105 @@ def read_element(
             assert_never(element_desc)
 
 
+def get_element_value[A](
+    element_type: EBMLAdvancedElementTypeAbstract[A],
+    element: EBMLElement,
+) -> A:
+
+    def cast_to_type[B](_typ: EBMLAdvancedElementTypeAbstract[B], a: B) -> A:
+        return cast(A, a)
+
+    match element_type:
+        case EBMLAdvancedElementTypeInteger() as int_type:
+            match int_type.type:
+                case EBMLElementType.SignedInteger:
+                    if not isinstance(element, EBMLSignedIntegerElement):
+                        msg = "Invalid SignedInteger: type not dispatched to correct class"
+                        raise TypeError(msg)
+
+                    return cast_to_type(int_type, element.value)
+                case EBMLElementType.UnsignedInteger:
+                    if not isinstance(element, EBMLUnsignedIntegerElement):
+                        msg = "Invalid UnsignedInteger: type not dispatched to correct class"
+                        raise TypeError(msg)
+
+                    return cast_to_type(int_type, element.value)
+                case _:
+                    assert_never(int_type)
+
+        case EBMLAdvancedElementTypeFloat() as float_type:
+            if not isinstance(element, EBMLFloatElement):
+                msg = "Invalid Float: type not dispatched to correct class"
+                raise TypeError(msg)
+
+            return cast_to_type(float_type, element.value)
+        case EBMLAdvancedElementTypeString() as str_type:
+            match str_type.type:
+                case EBMLElementType.String:
+                    if not isinstance(element, EBMLStringElement):
+                        msg = "Invalid String: type not dispatched to correct class"
+                        raise TypeError(msg)
+
+                    return cast_to_type(str_type, element.value)
+                case EBMLElementType.UTF8:
+                    if not isinstance(element, EBMLUTF8Element):
+                        msg = "Invalid UTF8: type not dispatched to correct class"
+                        raise TypeError(msg)
+
+                    return cast_to_type(str_type, element.value)
+                case _:
+                    assert_never(str_type)
+
+        case EBMLAdvancedElementTypeDate() as date_type:
+            if not isinstance(element, EBMLDateElement):
+                msg = "Invalid Date: type not dispatched to correct class"
+                raise TypeError(msg)
+
+            return cast_to_type(date_type, element.value)
+        case EBMLAdvancedElementTypeMaster():
+            msg = "Can't get element value for Master Type"
+            raise RuntimeError(msg)
+        case EBMLAdvancedElementTypeBinary() as binary_type:
+            if not isinstance(element, EBMLBinaryElement):
+                msg = "Invalid Binary: type not dispatched to correct class"
+                raise TypeError(msg)
+
+            return cast_to_type(binary_type, element.value)
+
+        case _:
+            msg = f"Invalid element_type: {element_type}"
+            raise RuntimeError(msg)
+
+
+def ebml_iter_elements_io(
+    io: BoundedIO,
+    options: EBMLDecodeOptions,
+    spec: EBMLSpec,
+) -> Generator[tuple[EBMLElement, EBMLElementDescription]]:
+
+    spec_by_id = spec.elements_by_id()
+
+    # TODO: check minOccurs and maxOccurs in iter function
+
+    pos = io.span.start
+    end = io.span.end
+
+    while pos < end:
+        new_io = io.new_span_io(SimpleSpan(pos, end - pos))
+        element, element_desc = read_element(new_io, options, spec_by_id)
+
+        if pos + element.span.total.size > end:
+            msg = f"Element {element.element_id} at {pos} extends past parent boundary"
+            raise RuntimeError(msg)
+
+        yield (element, element_desc)
+        pos += element.span.total.size
+
+    if pos != end:
+        msg = f"Element didn't reach to the end of the parent span: {pos} != {end}"
+        raise RuntimeError(msg)
+
+
 EBMLMainSpec = ebml_read_spec_xml("ebml/ebml.xml")
 
 
@@ -1315,8 +1425,48 @@ EBMLHeaderElementsSpec = filter_spec_elements(
     lambda element: not filter_ebml_global_element(element),
 )
 
-EBMLHeaderMasterSpec = EBMLHeaderElementsSpec.elements_by_name()["EBML"]
 
+def typed_spec[A: (EBMLAdvancedElementType)](
+    spec: EBMLElementDescription,
+    a: type[A],
+) -> EBMLElementDescriptionGeneric[A]:
+    if isinstance(spec.type, a):
+        return cast(EBMLElementDescriptionGeneric[A], spec)
+    msg = (
+        f"Expected EBMLElementDescription to be of type {a} but have: {type(spec.type)}"
+    )
+    raise RuntimeError(msg)
+
+
+def require_default_spec_value[A](value: A | DefaultOptions) -> A:
+    if isinstance(value, (DefaultRequired, DefaultEmpty)):
+        msg = f"Required a default value, but have: {value}"
+        raise TypeError(msg)
+
+    return value
+
+
+EBMLHeaderMasterSpec = EBMLHeaderElementsSpec.elements_by_name()["EBML"]
+EBMLVersionSpec = typed_spec(
+    EBMLHeaderElementsSpec.elements_by_name()["EBMLVersion"],
+    EBMLAdvancedElementTypeInteger,
+)
+EBMLMaxIDLengthSpec = typed_spec(
+    EBMLHeaderElementsSpec.elements_by_name()["EBMLMaxIDLength"],
+    EBMLAdvancedElementTypeInteger,
+)
+EBMLMaxSizeLengthSpec = typed_spec(
+    EBMLHeaderElementsSpec.elements_by_name()["EBMLMaxSizeLength"],
+    EBMLAdvancedElementTypeInteger,
+)
+EBMLDocTypeSpec = typed_spec(
+    EBMLHeaderElementsSpec.elements_by_name()["DocType"],
+    EBMLAdvancedElementTypeString,
+)
+EBMLDocTypeVersionSpec = typed_spec(
+    EBMLHeaderElementsSpec.elements_by_name()["DocTypeVersion"],
+    EBMLAdvancedElementTypeInteger,
+)
 # spec: RFC 8794
 # chapter 11.3
 
@@ -1342,13 +1492,28 @@ EBMLGlobalElementsSpec = filter_spec_elements(
 EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
 
 
+@dataclass(slots=True, repr=True)
+class DocType:
+    type: str
+    version: int
+
+
+@dataclass(slots=True, repr=True)
+class EBMLHeaderOptions:
+    version: int
+    options: EBMLDecodeOptions
+    doc_type: DocType
+
+
 @final
 @decorate_class(slots=True)
 class EBMLHeader(EBMLElement, FinalEBMLElement):
+    options: EBMLHeaderOptions
 
     def __init__(
         self: Self,
         parent: EBMLElement,
+        options: EBMLHeaderOptions,
     ) -> None:
         super().__init__(
             parent.element_id,
@@ -1356,6 +1521,8 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             parent.header_sizes,
             is_container=False,
         )
+
+        self.options = options
 
     @staticmethod
     def __read_impl(io: BoundedIO) -> "EBMLHeader":
@@ -1384,21 +1551,100 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         element = EBMLElement.read_ebml_element(io, ebml_header_master_options)
 
         if element.element_id != EBMLHeaderMasterSpec.id:
-            raise "TODO"
+            msg = f"Invalid EBML Header element ID: {element.element_id}"
+            raise RuntimeError(msg)
+
+        version = require_default_spec_value(EBMLVersionSpec.type.default)
+        max_id_length = require_default_spec_value(EBMLMaxIDLengthSpec.type.default)
+        max_size_length = require_default_spec_value(EBMLMaxSizeLengthSpec.type.default)
+
+        doc_type_str: Optional[str] = None
+        doc_type_version = require_default_spec_value(
+            EBMLDocTypeVersionSpec.type.default,
+        )
 
         ebml_header_children_options = EBMLDecodeOptions(
             max_id_length=4,
             max_size_length=8,
         )
 
-        todo = ebml_iter_elements(
-            element.payload_io(io), ebml_header_children_options, EBMLHeaderElementsSpec
+        children_elements = ebml_iter_elements_io(
+            element.payload_io(io),
+            ebml_header_children_options,
+            EBMLHeaderElementsSpec,
         )
 
-        if todo.type == "master":
-            raise "not allowed"
+        for children_element, element_desc in children_elements:
+            match element_desc.type:
+                case EBMLAdvancedElementTypeInteger() as int_type:
+                    int_value = get_element_value(int_type, element)
 
-        raise "TODO"
+                    match element_desc.name:
+                        case EBMLVersionSpec.name:
+                            version = int_value
+                        case EBMLMaxIDLengthSpec.name:
+                            max_id_length = int_value
+                        case EBMLMaxSizeLengthSpec.name:
+                            max_size_length = int_value
+                        case EBMLDocTypeVersionSpec.name:
+                            doc_type_version = int_value
+                        case _:
+                            # ignore unused values atm
+                            pass
+                case EBMLAdvancedElementTypeFloat() as float_type:
+                    _float_value = get_element_value(float_type, element)
+
+                    match element_desc.name:
+                        case _:
+                            # ignore unused values atm
+                            pass
+                case EBMLAdvancedElementTypeString() as str_type:
+                    str_value = get_element_value(str_type, element)
+
+                    match element_desc.name:
+                        case EBMLDocTypeSpec.name:
+                            doc_type_str = str_value
+                        case _:
+                            # ignore unused values atm
+                            pass
+                case EBMLAdvancedElementTypeDate() as date_type:
+                    _date_value = get_element_value(date_type, element)
+
+                    match element_desc.name:
+                        case _:
+                            # ignore unused values atm
+                            pass
+                case EBMLAdvancedElementTypeMaster():
+                    msg = f"Master element not allowed in header element: {children_element}"
+                    raise RuntimeError(msg)
+                case EBMLAdvancedElementTypeBinary() as binary_type:
+                    _binary_value = get_element_value(binary_type, element)
+
+                    match element_desc.name:
+                        case _:
+                            # ignore unused values atm
+                            pass
+                case _:
+                    assert_never(element_desc)
+
+        decode_options: EBMLDecodeOptions = EBMLDecodeOptions(
+            max_id_length=max_id_length,
+            max_size_length=max_size_length,
+        )
+
+        if doc_type_str is None:
+            msg = "missing doc_type_str in header"
+            raise RuntimeError(msg)
+
+        doc_type: DocType = DocType(type=doc_type_str, version=doc_type_version)
+
+        options: EBMLHeaderOptions = EBMLHeaderOptions(
+            version,
+            decode_options,
+            doc_type,
+        )
+
+        return EBMLHeader(element, options)
 
     @staticmethod
     def read(

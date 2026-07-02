@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
+    Any,
     Literal,
     Optional,
     Self,
@@ -282,12 +283,19 @@ class DefaultEmpty:
 DefaultOptions = DefaultRequired | DefaultEmpty
 
 
+@decorate_class(slots=True)
+class EBMLAdvancedElementTypeAbstract[Type](ABC):
+    @abstractmethod
+    def validate(self: Self, value: Type) -> Result[None, str]: ...
+
+
 @dataclass(slots=True, repr=True)
-class EBMLAdvancedElementTypeInteger:
+class EBMLAdvancedElementTypeInteger(EBMLAdvancedElementTypeAbstract[int]):
     type: Literal[EBMLElementType.SignedInteger, EBMLElementType.UnsignedInteger]
     default: int | DefaultOptions
     range: Optional[EBMLSchemaRange[int]]
 
+    @override
     def validate(self: Self, value: int) -> Result[None, str]:
         if self.range is None:
             return Ok(None)
@@ -301,11 +309,12 @@ class EBMLAdvancedElementTypeInteger:
 
 
 @dataclass(slots=True, repr=True)
-class EBMLAdvancedElementTypeFloat:
+class EBMLAdvancedElementTypeFloat(EBMLAdvancedElementTypeAbstract[float]):
     type: Literal[EBMLElementType.Float]
     default: float | DefaultOptions
     range: Optional[EBMLSchemaRange[float]]
 
+    @override
     def validate(self: Self, value: float) -> Result[None, str]:
         if self.range is None:
             return Ok(None)
@@ -332,11 +341,12 @@ class LengthRange:
 
 
 @dataclass(slots=True, repr=True)
-class EBMLAdvancedElementTypeString:
+class EBMLAdvancedElementTypeString(EBMLAdvancedElementTypeAbstract[str]):
     type: Literal[EBMLElementType.String, EBMLElementType.UTF8]
     default: str | DefaultOptions
     length: Optional[LengthRange]
 
+    @override
     def validate(self: Self, value: str) -> Result[None, str]:
         if self.length is None:
             return Ok(None)
@@ -350,11 +360,12 @@ class EBMLAdvancedElementTypeString:
 
 
 @dataclass(slots=True, repr=True)
-class EBMLAdvancedElementTypeDate:
+class EBMLAdvancedElementTypeDate(EBMLAdvancedElementTypeAbstract[datetime]):
     type: Literal[EBMLElementType.Date]
     default: datetime | DefaultOptions
 
-    def validate(self: Self, value: datetime) -> Result[None, str]:  # noqa: ARG002
+    @override
+    def validate(self: Self, value: datetime) -> Result[None, str]:
         return Ok(None)
 
 
@@ -364,11 +375,12 @@ class EBMLAdvancedElementTypeMaster:
 
 
 @dataclass(slots=True, repr=True)
-class EBMLAdvancedElementTypeBinary:
+class EBMLAdvancedElementTypeBinary(EBMLAdvancedElementTypeAbstract[bytes]):
     type: Literal[EBMLElementType.Binary]
     default: bytes | DefaultOptions
     length: Optional[LengthRange]
 
+    @override
     def validate(self: Self, value: bytes) -> Result[None, str]:
         if self.length is None:
             return Ok(None)
@@ -392,17 +404,20 @@ EBMLAdvancedElementType = (
 
 
 @dataclass(slots=True, repr=True)
-class EBMLElementDescription:
+class EBMLElementDescriptionGeneric[A: (EBMLAdvancedElementType)]:
     name: str
     id: int
     occurrences: EBMLOccurrences
-    type: EBMLAdvancedElementType
+    type: A
     description: Optional[str]
     unknown_size_allowed: bool
     versions: EBMLVersions
     path: str
     recurring: bool
     recursive: bool
+
+
+type EBMLElementDescription = EBMLElementDescriptionGeneric[EBMLAdvancedElementType]
 
 
 @dataclass(slots=True, repr=True)
@@ -572,11 +587,13 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         match bound1_b:
             case Bound.GE:
                 new_range_start = EBMLSchemaRangeElem(
-                    bound1_num, EBMLSchemaRangeBound.Inclusive,
+                    bound1_num,
+                    EBMLSchemaRangeBound.Inclusive,
                 )
             case Bound.GT:
                 new_range_start = EBMLSchemaRangeElem(
-                    bound1_num, EBMLSchemaRangeBound.Exclusive,
+                    bound1_num,
+                    EBMLSchemaRangeBound.Exclusive,
                 )
             case _:
                 return Err(
@@ -590,11 +607,13 @@ def xml_any_range_result[A: (int, float)](  # noqa: PLR0915
         match bound2_b:
             case Bound.LE:
                 new_range_end = EBMLSchemaRangeElem(
-                    bound2_num, EBMLSchemaRangeBound.Inclusive,
+                    bound2_num,
+                    EBMLSchemaRangeBound.Inclusive,
                 )
             case Bound.LT:
                 new_range_end = EBMLSchemaRangeElem(
-                    bound2_num, EBMLSchemaRangeBound.Exclusive,
+                    bound2_num,
+                    EBMLSchemaRangeBound.Exclusive,
                 )
             case _:
                 return Err(
@@ -982,7 +1001,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
 
         versions = ebml_versions_from_values(min_ver, max_ver)
 
-        element: EBMLElementDescription = EBMLElementDescription(
+        element: EBMLElementDescription = EBMLElementDescriptionGeneric(
             name=name,
             id=element_id,
             occurrences=occurrences,
