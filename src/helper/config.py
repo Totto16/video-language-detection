@@ -24,7 +24,7 @@ from apischema import (
 from apischema.metadata import none_as_undefined, required
 from prompt_toolkit.keys import KEY_ALIASES, Keys
 
-from content.extensions import ExtensionsConfig
+from content.extensions.extensions import ExtensionsConfig
 from content.language_picker import (
     LanguagePickerConfig,
     NoLanguagePickerConfig,

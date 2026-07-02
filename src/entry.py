@@ -719,18 +719,18 @@ def subcommand_config_check(
         )
         return 1
 
-    final_config, info = parsed_config.as_ok()
+    parsed_configs, info = parsed_config.as_ok()
 
     logger.info(_("Config '{config}' is valid!").format(config=args.config))
     logger.info(_("Info about config: {info}").format(info=info))
 
-    if len(final_config) == 0:
+    if len(parsed_configs) == 0:
         logger.error(_("parsing returned 0 configs"))
         return 1
 
-    configs = filter_configs(final_config, args.filter)
+    configs = filter_configs(parsed_configs, args.filter)
 
-    if len(configs) > len(final_config):
+    if len(configs) > len(parsed_configs):
         logger.error(
             _(
                 "filtering returned more configs than there are, at least one was used multiple times"  # noqa: COM812
@@ -742,12 +742,12 @@ def subcommand_config_check(
         logger.error(_("filtering returned 0 configs"))
         return 1
 
-    serialized_config: dict[str, Any] = serialize(
-        FinalConfig,
-        final_config,
+    serialized_configs: dict[str, Any] = serialize(
+        list[FinalConfig],
+        configs,
     )
-    logger.info(_("Printing final config as json:"))
-    logger.info(json.dumps(serialized_config, indent=4))
+    logger.info(_("Printing final configs as json:"))
+    logger.info(json.dumps(serialized_configs, indent=4))
     return 0
 
 

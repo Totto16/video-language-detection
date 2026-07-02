@@ -4,6 +4,7 @@ from dataclasses import dataclass
 @dataclass(slots=True, repr=True)
 class TraktConfig:
     api_key: str
+    cache_path: str
 
 
 def sync_collection():
@@ -11,9 +12,9 @@ def sync_collection():
 
     # sync/collection/
 
-    #type: media
+    # type: media
     # extended=full,images,available_on&
     # available_on=other
 
-    
     # https://docs.trakt.tv/reference/postsynccollectionadd
+    pass
