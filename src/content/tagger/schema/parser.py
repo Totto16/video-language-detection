@@ -435,6 +435,19 @@ class EBMLSpec:
     def elements_by_id(self: Self) -> EBMLSpecById:
         return {element.id: element for element in self.elements}
 
+    def append(self: Self, element: EBMLElementDescription) -> None:
+        id_value = self.elements_by_id().get(element.id, None)
+        if id_value is not None:
+            msg = f"Duplicate ID: {id_value}: {element}"
+            raise RuntimeError(msg)
+
+        name_value = self.elements_by_name().get(element.name, None)
+        if name_value is not None:
+            msg = f"Duplicate name: {name_value}: {element}"
+            raise RuntimeError(msg)
+
+        self.elements.append(element)
+
 
 @decorate_class(slots=True)
 class _MISSING:
@@ -845,19 +858,6 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
 
     result: EBMLSpec = EBMLSpec(version=version, elements=[])
 
-    def append_element(element: EBMLElementDescription) -> None:
-        id_value = result.elements_by_id().get(element.id, None)
-        if id_value is not None:
-            msg = f"Duplicate ID: {id_value}: {element}"
-            raise RuntimeError(msg)
-
-        name_value = result.elements_by_name().get(element.name, None)
-        if name_value is not None:
-            msg = f"Duplicate name: {name_value}: {element}"
-            raise RuntimeError(msg)
-
-        result.elements.append(element)
-
     for element_entry in root:
 
         element_entry_tag = xml_local_name(element_entry.tag)
@@ -1014,7 +1014,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
             recursive=recursive,
         )
 
-        append_element(element)
+        result.append(element)
 
     return result
 

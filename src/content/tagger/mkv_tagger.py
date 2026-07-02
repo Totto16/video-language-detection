@@ -1489,8 +1489,6 @@ EBMLGlobalElementsSpec = filter_spec_elements(
     filter_ebml_global_element,
 )
 
-EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
-
 
 @dataclass(slots=True, repr=True)
 class DocType:
@@ -1500,7 +1498,6 @@ class DocType:
 
 @dataclass(slots=True, repr=True)
 class EBMLHeaderOptions:
-    version: int
     options: EBMLDecodeOptions
     doc_type: DocType
 
@@ -1518,7 +1515,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
+            header_sizes=parent.header_sizes,
             is_container=False,
         )
 
@@ -1638,8 +1635,13 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
 
         doc_type: DocType = DocType(type=doc_type_str, version=doc_type_version)
 
+        if version != 1:
+            msg = (
+                f"Only version 1 of the EBML spec is supported atm, but got: {version}"
+            )
+            raise RuntimeError(msg)
+
         options: EBMLHeaderOptions = EBMLHeaderOptions(
-            version,
             decode_options,
             doc_type,
         )
@@ -1653,14 +1655,83 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         return EBMLHeader.__read_impl(io)
 
     def __str__(self: Self) -> str:
-        return f"<EBMLHeader parent: {EBMLElement.__str__(self)}>"
+        return (
+            f"<EBMLHeader parent: {EBMLElement.__str__(self)} options: {self.options}>"
+        )
 
     def __repr__(self: Self) -> str:
         return str(self)
 
 
-class EBMLBody(EBMLElement):
-    pass
+@final
+@decorate_class(slots=True)
+class EBMLBody(EBMLElement, FinalEBMLElement):
+
+    def __init__(
+        self: Self,
+        parent: EBMLElement,
+    ) -> None:
+        super().__init__(
+            parent.element_id,
+            parent.span,
+            header_sizes=parent.header_sizes,
+            is_container=True,
+        )
+
+    @staticmethod
+    def __read_impl(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+        spec: EBMLSpec,
+    ) -> "EBMLBody":
+        # spec: RFC 8794
+        # chapter 8.2
+
+        # All data of an EBML Document following the EBML Header is the EBML Body. The end of the
+        # EBML Body, as well as the end of the EBML Document that contains the EBML Body, is reached at
+        # whichever comes ﬁrst: the beginning of a new EBML Header at the Root Level or the end of the
+        # ﬁle. This document deﬁnes precisely which EBML Elements are to be used within the EBML
+        # Header but does not name or deﬁne which EBML Elements are to be used within the EBML Body.
+        # The deﬁnition of which EBML Elements are to be used within the EBML Body is deﬁned by an
+        # EBML Schema.
+        # Within the EBML Body, the maximum octet length allowed for any Element ID is set by the
+        # EBMLMaxIDLength Element of the EBML Header, and the maximum octet length allowed for any
+        # Element Data Size is set by the EBMLMaxSizeLength Element of the EBML Header.
+
+        spec_id = spec.elements_by_id()
+
+        element, element_desc = read_element(io, options, spec_id)
+
+        if element_desc.type.type != EBMLElementType.Master:
+            msg = f"Only Ma Master element allowed for a EBML Body element: {element} {element_desc}"
+            raise RuntimeError(msg)
+
+        return EBMLBody(element)
+
+    @staticmethod
+    def read(
+        io: BoundedIO,
+        options: EBMLDecodeOptions,
+        spec: EBMLSpec,
+    ) -> "EBMLBody":
+        return EBMLBody.__read_impl(io, options, spec)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLBody parent: {EBMLElement.__str__(self)}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+def get_spec_by_doc_type(doc_type: DocType) -> Result[EBMLSpec, str]:
+
+    EBMLGlobalElementsSpec = filter_spec_elements(
+        EBMLMainSpec,
+        filter_ebml_global_element,
+    )
+
+    EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+    return "TODO"
 
 
 @final
@@ -1696,7 +1767,17 @@ class EBMLDocument(FinalEBMLElement):
 
         header = EBMLHeader.read(io)
         body_io = io.new_span_io(io.span.next_span(header.span.total.size))
-        body = EBMLBody.read(body_io, header.options)
+
+        header_options = header.options
+
+        spec_res = get_spec_by_doc_type(header_options.doc_type)
+
+        if spec_res.err():
+            msg = f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
+
+        spec = spec_res.as_ok()
+
+        body = EBMLBody.read(body_io, header_options.options, spec)
 
         total_span = SimpleSpan(
             header.span.total.start,
