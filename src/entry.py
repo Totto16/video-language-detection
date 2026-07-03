@@ -10,6 +10,7 @@ from logging import Logger
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     Literal,
     Never,
     Optional,
@@ -700,11 +701,16 @@ def subcommand_config_check(
 ) -> ExitCode:
     from apischema import serialize
 
+    from main import AppSchemas, validate_schema
     from helper.config import (
         AdvancedConfig,
         FinalConfig,
         filter_configs,
     )
+
+    schemas = AppSchemas.from_folder(Path("schema/"))
+
+    validate_schema(schemas.config, args.config)
 
     parsed_config = AdvancedConfig.load_and_resolve_with_info(
         args.config,
@@ -741,6 +747,14 @@ def subcommand_config_check(
     if len(configs) == 0:
         logger.error(_("filtering returned 0 configs"))
         return 1
+
+    for config in configs:
+        target_file = config.general.target_file
+        if target_file.type == "json":
+            validate_schema(schemas.data, target_file.file)
+        else:
+            msg = f"Not yet implemented: {target_file.type }"
+            raise RuntimeError(msg)
 
     serialized_configs: dict[str, Any] = serialize(
         list[FinalConfig],

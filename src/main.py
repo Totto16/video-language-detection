@@ -1,9 +1,11 @@
+from dataclasses import dataclass
 import json
 from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional
 
 import jsonschema.validators
+import yaml
 
 from content.collection_content import CollectionContent
 from content.episode_content import EpisodeContent
@@ -47,6 +49,34 @@ def validate_metaschema(file_path: Path) -> None:
         logger.error(_("Invalid metaschema: {err}").format(err=e))  # noqa: TRY400
 
 
+def validate_schema(schema_file: Path, content_file: Path) -> None:
+
+    # trying to emulate: check_jsonschema
+    # check-jsonschema --schemafile data_schema.json data.json
+
+    try:
+
+        schema: Any
+        with schema_file.open("r") as f:
+            schema = json.load(f)
+
+        content: Any
+        with content_file.open("r") as f:
+            suffix: str = content_file.suffix[1:]
+            match suffix:
+                case "json":
+                    content = json.load(f)
+                case "yml" | "yaml":
+                    content = yaml.safe_load(f)
+                case _:
+                    msg = f"Content not loadable from '{suffix}' file!"
+                    raise RuntimeError(msg)
+
+        jsonschema.validate(content, schema)
+    except jsonschema.ValidationError as e:
+        logger.error(_("Invalid schema: {err}").format(err=e))  # noqa: TRY400
+
+
 def generate_schema(
     file_path: Path,
     any_type: Any,
@@ -69,14 +99,28 @@ def generate_schema(
     validate_metaschema(file_path)
 
 
+@dataclass(slots=True, repr=True)
+class AppSchemas:
+    data: Path
+    config: Path
+
+    @staticmethod
+    def from_folder(folder: Path) -> "AppSchemas":
+        data = folder / "content_list_schema.json"
+        config = folder / "config_schema.json"
+        return AppSchemas(data, config)
+
+
 def generate_schemas(folder: Path) -> None:
+    schemas = AppSchemas.from_folder(folder)
+
     generate_schema(
-        folder / "content_list_schema.json",
+        schemas.data,
         list[AllContent],
         emit_type="deserialize",
     )
     generate_schema(
-        folder / "config_schema.json",
+        schemas.config,
         SchemaConfig,
         emit_type="deserialize",
     )
