@@ -43,7 +43,7 @@ def get_tagger_for_mp4_file_deprecated(file: Path) -> Result["VideoTagger", str]
 
         return Ok(result)
 
-    except RuntimeError as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )
@@ -61,7 +61,7 @@ def get_tagger_for_mp4_file(file: Path) -> Result["VideoTagger", str]:
             return Err(mp4_handle.as_err())
 
         return Ok(mp4_handle.as_ok())
-    except RuntimeError as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )
@@ -80,7 +80,7 @@ def get_tagger_for_avi_file(file: Path) -> Result["VideoTagger", str]:
 
         return Ok(avi_handle.as_ok())
 
-    except RuntimeError as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )
@@ -99,7 +99,7 @@ def get_tagger_for_mkv_file(file: Path) -> Result["VideoTagger", str]:
 
         return Ok(mkv_handle.as_ok())
 
-    except RuntimeError as err:
+    except (RuntimeError, ValueError, TypeError) as err:
         return Err(
             _("get tagger {err}").format(err=err),
         )

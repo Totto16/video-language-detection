@@ -38,6 +38,7 @@ from content.tagger.schema.parser import (
     EBMLAdvancedElementTypeString,
     EBMLElementDescription,
     EBMLElementDescriptionGeneric,
+    EBMLElementIDParsed,
     EBMLElementType,
     EBMLSpec,
     ebml_read_spec_xml,
@@ -219,46 +220,6 @@ class EBMLVarInt:
 
         return amount
 
-    def is_valid_element_id(self: Self, bytes_used: int) -> Optional[str]:
-        # spec: RFC 8794
-        # chapter 5
-
-        # The bits of the
-        # VINT_DATA component of the Element ID MUST NOT be all 0 values or all 1 values. The
-        # VINT_DATA component of the Element ID MUST be encoded at the shortest valid length. For
-        # example, an Element ID with binary encoding of 1011 1111 is valid, whereas an Element ID with
-        # binary encoding of 0100 0000 0011 1111 stores a semantically equal VINT_DATA but is invalid,
-        # because a shorter VINT encoding is possible. Additionally, an Element ID with binary encoding of
-        # 1111 1111 is invalid, since the VINT_DATA section is set to all one values, whereas an Element ID
-        # with binary encoding of 0100 0000 0111 1111 stores a semantically equal VINT_DATA and is the
-        # shortest-possible VINT encoding.
-
-        if self.__value == 0:
-            return "Value is NULL"
-
-        if bytes_used == 0:
-            msg = f"IMPLEMENTATION error: bytes_used {bytes_used}"
-            raise RuntimeError(msg)
-
-        if self.__value == ((1 << (bytes_used * 7)) - 1):
-            return "Value is 0xFF..FF"
-
-        minmum_bytes_required = self.minmum_bytes_required()
-
-        if minmum_bytes_required != bytes_used:
-            if minmum_bytes_required > bytes_used:
-                msg = f"IMPLEMENTATION ERROR: minmum_bytes_required  calculated incorrectly: {minmum_bytes_required} {self.__value}"
-                raise RuntimeError(msg)
-
-            if self.__value == ((1 << ((bytes_used - 1) * 7)) - 1):
-                if minmum_bytes_required + 1 == bytes_used:
-                    return None
-                return f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}"
-
-            return f"Value {self.__value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
-
-        return None
-
     @property
     def value(self: Self) -> int:
         return self.__value
@@ -281,6 +242,118 @@ class EBMLVarInt:
 
         if isinstance(other, int):
             return self.__value == other
+
+        return False
+
+
+@decorate_class(slots=True)
+class EBMLElementID(EBMLVarInt):
+    __raw: int
+
+    def __init__(self: Self, parent: EBMLVarInt, raw: int) -> None:
+        super().__init__(parent.value)
+        self.__raw = raw
+
+    @staticmethod
+    def from_io(io: BoundedIO) -> Result[tuple["EBMLElementID", int], str]:
+
+        # not explicitly in spec BUT
+        # use all bytes from the VarInt, even the ones, that specify the size
+
+        var_int_res = EBMLVarInt.from_io(io)
+
+        if var_int_res.err():
+            return Err(var_int_res.as_err())
+
+        var_int, bytes_used = var_int_res.as_ok()
+
+        with io.r_ctx(force_entire_read=False) as f:
+
+            all_bytes = f.read(bytes_used)
+
+            int_value = int.from_bytes(all_bytes, byteorder="big", signed=False)
+
+            return Ok(
+                (
+                    EBMLElementID(
+                        var_int,
+                        int_value,
+                    ),
+                    bytes_used,
+                ),
+            )
+
+    def is_valid(self: Self, bytes_used: int) -> Optional[str]:
+        # spec: RFC 8794
+        # chapter 5
+
+        # The bits of the
+        # VINT_DATA component of the Element ID MUST NOT be all 0 values or all 1 values. The
+        # VINT_DATA component of the Element ID MUST be encoded at the shortest valid length. For
+        # example, an Element ID with binary encoding of 1011 1111 is valid, whereas an Element ID with
+        # binary encoding of 0100 0000 0011 1111 stores a semantically equal VINT_DATA but is invalid,
+        # because a shorter VINT encoding is possible. Additionally, an Element ID with binary encoding of
+        # 1111 1111 is invalid, since the VINT_DATA section is set to all one values, whereas an Element ID
+        # with binary encoding of 0100 0000 0111 1111 stores a semantically equal VINT_DATA and is the
+        # shortest-possible VINT encoding.
+
+        if self.value == 0:
+            return "Value is NULL"
+
+        if bytes_used == 0:
+            msg = f"IMPLEMENTATION error: bytes_used {bytes_used}"
+            raise RuntimeError(msg)
+
+        if self.value == ((1 << (bytes_used * 7)) - 1):
+            return "Value is 0xFF..FF"
+
+        minmum_bytes_required = self.minmum_bytes_required()
+
+        if minmum_bytes_required != bytes_used:
+            if minmum_bytes_required > bytes_used:
+                msg = f"IMPLEMENTATION ERROR: minmum_bytes_required  calculated incorrectly: {minmum_bytes_required} {self.value}"
+                raise RuntimeError(msg)
+
+            if self.value == ((1 << ((bytes_used - 1) * 7)) - 1):
+                if minmum_bytes_required + 1 == bytes_used:
+                    return None
+                return f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}"
+
+            return f"Value {self.value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
+
+        return None
+
+    @override
+    @property
+    def value(self: Self) -> int:
+        msg = "Don't use value with EBMLElementID: use raw"
+        raise RuntimeError(msg)
+
+    @property
+    def raw(self: Self) -> int:
+        return self.__raw
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLElementID {hex(self.__raw)}>"
+
+    def __repr__(self: Self) -> str:
+        return repr(self.__raw)
+
+    def __hash__(self: Self) -> int:
+        return hash(("EBMLElementID", self.__raw, super().__hash__()))
+
+    def __int__(self: Self) -> int:
+        return self.__raw
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, EBMLElementID):
+            return self.__raw == other.raw
+
+        if isinstance(other, EBMLElementIDParsed):
+            return self.__raw == other.value
+
+        if isinstance(other, int):
+            return self.__raw == other
 
         return False
 
@@ -396,14 +469,14 @@ VINTMAX: int = vint_max_for_bytes(8)
 
 @decorate_class(slots=True)
 class EBMLElement(NonFinalEBMLElement):
-    element_id: EBMLVarInt
+    element_id: EBMLElementID
     span: EBMLElementSpan
     header_sizes: tuple[int, int]
     is_container: bool
 
     def __init__(
         self: Self,
-        element_id: EBMLVarInt,
+        element_id: EBMLElementID,
         span: EBMLElementSpan,
         header_sizes: tuple[int, int],
         *,
@@ -432,7 +505,8 @@ class EBMLElement(NonFinalEBMLElement):
         #     Byte data[data_size]
         # };
 
-        element_id_res = EBMLVarInt.from_io(io)
+
+        element_id_res = EBMLElementID.from_io(io)
 
         if element_id_res.err():
             msg = f"Element ID Parse error: {element_id_res.as_err()}"
@@ -451,8 +525,9 @@ class EBMLElement(NonFinalEBMLElement):
             msg = f"ELement ID VarInt exceeds allowed size of {options.max_id_length}: {element_id_bytes}"
             raise RuntimeError(msg)
 
-        if not element_id.is_valid_element_id(element_id_bytes):
-            msg = f"Invalid Element ID: {element_id}"
+        valid_element_res = element_id.is_valid(element_id_bytes)
+        if valid_element_res is not None:
+            msg = f"Invalid Element ID: {element_id}: {valid_element_res}"
             raise RuntimeError(msg)
 
         size_span = io.span.next_span(element_id_bytes)
@@ -491,6 +566,7 @@ class EBMLElement(NonFinalEBMLElement):
             io.span.sub_span(data_size.value),
             header_sizes=header_sizes,
         )
+
         return EBMLElement(element_id, span, header_sizes, is_container=False)
 
     @final
@@ -1200,7 +1276,7 @@ def read_element(  # noqa: PLR0915
 
     element = EBMLElement.read_ebml_element(io, options)
 
-    element_desc = spec.get(element.element_id.value, None)
+    element_desc = spec.get(element.element_id.raw, None)
 
     if element_desc is None:
         msg = f"Invalid EBML Element ID, not defined by schema: {element.element_id}"
@@ -1591,7 +1667,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         element = EBMLElement.read_ebml_element(io, ebml_header_master_options)
 
         if element.element_id != EBMLHeaderMasterSpec.id:
-            msg = f"Invalid EBML Header element ID: {element.element_id}"
+            msg = f"Invalid EBML Header element ID: got {element.element_id} but expected {EBMLHeaderMasterSpec.id}"
             raise RuntimeError(msg)
 
         version = require_default_spec_value(EBMLVersionSpec.type.default)

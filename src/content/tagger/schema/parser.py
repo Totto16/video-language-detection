@@ -425,9 +425,69 @@ EBMLAdvancedElementType = (
 
 
 @dataclass(slots=True, repr=True)
+class EBMLElementIDParsed:
+    value: int
+
+    @staticmethod
+    def from_checked(value: int) -> "EBMLElementIDParsed":
+        # check if this would be a valid ID, alias it can be encoded as varint
+
+        encoded_bytes = value.to_bytes(byteorder="big", signed=False)
+
+        int_range = LengthRange(
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(1, EBMLSchemaRangeBound.Inclusive),
+                    EBMLSchemaRangeElem(4, EBMLSchemaRangeBound.Inclusive),
+                ),
+            ),
+        )
+
+        is_valid = int_range.valid(encoded_bytes)
+
+        if is_valid.err():
+            msg = f"Invalid EBMLElementID: length has to be in range {int_range} but was: {len(encoded_bytes)}: {is_valid.as_err()}"
+            raise RuntimeError(msg)
+
+        first_byte = encoded_bytes[0]
+
+        match len(encoded_bytes):
+            case 1:
+                val = first_byte & 0x80
+                if val != 0x80:
+                    msg = f"Invalid EBMLElementID: length not correctly encoded: {len(encoded_bytes)}: {hex(val)}"
+                    raise RuntimeError(msg)
+            case 2:
+                val = first_byte & 0xC0
+                if val != 0x40:
+                    msg = f"Invalid EBMLElementID: length not correctly encoded: {len(encoded_bytes)}: {hex(val)}"
+                    raise RuntimeError(msg)
+            case 3:
+                val = first_byte & 0xE0
+                if val != 0x20:
+                    msg = f"Invalid EBMLElementID: length not correctly encoded: {len(encoded_bytes)}: {hex(val)}"
+                    raise RuntimeError(msg)
+            case 4:
+                val = first_byte & 0xF0
+                if val != 0x10:
+                    msg = f"Invalid EBMLElementID: length not correctly encoded: {len(encoded_bytes)}: {hex(val)}"
+                    raise RuntimeError(msg)
+            case _:
+                msg = f"UNREACHABLE: LengthRange error: {int_range} {encoded_bytes!r} {value}"
+
+        return EBMLElementIDParsed(value)
+
+    def __str__(self: Self) -> str:
+        return f"<EBMLElementIDParsed {hex(self.value)}>"
+
+    def __repr__(self: Self) -> str:
+        return repr(self.value)
+
+
+@dataclass(slots=True, repr=True)
 class EBMLElementDescriptionGeneric[A: (EBMLAdvancedElementType)]:
     name: str
-    id: int
+    id: EBMLElementIDParsed
     occurrences: EBMLOccurrences
     type: A
     description: Optional[str]
@@ -474,10 +534,10 @@ class EBMLSpec:
     EBMLSpecById = dict[int, EBMLElementDescription]
 
     def elements_by_id(self: Self) -> EBMLSpecById:
-        return {element.id: element for element in self.__elements}
+        return {element.id.value: element for element in self.__elements}
 
     def append(self: Self, element: EBMLElementDescription) -> None:
-        id_value = self.elements_by_id().get(element.id, None)
+        id_value = self.elements_by_id().get(element.id.value, None)
         if id_value is not None:
             msg = f"Duplicate ID: {id_value}: {element}"
             raise RuntimeError(msg)
@@ -1054,7 +1114,7 @@ def ebml_read_spec_xml(name: str) -> EBMLSpec:  # noqa: PLR0915
 
         element: EBMLElementDescription = EBMLElementDescriptionGeneric(
             name=name,
-            id=element_id,
+            id=EBMLElementIDParsed.from_checked(element_id),
             occurrences=occurrences,
             type=advanced_type,
             description=description,

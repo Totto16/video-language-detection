@@ -7,7 +7,12 @@ from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
 from test_helper import ErrResult, OkResult
 
-from content.tagger.mkv_tagger import BitIterator, EBMLVarInt, is_mkv_file
+from content.tagger.mkv_tagger import (
+    BitIterator,
+    EBMLElementID,
+    EBMLVarInt,
+    is_mkv_file,
+)
 from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.schema.parser import (
     DefaultEmpty,
@@ -18,6 +23,7 @@ from content.tagger.schema.parser import (
     EBMLAdvancedElementTypeString,
     EBMLElementDescription,
     EBMLElementDescriptionGeneric,
+    EBMLElementIDParsed,
     EBMLElementType,
     EBMLSchemaRange,
     EBMLSchemaRangeBound,
@@ -165,15 +171,15 @@ def test_mkv_tagger_parse_element_id(
                 buf_io,
                 span=SimpleSpan(0, len(byte)),
             )
-            var_int_res = EBMLVarInt.from_io(io)
+            element_id_res = EBMLElementID.from_io(io)
 
-            assert var_int_res == OkResult()
+            assert element_id_res == OkResult()
 
-            var_int, bytes_used = var_int_res.as_ok()
+            element_id, bytes_used = element_id_res.as_ok()
 
             assert bytes_used == len(byte)
 
-            is_valid_element_id = var_int.is_valid_element_id(bytes_used)
+            is_valid_element_id = element_id.is_valid(bytes_used)
 
             assert is_valid_element_id == result
 
@@ -304,7 +310,7 @@ def test_mkv_tagger_parsing(
 
     for file, name, result in test_files:
         with subtests.test(f"video gets parsed correctly: {name}"):
-            #TODO
+            # TODO
             assert file != ""
 
 
@@ -523,7 +529,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                 [
                     EBMLElementDescriptionGeneric(
                         name="EBML",
-                        id=440786851,
+                        id=EBMLElementIDParsed.from_checked(440786851),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeMaster(type=EBMLElementType.Master),
                         description=None,
@@ -543,7 +549,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="EBMLVersion",
-                        id=17030,
+                        id=EBMLElementIDParsed.from_checked(17030),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -566,7 +572,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="EBMLReadVersion",
-                        id=17143,
+                        id=EBMLElementIDParsed.from_checked(17143),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -589,7 +595,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="EBMLMaxIDLength",
-                        id=17138,
+                        id=EBMLElementIDParsed.from_checked(17138),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -619,7 +625,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="EBMLMaxSizeLength",
-                        id=17139,
+                        id=EBMLElementIDParsed.from_checked(17139),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -642,7 +648,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocType",
-                        id=17026,
+                        id=EBMLElementIDParsed.from_checked(17026),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeString(
                             type=EBMLElementType.String,
@@ -675,7 +681,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocTypeVersion",
-                        id=17031,
+                        id=EBMLElementIDParsed.from_checked(17031),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -698,7 +704,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocTypeReadVersion",
-                        id=17029,
+                        id=EBMLElementIDParsed.from_checked(17029),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -721,7 +727,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtension",
-                        id=17025,
+                        id=EBMLElementIDParsed.from_checked(17025),
                         occurrences=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
@@ -747,7 +753,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtensionName",
-                        id=17027,
+                        id=EBMLElementIDParsed.from_checked(17027),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeString(
                             type=EBMLElementType.String,
@@ -780,7 +786,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtensionVersion",
-                        id=17028,
+                        id=EBMLElementIDParsed.from_checked(17028),
                         occurrences=EBMLSchemaRange(1),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
@@ -803,7 +809,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="Void",
-                        id=236,
+                        id=EBMLElementIDParsed.from_checked(236),
                         occurrences=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
@@ -833,7 +839,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     ),
                     EBMLElementDescriptionGeneric(
                         name="CRC-32",
-                        id=191,
+                        id=EBMLElementIDParsed.from_checked(191),
                         occurrences=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
