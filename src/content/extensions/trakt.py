@@ -18,3 +18,9 @@ def sync_collection():
 
     # https://docs.trakt.tv/reference/postsynccollectionadd
     pass
+
+
+#TODO:
+# https://docs.trakt.tv/reference/getsearchlookup
+# https://app.trakt.tv/users/me/library?library=other&mode=media
+# https://pytrakt.readthedocs.io/en/latest/
