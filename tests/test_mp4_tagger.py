@@ -50,7 +50,7 @@ from content.tagger.mp4_tagger import (
     VideoTaggerMP4,
     find_mdhd_boxes_with_type,
     is_mp4_file,
-    mp4_iter_boxes,
+    mp4_iter_boxes_for_span,
 )
 from content.tagger.mutagen_tagger import VideoTaggerMutagen
 from content.tagger.parser import SimpleSpan
@@ -370,7 +370,7 @@ def list_all_boxes_recursively(
     while stack:
         span, current_target = stack.pop()
 
-        for box in mp4_iter_boxes(f, span, options):
+        for box in mp4_iter_boxes_for_span(f, span, options):
             if box.is_container:
                 target: tuple[MP4Box, RecursiveBoxes] = (box, RecursiveBoxes([]))
                 current_target.append(target)

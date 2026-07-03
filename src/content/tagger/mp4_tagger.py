@@ -1347,7 +1347,7 @@ class TrackBox(MP4Box, FinalMP4Box):
 
         mdia_box: Optional[MediaBox] = None
 
-        for box in mp4_iter_boxes_io(
+        for box in mp4_iter_boxes(
             parent.payload_io(io),
             options,
         ):
@@ -1363,7 +1363,7 @@ class TrackBox(MP4Box, FinalMP4Box):
             msg = "Missing mdia box in trak"
             raise RuntimeError(msg)
 
-        for box in mp4_iter_boxes_io(
+        for box in mp4_iter_boxes(
             mdia_box.payload_io(io),
             options,
         ):
@@ -2867,29 +2867,6 @@ def read_box(
 
 
 def mp4_iter_boxes(
-    io_base: BinaryIO,
-    span: SimpleSpan,
-    options: MP4DecodeOptions,
-) -> Generator[MP4Box]:
-    pos = span.start
-
-    while pos < span.end:
-        io = BoundedIO.get_new(io_base, SimpleSpan(pos, span.end - pos))
-        box = read_box(io, options)
-
-        if pos + box.span.total.size > span.end:
-            msg = f"Box {box.type!r} at {pos} extends past parent boundary"
-            raise RuntimeError(msg)
-
-        yield box
-        pos += box.span.total.size
-
-    if pos != span.end:
-        msg = f"Boxes didn't reach to the end of the parent span: {pos} != {span.end}"
-        raise RuntimeError(msg)
-
-
-def mp4_iter_boxes_io(
     io: BoundedIO,
     options: MP4DecodeOptions,
 ) -> Generator[MP4Box]:
@@ -2912,6 +2889,16 @@ def mp4_iter_boxes_io(
         raise RuntimeError(msg)
 
 
+def mp4_iter_boxes_for_span(
+    io_base: BinaryIO,
+    span: SimpleSpan,
+    options: MP4DecodeOptions,
+) -> Generator[MP4Box]:
+
+    io = BoundedIO.get_new(io_base, span)
+    return mp4_iter_boxes(io, options)
+
+
 def find_mdhd_boxes_with_type(
     f: BinaryIO,
     types: list[ISOMAtomName],
@@ -2925,7 +2912,7 @@ def find_mdhd_boxes_with_type(
     while stack:
         span, path = stack.pop()
 
-        for box in mp4_iter_boxes(f, span, options):
+        for box in mp4_iter_boxes_for_span(f, span, options):
 
             if box.type == TRAK_ATOM_NAME:
                 if not isinstance(box, TrackBox):
@@ -3189,7 +3176,7 @@ class MP4MetadataHandler:
         metadata_result: ReadMetadataImpl = ReadMetadataImpl({}, None)
 
         meta_child_boxes = list(
-            mp4_iter_boxes(f, box.span.payload_span, options),
+            mp4_iter_boxes_for_span(f, box.span.payload_span, options),
         )
 
         if len(meta_child_boxes) != 1:
@@ -3205,7 +3192,9 @@ class MP4MetadataHandler:
             msg = f"Invalid meta child, expected AppleItunesItemList but got: {meta_child_box}"
             raise RuntimeError(msg)
 
-        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span, options):
+        for data_box in mp4_iter_boxes_for_span(
+            f, meta_child_box.span.payload_span, options
+        ):
             if not isinstance(
                 data_box,
                 (AppleItunesItemFreeformBox, AppleItunesItemBox),
@@ -3387,7 +3376,7 @@ class MP4MetadataHandler:
         options: MP4DecodeOptions,
     ) -> ReadMetaBoxValues:
         meta_child_boxes = list(
-            mp4_iter_boxes(f, meta_box.span.payload_span, options),
+            mp4_iter_boxes_for_span(f, meta_box.span.payload_span, options),
         )
 
         if len(meta_child_boxes) != 1:
@@ -3405,7 +3394,9 @@ class MP4MetadataHandler:
 
         result: ReadMetaBoxValues = []
 
-        for data_box in mp4_iter_boxes(f, meta_child_box.span.payload_span, options):
+        for data_box in mp4_iter_boxes_for_span(
+            f, meta_child_box.span.payload_span, options
+        ):
             if not isinstance(
                 data_box,
                 (AppleItunesItemFreeformBox, AppleItunesItemBox),
@@ -3530,7 +3521,7 @@ class MP4MetadataHandler:
         f.seek(0)
 
         top_boxes: list[MP4Box] = list(
-            mp4_iter_boxes(f, SimpleSpan(0, filesize), options),
+            mp4_iter_boxes_for_span(f, SimpleSpan(0, filesize), options),
         )
 
         our_boxes_reversed: list[MP4Box] = []
@@ -3848,7 +3839,7 @@ class VideoTaggerMP4(VideoTagger):
         with self.file.open(mode="rb") as f:
 
             def iterate_boxes_recursive(span: SimpleSpan, *, depth: int) -> None:
-                for box in mp4_iter_boxes(f, span, options):
+                for box in mp4_iter_boxes_for_span(f, span, options):
 
                     print_box(box, depth=depth)
 
