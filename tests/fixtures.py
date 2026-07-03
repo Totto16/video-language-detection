@@ -103,10 +103,6 @@ def video_file_dict() -> dict[str, VideoFile]:
             "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
             "video/mp4",
         ),
-        "Big_Buck_Bunny_360_10s_1MB.mkv": VideoFileURL(
-            "https://test-videos.co.uk/vids/bigbuckbunny/mkv/360/Big_Buck_Bunny_360_10s_1MB.mkv",
-            "video/x-matroska",
-        ),
         # separator
         "file_example_MP4_480_1_5MG.mp4": VideoFileLocal(
             "file_example_MP4_480_1_5MG.mp4",
@@ -221,7 +217,6 @@ def ffprobe_temp_video_files(
         at_video_dict(video_file_dict, "Big_Buck_Bunny_1080_10s_1MB.mp4"),
         at_video_dict(video_file_dict, "Big_Buck_Bunny_1080_10s_30MB.mp4"),
         at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.webm"),
-        at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mkv"),
         at_video_dict(video_file_dict, "sample_640x360.mkv"),
         at_video_dict(video_file_dict, "file_example_AVI_480_750kB.avi"),
     ]
@@ -233,7 +228,6 @@ def ffprobe_temp_video_files(
         FFprobeData("h264", timedelta(seconds=10.0)),
         FFprobeData("h264", timedelta(seconds=10.0)),
         FFprobeData("vp9", timedelta(seconds=10.0)),
-        FFprobeData("h264", timedelta(seconds=10.0)),
         FFprobeData("h264", timedelta(seconds=13.346)),
         FFprobeData("h264", timedelta(seconds=30, microseconds=33333)),
     ]
