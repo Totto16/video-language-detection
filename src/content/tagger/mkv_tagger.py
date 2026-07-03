@@ -45,6 +45,7 @@ from content.tagger.schema.parser import (
 )
 from content.tagger.video_tagger import (
     ContextType,
+    InspectElement,
     InspectNotImplemented,
     InspectPrinter,
     InspectPriority,
@@ -1491,6 +1492,8 @@ EBMLGlobalElementsSpec = filter_spec_elements(
     filter_ebml_global_element,
 )
 
+EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+
 
 @dataclass(slots=True, repr=True)
 class EBMLHeaderOptions:
@@ -1516,6 +1519,50 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         )
 
         self.options = options
+
+    @staticmethod
+    def __get_spec_by_doc_type(doc_type: DocType) -> Result[EBMLSpec, str]:
+
+        available_specs: list[EBMLSpec] = [EBMLMKVSpec]
+
+        for spec in available_specs:
+            if doc_type.type == spec.doc_type.type:
+                if doc_type.version > spec.doc_type.version:
+                    return Err(
+                        f"Unsupported version: max supported version is {spec.doc_type.version}",
+                    )
+
+                result = EBMLSpec(doc_type=doc_type)
+
+                for elem in EBMLGlobalElementsSpec.elements:
+                    result.append(elem)
+
+                for element in spec.elements:
+
+                    should_include = element.versions.valid(doc_type.version)
+
+                    if should_include:
+                        result.append(element)
+
+                return Ok(result)
+
+        return Err("No such DocType")
+
+    def spec(self: Self) -> Result[EBMLSpec, str]:
+        return EBMLHeader.__get_spec_by_doc_type(self.options.doc_type)
+
+    def spec_unsafe(self: Self) -> EBMLSpec:
+        spec_res = EBMLHeader.__get_spec_by_doc_type(self.options.doc_type)
+
+        if spec_res.err():
+            msg = (
+                f"DocType {self.options.doc_type} is not supported: {spec_res.as_err()}"
+            )
+            raise RuntimeError(msg)
+
+        spec = spec_res.as_ok()
+
+        return spec
 
     @staticmethod
     def __read_impl(io: BoundedIO) -> "EBMLHeader":
@@ -1719,37 +1766,6 @@ class EBMLBody(EBMLElement, FinalEBMLElement):
         return str(self)
 
 
-EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
-
-
-def get_spec_by_doc_type(doc_type: DocType) -> Result[EBMLSpec, str]:
-
-    available_specs: list[EBMLSpec] = [EBMLMKVSpec]
-
-    for spec in available_specs:
-        if doc_type.type == spec.doc_type.type:
-            if doc_type.version > spec.doc_type.version:
-                return Err(
-                    f"Unsupported version: max supported version is {spec.doc_type.version}",
-                )
-
-            result = EBMLSpec(doc_type=doc_type)
-
-            for elem in EBMLGlobalElementsSpec.elements:
-                result.append(elem)
-
-            for element in spec.elements:
-
-                should_include = element.versions.valid(doc_type.version)
-
-                if should_include:
-                    result.append(element)
-
-            return Ok(result)
-
-    return Err("No such DocType")
-
-
 @final
 @decorate_class(slots=True)
 class EBMLDocument(FinalEBMLElement):
@@ -1786,7 +1802,7 @@ class EBMLDocument(FinalEBMLElement):
 
         header_options = header.options
 
-        spec_res = get_spec_by_doc_type(header_options.doc_type)
+        spec_res = header.spec()
 
         if spec_res.err():
             msg = f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
@@ -1906,7 +1922,7 @@ def is_mkv_file(
 
         header_options = header.options
 
-        spec_res = get_spec_by_doc_type(header_options.doc_type)
+        spec_res = header.spec()
 
         if spec_res.err():
             return f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
@@ -1952,7 +1968,9 @@ class VideoTaggerMKV(VideoTagger):
                 f.seek(0)
 
                 streams = 0
-                types: list[EBMLVarInt] = [AUDIO_TODO, VIDEO_TODO]
+                types: list[EBMLVarInt] = [
+                    # AUDIO_TODO, VIDEO_TODO
+                ]
 
                 # read the file, so that we check if we can parse it correctly and that it is an mkv file
                 # TODO
@@ -1995,6 +2013,7 @@ class VideoTaggerMKV(VideoTagger):
                 manager: ManagerInterface,
                 writer: BinaryIO,
             ) -> VideoTaggerContextMKV:
+                raise NotImplementedError("TODO")
                 return VideoTaggerContextMKV(manager, file, writer, streams, types)
 
         return VideoTaggerContextCtx()
@@ -2027,50 +2046,68 @@ class VideoTaggerMKV(VideoTagger):
         priority: InspectPriority,
     ) -> Optional[InspectNotImplemented]:
 
-        def print_element(element: EBMLElement, *, depth: int) -> None:
+        def print_element(
+            element: EBMLElement,
+            element_desc: EBMLElementDescription,
+            *,
+            depth: int,
+        ) -> None:
 
             local_priority = (
-                InspectPriority.Important if element.is_list else InspectPriority.Normal
+                InspectPriority.Important
+                if element_desc.type.type == EBMLElementType.Master
+                else InspectPriority.Normal
             )
 
             if local_priority.as_int() > priority.as_int():
                 return
 
-            name: str = f"{element.fourcc}"
-            if isinstance(chunk, AVIList):
-                name = f"{chunk.fourcc}({chunk.type})"
+            name: str = f"{element_desc.name}"
 
-            element = InspectElement(name, size=chunk.span.total.size)
+            inspect_element = InspectElement(name, size=element.span.total.size)
 
-            printer.element(element, depth)
+            printer.element(inspect_element, depth)
 
         with self.file.open(mode="rb") as f:
 
-            def iterate_elements_recursive(span: SimpleSpan, *, depth: int) -> None:
-                for element in ebml_iter_elements(f, span):
+            def iterate_elements_recursive(
+                span: SimpleSpan,
+                options: EBMLDecodeOptions,
+                spec: EBMLSpec,
+                *,
+                depth: int,
+            ) -> None:
+                io = BoundedIO.get_new(f, span)
+                for element, element_desc in ebml_iter_elements(io, options, spec):
 
-                    print_chunk(chunk, depth=depth)
+                    print_element(element, element_desc, depth=depth)
 
-                    if (
-                        chunk.fourcc == LIST_FOURCC
-                        and isinstance(chunk, AVIList)
-                        and chunk.type == MOVI_FOURCC
-                        and priority.as_int() <= InspectPriority.Normal.as_int()
-                    ):
-                        # skip movi chunk with maaaany data chunks, but nothing interesting
-                        continue
-
-                    if chunk.is_list:
-                        iterate_chunks_recursive(
-                            chunk.span.payload_span,
+                    if element_desc.type.type == EBMLElementType.Master:
+                        iterate_elements_recursive(
+                            element.span.payload_span,
+                            options,
+                            spec,
                             depth=depth + 1,
                         )
 
-            f.seek(0, 2)
-            filesize = f.tell()
+            stream = EBMLStream.read_from_file(f)
+
+            if len(stream.documents) > 1:
+                msg = f"More than one mkv document in file, nit supported atm: {len(stream.documents)}"
+                raise RuntimeError(msg)
+
+            document = stream.documents[0]
+
+            header_options = document.header.options
+            spec = document.header.spec_unsafe()
 
             printer.start()
-            iterate_chunks_recursive(SimpleSpan(0, filesize), depth=0)
+            iterate_elements_recursive(
+                document.body.span.payload_span,
+                header_options.options,
+                spec,
+                depth=0,
+            )
             printer.end()
 
         return None
