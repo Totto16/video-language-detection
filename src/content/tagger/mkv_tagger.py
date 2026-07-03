@@ -297,14 +297,14 @@ class EBMLElementID(EBMLVarInt):
         # with binary encoding of 0100 0000 0111 1111 stores a semantically equal VINT_DATA and is the
         # shortest-possible VINT encoding.
 
-        if self.value == 0:
+        if super().value == 0:
             return "Value is NULL"
 
         if bytes_used == 0:
             msg = f"IMPLEMENTATION error: bytes_used {bytes_used}"
             raise RuntimeError(msg)
 
-        if self.value == ((1 << (bytes_used * 7)) - 1):
+        if super().value == ((1 << (bytes_used * 7)) - 1):
             return "Value is 0xFF..FF"
 
         minmum_bytes_required = self.minmum_bytes_required()
@@ -314,12 +314,12 @@ class EBMLElementID(EBMLVarInt):
                 msg = f"IMPLEMENTATION ERROR: minmum_bytes_required  calculated incorrectly: {minmum_bytes_required} {self.value}"
                 raise RuntimeError(msg)
 
-            if self.value == ((1 << ((bytes_used - 1) * 7)) - 1):
+            if super().value == ((1 << ((bytes_used - 1) * 7)) - 1):
                 if minmum_bytes_required + 1 == bytes_used:
                     return None
                 return f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}"
 
-            return f"Value {self.value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
+            return f"Value {super().value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
 
         return None
 
@@ -373,7 +373,7 @@ class EBMLElementSpan:
         self.__total = span
         self.__intervals = [header_size]
 
-        if self.__total.size < 8:
+        if self.__total.size < 2:
             msg = f"Invalid element: size too small: {self.__total.size}"
             raise RuntimeError(msg)
 
