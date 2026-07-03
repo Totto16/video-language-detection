@@ -2,6 +2,7 @@ from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import (
     Any,
     BinaryIO,
@@ -1380,7 +1381,7 @@ def get_element_value[A](
             raise RuntimeError(msg)
 
 
-def ebml_iter_elements_io(
+def ebml_iter_elements(
     io: BoundedIO,
     options: EBMLDecodeOptions,
     spec: EBMLSpec,
@@ -1560,7 +1561,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             max_size_length=8,
         )
 
-        children_elements = ebml_iter_elements_io(
+        children_elements = ebml_iter_elements(
             element.payload_io(io),
             ebml_header_children_options,
             EBMLHeaderElementsSpec,
@@ -1921,178 +1922,155 @@ def is_mkv_file(
     return None
 
 
-# MKV_FOURCC = "TODO"
+@decorate_class(slots=True)
+class VideoTaggerMKV(VideoTagger):
+    __streams: int
+    __types: list[EBMLVarInt]
 
+    def __init__(
+        self: Self,
+        file: Path,
+        streams: int,
+        types: list[EBMLVarInt],
+    ) -> None:
+        super().__init__(file)
+        self.__streams = streams
+        self.__types = types
 
-# @decorate_class(slots=True)
-# class VideoTaggerAVI(VideoTagger):
-#     __streams: int
-#     __types: list[MKV_FOURCC]
+        streams = 0
 
-#     def __init__(
-#         self: Self,
-#         file: Path,
-#         streams: int,
-#         types: list[MKV_FOURCC],
-#     ) -> None:
-#         super().__init__(file)
-#         self.__streams = streams
-#         self.__types = types
+    @staticmethod
+    def get_handle(file: Path) -> Result["VideoTagger", str]:
 
-#         streams = 0
+        try:
 
-#     @staticmethod
-#     def get_handle(file: Path) -> Result["VideoTagger", str]:
+            with file.open("rb") as f:
+                mkv_res = is_mkv_file(f)
+                if mkv_res is not None:
+                    return Err(mkv_res)
 
-#         options: MKVDecodeOptions = MKVDecodeOptions(
-#             strict=False,
-#             type=MKVDecodeType.Check,
-#         )
+                f.seek(0)
 
-#         try:
+                streams = 0
+                types: list[EBMLVarInt] = [AUDIO_TODO, VIDEO_TODO]
 
-#             with file.open("rb") as f:
-#                 mkv_res = is_mkv_file(f)
-#                 if mkv_res is not None:
-#                     return Err(mkv_res)
+                # read the file, so that we check if we can parse it correctly and that it is an mkv file
+                # TODO
+                # for strh in find_strh_chunks_with_type(f, types, options):
+                #     streams = streams + 1
+                #     lang = strh.read_language(f)
+                #     # check if this lang is valid
 
-#                 f.seek(0)
+                #     if isinstance(lang, str):
+                #         msg = _("Invalid language in avi detected: {lang}").format(
+                #             lang=lang,
+                #         )
+                #         return Err(msg)
 
-#                 streams = 0
-#                 types: list[MKV_FOURCC] = [AUDIO_TODO, VIDEO_TODO]
+                return Ok(
+                    VideoTaggerMKV(file, streams, types),
+                )
+        except (RuntimeError, ValueError, TypeError) as err:
+            return Err(str(err))
 
-#                 # read the file, so that we check if we can parse it correctly and that it is an avi file
-#                 for strh in find_strh_chunks_with_type(f, types, options):
-#                     streams = streams + 1
-#                     lang = strh.read_language(f)
-#                     # check if this lang is valid
+    def __context_impl(
+        self: Self,
+        manager: ManagerInterface,
+        ctx: ContextType,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
 
-#                     if isinstance(lang, str):
-#                         msg = _("Invalid language in avi detected: {lang}").format(
-#                             lang=lang,
-#                         )
-#                         return Err(msg)
+        file = self.file
+        streams = self.__streams
+        types = self.__types
 
-#                 return Ok(
-#                     VideoTaggerAVI(file, streams, types),
-#                 )
-#         except (RuntimeError, ValueError, TypeError) as err:
-#             return Err(str(err))
+        @decorate_class(slots=True)
+        class VideoTaggerContextCtx(VideoTaggerContextCtxGeneric):
 
-#     def __context_impl(
-#         self: Self,
-#         manager: ManagerInterface,
-#         ctx: ContextType,
-#     ) -> AbstractContextManager[VideoTaggerContextRW]:
+            def __init__(self: Self) -> None:
+                super().__init__(file, ctx, manager)
 
-#         file = self.file
-#         streams = self.__streams
-#         types = self.__types
+            @override
+            def get_context(
+                self: Self,
+                manager: ManagerInterface,
+                writer: BinaryIO,
+            ) -> VideoTaggerContextMKV:
+                return VideoTaggerContextMKV(manager, file, writer, streams, types)
 
-#         @decorate_class(slots=True)
-#         class VideoTaggerContextCtx(VideoTaggerContextCtxGeneric):
+        return VideoTaggerContextCtx()
 
-#             def __init__(self: Self) -> None:
-#                 super().__init__(file, ctx, manager)
+    @override
+    def r_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextReadable]:
+        return self.__context_impl(manager, "r")
 
-#             @override
-#             def get_context(
-#                 self: Self,
-#                 manager: ManagerInterface,
-#                 writer: BinaryIO,
-#             ) -> VideoTaggerContextMKV:
-#                 return VideoTaggerContextMKV(manager, file, writer, streams, types)
+    @override
+    def w_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextWriteable]:
+        return self.__context_impl(manager, "w")
 
-#         return VideoTaggerContextCtx()
+    @override
+    def rw_ctx(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> AbstractContextManager[VideoTaggerContextRW]:
+        return self.__context_impl(manager, "rw")
 
-#     @override
-#     def r_ctx(
-#         self: Self,
-#         manager: ManagerInterface,
-#     ) -> AbstractContextManager[VideoTaggerContextReadable]:
-#         return self.__context_impl(manager, "r")
+    @override
+    def inspect(
+        self: Self,
+        printer: InspectPrinter,
+        priority: InspectPriority,
+    ) -> Optional[InspectNotImplemented]:
 
-#     @override
-#     def w_ctx(
-#         self: Self,
-#         manager: ManagerInterface,
-#     ) -> AbstractContextManager[VideoTaggerContextWriteable]:
-#         return self.__context_impl(manager, "w")
+        def print_element(element: EBMLElement, *, depth: int) -> None:
 
-#     @override
-#     def rw_ctx(
-#         self: Self,
-#         manager: ManagerInterface,
-#     ) -> AbstractContextManager[VideoTaggerContextRW]:
-#         return self.__context_impl(manager, "rw")
+            local_priority = (
+                InspectPriority.Important if element.is_list else InspectPriority.Normal
+            )
 
-#     @override
-#     def inspect(
-#         self: Self,
-#         printer: InspectPrinter,
-#         priority: InspectPriority,
-#     ) -> Optional[InspectNotImplemented]:
+            if local_priority.as_int() > priority.as_int():
+                return
 
-#         def is_data_chunk(chunk: AVIChunk) -> bool:
-#             fourcc = chunk.fourcc
+            name: str = f"{element.fourcc}"
+            if isinstance(chunk, AVIList):
+                name = f"{chunk.fourcc}({chunk.type})"
 
-#             data_type = fourcc.value[2:4]
+            element = InspectElement(name, size=chunk.span.total.size)
 
-#             if data_type not in [b"dc", b"wb", "tx"]:
-#                 return False
+            printer.element(element, depth)
 
-#             return all(bytes([c]).isdigit() for c in fourcc.value[0:2])
+        with self.file.open(mode="rb") as f:
 
-#         def print_chunk(chunk: AVIChunk, *, depth: int) -> None:
+            def iterate_elements_recursive(span: SimpleSpan, *, depth: int) -> None:
+                for element in ebml_iter_elements(f, span):
 
-#             local_priority = (
-#                 InspectPriority.Important
-#                 if chunk.is_list
-#                 else (
-#                     InspectPriority.Ignore
-#                     if is_data_chunk(chunk)
-#                     else InspectPriority.Normal
-#                 )
-#             )
+                    print_chunk(chunk, depth=depth)
 
-#             if local_priority.as_int() > priority.as_int():
-#                 return
+                    if (
+                        chunk.fourcc == LIST_FOURCC
+                        and isinstance(chunk, AVIList)
+                        and chunk.type == MOVI_FOURCC
+                        and priority.as_int() <= InspectPriority.Normal.as_int()
+                    ):
+                        # skip movi chunk with maaaany data chunks, but nothing interesting
+                        continue
 
-#             name: str = f"{chunk.fourcc}"
-#             if isinstance(chunk, AVIList):
-#                 name = f"{chunk.fourcc}({chunk.type})"
+                    if chunk.is_list:
+                        iterate_chunks_recursive(
+                            chunk.span.payload_span,
+                            depth=depth + 1,
+                        )
 
-#             element = InspectElement(name, size=chunk.span.total.size)
+            f.seek(0, 2)
+            filesize = f.tell()
 
-#             printer.element(element, depth)
+            printer.start()
+            iterate_chunks_recursive(SimpleSpan(0, filesize), depth=0)
+            printer.end()
 
-#         with self.file.open(mode="rb") as f:
-
-#             def iterate_chunks_recursive(span: SimpleSpan, *, depth: int) -> None:
-#                 for chunk in avi_iter_chunks(f, span):
-
-#                     print_chunk(chunk, depth=depth)
-
-#                     if (
-#                         chunk.fourcc == LIST_FOURCC
-#                         and isinstance(chunk, AVIList)
-#                         and chunk.type == MOVI_FOURCC
-#                         and priority.as_int() <= InspectPriority.Normal.as_int()
-#                     ):
-#                         # skip movi chunk with maaaany data chunks, but nothing interesting
-#                         continue
-
-#                     if chunk.is_list:
-#                         iterate_chunks_recursive(
-#                             chunk.span.payload_span,
-#                             depth=depth + 1,
-#                         )
-
-#             f.seek(0, 2)
-#             filesize = f.tell()
-
-#             printer.start()
-#             iterate_chunks_recursive(SimpleSpan(0, filesize), depth=0)
-#             printer.end()
-
-#         return None
+        return None
