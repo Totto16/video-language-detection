@@ -505,7 +505,6 @@ class EBMLElement(NonFinalEBMLElement):
         #     Byte data[data_size]
         # };
 
-
         element_id_res = EBMLElementID.from_io(io)
 
         if element_id_res.err():
@@ -1401,13 +1400,13 @@ def get_element_value[A](
             match int_type.type:
                 case EBMLElementType.SignedInteger:
                     if not isinstance(element, EBMLSignedIntegerElement):
-                        msg = "Invalid SignedInteger: type not dispatched to correct class"
+                        msg = f"Invalid SignedInteger: type not dispatched to correct class: {type(element)}"
                         raise TypeError(msg)
 
                     return cast_to_type(int_type, element.value)
                 case EBMLElementType.UnsignedInteger:
                     if not isinstance(element, EBMLUnsignedIntegerElement):
-                        msg = "Invalid UnsignedInteger: type not dispatched to correct class"
+                        msg = f"Invalid UnsignedInteger: type not dispatched to correct class: {type(element)}"
                         raise TypeError(msg)
 
                     return cast_to_type(int_type, element.value)
@@ -1416,7 +1415,7 @@ def get_element_value[A](
 
         case EBMLAdvancedElementTypeFloat() as float_type:
             if not isinstance(element, EBMLFloatElement):
-                msg = "Invalid Float: type not dispatched to correct class"
+                msg = f"Invalid Float: type not dispatched to correct class: {type(element)}"
                 raise TypeError(msg)
 
             return cast_to_type(float_type, element.value)
@@ -1424,13 +1423,13 @@ def get_element_value[A](
             match str_type.type:
                 case EBMLElementType.String:
                     if not isinstance(element, EBMLStringElement):
-                        msg = "Invalid String: type not dispatched to correct class"
+                        msg = f"Invalid String: type not dispatched to correct class: {type(element)}"
                         raise TypeError(msg)
 
                     return cast_to_type(str_type, element.value)
                 case EBMLElementType.UTF8:
                     if not isinstance(element, EBMLUTF8Element):
-                        msg = "Invalid UTF8: type not dispatched to correct class"
+                        msg = f"Invalid UTF8: type not dispatched to correct class: {type(element)}"
                         raise TypeError(msg)
 
                     return cast_to_type(str_type, element.value)
@@ -1439,7 +1438,7 @@ def get_element_value[A](
 
         case EBMLAdvancedElementTypeDate() as date_type:
             if not isinstance(element, EBMLDateElement):
-                msg = "Invalid Date: type not dispatched to correct class"
+                msg = f"Invalid Date: type not dispatched to correct class: {type(element)}"
                 raise TypeError(msg)
 
             return cast_to_type(date_type, element.value)
@@ -1448,7 +1447,7 @@ def get_element_value[A](
             raise RuntimeError(msg)
         case EBMLAdvancedElementTypeBinary() as binary_type:
             if not isinstance(element, EBMLBinaryElement):
-                msg = "Invalid Binary: type not dispatched to correct class"
+                msg = f"Invalid Binary: type not dispatched to correct class: {type(element)}"
                 raise TypeError(msg)
 
             return cast_to_type(binary_type, element.value)
@@ -1664,10 +1663,10 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             max_id_length=8,
             max_size_length=8,
         )
-        element = EBMLElement.read_ebml_element(io, ebml_header_master_options)
+        header_element = EBMLElement.read_ebml_element(io, ebml_header_master_options)
 
-        if element.element_id != EBMLHeaderMasterSpec.id:
-            msg = f"Invalid EBML Header element ID: got {element.element_id} but expected {EBMLHeaderMasterSpec.id}"
+        if header_element.element_id != EBMLHeaderMasterSpec.id:
+            msg = f"Invalid EBML Header element ID: got {header_element.element_id} but expected {EBMLHeaderMasterSpec.id}"
             raise RuntimeError(msg)
 
         version = require_default_spec_value(EBMLVersionSpec.type.default)
@@ -1685,7 +1684,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         )
 
         children_elements = ebml_iter_elements(
-            element.payload_io(io),
+            header_element.payload_io(io),
             ebml_header_children_options,
             EBMLHeaderElementsSpec,
         )
@@ -1693,7 +1692,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         for children_element, element_desc in children_elements:
             match element_desc.type:
                 case EBMLAdvancedElementTypeInteger() as int_type:
-                    int_value = get_element_value(int_type, element)
+                    int_value = get_element_value(int_type, children_element)
 
                     match element_desc.name:
                         case EBMLVersionSpec.name:
@@ -1708,14 +1707,14 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeFloat() as float_type:
-                    _float_value = get_element_value(float_type, element)
+                    _float_value = get_element_value(float_type, children_element)
 
                     match element_desc.name:
                         case _:
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeString() as str_type:
-                    str_value = get_element_value(str_type, element)
+                    str_value = get_element_value(str_type, children_element)
 
                     match element_desc.name:
                         case EBMLDocTypeSpec.name:
@@ -1724,7 +1723,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeDate() as date_type:
-                    _date_value = get_element_value(date_type, element)
+                    _date_value = get_element_value(date_type, children_element)
 
                     match element_desc.name:
                         case _:
@@ -1734,7 +1733,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
                     msg = f"Master element not allowed in header element: {children_element}"
                     raise RuntimeError(msg)
                 case EBMLAdvancedElementTypeBinary() as binary_type:
-                    _binary_value = get_element_value(binary_type, element)
+                    _binary_value = get_element_value(binary_type, children_element)
 
                     match element_desc.name:
                         case _:
@@ -1765,7 +1764,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             doc_type,
         )
 
-        return EBMLHeader(element, options)
+        return EBMLHeader(header_element, options)
 
     @staticmethod
     def read(
