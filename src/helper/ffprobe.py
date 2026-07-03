@@ -274,8 +274,10 @@ class FFProbeResult:
 
     def is_audio(self: Self) -> bool:
         """
-        Is the file a audio alias has it at least one audio stream
+        Is the file a audio alias has it at least one audio stream and is not a video
         """
+        if self.is_video():
+            return False
         return len(self.audio_streams()) != 0
 
     def __str__(self: Self) -> str:

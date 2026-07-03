@@ -293,16 +293,18 @@ def test_mkv_tagger_parsing(
     mkv_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    test_files: list[tuple[Path, int]] = list(
+    test_files: list[tuple[Path, str, int]] = list(
         zip(
-            mkv_test_parse_files.data,
+            [f for f, _ in mkv_test_parse_files.data],
+            [nm for _, nm in mkv_test_parse_files.data],
             [42],
             strict=True,
         ),
     )
 
-    for file, result in test_files:
-        with subtests.test("video gets parsed correctly"):
+    for file, name, result in test_files:
+        with subtests.test(f"video gets parsed correctly: {name}"):
+            #TODO
             assert file != ""
 
 

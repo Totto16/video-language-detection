@@ -614,16 +614,17 @@ def test_mp4_tagger_parsing(
         ),
     )
 
-    test_files: list[tuple[Path, MP4BoxStructure]] = list(
+    test_files: list[tuple[Path, str, MP4BoxStructure]] = list(
         zip(
-            mp4_test_parse_files.data,
+            [f for f, _ in mp4_test_parse_files.data],
+            [nm for _, nm in mp4_test_parse_files.data],
             [structure1, structure2],
             strict=True,
         ),
     )
 
-    for file, result in test_files:
-        with subtests.test("video gets parsed correctly"):
+    for file, name, result in test_files:
+        with subtests.test(f"video gets parsed correctly: {name}"):
             structure_res = MP4BoxStructure.from_file(file, mp4_options)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
@@ -707,9 +708,10 @@ def test_mp4_tagger_language_patching(
     mp4_options: MP4DecodeOptions,
 ) -> None:
 
-    test_files: list[tuple[Path, Language, Language]] = list(
+    test_files: list[tuple[Path, str, Language, Language]] = list(
         zip(
-            mp4_test_parse_files.data,
+            [f for f, _ in mp4_test_parse_files.data],
+            [nm for _, nm in mp4_test_parse_files.data],
             [Language.get_default(), Language.get_default()],
             [
                 Language.from_values_unsafe("de", "German"),
@@ -721,24 +723,24 @@ def test_mp4_tagger_language_patching(
 
     types: list[ISOMAtomName] = [SOUN_ATOM_NAME, VIDE_ATOM_NAME]
 
-    for file, old_lang, new_language in test_files:
-        with subtests.test("video gets parsed correctly"):
+    for file, name, old_lang, new_language in test_files:
+        with subtests.test(f"video gets parsed correctly: {name}"):
             structure_res = MP4BoxStructure.from_file(file, mp4_options)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
 
-            with file.open("rb+") as f:
-                for mdhd in find_mdhd_boxes_with_type(f, types, mp4_options):
-                    old_file_lang = mdhd.read_language(f)
+            with file.open("rb+") as f1:
+                for mdhd in find_mdhd_boxes_with_type(f1, types, mp4_options):
+                    old_file_lang = mdhd.read_language(f1)
 
                     assert old_lang.short == old_file_lang, "Old language should match"
 
-                    mdhd.patch_language(f, new_language.short)
+                    mdhd.patch_language(f1, new_language.short)
 
             # validate language
-            with file.open("rb") as f:
-                for mdhd in find_mdhd_boxes_with_type(f, types, mp4_options):
-                    old_file_lang = mdhd.read_language(f)
+            with file.open("rb") as f2:
+                for mdhd in find_mdhd_boxes_with_type(f2, types, mp4_options):
+                    old_file_lang = mdhd.read_language(f2)
 
                     assert (
                         new_language.short == old_file_lang
@@ -805,9 +807,10 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 ) -> None:
 
     with file_duplicates(mp4_test_parse_files.data) as data:
-        test_files: list[tuple[Path, MetadataTags]] = list(
+        test_files: list[tuple[Path, str, MetadataTags]] = list(
             zip(
-                data,
+                [f for f, _ in data],
+                [nm for _, nm in data],
                 [
                     MetadataTags(
                         comment="Test comment 1",
@@ -830,8 +833,8 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
             ),
         )
 
-        for file, tags in test_files:
-            with subtests.test("video gets tagged correctly"):
+        for file, name, tags in test_files:
+            with subtests.test(f"video gets tagged correctly: {name}"):
                 # mutagen reqrite the udta, if it is already present, otherwise it creates its own, which is not recognized by ffprobe
                 # the reason for that is, that it writes the udta box before any trak box, so ffprobe ignores custom tags alias freeform keys
                 # see: https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/23427
@@ -1006,9 +1009,10 @@ def test_mp4_tagger_metadata_tags_custom(
 ) -> None:
 
     with file_duplicates(mp4_test_parse_files.data) as data:
-        test_files: list[tuple[Path, MetadataTags]] = list(
+        test_files: list[tuple[Path, str, MetadataTags]] = list(
             zip(
-                data,
+                [f for f, _ in data],
+                [nm for _, nm in data],
                 [
                     MetadataTags(
                         comment="Test comment 1",
@@ -1031,8 +1035,8 @@ def test_mp4_tagger_metadata_tags_custom(
             ),
         )
 
-        for file, tags in test_files:
-            with subtests.test("video gets tagged correctly"):
+        for file, name, tags in test_files:
+            with subtests.test(f"video gets tagged correctly: {name}"):
                 tagger_res = VideoTaggerMP4.get_handle(file)
 
                 assert tagger_res == OkResult(), "video tagger handle err"
@@ -1215,9 +1219,10 @@ def test_mp4_metadata_tags_apple_custom(
             ),
         ]
 
-        test_files: list[tuple[Path, MetadataTags, MP4BoxStructure]] = list(
+        test_files: list[tuple[Path, str, MetadataTags, MP4BoxStructure]] = list(
             zip(
-                data,
+                [f for f, _ in data],
+                [nm for _, nm in data],
                 metadatas,
                 [
                     MP4BoxStructure(
@@ -1393,8 +1398,8 @@ def test_mp4_metadata_tags_apple_custom(
             ),
         )
 
-        for file, tags, apple_boxes in test_files:
-            with subtests.test("video gets tagged correctly"):
+        for file, name, tags, apple_boxes in test_files:
+            with subtests.test(f"video gets tagged correctly: {name}"):
                 tagger_res = VideoTaggerMutagen.get_handle(file)
 
                 assert tagger_res == OkResult(), "video tagger handle err"

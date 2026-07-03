@@ -78,8 +78,12 @@ def test_ffprobe_with_intact_videos(
     subtests: SubTests,
     ffprobe_temp_video_files: TempFFProbeVideoFiles,
 ) -> None:
-    for video, ffprobe_data in ffprobe_temp_video_files.data:
-        with subtests.test("video get's parsed correctly"):
+    for video, name, ffprobe_data in ffprobe_temp_video_files.data:
+        with subtests.test(f"video get's parsed correctly: {name}"):
+
+            ext = video.suffix.replace(".", "")
+            assert ext in ["mkv", "avi", "mp4", "webm"]
+
             err_result = ffprobe(video)
             assert err_result == OkResult(), "FFProbe error"
 
@@ -87,10 +91,19 @@ def test_ffprobe_with_intact_videos(
 
             assert result.file_info.duration() is not None, "duration is defined"
 
-            assert len(result.streams) > 0, "at least one stream was detected"
-            assert len(result.streams) == 1, "correct amount of streams"
+            format_name: str = (
+                "avi"
+                if ext == "avi"
+                else ("matroska,webm" if ext in ["mkv", "webm"] else "mov,mp4,m4a,3gp,3g2,mj2")
+            )
 
-            for stream in result.streams:
+            assert result.file_info.raw["format_name"] == format_name
+
+            assert len(result.video_streams()) > 0, "at least one stream was detected"
+            assert len(result.video_streams()) == 1, "correct amount of streams"
+
+            for stream in result.video_streams():
+
                 assert stream.codec() == ffprobe_data.codec, "codec is correct"
                 assert stream.duration() == ffprobe_data.duration, "duration is correct"
 
@@ -103,7 +116,10 @@ def test_ffprobe_with_intact_videos(
             assert len(result.video_streams()) == 1, "correct amount of video streams"
             assert result.is_video(), "result is video"
 
-            assert len(result.audio_streams()) == 0, "correct amount of audio streams"
+            assert len(result.audio_streams()) in [
+                0,
+                1,
+            ], "correct amount of audio streams"
             assert result.is_audio() is False, "result is no audio"
 
 

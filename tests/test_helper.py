@@ -12,26 +12,28 @@ from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 
 
-def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
+def file_duplicates(
+    paths: list[tuple[Path, str]],
+) -> AbstractContextManager[list[tuple[Path, str]]]:
 
     @decorate_class(slots=True)
-    class DuplicatesCtx(AbstractContextManager[list[Path]]):
-        __paths: list[Path]
+    class DuplicatesCtx(AbstractContextManager[list[tuple[Path, str]]]):
+        __paths: list[tuple[Path, str]]
 
         def __init__(self: Self) -> None:
             super().__init__()
             self.__paths = []
 
         @override
-        def __enter__(self: Self) -> list[Path]:
-            results: list[Path] = []
-            for path in paths:
+        def __enter__(self: Self) -> list[tuple[Path, str]]:
+            results: list[tuple[Path, str]] = []
+            for path, name in paths:
                 with tempfile.NamedTemporaryFile(
                     delete=False,
                     prefix="video_language_detect_tests_",
                 ) as f:
                     f.write(path.read_bytes())
-                    results.append(Path(f.file.name))
+                    results.append((Path(f.file.name), name))
 
             return results
 
@@ -42,7 +44,7 @@ def file_duplicates(paths: list[Path]) -> AbstractContextManager[list[Path]]:
             _exc_val: Optional[BaseException],
             _exc_tb: Optional[TracebackType],
         ) -> Literal[False]:  # actually bool
-            for path in self.__paths:
+            for path, _name in self.__paths:
                 path.unlink(missing_ok=True)
 
             return False

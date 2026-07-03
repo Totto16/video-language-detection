@@ -37,7 +37,7 @@ class FinalizerFixture[A]:
             self.__data.drop(self.__data.data)
 
 
-TempVideoFiles = FinalizerFixture[list[Path]]
+TempVideoFiles = FinalizerFixture[list[tuple[Path, str]]]
 
 
 class VideoFile(Protocol):
@@ -181,22 +181,24 @@ def cached_file_manager() -> CachedFileManager:
 def temp_video_files(
     videos: list[tuple[str, VideoFile]],
     cached_manager: CachedFileManager,
-) -> Finalizer[list[Path]]:
-    results: list[Path] = []
+) -> Finalizer[list[tuple[Path, str]]]:
+    results: list[tuple[Path, str]] = []
     for name, file in videos:
+        suffix = Path(name).suffix
         file_data = cached_manager.get(name, file)
         with tempfile.NamedTemporaryFile(
             delete=False,
             prefix="video_language_detect_tests_",
+            suffix=suffix,
         ) as f:
             f.write(file_data)
-            results.append(Path(f.file.name))
+            results.append((Path(f.file.name), name))
 
-    def delete_results(files: list[Path]) -> None:
-        for f in files:
+    def delete_results(files: list[tuple[Path, str]]) -> None:
+        for f, _name in files:
             f.unlink(missing_ok=True)
 
-    return Finalizer[list[Path]](results, delete_results)
+    return Finalizer[list[tuple[Path, str]]](results, delete_results)
 
 
 @dataclass(slots=True, repr=True)
@@ -205,7 +207,7 @@ class FFprobeData:
     duration: Optional[timedelta]
 
 
-TempFFProbeVideoFiles = FinalizerFixture[list[tuple[Path, FFprobeData]]]
+TempFFProbeVideoFiles = FinalizerFixture[list[tuple[Path, str, FFprobeData]]]
 
 
 @pytest.fixture(scope="package")
@@ -221,6 +223,7 @@ def ffprobe_temp_video_files(
         at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.webm"),
         at_video_dict(video_file_dict, "Big_Buck_Bunny_360_10s_1MB.mkv"),
         at_video_dict(video_file_dict, "sample_640x360.mkv"),
+        at_video_dict(video_file_dict, "file_example_AVI_480_750kB.avi"),
     ]
 
     files = temp_video_files(video_urls, cached_file_manager)
@@ -232,15 +235,23 @@ def ffprobe_temp_video_files(
         FFprobeData("vp9", timedelta(seconds=10.0)),
         FFprobeData("h264", timedelta(seconds=10.0)),
         FFprobeData("h264", timedelta(seconds=13.346)),
+        FFprobeData("h264", timedelta(seconds=30, microseconds=33333)),
     ]
 
-    def delete_results(_: list[tuple[Path, FFprobeData]]) -> None:
+    def delete_results(_: list[tuple[Path, str, FFprobeData]]) -> None:
         files.drop(files.data)
 
-    data: list[tuple[Path, FFprobeData]] = list(zip(files.data, metadatas, strict=True))
+    data: list[tuple[Path, str, FFprobeData]] = list(
+        zip(
+            [f for f, _ in files.data],
+            [nm for _, nm in files.data],
+            metadatas,
+            strict=True,
+        )
+    )
 
-    finalizer: Finalizer[list[tuple[Path, FFprobeData]]] = Finalizer[
-        list[tuple[Path, FFprobeData]]
+    finalizer: Finalizer[list[tuple[Path, str, FFprobeData]]] = Finalizer[
+        list[tuple[Path, str, FFprobeData]]
     ](data, delete_results)
 
     return TempFFProbeVideoFiles(finalizer)

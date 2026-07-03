@@ -392,9 +392,10 @@ def test_avi_tagger_parsing(
     avi_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    test_files: list[tuple[Path, AVIChunkStructure]] = list(
+    test_files: list[tuple[Path, str, AVIChunkStructure]] = list(
         zip(
-            avi_test_parse_files.data,
+            [f for f, _ in avi_test_parse_files.data],
+            [nm for _, nm in avi_test_parse_files.data],
             [
                 AVIChunkStructure(
                     RecursiveChunks(
@@ -472,8 +473,8 @@ def test_avi_tagger_parsing(
         ),
     )
 
-    for file, result in test_files:
-        with subtests.test("video gets parsed correctly"):
+    for file, name, result in test_files:
+        with subtests.test(f"video gets parsed correctly: {name}"):
             structure_res = AVIChunkStructure.from_file(file)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
@@ -562,9 +563,10 @@ def test_avi_tagger_language_patching(
     avi_options: AVIDecodeOptions,
 ) -> None:
 
-    test_files: list[tuple[Path, Language, Language]] = list(
+    test_files: list[tuple[Path, str, Language, Language]] = list(
         zip(
-            avi_test_parse_files.data,
+            [f for f, _ in avi_test_parse_files.data],
+            [nm for _, nm in avi_test_parse_files.data],
             [Language.get_default()],
             [Language.from_values_unsafe("de", "German")],
             strict=True,
@@ -573,24 +575,24 @@ def test_avi_tagger_language_patching(
 
     types: list[FOURCC] = [AUDS_FOURCC, VIDS_FOURCC]
 
-    for file, old_lang, new_language in test_files:
-        with subtests.test("video gets parsed correctly"):
+    for file, name, old_lang, new_language in test_files:
+        with subtests.test(f"video gets parsed correctly: {name}"):
             structure_res = AVIChunkStructure.from_file(file)
 
             assert structure_res == OkResult(), "structure not parsed correctly"
 
-            with file.open("rb+") as f:
-                for strh in find_strh_chunks_with_type(f, types, avi_options):
-                    old_file_lang = strh.read_language(f)
+            with file.open("rb+") as f1:
+                for strh in find_strh_chunks_with_type(f1, types, avi_options):
+                    old_file_lang = strh.read_language(f1)
 
                     assert old_lang.short == old_file_lang, "Old language should match"
 
-                    strh.patch_language(f, new_language.short)
+                    strh.patch_language(f1, new_language.short)
 
             # validate language
-            with file.open("rb") as f:
-                for strh in find_strh_chunks_with_type(f, types, avi_options):
-                    old_file_lang = strh.read_language(f)
+            with file.open("rb") as f2:
+                for strh in find_strh_chunks_with_type(f2, types, avi_options):
+                    old_file_lang = strh.read_language(f2)
 
                     assert (
                         new_language.short == old_file_lang
@@ -679,9 +681,10 @@ def test_avi_tagger_metadata_tags_custom(
 ) -> None:
 
     with file_duplicates(avi_test_parse_files.data) as data:
-        test_files: list[tuple[Path, MetadataTags]] = list(
+        test_files: list[tuple[Path, str, MetadataTags]] = list(
             zip(
-                data,
+                [f for f, _ in data],
+                [nm for _, nm in data],
                 [
                     MetadataTags(
                         comment="Test comment 1",
@@ -696,8 +699,8 @@ def test_avi_tagger_metadata_tags_custom(
             ),
         )
 
-        for file, tags in test_files:
-            with subtests.test("video gets tagged correctly"):
+        for file, name, tags in test_files:
+            with subtests.test(f"video gets tagged correctly: {name}"):
                 tagger_res = VideoTaggerAVI.get_handle(file)
 
                 assert tagger_res == OkResult(), "video tagger handle err"
