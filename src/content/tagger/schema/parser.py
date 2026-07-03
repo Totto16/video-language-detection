@@ -432,7 +432,8 @@ class EBMLElementIDParsed:
     def from_checked(value: int) -> "EBMLElementIDParsed":
         # check if this would be a valid ID, alias it can be encoded as varint
 
-        encoded_bytes = value.to_bytes(byteorder="big", signed=False)
+        length = max(1, (value.bit_length() + 7) // 8)
+        encoded_bytes = value.to_bytes(length=length, byteorder="big", signed=False)
 
         int_range = LengthRange(
             EBMLSchemaRange(
