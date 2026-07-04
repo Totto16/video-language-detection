@@ -14,6 +14,7 @@ from typing import (
     final,
     override,
 )
+import zlib
 
 from content.tagger.parser import (
     BoundedIO,
@@ -1461,6 +1462,8 @@ def ebml_iter_elements(
     io: BoundedIO,
     options: EBMLDecodeOptions,
     spec: EBMLSpec,
+    *,
+    depth: int,
 ) -> Generator[tuple[EBMLElement, EBMLElementDescription]]:
 
     spec_by_id = spec.elements_by_id()
@@ -1470,9 +1473,22 @@ def ebml_iter_elements(
     pos = io.span.start
     end = io.span.end
 
+    crc_element: Optional[tuple[EBMLBinaryElement, EBMLElementDescription]] = None
+
     while pos < end:
         new_io = io.new_span_io(SimpleSpan(pos, end - pos))
         element, element_desc = read_element(new_io, options, spec_by_id)
+
+        if depth == 1 and element_desc.name == "CRC-32":
+            if crc_element is not None:
+                msg = f"Duplicate CRC element detected: {crc_element} {element} {element_desc}"
+                raise RuntimeError(msg)
+
+            if not isinstance(element, EBMLBinaryElement):
+                msg = f"Invalid element type for CRC-32 element: {type(element)}"
+                raise RuntimeError(msg)
+
+            crc_element = (element, element_desc)
 
         if pos + element.span.total.size > end:
             msg = f"Element {element.element_id} at {pos} extends past parent boundary"
@@ -1484,6 +1500,27 @@ def ebml_iter_elements(
     if pos != end:
         msg = f"Element didn't reach to the end of the parent span: {pos} != {end}"
         raise RuntimeError(msg)
+
+    # The CRC element should be the first in it's parent master for easier reading. All level 1 elements should include a CRC-32.
+    if depth == 1:
+        if crc_element is None:
+            msg = "No CRC element found in master element of level 1"
+            raise RuntimeError(msg)
+
+        given_crc = crc_element[0].value
+
+        crc_bytes: bytes
+        with io.r_ctx(force_entire_read=True) as f:
+            crc_bytes = f.read(io.span.size)
+
+        data_crc_int = zlib.crc32(crc_bytes, 0xFFFFFFFF) & 0xFFFFFFFF
+        data_crc = data_crc_int.to_bytes(length=4, byteorder="little", signed=False)
+
+        if given_crc != data_crc:
+            msg = (
+                f"Invalid CRC for master element: {given_crc.hex()} != {data_crc.hex()}"
+            )
+            raise RuntimeError(msg)
 
 
 EBMLMainSpec = ebml_read_spec_xml("ebml/ebml.xml")
@@ -1687,6 +1724,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             header_element.payload_io(io),
             ebml_header_children_options,
             EBMLHeaderElementsSpec,
+            depth=0,
         )
 
         for children_element, element_desc in children_elements:
@@ -2153,7 +2191,12 @@ class VideoTaggerMKV(VideoTagger):
                 depth: int,
             ) -> None:
                 io = BoundedIO.get_new(f, span)
-                for element, element_desc in ebml_iter_elements(io, options, spec):
+                for element, element_desc in ebml_iter_elements(
+                    io,
+                    options,
+                    spec,
+                    depth=depth,
+                ):
 
                     print_element(element, element_desc, depth=depth)
 
