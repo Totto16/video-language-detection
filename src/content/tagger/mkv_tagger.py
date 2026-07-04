@@ -1,3 +1,4 @@
+import zlib
 from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -14,7 +15,6 @@ from typing import (
     final,
     override,
 )
-import zlib
 
 from content.tagger.parser import (
     BoundedIO,
@@ -1458,6 +1458,23 @@ def get_element_value[A](
             raise RuntimeError(msg)
 
 
+# NOTE: the spec says, that ALL data from the master element should be use, so also the not yet "written" CRC element, but in practice, all encoders juts use th data from all children elements except the CRC one
+CRC_USE_ZEROED_ELEMENT = False
+
+
+class CRC32Builder:
+    __value: int
+
+    def __init__(self: Self, initial_value: int) -> None:
+        self.__value = initial_value
+
+    def update(self: Self, value: bytes) -> None:
+        self.__value = zlib.crc32(value, self.__value)
+
+    def result(self: Self) -> int:
+        return self.__value
+
+
 def ebml_iter_elements(
     io: BoundedIO,
     options: EBMLDecodeOptions,
@@ -1473,7 +1490,8 @@ def ebml_iter_elements(
     pos = io.span.start
     end = io.span.end
 
-    crc_element: Optional[tuple[EBMLBinaryElement, EBMLElementDescription]] = None
+    crc_element: Optional[EBMLBinaryElement] = None
+    i = 0
 
     while pos < end:
         new_io = io.new_span_io(SimpleSpan(pos, end - pos))
@@ -1488,7 +1506,11 @@ def ebml_iter_elements(
                 msg = f"Invalid element type for CRC-32 element: {type(element)}"
                 raise RuntimeError(msg)
 
-            crc_element = (element, element_desc)
+            if i != 0:
+                msg = f"CRC Element is not the first in the parent: {i}"
+                raise RuntimeError(msg)
+
+            crc_element = element
 
         if pos + element.span.total.size > end:
             msg = f"Element {element.element_id} at {pos} extends past parent boundary"
@@ -1496,6 +1518,7 @@ def ebml_iter_elements(
 
         yield (element, element_desc)
         pos += element.span.total.size
+        i += 1
 
     if pos != end:
         msg = f"Element didn't reach to the end of the parent span: {pos} != {end}"
@@ -1507,15 +1530,28 @@ def ebml_iter_elements(
             msg = "No CRC element found in master element of level 1"
             raise RuntimeError(msg)
 
-        given_crc = crc_element[0].value
+        given_crc = crc_element.value
 
         crc_bytes: bytes
         with io.r_ctx(force_entire_read=True) as f:
             crc_bytes = f.read(io.span.size)
 
-        data_crc_int = zlib.crc32(crc_bytes, 0xFFFFFFFF) & 0xFFFFFFFF
-        data_crc = data_crc_int.to_bytes(length=4, byteorder="little", signed=False)
+        crc_builder = CRC32Builder(0)
 
+        crc_value_span = crc_element.span.header_span(1)
+
+        crc_offset = crc_value_span.start - io.span.start
+
+        if CRC_USE_ZEROED_ELEMENT:
+            crc_builder.update(crc_bytes[0:crc_offset])
+
+            # treat the payload of the crc element as 0 bytes
+            crc_builder.update(b"\00" * len(crc_element.value))
+
+        crc_builder.update(crc_bytes[crc_offset + len(crc_element.value) :])
+
+        data_crc_int = crc_builder.result()
+        data_crc = data_crc_int.to_bytes(length=4, byteorder="little", signed=False)
         if given_crc != data_crc:
             msg = (
                 f"Invalid CRC for master element: {given_crc.hex()} != {data_crc.hex()}"
