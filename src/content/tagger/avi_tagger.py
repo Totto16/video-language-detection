@@ -2125,6 +2125,10 @@ class VideoTaggerAVI(VideoTagger):
                         and priority.as_int() <= InspectPriority.Normal.as_int()
                     ):
                         # skip movi chunk with maaaany data chunks, but nothing interesting
+                        skipped_children = sum(
+                            1 for _ in avi_iter_chunks(f, chunk.span.payload_span)
+                        )
+                        printer.skip(f"{MOVI_FOURCC}", skipped_children, depth + 1)
                         continue
 
                     if chunk.is_list:

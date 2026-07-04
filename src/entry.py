@@ -988,7 +988,6 @@ def subcommand_tagger_inspect(
 
         @override
         def element(self: Self, element: InspectElement, depth: int) -> None:
-
             print(f"{" " * depth}{element.name}")  # noqa: T201
 
         @override
@@ -1003,6 +1002,17 @@ def subcommand_tagger_inspect(
         ) -> None:
             pass
 
+        @override
+        def skip(
+            self: Self,
+            parent: str,
+            amount: int,
+            depth: int,
+        ) -> None:
+            print(  # noqa: T201
+                f"{" " * depth}<Skipped>: {amount} Children of {parent}",
+            )
+
     @decorate_class(slots=True)
     class JsonPrinter(InspectPrinter):
         __pos: int
@@ -1014,15 +1024,7 @@ def subcommand_tagger_inspect(
             self.__pos = 0
             self.__current_depth = 0
 
-        @override
-        def element(self: Self, element: InspectElement, depth: int) -> None:
-
-            entry: dict[str, str | int] = {
-                "name": element.name,
-                "size": element.size,
-                "depth": depth,
-            }
-
+        def __add_entry(self: Self, value: Any, depth: int) -> None:
             if self.__current_depth > depth:
                 for _ in range(self.__current_depth - depth):
                     print("]", end="")  # noqa: T201
@@ -1036,10 +1038,22 @@ def subcommand_tagger_inspect(
                 for _ in range(depth - self.__current_depth):
                     print("[", end="")  # noqa: T201
 
-            print(json.dumps(entry), end="")  # noqa: T201
+            print(json.dumps(value), end="")  # noqa: T201
 
             self.__pos = self.__pos + 1
             self.__current_depth = depth
+
+        @override
+        def element(self: Self, element: InspectElement, depth: int) -> None:
+
+            entry: dict[str, str | int] = {
+                "type": "element",
+                "name": element.name,
+                "size": element.size,
+                "depth": depth,
+            }
+
+            self.__add_entry(entry, depth=depth)
 
         @override
         def start(
@@ -1055,6 +1069,22 @@ def subcommand_tagger_inspect(
                 for i in reversed(range(self.__current_depth)):
                     print(f" {" " * i}]", end="")  # noqa: T201
             print("\n]")  # noqa: T201
+
+        @override
+        def skip(
+            self: Self,
+            parent: str,
+            amount: int,
+            depth: int,
+        ) -> None:
+            entry: dict[str, str | int] = {
+                "type": "skipped",
+                "parent": parent,
+                "amount": amount,
+                "depth": depth,
+            }
+
+            self.__add_entry(entry, depth=depth)
 
     printer: InspectPrinter
     match args.output_format:

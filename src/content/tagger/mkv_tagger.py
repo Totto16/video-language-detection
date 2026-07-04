@@ -2236,6 +2236,25 @@ class VideoTaggerMKV(VideoTagger):
 
                     print_element(element, element_desc, depth=depth)
 
+                    if (
+                        element_desc.name == "Cluster"
+                        and element_desc.type.type == EBMLElementType.Master
+                        and priority.as_int() <= InspectPriority.Normal.as_int()
+                    ):
+                        # skip "Cluster" element with maaaany SimpleBlock elements, but nothing interesting
+
+                        # iterate over it, for a CRC, so that it is validated!
+                        skipped_children = sum(
+                            1 for _ in ebml_iter_elements(
+                                BoundedIO.get_new(f, element.span.payload_span),
+                                options,
+                                spec,
+                                depth=depth + 1,
+                            )
+                        )
+                        printer.skip(f"{element_desc.name}", skipped_children, depth + 1)
+                        continue
+
                     if element_desc.type.type == EBMLElementType.Master:
                         iterate_elements_recursive(
                             element.span.payload_span,

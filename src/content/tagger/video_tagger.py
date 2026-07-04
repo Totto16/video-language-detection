@@ -232,6 +232,15 @@ class InspectPrinter(ABC):
         self: Self,
     ) -> None: ...
 
+    @abstractmethod
+    def skip(
+        self: Self,
+        parent: str,
+        amount:int,
+        depth: int,
+    ) -> None: ...
+
+
 
 @decorate_class(slots=True)
 class VideoTagger(ABC):
