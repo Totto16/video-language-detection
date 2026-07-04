@@ -3,7 +3,6 @@ __pycache__
 model/
 /src/tmp/
 /data/
-/*.json
 /.vscode
 /.coverage
 /coverage.xml

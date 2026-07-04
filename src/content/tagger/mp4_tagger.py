@@ -2754,6 +2754,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"sfID"): None,
     ISOMAtomName(b"cmID"): None,
     ISOMAtomName(b"akID"): None,
+    #TODO: use these in the write_tags helper, mkv also has a similar mechanims, avi not , but thats fine
     ISOMAtomName(b"tvsh"): AppleItunesItemDataType.UTF8,  # TV Show, show name
     ISOMAtomName(b"tven"): AppleItunesItemDataType.INTEGER,  # TV Episode id
     ISOMAtomName(b"tvsn"): AppleItunesItemDataType.INTEGER,  # -- TV Season
