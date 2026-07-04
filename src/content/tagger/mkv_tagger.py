@@ -1497,7 +1497,7 @@ def ebml_iter_elements(
         new_io = io.new_span_io(SimpleSpan(pos, end - pos))
         element, element_desc = read_element(new_io, options, spec_by_id)
 
-        if depth == 1 and element_desc.name == "CRC-32":
+        if depth == 2 and element_desc.name == "CRC-32":
             if crc_element is not None:
                 msg = f"Duplicate CRC element detected: {crc_element} {element} {element_desc}"
                 raise RuntimeError(msg)
@@ -1525,7 +1525,7 @@ def ebml_iter_elements(
         raise RuntimeError(msg)
 
     # The CRC element should be the first in it's parent master for easier reading. All level 1 elements should include a CRC-32.
-    if depth == 1:
+    if depth == 2:
         if crc_element is None:
             msg = "No CRC element found in master element of level 1"
             raise RuntimeError(msg)
@@ -1654,10 +1654,13 @@ class EBMLHeaderOptions:
 class EBMLHeader(EBMLElement, FinalEBMLElement):
     options: EBMLHeaderOptions
 
+    desc: EBMLElementDescription
+
     def __init__(
         self: Self,
         parent: EBMLElement,
         options: EBMLHeaderOptions,
+        desc: EBMLElementDescription,
     ) -> None:
         super().__init__(
             parent.element_id,
@@ -1667,6 +1670,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         )
 
         self.options = options
+        self.desc = desc
 
     @staticmethod
     def __get_spec_by_doc_type(doc_type: DocType) -> Result[EBMLSpec, str]:
@@ -1838,7 +1842,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             doc_type,
         )
 
-        return EBMLHeader(header_element, options)
+        return EBMLHeader(header_element, options, EBMLHeaderMasterSpec)
 
     @staticmethod
     def read(
@@ -1858,10 +1862,12 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
 @final
 @decorate_class(slots=True)
 class EBMLBody(EBMLElement, FinalEBMLElement):
+    desc: EBMLElementDescription
 
     def __init__(
         self: Self,
         parent: EBMLElement,
+        desc: EBMLElementDescription,
     ) -> None:
         super().__init__(
             parent.element_id,
@@ -1869,6 +1875,8 @@ class EBMLBody(EBMLElement, FinalEBMLElement):
             header_sizes=parent.header_sizes,
             is_container=True,
         )
+
+        self.desc = desc
 
     @staticmethod
     def __read_impl(
@@ -1895,10 +1903,10 @@ class EBMLBody(EBMLElement, FinalEBMLElement):
         element, element_desc = read_element(io, options, spec_id)
 
         if element_desc.type.type != EBMLElementType.Master:
-            msg = f"Only Ma Master element allowed for a EBML Body element: {element} {element_desc}"
+            msg = f"Only a Master element is allowed for a EBML Body element: {element} {element_desc}"
             raise RuntimeError(msg)
 
-        return EBMLBody(element)
+        return EBMLBody(element, element_desc)
 
     @staticmethod
     def read(
@@ -2245,14 +2253,19 @@ class VideoTaggerMKV(VideoTagger):
 
                         # iterate over it, for a CRC, so that it is validated!
                         skipped_children = sum(
-                            1 for _ in ebml_iter_elements(
+                            1
+                            for _ in ebml_iter_elements(
                                 BoundedIO.get_new(f, element.span.payload_span),
                                 options,
                                 spec,
                                 depth=depth + 1,
                             )
                         )
-                        printer.skip(f"{element_desc.name}", skipped_children, depth + 1)
+                        printer.skip(
+                            f"{element_desc.name}",
+                            skipped_children,
+                            depth + 1,
+                        )
                         continue
 
                     if element_desc.type.type == EBMLElementType.Master:
@@ -2265,22 +2278,22 @@ class VideoTaggerMKV(VideoTagger):
 
             stream = EBMLStream.read_from_file(f)
 
-            if len(stream.documents) > 1:
-                msg = f"More than one mkv document in file, nit supported atm: {len(stream.documents)}"
-                raise RuntimeError(msg)
-
-            document = stream.documents[0]
-
-            header_options = document.header.options
-            spec = document.header.spec_unsafe()
-
             printer.start()
-            iterate_elements_recursive(
-                document.body.span.payload_span,
-                header_options.options,
-                spec,
-                depth=0,
-            )
+            for document in stream.documents:
+                print_element(document.header, document.header.desc, depth=0)
+
+                print_element(document.body, document.body.desc, depth=0)
+
+                header_options = document.header.options
+                spec = document.header.spec_unsafe()
+
+                iterate_elements_recursive(
+                    document.body.span.payload_span,
+                    header_options.options,
+                    spec,
+                    depth=1,
+                )
+
             printer.end()
 
         return None
