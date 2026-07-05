@@ -25,6 +25,7 @@ from content.tagger.schema.parser import (
     EBMLElementDescriptionGeneric,
     EBMLElementIDParsed,
     EBMLElementType,
+    EBMLOccurrences,
     EBMLSchemaRange,
     EBMLSchemaRangeBound,
     EBMLSchemaRangeElem,
@@ -530,7 +531,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="EBML",
                         id=EBMLElementIDParsed.from_checked(440786851),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeMaster(type=EBMLElementType.Master),
                         description=None,
                         unknown_size_allowed=False,
@@ -550,7 +551,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="EBMLVersion",
                         id=EBMLElementIDParsed.from_checked(17030),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=1,
@@ -561,10 +562,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\EBMLVersion",
                         recurring=False,
@@ -573,7 +575,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="EBMLReadVersion",
                         id=EBMLElementIDParsed.from_checked(17143),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=1,
@@ -584,10 +586,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\EBMLReadVersion",
                         recurring=False,
@@ -596,14 +599,15 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="EBMLMaxIDLength",
                         id=EBMLElementIDParsed.from_checked(17138),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=4,
                             range=EBMLSchemaRange(
                                 (
                                     EBMLSchemaRangeElem(
-                                        value=4, bound=EBMLSchemaRangeBound.Inclusive
+                                        value=4,
+                                        bound=EBMLSchemaRangeBound.Inclusive,
                                     ),
                                     None,
                                 ),
@@ -614,10 +618,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\EBMLMaxIDLength",
                         recurring=False,
@@ -626,7 +631,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="EBMLMaxSizeLength",
                         id=EBMLElementIDParsed.from_checked(17139),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=8,
@@ -637,10 +642,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\EBMLMaxSizeLength",
                         recurring=False,
@@ -649,7 +655,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocType",
                         id=EBMLElementIDParsed.from_checked(17026),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeString(
                             type=EBMLElementType.String,
                             default=DefaultEmpty(),
@@ -661,8 +667,8 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                                             bound=EBMLSchemaRangeBound.Exclusive,
                                         ),
                                         None,
-                                    )
-                                )
+                                    ),
+                                ),
                             ),
                         ),
                         description=None,
@@ -670,10 +676,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocType",
                         recurring=False,
@@ -682,7 +689,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocTypeVersion",
                         id=EBMLElementIDParsed.from_checked(17031),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=1,
@@ -693,10 +700,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocTypeVersion",
                         recurring=False,
@@ -705,7 +713,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocTypeReadVersion",
                         id=EBMLElementIDParsed.from_checked(17029),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=1,
@@ -716,10 +724,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocTypeReadVersion",
                         recurring=False,
@@ -728,13 +737,16 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtension",
                         id=EBMLElementIDParsed.from_checked(17025),
-                        occurrences=EBMLSchemaRange(
-                            (
-                                EBMLSchemaRangeElem(
-                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                        occurrences=EBMLOccurrences(
+                            EBMLSchemaRange(
+                                (
+                                    EBMLSchemaRangeElem(
+                                        value=0,
+                                        bound=EBMLSchemaRangeBound.Inclusive,
+                                    ),
+                                    None,
                                 ),
-                                None,
-                            )
+                            ),
                         ),
                         type=EBMLAdvancedElementTypeMaster(type=EBMLElementType.Master),
                         description=None,
@@ -742,10 +754,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocTypeExtension",
                         recurring=False,
@@ -754,7 +767,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtensionName",
                         id=EBMLElementIDParsed.from_checked(17027),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeString(
                             type=EBMLElementType.String,
                             default=DefaultEmpty(),
@@ -766,7 +779,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                                             bound=EBMLSchemaRangeBound.Exclusive,
                                         ),
                                         None,
-                                    )
+                                    ),
                                 ),
                             ),
                         ),
@@ -775,10 +788,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocTypeExtension\\DocTypeExtensionName",
                         recurring=False,
@@ -787,7 +801,7 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="DocTypeExtensionVersion",
                         id=EBMLElementIDParsed.from_checked(17028),
-                        occurrences=EBMLSchemaRange(1),
+                        occurrences=EBMLOccurrences(EBMLSchemaRange(1)),
                         type=EBMLAdvancedElementTypeInteger(
                             type=EBMLElementType.UnsignedInteger,
                             default=DefaultEmpty(),
@@ -798,10 +812,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\EBML\\DocTypeExtension\\DocTypeExtensionVersion",
                         recurring=False,
@@ -810,13 +825,16 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="Void",
                         id=EBMLElementIDParsed.from_checked(236),
-                        occurrences=EBMLSchemaRange(
-                            (
-                                EBMLSchemaRangeElem(
-                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                        occurrences=EBMLOccurrences(
+                            EBMLSchemaRange(
+                                (
+                                    EBMLSchemaRangeElem(
+                                        value=0,
+                                        bound=EBMLSchemaRangeBound.Inclusive,
+                                    ),
+                                    None,
                                 ),
-                                None,
-                            )
+                            ),
                         ),
                         type=EBMLAdvancedElementTypeBinary(
                             type=EBMLElementType.Binary,
@@ -828,10 +846,11 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\(-\\)Void",
                         recurring=False,
@@ -840,15 +859,19 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                     EBMLElementDescriptionGeneric(
                         name="CRC-32",
                         id=EBMLElementIDParsed.from_checked(191),
-                        occurrences=EBMLSchemaRange(
-                            (
-                                EBMLSchemaRangeElem(
-                                    value=0, bound=EBMLSchemaRangeBound.Inclusive
+                        occurrences=EBMLOccurrences(
+                            EBMLSchemaRange(
+                                (
+                                    EBMLSchemaRangeElem(
+                                        value=0,
+                                        bound=EBMLSchemaRangeBound.Inclusive,
+                                    ),
+                                    EBMLSchemaRangeElem(
+                                        value=1,
+                                        bound=EBMLSchemaRangeBound.Inclusive,
+                                    ),
                                 ),
-                                EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
-                                ),
-                            )
+                            ),
                         ),
                         type=EBMLAdvancedElementTypeBinary(
                             type=EBMLElementType.Binary,
@@ -860,16 +883,17 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
                         versions=EBMLSchemaRange(
                             (
                                 EBMLSchemaRangeElem(
-                                    value=1, bound=EBMLSchemaRangeBound.Inclusive
+                                    value=1,
+                                    bound=EBMLSchemaRangeBound.Inclusive,
                                 ),
                                 None,
-                            )
+                            ),
                         ),
                         path="\\(1-\\)CRC-32",
                         recurring=False,
                         recursive=False,
                     ),
-                ]
+                ],
             )
 
             return result

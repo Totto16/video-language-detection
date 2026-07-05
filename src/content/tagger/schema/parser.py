@@ -119,6 +119,30 @@ class EBMLSchemaRange[A: (int, float)]:
 
         return Ok(None)
 
+    def check_overflow(self: Self, value: A) -> Result[None, str]:
+        if isinstance(self.__underlying, (int, float)):
+            # TODO. check if the value is the same type as A
+            # checks if the value is bigger than the final result, this value is not the final one, but it can be ruled out earlier, if it is too big
+            if value > self.__underlying:
+                return Err(
+                    f"Value needs to be {self.__underlying} but was {value}, which already has overflown",
+                )
+        elif isinstance(self.__underlying, tuple):
+            min_val, max_val = self.__underlying
+
+            # only  check the maximum
+            if max_val is not None and not max_val.check(value, start=False):
+                return Err(
+                    f"Value needs to be between {min_val.format(start=True)if min_val is not None else "(*"}, {max_val.format(start=False)} but was above it: {value}",
+                )
+        elif isinstance(self.__underlying, EBMLSchemaRangeNot):
+            # we never know, until the final check
+            pass
+        else:
+            assert_never(self.__underlying)
+
+        return Ok(None)
+
     def __str__(self: Self) -> str:
         if isinstance(self.__underlying, (int, float)):
             return f"<EBMLSchemaRange exact value: {self.__underlying}>"
@@ -159,7 +183,15 @@ class EBMLSchemaRange[A: (int, float)]:
         assert_never(self.__underlying)
 
 
-type EBMLOccurrences = EBMLSchemaRange[int]
+@dataclass
+class EBMLOccurrences:
+    range: EBMLSchemaRange[int]
+
+    def check_overflow(self: Self, amount: int) -> Result[None, str]:
+        return self.range.check_overflow(amount)
+
+    def check(self: Self, amount: int) -> Result[None, str]:
+        return self.range.valid(amount)
 
 
 def ebml_occurrences_from_values(
@@ -171,10 +203,14 @@ def ebml_occurrences_from_values(
         raise RuntimeError(msg)
 
     if max_occurrences is None:
-        return EBMLSchemaRange(
-            (
-                EBMLSchemaRangeElem(min_occurrences, EBMLSchemaRangeBound.Inclusive),
-                None,
+        return EBMLOccurrences(
+            EBMLSchemaRange(
+                (
+                    EBMLSchemaRangeElem(
+                        min_occurrences, EBMLSchemaRangeBound.Inclusive
+                    ),
+                    None,
+                ),
             ),
         )
 
@@ -183,16 +219,18 @@ def ebml_occurrences_from_values(
         raise RuntimeError(msg)
 
     if min_occurrences == max_occurrences:
-        return EBMLSchemaRange(min_occurrences)
+        return EBMLOccurrences(EBMLSchemaRange(min_occurrences))
 
     if min_occurrences > max_occurrences:
         msg = f"min occurrences is greater than max occurrences: {min_occurrences} > {max_occurrences}"
         raise RuntimeError(msg)
 
-    return EBMLSchemaRange(
-        (
-            EBMLSchemaRangeElem(min_occurrences, EBMLSchemaRangeBound.Inclusive),
-            EBMLSchemaRangeElem(max_occurrences, EBMLSchemaRangeBound.Inclusive),
+    return EBMLOccurrences(
+        EBMLSchemaRange(
+            (
+                EBMLSchemaRangeElem(min_occurrences, EBMLSchemaRangeBound.Inclusive),
+                EBMLSchemaRangeElem(max_occurrences, EBMLSchemaRangeBound.Inclusive),
+            ),
         ),
     )
 

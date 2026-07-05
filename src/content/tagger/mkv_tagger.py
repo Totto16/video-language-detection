@@ -1485,7 +1485,33 @@ def ebml_iter_elements(
 
     spec_by_id = spec.elements_by_id()
 
-    # TODO: check minOccurs and maxOccurs in iter function
+    @dataclass(slots=True, repr=True)
+    class Occurrence:
+        desc: EBMLElementDescription
+        amount: int
+
+        def increment(self: Self) -> None:
+            self.amount += 1
+
+        def check_overflow(self: Self) -> Result[None, str]:
+            return self.desc.occurrences.check_overflow(self.amount)
+
+        def check(self: Self) -> Result[None, str]:
+            return self.desc.occurrences.check(self.amount)
+
+    occurrences: dict[str, Occurrence] = {}
+
+    def add_occurrence(element_desc: EBMLElementDescription) -> None:
+        if occurrences.get(element_desc.name, None) is None:  # noqa: SIM910
+            occurrences[element_desc.name] = Occurrence(desc=element_desc, amount=1)
+        else:
+            occurrences[element_desc.name].increment()
+
+        overflow_check = occurrences[element_desc.name].check_overflow()
+
+        if overflow_check.err():
+            msg = f"Occurrences error: {overflow_check.as_err()}"
+            raise RuntimeError(msg)
 
     pos = io.span.start
     end = io.span.end
@@ -1496,6 +1522,8 @@ def ebml_iter_elements(
     while pos < end:
         new_io = io.new_span_io(SimpleSpan(pos, end - pos))
         element, element_desc = read_element(new_io, options, spec_by_id)
+
+        add_occurrence(element_desc)
 
         if depth == 2 and element_desc.name == "CRC-32":
             if crc_element is not None:
@@ -1556,6 +1584,12 @@ def ebml_iter_elements(
             msg = (
                 f"Invalid CRC for master element: {given_crc.hex()} != {data_crc.hex()}"
             )
+            raise RuntimeError(msg)
+
+    for occurrence in occurrences.values():
+        range_check = occurrence.check()
+        if range_check.err():
+            msg = f"Occurrences error: {range_check.as_err()}"
             raise RuntimeError(msg)
 
 
