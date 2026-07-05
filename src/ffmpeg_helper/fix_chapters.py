@@ -3,18 +3,20 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+from helper.result import Err, Ok, Result
+
 
 def fix_chapters(files: list[Path]) -> list[str]:
     results: list[str] = []
     for file in files:
         res = fix_chapter(file)
-        if res is not None:
-            results.append(res)
+        if res.err():
+            results.append(res.as_err())
 
     return results
 
 
-def fix_chapter(input_file: Path) -> Optional[str]:
+def fix_chapter(input_file: Path) -> Result[None, str]:
     temp_folder = Path(__file__).parent.parent.parent / "temp"
 
     if not temp_folder.exists():
@@ -43,13 +45,13 @@ def fix_chapter(input_file: Path) -> Optional[str]:
 
         if ret_code != 0:
             output.unlink(missing_ok=True)
-            return f"Process exited with status code: {ret_code}"
+            return Err(f"Process exited with status code: {ret_code}")
 
         temp_result = temp_folder / input_file.name
 
         shutil.move(input_file, temp_result)
         shutil.move(output, input_file)
     except (RuntimeError, ValueError, TypeError) as error:
-        return str(error)
+        return Err(str(error))
     else:
-        return None
+        return Ok(None)

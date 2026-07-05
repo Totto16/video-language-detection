@@ -218,13 +218,11 @@ class WsSingleManager(WebsocketHandler):
                             else deserialize_select_result(data.result)
                         )
                         unique_id: uuid.UUID = uuid_deserialize(data.id)
-                        result: Optional[str] = (
-                            self.__parent_ref.process_ask_question_reply(
-                                result=res_data,
-                                unique_id=unique_id,
-                            )
+                        result = self.__parent_ref.process_ask_question_reply(
+                            result=res_data,
+                            unique_id=unique_id,
                         )
-                        if result is None:
+                        if result.ok():
                             response = ManagerWsChoiceMessage(
                                 data=ManagerWsChoiceMessageQuestionReplyReceivedData(
                                     id=data.id,
@@ -232,7 +230,7 @@ class WsSingleManager(WebsocketHandler):
                             )
                             return Ok(response)
 
-                        return Err(result)
+                        return Err(result.as_err())
                     case _:
                         assert_never(data.reply)
             case _:
@@ -989,22 +987,22 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
         self: Self,
         result: Optional[SelectResult],
         unique_id: uuid.UUID,
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
         reply_data = self.__reply_ids.get(unique_id, None)
         if reply_data is None:
-            return "Error: reply not present or already answered!"
+            return Err("Error: reply not present or already answered!")
 
         if reply_data.type != "ask_question":
-            return "Error: wrong reply type!"
+            return Err("Error: wrong reply type!")
 
         if reply_data.finished or reply_data.event.is_set():
-            return "Error: reply already finished!"
+            return Err("Error: reply already finished!")
 
         reply_data.data = result
         reply_data.finished = True
         reply_data.event.set()
 
-        return None
+        return Ok(None)
 
     @override
     def emit_error(
@@ -1116,14 +1114,14 @@ def register_routes(app: FastAPI, backend_ref: BackendRef) -> None:
             template_to_use=start_query.template,
         )
 
-        result: Optional[str] = backend.scanner.start(
+        result = backend.scanner.start(
             options=options,
             run_in_background=run_in_background,
             backend=backend,
         )
 
-        if result is not None:
-            return JSONResponse(status_code=422, content={"error": result})
+        if result.err():
+            return JSONResponse(status_code=422, content={"error": result.as_err()})
 
         return JSONResponse(status_code=200, content={"ok": True})
 
@@ -1732,12 +1730,12 @@ class BackendScanner:
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
         backend: "Backend",
         filters: list[Filter],
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
 
         with self.__state.ctx() as ctx:
             state = ctx.get()
             if state.state.type == "running" or state.thread is not None:
-                return "Scanner is already running"
+                return Err("Scanner is already running")
 
             event = asyncio.Event()
 
@@ -1783,14 +1781,14 @@ class BackendScanner:
             )
             backend.manager.send_data_sync(data)
 
-        return None
+        return Ok(None)
 
     def start(
         self: Self,
         options: StartOptions,
         run_in_background: Callable[[Callable[[], Coroutine[Any, Any, Any]]], None],
         backend: "Backend",
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
 
         parsed_config = AdvancedConfig.resolve_raw(
             raw_config=self.__raw_config,

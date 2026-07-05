@@ -284,7 +284,7 @@ class EBMLElementID(EBMLVarInt):
                 ),
             )
 
-    def is_valid(self: Self, bytes_used: int) -> Optional[str]:
+    def is_valid(self: Self, bytes_used: int) -> Result[None, str]:
         # spec: RFC 8794
         # chapter 5
 
@@ -299,14 +299,14 @@ class EBMLElementID(EBMLVarInt):
         # shortest-possible VINT encoding.
 
         if super().value == 0:
-            return "Value is NULL"
+            return Err("Value is NULL")
 
         if bytes_used == 0:
             msg = f"IMPLEMENTATION error: bytes_used {bytes_used}"
             raise RuntimeError(msg)
 
         if super().value == ((1 << (bytes_used * 7)) - 1):
-            return "Value is 0xFF..FF"
+            return Err("Value is 0xFF..FF")
 
         minmum_bytes_required = self.minmum_bytes_required()
 
@@ -317,12 +317,16 @@ class EBMLElementID(EBMLVarInt):
 
             if super().value == ((1 << ((bytes_used - 1) * 7)) - 1):
                 if minmum_bytes_required + 1 == bytes_used:
-                    return None
-                return f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}"
+                    return Ok(None)
+                return Err(
+                    f"Value 0xFF..FF encoded incorrectly, must use exactly {minmum_bytes_required +1 } bytes, but used {bytes_used}",
+                )
 
-            return f"Value {super().value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}"
+            return Err(
+                f"Value {super().value} uses too much bytes: {minmum_bytes_required} bytes are the minimum, but used {bytes_used}",
+            )
 
-        return None
+        return Ok(None)
 
     @override
     @property
@@ -526,8 +530,8 @@ class EBMLElement(NonFinalEBMLElement):
             raise RuntimeError(msg)
 
         valid_element_res = element_id.is_valid(element_id_bytes)
-        if valid_element_res is not None:
-            msg = f"Invalid Element ID: {element_id}: {valid_element_res}"
+        if valid_element_res.err():
+            msg = f"Invalid Element ID: {element_id}: {valid_element_res.as_err()}"
             raise RuntimeError(msg)
 
         size_span = io.span.next_span(element_id_bytes)
@@ -2103,7 +2107,7 @@ class EBMLStream(FinalEBMLElement):
 
 def is_mkv_file(
     f: BinaryIO,
-) -> Optional[str]:
+) -> Result[None, str]:
     f.seek(0)
 
     try:
@@ -2116,17 +2120,19 @@ def is_mkv_file(
         spec_res = header.spec()
 
         if spec_res.err():
-            return f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}"
+            return Err(
+                f"DocType {header_options.doc_type} is not supported: {spec_res.as_err()}",
+            )
 
         spec = spec_res.as_ok()
 
         if spec.doc_type.type != EBMLMKVSpec.doc_type.type:
-            return "Not a matroska EBML file"
+            return Err("Not a matroska EBML file")
 
         f.seek(0)
     except (RuntimeError, ValueError, TypeError) as err:
-        return str(err)
-    return None
+        return Err(str(err))
+    return Ok(None)
 
 
 @decorate_class(slots=True)
@@ -2153,8 +2159,8 @@ class VideoTaggerMKV(VideoTagger):
 
             with file.open("rb") as f:
                 mkv_res = is_mkv_file(f)
-                if mkv_res is not None:
-                    return Err(mkv_res)
+                if mkv_res.err():
+                    return Err(mkv_res.as_err())
 
                 f.seek(0)
 

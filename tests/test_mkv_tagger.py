@@ -180,9 +180,9 @@ def test_mkv_tagger_parse_element_id(
 
             assert bytes_used == len(byte)
 
-            is_valid_element_id = element_id.is_valid(bytes_used)
+            valid_element_id = element_id.is_valid(bytes_used)
 
-            assert is_valid_element_id == result
+            assert valid_element_id == ErrResult(result)
 
 
 def test_mkv_tagger_parse_ebml_schema_range(
@@ -342,9 +342,7 @@ def test_mkv_invalid_bytes(
             io = BytesIO(data)
             res = is_mkv_file(io)
 
-            assert res is not None, "valid mp4 is incorrect here"
-
-            assert res == err, "incorrect error"
+            assert res == ErrResult(err), "incorrect error"
 
 
 @decorate_class(slots=True)

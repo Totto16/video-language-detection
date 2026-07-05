@@ -467,7 +467,7 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
     @override
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]:
+    ) -> RestoreFileNotSupported | Result[None, str]:
         return RestoreFileNotSupported()
 
     @override

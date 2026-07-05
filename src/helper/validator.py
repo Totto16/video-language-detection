@@ -803,14 +803,14 @@ class LanguageValidator(Validator[None, None, None, None]):
         if episode.language in [Language.no_language(), Language.get_default()]:
             return
 
-        is_valid = self.__model_language.is_valid_language(episode.language)
+        valid = self.__model_language.is_valid_language(episode.language)
 
-        if is_valid is None:
+        if valid.ok():
             return
 
         self.emit_error(
             (series, season, episode),
-            _("Invalid language in episode: {err}").format(err=is_valid),
+            _("Invalid language in episode: {err}").format(err=valid.as_err()),
         )
 
     @override

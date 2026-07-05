@@ -15,7 +15,7 @@ from fixtures import (
     test_manager,
 )
 from pytest_subtests import SubTests
-from test_helper import OkResult, file_duplicates
+from test_helper import ErrResult, OkResult, file_duplicates
 
 from content.language import Language
 from content.tagger.avi_tagger import (
@@ -344,8 +344,8 @@ class AVIChunkStructure(FancyEq):
             with file.open("rb") as f:
                 avi_res = is_avi_file(f)
 
-                if avi_res is not None:
-                    return Err(avi_res)
+                if avi_res.err():
+                    return Err(avi_res.as_err())
 
                 chunks = list_all_chunks_recursively(f)
                 return Ok(AVIChunkStructure(chunks))
@@ -552,9 +552,7 @@ def test_avi_invalid_bytes(
             io = BytesIO(data)
             res = is_avi_file(io)
 
-            assert res is not None, "valid avi is incorrect here"
-
-            assert res == err, "incorrect error"
+            assert res == ErrResult(err), "incorrect error"
 
 
 def test_avi_tagger_language_patching(

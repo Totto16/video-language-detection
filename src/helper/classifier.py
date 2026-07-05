@@ -230,7 +230,7 @@ class MemoryPatternQuadratic(MemoryPattern):
 class ModelLanguage(ABC):
 
     @abstractmethod
-    def is_valid_language(self: Self, language: Language) -> Optional[str]: ...
+    def is_valid_language(self: Self, language: Language) -> Result[None, str]: ...
 
 
 @dataclass(slots=True, repr=True)

@@ -25,7 +25,7 @@ from helper.decorator import decorate_class
 from helper.ffprobe import FFProbeResult, ffprobe
 from helper.log import get_logger
 from helper.manager import ManagerInterface
-from helper.result import Err, Result
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 logger: Logger = get_logger()
@@ -94,23 +94,32 @@ class RestoreFileNotSupported:
     pass
 
 
-def is_the_same_file(pre_res: FFProbeResult, after_res: FFProbeResult) -> Optional[str]:
+def is_the_same_file(
+    pre_res: FFProbeResult,
+    after_res: FFProbeResult,
+) -> Result[None, str]:
     try:
         if len(pre_res.streams) != len(after_res.streams):
-            return f"Number of streams differs: {len(pre_res.streams)} != {len(after_res.streams)}"
+            return Err(
+                f"Number of streams differs: {len(pre_res.streams)} != {len(after_res.streams)}",
+            )
 
         if pre_res.file_info.duration() != after_res.file_info.duration():
-            return f"Duration differs: {pre_res.file_info.duration()} != {after_res.file_info.duration()}"
+            return Err(
+                f"Duration differs: {pre_res.file_info.duration()} != {after_res.file_info.duration()}",
+            )
 
         if (
             pre_res.file_info.raw["format_name"]
             != after_res.file_info.raw["format_name"]
         ):
-            return f"Format name differs: {pre_res.file_info.raw["format_name"] } != {after_res.file_info.raw["format_name"] }"
+            return Err(
+                f"Format name differs: {pre_res.file_info.raw["format_name"] } != {after_res.file_info.raw["format_name"] }",
+            )
 
-        return None  # noqa: TRY300
+        return Ok(None)
     except (KeyError, RuntimeError, ValueError, TypeError) as err:
-        return f"Excpetion occurred: {err!s}"
+        return Err(f"Excpetion occurred: {err!s}")
 
 
 @decorate_class(slots=True)
@@ -122,11 +131,11 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
     ) -> None: ...
 
     @final
-    def write_tags_safe(self: Self, tags: MetadataTags) -> Optional[str]:
+    def write_tags_safe(self: Self, tags: MetadataTags) -> Result[None, str]:
         try:
             pre_write_res = ffprobe(self.file)
             if pre_write_res.err():
-                return f"FFprobe err: {pre_write_res.as_err()}"
+                return Err(f"FFprobe err: {pre_write_res.as_err()}")
 
             pre_write = pre_write_res.as_ok()
 
@@ -141,27 +150,27 @@ class VideoTaggerContextWriteable(VideoTaggerContextInterface):
 
             same_res = is_the_same_file(pre_write, after_write)
 
-            if same_res is not None:
-                msg = f"FFProbe detected differences: {same_res}"
+            if same_res.err():
+                msg = f"FFProbe detected differences: {same_res.as_err()}"
                 raise RuntimeError(msg)  # noqa: TRY301
 
-            return None  # noqa: TRY300
+            return Ok(None)
         except Exception as err:  # noqa: BLE001
             restore_result = self.restore_file()
             if isinstance(restore_result, RestoreFileNotSupported):
-                return f"Can't restore file, original error: {err!s}"
+                return Err(f"Can't restore file, original error: {err!s}")
 
-            if restore_result is not None:
-                return f"Restore file error: {restore_result}, original error: {err!s}"
+            if restore_result.err():
+                return Err(
+                    f"Restore file error: {restore_result.as_err()}, original error: {err!s}",
+                )
 
-            assert_type(restore_result, None)
-
-            return str(err)
+            return Err(str(err))
 
     @abstractmethod
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]: ...
+    ) -> RestoreFileNotSupported | Result[None, str]: ...
 
     @abstractmethod
     def write_language(
@@ -236,10 +245,9 @@ class InspectPrinter(ABC):
     def skip(
         self: Self,
         parent: str,
-        amount:int,
+        amount: int,
         depth: int,
     ) -> None: ...
-
 
 
 @decorate_class(slots=True)
@@ -287,7 +295,7 @@ ContextType = Literal["r", "w", "rw"]
 class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
     __impl: VideoTaggerContextRW
     __ctx: ContextType
-    __restore_backup_fn: Callable[[], RestoreFileNotSupported | Optional[str]]
+    __restore_backup_fn: Callable[[], RestoreFileNotSupported | Result[None, str]]
 
     def __init__(
         self: Self,
@@ -295,7 +303,7 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
         impl: VideoTaggerContextRW,
         ctx: ContextType,
         file: Path,
-        restore_backup_fn: Callable[[], RestoreFileNotSupported | Optional[str]],
+        restore_backup_fn: Callable[[], RestoreFileNotSupported | Result[None, str]],
     ) -> None:
         super().__init__(manager=manager, file=file)
         self.__impl = impl
@@ -313,7 +321,7 @@ class VideoTaggerContextWrapperGeneric(VideoTaggerContextRW):
     @override
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]:
+    ) -> RestoreFileNotSupported | Result[None, str]:
         res = self.__impl.restore_file()
 
         if isinstance(res, RestoreFileNotSupported):
@@ -379,9 +387,9 @@ class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW])
         writer: BinaryIO,
     ) -> VideoTaggerContextRW: ...
 
-    def __restore_backup_impl(self: Self) -> Optional[str]:
+    def __restore_backup_impl(self: Self) -> Result[None, str]:
         if self.__backup is None:
-            return "Backup for file not present"
+            return Err("Backup for file not present")
 
         # restore file backup
         if self.__ctx != "r":
@@ -392,7 +400,7 @@ class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW])
             print(f"RESTORED BACKUP FOR FILE: '{self.__file}'")  # noqa: T201
 
         self.__backup = None
-        return None
+        return Ok(None)
 
     @final
     def restore_backup(self: Self) -> None:
@@ -476,14 +484,14 @@ class VideoTaggerContextMultipleRW(VideoTaggerContextRW):
     @override
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]:
+    ) -> RestoreFileNotSupported | Result[None, str]:
         for context in self.__contexts:
             with context as ctx:
                 res = ctx.restore_file()
                 if isinstance(res, RestoreFileNotSupported):
                     continue
 
-                if res is None:
+                if res.ok():
                     return res
 
         return RestoreFileNotSupported()

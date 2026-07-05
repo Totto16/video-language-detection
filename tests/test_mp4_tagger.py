@@ -16,7 +16,7 @@ from fixtures import (
     test_manager,
 )
 from pytest_subtests import SubTests
-from test_helper import OkResult, file_duplicates
+from test_helper import ErrResult, OkResult, file_duplicates
 
 from content.language import Language
 from content.tagger.mp4_tagger import (
@@ -397,8 +397,8 @@ class MP4BoxStructure(FancyEq):
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f, options)
 
-                if mp4_res is not None:
-                    return Err(mp4_res)
+                if mp4_res.err():
+                    return Err(mp4_res.as_err())
 
                 boxes = list_all_boxes_recursively(f, options=options)
                 return Ok(MP4BoxStructure(boxes))
@@ -697,9 +697,7 @@ def test_mp4_invalid_bytes(
             io = BytesIO(data)
             res = is_mp4_file(io, mp4_options)
 
-            assert res is not None, "valid mp4 is incorrect here"
-
-            assert res == err, "incorrect error"
+            assert res == ErrResult(err), "incorrect error"
 
 
 def test_mp4_tagger_language_patching(

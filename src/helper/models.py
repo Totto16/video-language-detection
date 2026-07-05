@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Self, override
+from typing import Annotated, Self, override
 
 from content.language import (
     Alpha2LanguageStr,
@@ -11,6 +11,7 @@ from content.language import (
 )
 from helper.classifier import LinearCoeffs, MemoryPatternLinear, Model, ModelLanguage
 from helper.decorator import decorate_class
+from helper.result import Err, Ok, Result
 from helper.translation import get_translator
 
 __all__: list[str] = ["voxlingua107_ecapa_model"]
@@ -466,6 +467,7 @@ voxlingua107_ecapa_languages: Annotated[
 if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
     raise RuntimeError("UNREACHABLE")  # noqa: EM101
 
+
 @decorate_class(slots=True)
 class ModelLanguageForList(ModelLanguage):
     __languages: list[
@@ -488,15 +490,17 @@ class ModelLanguageForList(ModelLanguage):
         self.__languages = languages
 
     @override
-    def is_valid_language(self: Self, language: Language) -> Optional[str]:
+    def is_valid_language(self: Self, language: Language) -> Result[None, str]:
         for short_str, long_str in self.__languages:
             if language.short == short_str:
                 if language.long != long_str:
-                    return _("Long language doesn't match")
-                return None
+                    return Err(_("Long language doesn't match"))
+                return Ok(None)
 
-        return _("This dataset has no such language: {language}").format(
-            language=language,
+        return Err(
+            _("This dataset has no such language: {language}").format(
+                language=language,
+            ),
         )
 
 

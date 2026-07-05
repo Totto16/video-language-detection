@@ -2026,13 +2026,16 @@ class AppleItunesItemDataBox(MP4FullBox, FinalMP4Box):
     def can_encode_value(
         type_indicator: AppleItunesItemDataType,
         value: AppleItunesItemDataContent,
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
         encoded = AppleItunesItemDataBox.__encode_value_impl(
             type_indicator.value,
             value,
         )
 
-        return encoded.err_or(None)
+        if encoded.err():
+            return Err(encoded.as_err())
+
+        return Ok(None)
 
     @staticmethod
     def __read_impl(
@@ -2639,8 +2642,8 @@ class ApplItunesTags:
         data: ApplItunesTagsData,
     ) -> "ApplItunesTags":
         encode_res = AppleItunesItemDataBox.can_encode_value(data.type, data.value)
-        if encode_res is not None:
-            msg = f"Atom {key} not encodable: {encode_res}"
+        if encode_res.err():
+            msg = f"Atom {key} not encodable: {encode_res.as_err()}"
             raise AppleItunesFormatError(msg)
 
         return ApplItunesTags(key=key, data=data)
@@ -2754,7 +2757,7 @@ AppleItunesItemBoxAtoms: dict[ISOMAtomName, Optional[AppleItunesItemDataType]] =
     ISOMAtomName(b"sfID"): None,
     ISOMAtomName(b"cmID"): None,
     ISOMAtomName(b"akID"): None,
-    #TODO: use these in the write_tags helper, mkv also has a similar mechanims, avi not , but thats fine
+    # TODO: use these in the write_tags helper, mkv also has a similar mechanims, avi not , but thats fine
     ISOMAtomName(b"tvsh"): AppleItunesItemDataType.UTF8,  # TV Show, show name
     ISOMAtomName(b"tven"): AppleItunesItemDataType.INTEGER,  # TV Episode id
     ISOMAtomName(b"tvsn"): AppleItunesItemDataType.INTEGER,  # -- TV Season
@@ -2948,7 +2951,7 @@ def find_mdhd_boxes_with_type(
 def is_mp4_file(
     f: BinaryIO,
     options: MP4DecodeOptions,
-) -> Optional[str]:
+) -> Result[None, str]:
     f.seek(0)
 
     try:
@@ -2957,17 +2960,19 @@ def is_mp4_file(
         first_box = read_box(BoundedIO.get_new(f, SimpleSpan(0, filesize)), options)
 
         if not isinstance(first_box, FileTypeBox):
-            return _("Not a valid ISOM / MP4 file")
+            return Err(_("Not a valid ISOM / MP4 file"))
 
         if first_box.major_brand not in [b"isom", b"mp42"]:
-            return _(
-                "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"  # noqa: COM812
-            ).format(major_brand=first_box.major_brand)
+            return Err(
+                _(
+                    "ISOM/MP42 file has valid box, but invalid major_brand: {major_brand!s}"  # noqa: COM812
+                ).format(major_brand=first_box.major_brand),
+            )
 
         f.seek(0)
     except (RuntimeError, ValueError, TypeError) as err:
-        return str(err)
-    return None
+        return Err(str(err))
+    return Ok(None)
 
 
 # see also: https://mp4ra.org/registered-types/boxes
@@ -3604,7 +3609,7 @@ class VideoTaggerContextMP4(VideoTaggerContextRW):
     @override
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]:
+    ) -> RestoreFileNotSupported | Result[None, str]:
         return RestoreFileNotSupported()
 
     @override
@@ -3738,8 +3743,8 @@ class VideoTaggerMP4(VideoTagger):
 
             with file.open("rb") as f:
                 mp4_res = is_mp4_file(f, options)
-                if mp4_res is not None:
-                    return Err(mp4_res)
+                if mp4_res.err():
+                    return Err(mp4_res.as_err())
 
                 f.seek(0)
 

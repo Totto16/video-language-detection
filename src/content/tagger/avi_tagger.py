@@ -393,7 +393,7 @@ class AVIChunk(NonFinalAVIChunk):
             self.span.header_span(depth),
         )
 
-    def adjust_size(self: Self, f: BinaryIO, new_size: int) -> Optional[str]:
+    def adjust_size(self: Self, f: BinaryIO, new_size: int) -> Result[None, str]:
         # TODO: check, that we are the top level chunk, otherwise we might need some data changes, alias relocation
 
         f.seek(0, 2)
@@ -401,7 +401,7 @@ class AVIChunk(NonFinalAVIChunk):
         f.seek(0)
 
         if self.span.total.start != 0 or self.span.total.end < filesize:
-            return f"Can't add content to a non toplevel AVI chunk: {self.span}"
+            return Err(f"Can't add content to a non toplevel AVI chunk: {self.span}")
 
         if self.span.total.end > filesize:
             # need to adjust the span, as we just truncated the file
@@ -413,7 +413,9 @@ class AVIChunk(NonFinalAVIChunk):
 
         # Note: size is the size after it, so 8 bytes less then the whole size
         if new_avi_size >= 0xFFFFFFFF:
-            return f"Size is too big, can't fit in the AVI chunk size: {new_avi_size}"
+            return Err(
+                f"Size is too big, can't fit in the AVI chunk size: {new_avi_size}"
+            )
 
         io = BoundedIO.get_new(io_base=f, span=self.span.total)
 
@@ -434,15 +436,15 @@ class AVIChunk(NonFinalAVIChunk):
         f.seek(old_size)
 
         if filesize != f.tell():
-            return "can't write over other chunks atm"
+            return Err("can't write over other chunks atm")
 
-        return None
+        return Ok(None)
 
     def add_content_after_avi_chunk(
         self: Self,
         f: BinaryIO,
         data: bytes,
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
 
         old_size = self.span.total.size
 
@@ -454,16 +456,16 @@ class AVIChunk(NonFinalAVIChunk):
             data = b"\x00" + data
 
         res = self.adjust_size(f, new_size)
-        if res is not None:
-            return res
+        if res.err():
+            return Err(res.as_err())
 
         f.write(data)
         f.flush()
 
         if new_size != f.tell():
-            return "somehow the write failed"
+            return Err("somehow the write failed")
 
-        return None
+        return Ok(None)
 
     @staticmethod
     def write_to_buffer_avi_chunk(
@@ -553,7 +555,7 @@ class AVIList(AVIChunk):
         self: Self,
         f: BinaryIO,
         data: bytes,
-    ) -> Optional[str]:
+    ) -> Result[None, str]:
         # the exact same as the avi chunk method, but it might be different, this is an implementation detail
 
         return self.add_content_after_avi_chunk(f, data)
@@ -1163,7 +1165,7 @@ def find_strh_chunks_with_type(
 
 def is_avi_file(
     f: BinaryIO,
-) -> Optional[str]:
+) -> Result[None, str]:
     f.seek(0)
 
     try:
@@ -1172,22 +1174,26 @@ def is_avi_file(
         first_chunk = read_chunk(BoundedIO.get_new(f, SimpleSpan(0, filesize)))
 
         if not isinstance(first_chunk, AVIList):
-            return _("Not a valid RIFF / AVI file")
+            return Err(_("Not a valid RIFF / AVI file"))
 
         if first_chunk.fourcc != RIFF_FOURCC:
-            return _(
-                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}",
-            ).format(first_chunk=first_chunk.fourcc)
+            return Err(
+                _(
+                    "RIFF/AVI file has valid chunk, but it is not the correct starting chunk: {first_chunk!r}",
+                ).format(first_chunk=first_chunk.fourcc)
+            )
 
         if first_chunk.type not in [AVI__FOURCC, AVIX_FOURCC]:
-            return _(
-                "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}",
-            ).format(list_type=first_chunk.type)
+            return Err(
+                _(
+                    "RIFF/AVI file has valid chunk, but it is not the correct starting chunk, list type invalid: {list_type!r}",
+                ).format(list_type=first_chunk.type)
+            )
 
         f.seek(0)
     except (RuntimeError, ValueError, TypeError) as err:
-        return str(err)
-    return None
+        return Err(str(err))
+    return Ok(None)
 
 
 @dataclass(slots=True, repr=True)
@@ -1496,8 +1502,8 @@ class AVIMetadataHandler:
         info_list_data = info_chunk.build()
         result = top_level_chunk.add_content_after_avi_list(f, info_list_data)
 
-        if result is not None:
-            msg = f"Adding content failed: {result}"
+        if result.err():
+            msg = f"Adding content failed: {result.as_err()}"
             raise RuntimeError(msg)
 
         f.flush()
@@ -1853,7 +1859,7 @@ class VideoTaggerContextAVI(VideoTaggerContextRW):
     @override
     def restore_file(
         self: Self,
-    ) -> RestoreFileNotSupported | Optional[str]:
+    ) -> RestoreFileNotSupported | Result[None, str]:
         return RestoreFileNotSupported()
 
     @override
@@ -1998,8 +2004,8 @@ class VideoTaggerAVI(VideoTagger):
 
             with file.open("rb") as f:
                 avi_res = is_avi_file(f)
-                if avi_res is not None:
-                    return Err(avi_res)
+                if avi_res.err():
+                    return Err(avi_res.as_err())
 
                 f.seek(0)
 

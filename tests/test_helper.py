@@ -118,9 +118,12 @@ class ErrResult(FancyEq):
     def __init__(self: Self, value: Any = _AnyResultValue) -> None:
         self.__value = value
 
+    #TODO: replace isinstance with is _AnyResultValue call
     def __eq_other(self: Self, other_value: Any) -> Result[None, list[str]]:
         if isinstance(self.__value, AnyResultValue):
             return Ok(None)
+        
+        assert_type("a",_AnyResultValue)
 
         if self.__value == other_value:
             return Ok(None)
