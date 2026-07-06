@@ -34,6 +34,7 @@ from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+from helper.utils import dict_has
 
 _ = get_translator()
 logger: Logger = get_logger()
@@ -1291,7 +1292,7 @@ def __get_all_validators_available_impl() -> dict[str, ValidatorEntry]:
     for validator_class in validator_classes:
         names = validator_class.names()
         for name in names:
-            if validators.get(name, None) is not None:  # noqa: SIM910
+            if dict_has(validators, name):
                 msg = _("Duplicate validator name: {name}").format(name=name)
                 raise RuntimeError(msg)
 

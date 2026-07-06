@@ -101,6 +101,7 @@ from helper.manager import (
 from helper.models import voxlingua107_ecapa_model
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+from helper.utils import dict_wrapper
 from helper.validator import (
     ReporterWhere,
     Validator,
@@ -851,10 +852,11 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
                 "total",
             ]
             for number_like_key in number_like_keys:
-                if serializable_options1.get(number_like_key) is not None:
+                value = dict_wrapper(lambda : serializable_options1[number_like_key])
+                if value.ok():
                     serializable_options1[number_like_key] = (
                         number_like_convert_to_serializable(
-                            serializable_options1[number_like_key],
+                            value.as_ok(),
                         )
                     )
             instance_serializable = CounterTypeCounter(

@@ -60,6 +60,7 @@ from helper.decorator import decorate_class
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+from helper.utils import dict_at
 
 _ = get_translator()
 
@@ -2653,14 +2654,14 @@ class ApplItunesTags:
         name: ISOMAtomName,
         value: AppleItunesItemDataContent,
     ) -> "ApplItunesTags":
-        data_type = AppleItunesItemBoxAtoms.get(name, None)  # noqa: SIM910
-        if data_type is None:
+        data_type = dict_at(AppleItunesItemBoxAtoms,name)
+        if data_type.err():
             msg = f"Atom name not known: {name}"
             raise AppleItunesFormatError(msg)
 
         return ApplItunesTags.validate_init(
             key=name,
-            data=ApplItunesTagsData(data_type, value),
+            data=ApplItunesTagsData(data_type.as_ok(), value),
         )
 
 

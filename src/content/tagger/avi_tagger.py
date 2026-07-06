@@ -58,6 +58,7 @@ from helper.decorator import decorate_class
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+from helper.utils import dict_has
 
 _ = get_translator()
 
@@ -1557,10 +1558,7 @@ class AVIMetadataHandler:
 
         for value in result_toplevel_info:
             if isinstance(value, VLDKnownStrSubChunk):
-                if (
-                    KNOWN_INFO_SUBCHUNK_FOURCCS.get(value.fourcc, None)  # noqa: SIM910
-                    is None
-                ):
+                if not dict_has(KNOWN_INFO_SUBCHUNK_FOURCCS, value.fourcc):
                     msg = f"Invalid VLDKnownStrSubChunk chunk, can't be transformed to a string key: {value.fourcc}"
                     raise RuntimeError(msg)
 
