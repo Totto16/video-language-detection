@@ -71,10 +71,14 @@ class OkResult(FancyEq):
         if self.__value is _AnyResultValue:
             return Ok(None)
 
-        if self.__value == other_value:
-            return Ok(None)
+        res = FancyEq.compare(self.__value, other_value)
+        if res.ok():
+            return Err(res.as_ok())
 
-        return Err(["Ok value not the same", str(self.__value), str(other_value)])
+        if self.__value != other_value:
+            return Err(["Ok value not the same", str(self.__value), str(other_value)])
+
+        return Ok(None)
 
     def __eq_impl(
         self: Self,
