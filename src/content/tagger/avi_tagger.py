@@ -58,7 +58,6 @@ from helper.decorator import decorate_class
 from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.utils import dict_has
 
 _ = get_translator()
 
@@ -1268,7 +1267,7 @@ class INFOChunkBuilder:
 
         key = INFOChunkBuilder._key_str_impl(sub_chunk)
 
-        if self.__sub_chunks.get(key, None) is not None:
+        if key in self.__sub_chunks:
             if duplicate_behavior == "error":
                 msg: str = f"Trying to add duplicate sub chunk key: {key}"
                 raise RuntimeError(msg)
@@ -1558,7 +1557,7 @@ class AVIMetadataHandler:
 
         for value in result_toplevel_info:
             if isinstance(value, VLDKnownStrSubChunk):
-                if not dict_has(KNOWN_INFO_SUBCHUNK_FOURCCS, value.fourcc):
+                if value.fourcc not in KNOWN_INFO_SUBCHUNK_FOURCCS:
                     msg = f"Invalid VLDKnownStrSubChunk chunk, can't be transformed to a string key: {value.fourcc}"
                     raise RuntimeError(msg)
 

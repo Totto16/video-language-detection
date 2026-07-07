@@ -34,7 +34,6 @@ from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.utils import dict_has
 
 _ = get_translator()
 logger: Logger = get_logger()
@@ -1292,7 +1291,7 @@ def __get_all_validators_available_impl() -> dict[str, ValidatorEntry]:
     for validator_class in validator_classes:
         names = validator_class.names()
         for name in names:
-            if dict_has(validators, name):
+            if name in validators:
                 msg = _("Duplicate validator name: {name}").format(name=name)
                 raise RuntimeError(msg)
 
@@ -1406,7 +1405,7 @@ def __get_validators_impl(
 
             validator_name = validator.name
 
-            if result.get(validator_name, None) is not None:
+            if validator_name in result:
                 msg = _(
                     "Validator is already present, duplicate is not allowed: {validator_name}"  # noqa: COM812
                 ).format(validator_name=validator_name)

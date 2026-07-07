@@ -785,7 +785,7 @@ def __filter_configs_impl(
                 assert_never(val)
 
             cfg_name = cfg.config_name
-            if result.get(cfg_name, None) is not None:
+            if cfg_name in result:
                 msg = f"Config is already present, duplicate is not allowed: {cfg_name}"
                 raise RuntimeError(msg)
 

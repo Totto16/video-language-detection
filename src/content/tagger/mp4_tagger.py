@@ -2654,14 +2654,20 @@ class ApplItunesTags:
         name: ISOMAtomName,
         value: AppleItunesItemDataContent,
     ) -> "ApplItunesTags":
-        data_type = dict_at(AppleItunesItemBoxAtoms,name)
-        if data_type.err():
+        data_type_res = dict_at(AppleItunesItemBoxAtoms, name)
+        if data_type_res.err():
             msg = f"Atom name not known: {name}"
+            raise AppleItunesFormatError(msg)
+
+        data_type = data_type_res.as_ok()
+
+        if data_type is None:
+            msg = f"Atom name '{name}' has no known data type"
             raise AppleItunesFormatError(msg)
 
         return ApplItunesTags.validate_init(
             key=name,
-            data=ApplItunesTagsData(data_type.as_ok(), value),
+            data=ApplItunesTagsData(data_type, value),
         )
 
 
@@ -2692,7 +2698,7 @@ class AppleItunesMetaBoxBuilder:
 
         key = AppleItunesMetaBoxBuilder._key_str_impl(tag.key)
 
-        if self.__tags.get(key, None) is not None:
+        if key in self.__tags:
             if duplicate_behavior == "error":
                 msg = f"Trying to add duplicate tag key: {key}"
                 raise AppleItunesFormatError(msg)
@@ -3323,7 +3329,7 @@ class MP4MetadataHandler:
             return json.dumps(val1) == json.dumps(val2)
 
         for key, value in mdt2.metadata.items():
-            if metadata_result.metadata.get(key, None) is not None:
+            if key in metadata_result.metadata:
                 if not is_value_eq(metadata_result.metadata[key], value):
                     msg = f"Duplicate key '{key}' value doesn't match: {metadata_result.metadata[key]} != {value}"
                     raise RuntimeError(msg)

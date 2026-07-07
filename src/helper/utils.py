@@ -1,5 +1,4 @@
-from collections.abc import Callable
-from typing import Any, Optional, TypeIs
+from typing import Optional, TypeIs
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
@@ -38,14 +37,3 @@ def dict_at[A, B](dct: dict[A, B], key: A) -> Result[B, None]:
         return Err(None)
 
     return Ok(value)
-
-
-def dict_has[A](dct: dict[A, Any], key: A) -> bool:
-    return dict_at(dct, key).ok()
-
-
-def dict_wrapper[A](fn: Callable[[], A]) -> Result[A, None]:
-    try:
-        return Ok(fn())
-    except KeyError:
-        return Err(None)

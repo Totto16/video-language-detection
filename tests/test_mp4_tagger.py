@@ -782,13 +782,13 @@ def get_raw_ffprobe_tags(
 
     if val.get("tags", None) is not None:
         tags: dict[str, Any] = val["tags"]
-        if tags.get("comment", None) is not None:  # noqa: SIM910
+        if "comment" in tags:
             metadata["comment"] = tags["comment"]
             del val["tags"]["comment"]
 
         for key, value in [*tags.items()]:
             if key.startswith("video_language_detect"):
-                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                if "metadata" not in metadata:
                     metadata["metadata"] = {}
 
                 metadata["metadata"][key] = value

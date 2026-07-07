@@ -1,7 +1,5 @@
 from typing import Literal, assert_never
 
-from helper.utils import dict_has
-
 
 def merge_dicts[A](
     dict1: dict[str, A],
@@ -13,7 +11,7 @@ def merge_dicts[A](
         res[key] = value  # noqa: PERF403
 
     for key, value in dict2.items():
-        if dict_has(res, key):
+        if key in res:
             if duplicate_behavior == "error":
                 msg = f"Trying to merge duplicate key: {key}"
                 raise RuntimeError(msg)

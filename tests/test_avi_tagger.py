@@ -607,32 +607,32 @@ def get_raw_ffprobe_tags(
 
     metadata: dict[str, Any] = {"comment": None, "metadata": None}
 
-    if val.get("tags", None) is not None:
+    if "tags" in val:
         tags: dict[str, Any] = val["tags"]
-        if tags.get("comment", None) is not None:  # noqa: SIM910
+        if "comment" in tags:
             metadata["comment"] = tags["comment"]
             del val["tags"]["comment"]
 
         for key, value in [*tags.items()]:
             if key.startswith("video_language_detect"):
-                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                if "metadata" not in metadata:
                     metadata["metadata"] = {}
 
                 metadata["metadata"][key] = value
                 del val["tags"][key]
 
             if key in [LIST_FOURCC.value.decode(), VLD_KEY_VALUE_FOURCC.value.decode()]:
-                if metadata.get("artifacts", None) is None:  # noqa: SIM910
+                if "artifacts" not in metadata:
                     metadata["artifacts"] = {}
 
                 metadata["artifacts"][key] = value
                 del val["tags"][key]
 
             if key == VLD_FFMPEG_RAW_STRING_JSON_CHUNK_FOURCC.value.decode():
-                if metadata.get("metadata", None) is None:  # noqa: SIM910
+                if "metadata" not in metadata:
                     metadata["metadata"] = {}
 
-                if metadata.get("errors", None) is None:  # noqa: SIM910
+                if "errors" not in metadata:
                     metadata["errors"] = []
 
                 raw_value = json.loads(value)

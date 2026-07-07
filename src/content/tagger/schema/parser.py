@@ -18,7 +18,7 @@ from xml.etree.ElementTree import parse as parse_xml
 
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
-from helper.utils import parse_int_safely
+from helper.utils import dict_at, parse_int_safely
 
 
 @dataclass(slots=True, repr=True)
@@ -595,25 +595,14 @@ class EBMLSpec:
         return str(self)
 
 
-@decorate_class(slots=True)
-class _MISSING:
-    pass
-
-
-def is_missing[A](value: A | type[_MISSING]) -> TypeIs[type[_MISSING]]:
-    return isinstance(value, _MISSING)
-
-
 def xml_required[A](dct: dict[str, A], key: str) -> A:
-    value = dct.get(key, _MISSING)
+    value = dict_at(dct, key)
 
-    if is_missing(value):
+    if value.err():
         msg = f"Missing XML Require attribute '{key}': {dct}"
         raise TypeError(msg)
 
-    assert_type(value, A)
-
-    return value
+    return value.as_ok()
 
 
 def xml_int(value: str | int, base: int = 10) -> int:

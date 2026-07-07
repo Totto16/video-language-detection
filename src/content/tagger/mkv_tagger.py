@@ -60,7 +60,6 @@ from content.tagger.video_tagger import (
 from helper.decorator import decorate_class
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
-from helper.utils import dict_has
 
 
 @dataclass(slots=True, repr=True)
@@ -1507,7 +1506,7 @@ def ebml_iter_elements(
     occurrences: dict[str, Occurrence] = {}
 
     def add_occurrence(element_desc: EBMLElementDescription) -> None:
-        if not dict_has(occurrences,element_desc.name):
+        if element_desc.name not in occurrences:
             occurrences[element_desc.name] = Occurrence(desc=element_desc, amount=1)
         else:
             occurrences[element_desc.name].increment()

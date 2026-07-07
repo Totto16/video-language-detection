@@ -581,7 +581,7 @@ class VideoTaggerContextMutagen(VideoTaggerContextRW):
             elif TaggerDomain.key_start_with(key):
                 actual_key = TaggerDomain.get_raw(key)
 
-                if result.metadata.get(actual_key, None) is not None:
+                if actual_key in result.metadata:
                     msg = f"Duplicate metadata key tag read: {actual_key} -> {value}"
                     raise RuntimeError(msg)
 

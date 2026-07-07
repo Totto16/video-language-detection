@@ -39,7 +39,6 @@ from helper.error import ErrorMode
 from helper.log import get_logger
 from helper.manager import ManagerInterface
 from helper.translation import get_translator
-from helper.utils import dict_has
 
 logger: Logger = get_logger()
 _ = get_translator()
@@ -129,7 +128,7 @@ class SuccessSummaryManager:
             if result.value:
                 language = result.get_language()
 
-                if not dict_has(summary.success, language):
+                if language not in summary.success:
                     summary.success[language] = 0
 
                 summary.success[language] += 1
@@ -137,7 +136,7 @@ class SuccessSummaryManager:
             else:
                 reason_identifier = result.get_reason_identifier()
 
-                if not dict_has(summary.failure, reason_identifier):
+                if reason_identifier not in summary.failure:
                     summary.failure[reason_identifier] = 0
 
                 summary.failure[reason_identifier] += 1

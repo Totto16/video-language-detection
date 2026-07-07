@@ -101,7 +101,7 @@ from helper.manager import (
 from helper.models import voxlingua107_ecapa_model
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
-from helper.utils import dict_wrapper
+from helper.utils import dict_at
 from helper.validator import (
     ReporterWhere,
     Validator,
@@ -852,11 +852,10 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
                 "total",
             ]
             for number_like_key in number_like_keys:
-                value = dict_wrapper(lambda : serializable_options1[number_like_key])
-                if value.ok():
+                if number_like_key in serializable_options1:
                     serializable_options1[number_like_key] = (
                         number_like_convert_to_serializable(
-                            value.as_ok(),
+                            serializable_options1[number_like_key],
                         )
                     )
             instance_serializable = CounterTypeCounter(
@@ -990,9 +989,11 @@ class WsManager(ManagerInterface, ChoiceManagerInterface, ValidatorReporter):
         result: Optional[SelectResult],
         unique_id: uuid.UUID,
     ) -> Result[None, str]:
-        reply_data = self.__reply_ids.get(unique_id, None)
-        if reply_data is None:
+        reply_data_res = dict_at(self.__reply_ids, unique_id)
+        if reply_data_res.err():
             return Err("Error: reply not present or already answered!")
+
+        reply_data = reply_data_res.as_ok()
 
         if reply_data.type != "ask_question":
             return Err("Error: wrong reply type!")

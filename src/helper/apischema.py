@@ -64,7 +64,7 @@ def get_sub_schema(
         emit_type=emit_type,
     )
 
-    if schema.get("$schema", None) is not None:
+    if "$schema" in schema:
         del schema["$schema"]
 
     defs = schema.get("$defs", None)

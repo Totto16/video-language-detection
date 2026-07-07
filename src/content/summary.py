@@ -73,6 +73,7 @@ def metadata_handle_to_type(
 
     return MetadataType.ok
 
+
 @decorate_class(slots=True)
 class Summary:
     __complete: bool
@@ -310,7 +311,7 @@ class Summary:
         dct: LanguageDict = {}
         for input_dict in inp:
             for language, amount in input_dict.items():
-                if dct.get(language) is None:
+                if language not in dct:
                     dct[language] = 0
 
                 dct[language] += amount
@@ -342,7 +343,7 @@ class Summary:
 
         for input_dict in inp:
             for key, value in input_dict.items():
-                if dct.get(key) is None:
+                if key not in dct:
                     dct[key] = {
                         MetadataType.ok: 0,
                         MetadataType.missing: 0,

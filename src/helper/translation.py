@@ -31,7 +31,7 @@ TRANSLATION_DIR = Path(__file__).parent.parent.parent / "locales"
 
 
 def get_translator() -> TranslationFunction:
-    if builtins.__dict__.get("_", None) is None:
+    if "_" not in builtins.__dict__:
         translation = gettext.translation(
             TRANSLATION_DOMAIN,
             localedir=TRANSLATION_DIR,

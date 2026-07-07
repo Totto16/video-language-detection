@@ -98,7 +98,7 @@ class Prediction:
         prob_dict: dict[Language, list[float]] = {}
         for data in self.__data:
             for acc, language in data:
-                if prob_dict.get(language) is None:
+                if language not in prob_dict:
                     prob_dict[language] = []
 
                 prob_dict[language].append(acc)
