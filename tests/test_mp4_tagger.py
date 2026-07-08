@@ -754,10 +754,6 @@ def test_mp4_tagger_language_patching(
                 assert new_language.short == stream.raw["tags"]["language"]
 
 
-def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
-    return [key for key, value in dict1.items() if value is not None]
-
-
 def mp4_has_already_udta_box(file: Path, options: MP4DecodeOptions) -> bool:
     structure_res = MP4BoxStructure.from_file(file, options)
 
@@ -861,8 +857,8 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
                     )
 
                     assert (
-                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
-                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                        set(ffprobe_metadata_early.keys()) == {"comment"}
+                        or set(ffprobe_metadata_early.keys()) == set()
                     ), "raw ffprobe metadata is empty at start"
 
                     ctx.write_tags(tags)
@@ -890,12 +886,12 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 
                     assert raw_next_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
-                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                    } or set(ffprobe_metadata_next.keys()) == {
                         "comment",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
@@ -965,12 +961,12 @@ def test_mp4_tagger_metadata_tags_mutagen(  # noqa: PLR0915
 
                     assert raw_again_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
-                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                    } or set(ffprobe_metadata_next.keys()) == {
                         "comment",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
@@ -1058,8 +1054,8 @@ def test_mp4_tagger_metadata_tags_custom(
                     )
 
                     assert (
-                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
-                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                        set(ffprobe_metadata_early.keys()) == {"comment"}
+                        or set(ffprobe_metadata_early.keys()) == set()
                     ), "raw ffprobe metadata is empty at start"
 
                     ctx.write_tags(tags)
@@ -1087,12 +1083,12 @@ def test_mp4_tagger_metadata_tags_custom(
 
                     assert raw_next_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
-                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                    } or set(ffprobe_metadata_next.keys()) == {
                         "comment",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
@@ -1158,12 +1154,12 @@ def test_mp4_tagger_metadata_tags_custom(
 
                     assert raw_again_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
-                    ] or keys_that_are_not_none(ffprobe_metadata_next) == [
+                    } or set(ffprobe_metadata_next.keys()) == {
                         "comment",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
