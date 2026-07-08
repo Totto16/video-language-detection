@@ -8,9 +8,7 @@ from typing import (
     Literal,
     Optional,
     Self,
-    TypeIs,
     assert_never,
-    assert_type,
     override,
 )
 from xml.etree.ElementTree import XMLParser
@@ -207,7 +205,7 @@ def ebml_occurrences_from_values(
             EBMLSchemaRange(
                 (
                     EBMLSchemaRangeElem(
-                        min_occurrences, EBMLSchemaRangeBound.Inclusive
+                        min_occurrences, EBMLSchemaRangeBound.Inclusive,
                     ),
                     None,
                 ),

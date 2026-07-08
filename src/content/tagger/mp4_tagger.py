@@ -3206,7 +3206,7 @@ class MP4MetadataHandler:
             raise RuntimeError(msg)
 
         for data_box in mp4_iter_boxes_for_span(
-            f, meta_child_box.span.payload_span, options
+            f, meta_child_box.span.payload_span, options,
         ):
             if not isinstance(
                 data_box,
@@ -3408,7 +3408,7 @@ class MP4MetadataHandler:
         result: ReadMetaBoxValues = []
 
         for data_box in mp4_iter_boxes_for_span(
-            f, meta_child_box.span.payload_span, options
+            f, meta_child_box.span.payload_span, options,
         ):
             if not isinstance(
                 data_box,

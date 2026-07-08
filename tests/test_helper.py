@@ -1,11 +1,11 @@
-from abc import ABC, abstractmethod
 import re
 import tempfile
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Literal, Optional, Protocol, Self, override
+from typing import TYPE_CHECKING, Literal, Optional, Self, override
 
 from conftest import FancyEq
 

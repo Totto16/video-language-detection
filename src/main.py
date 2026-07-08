@@ -1,9 +1,10 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Optional
 
+import jsonschema
 import jsonschema.validators
 import yaml
 
@@ -13,8 +14,6 @@ from content.season_content import SeasonContent
 from content.series_content import SeriesContent
 from helper.apischema import EmitType, OneOf, get_schema
 from helper.config import SchemaConfig
-import jsonschema
-
 from helper.log import get_logger
 from helper.translation import get_translator
 

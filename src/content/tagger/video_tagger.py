@@ -13,7 +13,6 @@ from typing import (
     Optional,
     Self,
     assert_never,
-    assert_type,
     cast,
     final,
     override,

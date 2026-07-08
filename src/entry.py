@@ -10,7 +10,6 @@ from logging import Logger
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Literal,
     Never,
     Optional,
@@ -701,12 +700,12 @@ def subcommand_config_check(
 ) -> ExitCode:
     from apischema import serialize
 
-    from main import AppSchemas, validate_schema
     from helper.config import (
         AdvancedConfig,
         FinalConfig,
         filter_configs,
     )
+    from main import AppSchemas, validate_schema
 
     schemas = AppSchemas.from_folder(Path("schema/"))
 

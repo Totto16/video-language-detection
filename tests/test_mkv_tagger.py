@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Optional, Self, assert_never, override
+from pathlib import Path
+from typing import BinaryIO, Optional, Self, assert_never, override
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
@@ -48,9 +49,6 @@ from content.tagger.schema.parser import (
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
 from helper.utils import hash_list
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 mark_as_used(mkv_test_parse_files)
 
@@ -176,7 +174,7 @@ def test_mkv_tagger_parse_element_id(
         (
             b"\x20\x00\x7f",
             ErrResult(
-                "Value 127 uses too much bytes: 1 bytes are the minimum, but used 3"
+                "Value 127 uses too much bytes: 1 bytes are the minimum, but used 3",
             ),
         ),
     ]
@@ -525,7 +523,8 @@ class RecursiveElements:
 
             return RecursiveElements.__eq_impl_both(d1, d2, depth=depth + 1)
         if isinstance(data1, EBMLElementParsed) and isinstance(
-            data2, EBMLElementParsed
+            data2,
+            EBMLElementParsed,
         ):
             return RecursiveElements.__is_element_eq(data1, data2, depth)
 
@@ -651,7 +650,8 @@ class MKVElementStructure(FancyEq):
                 document = stream.documents[0]
 
                 header_elem: tuple[
-                    EBMLElementParsed, RecursiveElements.RecursiveElementsData
+                    EBMLElementParsed,
+                    RecursiveElements.RecursiveElementsData,
                 ] = (EBMLElementParsed(document.header, document.header.desc), [])
 
                 header_options = document.header.options
@@ -1027,16 +1027,14 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
 
         def get_mkv_spec() -> EBMLTestSpec:
 
-            result = EBMLTestSpec(doc_type=DocType(type="matroska", version=4))
+            return EBMLTestSpec(doc_type=DocType(type="matroska", version=4))
 
-            return result
-
-        EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")
+        EBMLMKVSpec = ebml_read_spec_xml("mkv/ebml_matroska.xml")  # noqa: N806
 
         mkv_spec = get_mkv_spec()
 
         # TODO: this needs so much boilerplate, but implement a full comparison
-        # assert EBMLMKVSpec == mkv_spec.spec
+        # assert EBMLMKVSpec == mkv_spec.spec  # noqa: ERA001
 
         assert EBMLMKVSpec.doc_type == mkv_spec.spec.doc_type
 
