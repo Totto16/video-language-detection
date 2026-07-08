@@ -494,6 +494,10 @@ def test_avi_tagger_parsing(
 
                 chunks_span, chunks = chunks_stack.pop()
                 start: int = chunks_span.start
+                if len(chunks) == 0:
+                    msg = f"Expected each list chunk to have at least one children, but got: {len(chunks)}"
+                    raise RuntimeError(msg)
+
                 for chunk_data in chunks:
 
                     chunk: AVIChunk

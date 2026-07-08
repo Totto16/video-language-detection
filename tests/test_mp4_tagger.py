@@ -454,6 +454,11 @@ class MP4BoxStructure(FancyEq):
         while len(boxes_stack) != 0:
 
             boxes = boxes_stack.pop()
+
+            if len(boxes) == 0:
+                msg = f"Expected each container box to have at least one children, but got: {len(boxes)}"
+                raise RuntimeError(msg)
+
             for box_data in boxes:
 
                 box: MP4Box
@@ -643,6 +648,11 @@ def test_mp4_tagger_parsing(
 
                 boxes_span, boxes = boxes_stack.pop()
                 start: int = boxes_span.start
+
+                if len(boxes) == 0:
+                    msg = f"Expected each container box to have at least one children, but got: {len(boxes)}"
+                    raise RuntimeError(msg)
+
                 for box_data in boxes:
 
                     box: MP4Box

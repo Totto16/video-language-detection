@@ -743,13 +743,15 @@ def test_mkv_tagger_parsing(
             ] = [
                 (SimpleSpan(0, filesize), structure.elements.data),
             ]
-            
-            print(structure)
 
             while len(elements_stack) != 0:
 
                 elements_span, elements = elements_stack.pop()
                 start: int = elements_span.start
+
+                if len(elements) == 0:
+                    start = elements_span.end
+
                 for element_data in elements:
 
                     element: EBMLElementParsed
