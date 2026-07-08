@@ -241,7 +241,7 @@ def ffprobe_temp_video_files(
             [nm for _, nm in files.data],
             metadatas,
             strict=True,
-        )
+        ),
     )
 
     finalizer: Finalizer[list[tuple[Path, str, FFprobeData]]] = Finalizer[

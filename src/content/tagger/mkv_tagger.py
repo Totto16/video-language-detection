@@ -16,6 +16,7 @@ from typing import (
     override,
 )
 
+from content.language import Language
 from content.tagger.parser import (
     BoundedIO,
     ByteOrder,
@@ -46,11 +47,15 @@ from content.tagger.schema.parser import (
     filter_spec_elements,
 )
 from content.tagger.video_tagger import (
+    VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
     ContextType,
     InspectElement,
     InspectNotImplemented,
     InspectPrinter,
     InspectPriority,
+    MetadataTags,
+    MetadataTagsRead,
+    RestoreFileNotSupported,
     VideoTagger,
     VideoTaggerContextCtxGeneric,
     VideoTaggerContextReadable,
@@ -58,7 +63,7 @@ from content.tagger.video_tagger import (
     VideoTaggerContextWriteable,
 )
 from helper.decorator import decorate_class
-from helper.manager import ManagerInterface
+from helper.manager import CounterInterface, ManagerInterface
 from helper.result import Err, Ok, Result
 
 
@@ -2135,16 +2140,177 @@ def is_mkv_file(
     return Ok(None)
 
 
+class VideoTaggerContextMKV(VideoTaggerContextRW):
+    __writer: BinaryIO
+    __streams: int
+    __types: list[EBMLElementID]
+
+    def __init__(
+        self: Self,
+        manager: ManagerInterface,
+        file: Path,
+        writer: BinaryIO,
+        streams: int,
+        types: list[EBMLElementID],
+    ) -> None:
+        super().__init__(manager, file)
+        self.__writer = writer
+        self.__streams = streams
+        self.__types = types
+
+    @override
+    def write_tags(
+        self: Self,
+        tags: MetadataTags,
+    ) -> None:
+
+        # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
+        bar: CounterInterface = self.manager.counter(
+            total=float(2),
+            desc="update mkv metadata tags",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
+        try:
+            # avi_metadata_handler = AVIMetadataHandler.get_metadata_handler(
+            #     f=self.__writer,
+            # )
+
+            bar.update(1, force=True)
+
+            # avi_metadata_handler.write_new_metadata(
+            #     self.__writer,
+            #     tags,
+            # )
+
+            bar.update(1, force=True)
+
+            self.__writer.flush()
+        finally:
+            bar.close(clear=True)
+
+    @override
+    def restore_file(
+        self: Self,
+    ) -> RestoreFileNotSupported | Result[None, str]:
+        return RestoreFileNotSupported()
+
+    @override
+    def write_language(
+        self: Self,
+        language: Language,
+    ) -> bool:
+        new_language = language.short
+
+        # TODO. replace VIDEO_FILE_TAG_UPDATE_BAR_FORMAT everywhere, as we don't use bytes here!
+        bar: CounterInterface = self.manager.counter(
+            total=float(self.__streams + 1),
+            desc="update mkv language",
+            unit="B",
+            leave=False,
+            bar_format=VIDEO_FILE_TAG_UPDATE_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
+        # options = AVIDecodeOptions.default()
+
+        try:
+            self.__writer.seek(0)
+            # for strh in find_strh_chunks_with_type(
+            #     self.__writer,
+            #     self.__types,
+            #     options,
+            # ):
+
+            # should_write_language = True
+
+            # lang = strh.read_language(self.__writer)
+            # if isinstance(lang, ShortLanguageStr) and new_language == lang:
+            #     should_write_language = False
+
+            # if should_write_language:
+            #     strh.patch_language(self.__writer, new_language)
+
+            # bar.update(1, force=True)
+
+            self.__writer.flush()
+        finally:
+            bar.close(clear=True)
+
+        return True
+
+    @override
+    def read_language(
+        self: Self,
+    ) -> Result[Optional[Language], str]:
+        return Err("Not Implemented yet")
+
+    @override
+    def get_tags(
+        self: Self,
+    ) -> MetadataTagsRead:
+
+        raise NotImplementedError("TODO")
+
+        # avi_metadata_handler = AVIMetadataHandler.get_metadata_handler(
+        #     f=self.__writer,
+        # )
+
+        # metadata_result = avi_metadata_handler.read_metadata(self.__writer)
+
+        # result: MetadataTagsRead = MetadataTagsRead(None, None, {}, [])
+
+        # if metadata_result.uuid is not None:
+        #     result.uuid = metadata_result.uuid
+
+        # for key, value in metadata_result.metadata.items():
+
+        #     if key == "comment":
+        #         if result.comment is not None:
+        #             msg = f"Duplicate comment tag read: {value}"
+        #             raise RuntimeError(msg)
+
+        #         result.comment = decode_as_str(value)
+
+        #     elif key == "metadata":
+        #         if len(result.metadata.items()) != 0:
+        #             msg = f"Duplicate metadata tag read: {value}"
+        #             raise RuntimeError(msg)
+
+        #         result.metadata = decode_as_dict(value)
+        #     else:
+        #         result.unrecognized.append(
+        #             (key, decode_as_str(value)),
+        #         )
+
+        # for unrecognized in metadata_result.unrecognized:
+        #     str_value: str
+        #     try:
+        #         str_value = unrecognized.data.decode()
+        #     except (UnicodeDecodeError, ValueError):
+        #         str_value = unrecognized.data.decode(errors="replace")
+
+        #     data: tuple[str, str] = (unrecognized.fourcc.value.decode(), str_value)
+        #     result.unrecognized.append(data)
+
+        # return result
+
+
 @decorate_class(slots=True)
 class VideoTaggerMKV(VideoTagger):
     __streams: int
-    __types: list[EBMLVarInt]
+    __types: list[EBMLElementID]
 
     def __init__(
         self: Self,
         file: Path,
         streams: int,
-        types: list[EBMLVarInt],
+        types: list[EBMLElementID],
     ) -> None:
         super().__init__(file)
         self.__streams = streams
@@ -2154,6 +2320,9 @@ class VideoTaggerMKV(VideoTagger):
 
     @staticmethod
     def get_handle(file: Path) -> Result["VideoTagger", str]:
+
+        if file.stem != "MYPY_NOT_ALAWAYS_TRUE:":
+            return Err("Not implemented yet")
 
         try:
 
@@ -2165,7 +2334,7 @@ class VideoTaggerMKV(VideoTagger):
                 f.seek(0)
 
                 streams = 0
-                types: list[EBMLVarInt] = [
+                types: list[EBMLElementID] = [
                     # AUDIO_TODO, VIDEO_TODO
                 ]
 
@@ -2210,7 +2379,6 @@ class VideoTaggerMKV(VideoTagger):
                 manager: ManagerInterface,
                 writer: BinaryIO,
             ) -> VideoTaggerContextMKV:
-                raise NotImplementedError("TODO")
                 return VideoTaggerContextMKV(manager, file, writer, streams, types)
 
         return VideoTaggerContextCtx()
