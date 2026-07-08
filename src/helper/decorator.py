@@ -8,8 +8,6 @@ from typing import Any, Optional, cast, is_typeddict
 
 from pydantic._internal._model_construction import ModelMetaclass
 
-from helper.result import Err, Ok, Result
-
 # some things here wer copied and modified from the @dataclass annotation
 
 
@@ -221,26 +219,26 @@ def __add_slots_impl[A](
     return newcls
 
 
-def __not_allowed_checks_impl[A](cls: type[A]) -> Result[None, str]:
+def __not_allowed_checks_impl[A](cls: type[A]) -> Optional[str]:
 
     # NOT: don't allow Enums, TypedDicts, pydantic BaseModels, exceptions, dataclasses
 
     if isinstance(cls, EnumType):
-        return Err("An Enum can't be annotated")  # type: ignore[unreachable]
+        return "An Enum can't be annotated"  # type: ignore[unreachable]
 
     if is_typeddict(cls):
-        return Err("A TypedDict can't be annotated")
+        return "A TypedDict can't be annotated"
 
     if isinstance(cls, ModelMetaclass):
-        return Err("A Pydantic BaseModel can't be annotated")  # type: ignore[unreachable]
+        return "A Pydantic BaseModel can't be annotated"  # type: ignore[unreachable]
 
     if isinstance(cls, type) and issubclass(cls, Exception):
-        return Err("An Exception can't be annotated")
+        return "An Exception can't be annotated"
 
     if is_dataclass(cls):
-        return Err("A dataclass can't be annotated")
+        return "A dataclass can't be annotated"
 
-    return Ok(None)
+    return None
 
 
 def __process_decorate_class_impl[A](
@@ -253,8 +251,8 @@ def __process_decorate_class_impl[A](
 
     not_allowed = __not_allowed_checks_impl(cls)
 
-    if not_allowed.err():
-        msg = f"Not allowed for class {cls} {type(cls)}: {not_allowed.as_err()}"
+    if not_allowed is not None:
+        msg = f"Not allowed for class {cls} {type(cls)}: {not_allowed}"
         raise TypeError(msg)
 
     cls_annotations = inspect.get_annotations(cls)
