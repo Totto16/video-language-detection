@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional, Self, override
+from typing import TYPE_CHECKING, BinaryIO, Optional, Self, assert_never, override
 
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
@@ -9,15 +9,24 @@ from test_helper import ErrResult, OkResult, TestResult
 
 from content.tagger.mkv_tagger import (
     BitIterator,
+    EBMLDecodeOptions,
+    EBMLElement,
     EBMLElementID,
+    EBMLElementParsed,
+    EBMLElementSpan,
+    EBMLStream,
     EBMLVarInt,
+    ebml_iter_elements,
     is_mkv_file,
 )
 from content.tagger.parser import BoundedIO, SimpleSpan
 from content.tagger.schema.parser import (
     DefaultEmpty,
     DocType,
+    EBMLAdvancedElementType,
     EBMLAdvancedElementTypeBinary,
+    EBMLAdvancedElementTypeDate,
+    EBMLAdvancedElementTypeFloat,
     EBMLAdvancedElementTypeInteger,
     EBMLAdvancedElementTypeMaster,
     EBMLAdvancedElementTypeString,
@@ -38,6 +47,7 @@ from content.tagger.schema.parser import (
 )
 from helper.decorator import decorate_class
 from helper.result import Err, Ok, Result
+from helper.utils import hash_list
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -301,24 +311,467 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
             assert value.as_err() == result
 
 
+@decorate_class(slots=True)
+class PseudoMKVElement(EBMLElementParsed):
+
+    def __init__(
+        self: Self,
+        element_id: EBMLElementID,
+        element_type: EBMLElementType,
+        name: str,
+        size: int,
+    ) -> None:
+        header_sizes: tuple[int, int] = (
+            element_id.minmum_bytes_required(),
+            EBMLVarInt(size).minmum_bytes_required(),
+        )
+        header_size = sum(header_sizes)
+        element: EBMLElement = EBMLElement(
+            element_id=element_id,
+            span=EBMLElementSpan.from_ebml_specified_size(
+                SimpleSpan(0, size - header_size),
+                header_sizes,
+            ),
+        )
+
+        advanced_element_type: EBMLAdvancedElementType
+
+        match element_type:
+            case EBMLElementType.SignedInteger:
+                advanced_element_type = EBMLAdvancedElementTypeInteger(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    range=None,
+                )
+            case EBMLElementType.UnsignedInteger:
+                advanced_element_type = EBMLAdvancedElementTypeInteger(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    range=None,
+                )
+            case EBMLElementType.Float:
+                advanced_element_type = EBMLAdvancedElementTypeFloat(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    range=None,
+                )
+            case EBMLElementType.String:
+                advanced_element_type = EBMLAdvancedElementTypeString(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    length=None,
+                )
+            case EBMLElementType.UTF8:
+                advanced_element_type = EBMLAdvancedElementTypeString(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    length=None,
+                )
+            case EBMLElementType.Date:
+                advanced_element_type = EBMLAdvancedElementTypeDate(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                )
+            case EBMLElementType.Master:
+                advanced_element_type = EBMLAdvancedElementTypeMaster(
+                    type=element_type,
+                )
+            case EBMLElementType.Binary:
+                advanced_element_type = EBMLAdvancedElementTypeBinary(
+                    type=element_type,
+                    default=DefaultEmpty(),
+                    length=None,
+                )
+            case _:
+                assert_never(element_type)
+
+        element_desc: EBMLElementDescription = EBMLElementDescriptionGeneric(
+            name=name,
+            id=EBMLElementIDParsed(element_id.raw),
+            occurrences=EBMLOccurrences(
+                EBMLSchemaRange(
+                    (
+                        EBMLSchemaRangeElem(0, bound=EBMLSchemaRangeBound.Inclusive),
+                        None,
+                    ),
+                ),
+            ),
+            type=advanced_element_type,
+            description="<Nothing>",
+            unknown_size_allowed=False,
+            versions=EBMLSchemaRange(42),
+            path="/<IGNORE>",
+            recurring=False,
+            recursive=False,
+        )
+
+        super().__init__(element, element_desc)
+
+
+@decorate_class(slots=True)
+class RecursiveElements:
+    RecursiveElementsData = list[
+        EBMLElementParsed | tuple[EBMLElementParsed, "RecursiveElementsData"]
+    ]
+    __data: RecursiveElementsData
+
+    def __init__(self: Self, data: RecursiveElementsData) -> None:
+        self.__data = data
+
+    def append(
+        self: Self,
+        val: EBMLElementParsed | tuple[EBMLElementParsed, "RecursiveElements"],
+    ) -> None:
+        if isinstance(val, tuple):
+            self.__data.append((val[0], val[1].__data))  # noqa: SLF001
+            return
+
+        self.__data.append(val)
+
+    @property
+    def data(self: Self) -> RecursiveElementsData:
+        return self.__data
+
+    @staticmethod
+    def __single_to_str(
+        data: EBMLElementParsed | tuple[EBMLElementParsed, "RecursiveElementsData"],
+        depth: int,
+        indent_str: str = " ",
+    ) -> str:
+        if isinstance(data, tuple):
+            return f"{(indent_str * depth)}<NestedElements\n{data[0]!s}\n{RecursiveElements.__to_str(data[1], depth=depth+1)}>"
+
+        return f"{(indent_str * depth)}<SimpleElement {data!s}>"
+
+    @staticmethod
+    def __to_str(
+        data: RecursiveElementsData,
+        depth: int,
+        indent_str: str = " ",
+    ) -> str:
+
+        return (f"\n{(indent_str * depth)}").join(
+            RecursiveElements.__single_to_str(dat, depth, indent_str=indent_str)
+            for dat in data
+        )
+
+    @staticmethod
+    def __is_element_eq(
+        element1: EBMLElementParsed,
+        element2: EBMLElementParsed,
+        depth: int,
+    ) -> Result[None, list[str]]:
+        # pseudo comparison based on pseudo elements, alias just size and type!
+        if element1.element.element_id != element2.element.element_id:
+            return Err[list[str]](
+                [
+                    "Element ID of data is not eq:",
+                    str(element1.element.element_id),
+                    str(element2.element.element_id),
+                    f"Depth {depth}",
+                    str(element1),
+                    str(element2),
+                ],
+            )
+
+        if element1.element.span.total.size != element2.element.span.total.size:
+            return Err[list[str]](
+                [
+                    "Sizeof data is not eq:",
+                    str(element1.element.span.total.size),
+                    str(element2.element.span.total.size),
+                    f"Depth {depth}",
+                    str(element1),
+                    str(element2),
+                ],
+            )
+
+        if element1.desc.name != element2.desc.name:
+            return Err(
+                [
+                    "Element name doesn't match:",
+                    str(element1.desc.name),
+                    str(element2.desc.name),
+                ],
+            )
+
+        if element1.desc.type.type != element2.desc.type.type:
+            return Err(
+                [
+                    "Element type doesn't match:",
+                    f"Element name: {element1.desc.name}",
+                    str(element1.desc.type.type),
+                    str(element2.desc.type.type),
+                ],
+            )
+
+        # TODO: compare value
+
+        return Ok(None)
+
+    @staticmethod
+    def __is_elem_eq(
+        data1: EBMLElementParsed | tuple[EBMLElementParsed, RecursiveElementsData],
+        data2: EBMLElementParsed | tuple[EBMLElementParsed, RecursiveElementsData],
+        depth: int,
+    ) -> Result[None, list[str]]:
+        if isinstance(data1, tuple) and isinstance(data2, tuple):
+            b1, d1 = data1
+            b2, d2 = data2
+
+            res = RecursiveElements.__is_element_eq(b1, b2, depth)
+            if res.err():
+                return res
+
+            return RecursiveElements.__eq_impl_both(d1, d2, depth=depth + 1)
+        if isinstance(data1, EBMLElementParsed) and isinstance(
+            data2, EBMLElementParsed
+        ):
+            return RecursiveElements.__is_element_eq(data1, data2, depth)
+
+        return Err[list[str]](
+            [
+                "Type of data is not eq:",
+                str(type(data1)),
+                str(type(data2)),
+                f"Depth {depth}",
+                str(data1),
+                str(data2),
+            ],
+        )
+
+    @staticmethod
+    def __eq_impl_both(
+        data1: RecursiveElementsData,
+        data2: RecursiveElementsData,
+        depth: int,
+    ) -> Result[None, list[str]]:
+        if len(data1) != len(data2):
+            return Err[list[str]](
+                [
+                    "Length of data is not eq:",
+                    str(len(data1)),
+                    str(len(data2)),
+                    f"Depth {depth}",
+                    str(data1),
+                    str(data2),
+                ],
+            )
+
+        for d1, d2 in zip(data1, data2, strict=True):
+            res = RecursiveElements.__is_elem_eq(d1, d2, depth)
+            if res.err():
+                return res
+
+        return Ok(None)
+
+    def __eq_impl(self: Self, data: RecursiveElementsData) -> Result[None, list[str]]:
+        return RecursiveElements.__eq_impl_both(self.__data, data, depth=0)
+
+    def __str__(self: Self) -> str:
+        return RecursiveElements.__to_str(self.__data, 0, "\t")
+
+    def __repr__(self: Self) -> str:
+        return RecursiveElements.__to_str(self.__data, 0, "  ")
+
+    def eq_impl(self: Self, other: "RecursiveElements") -> Result[None, list[str]]:
+        return self.__eq_impl(other.data)
+
+    def __eq__(self: Self, other: object) -> bool:
+        if isinstance(other, RecursiveElements):
+            return self.__eq_impl(other.__data).ok()
+
+        return False
+
+    def __hash__(self: Self) -> int:
+        return hash(("RecursiveElements", hash_list(self.__data)))
+
+
+def list_all_elements_recursively(
+    f: BinaryIO,
+    span: SimpleSpan,
+    options: EBMLDecodeOptions,
+    spec: EBMLSpec,
+) -> RecursiveElements:
+
+    result: RecursiveElements = RecursiveElements([])
+
+    stack: list[tuple[SimpleSpan, RecursiveElements, int]] = [
+        (span, result, 0),
+    ]
+
+    while stack:
+        span, current_target, depth = stack.pop()
+        io = BoundedIO.get_new(f, span)
+
+        for element in ebml_iter_elements(
+            io,
+            options,
+            spec,
+            depth=depth,
+        ):
+            if element.desc.type.type == EBMLElementType.Master:
+                target: tuple[EBMLElementParsed, RecursiveElements] = (
+                    element,
+                    RecursiveElements([]),
+                )
+                current_target.append(target)
+                stack.append((element.element.span.payload_span, target[1], depth + 1))
+            else:
+                current_target.append(element)
+
+    return result
+
+
+@decorate_class(slots=True)
+class MKVElementStructure(FancyEq):
+    elements: RecursiveElements
+
+    def __init__(self: Self, elements: RecursiveElements) -> None:
+        self.elements = elements
+
+    @staticmethod
+    def from_file(
+        file: Path,
+    ) -> Result["MKVElementStructure", str]:
+        try:
+            with file.open("rb") as f:
+                mkv_res = is_mkv_file(f)
+
+                if mkv_res.err():
+                    return Err(mkv_res.as_err())
+
+                stream = EBMLStream.read_from_file(f)
+
+                if len(stream.documents) != 1:
+                    return Err(
+                        f"Only One MKV EBML document supported atm, but got: {len(stream.documents)}",
+                    )
+
+                document = stream.documents[0]
+
+                header_elem: tuple[
+                    EBMLElementParsed, RecursiveElements.RecursiveElementsData
+                ] = (EBMLElementParsed(document.header, document.header.desc), [])
+
+                header_options = document.header.options
+                spec = document.header.spec_unsafe()
+
+                body_elements = list_all_elements_recursively(
+                    f,
+                    document.body.span.payload_span,
+                    header_options.options,
+                    spec,
+                )
+
+                body_element = (
+                    EBMLElementParsed(document.body, document.body.desc),
+                    body_elements.data,
+                )
+
+                elements = RecursiveElements([header_elem, body_element])
+
+                return Ok(MKVElementStructure(elements))
+        except RuntimeError as err:
+            return Err(str(err))
+
+    def __str__(self: Self) -> str:
+        return f"<MKVElementStructure elements: {self.elements!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+    def __eq_impl(
+        self: Self,
+        other: object,
+    ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
+        if isinstance(other, RecursiveElements):
+            return (True, lambda: self.elements.eq_impl(other))
+
+        if isinstance(other, MKVElementStructure):
+            return (True, lambda: self.elements.eq_impl(other.elements))
+
+        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
+
+    def __eq__(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[1]().ok()
+
+    @override
+    def supports_fancy_eq(self: Self, other: object) -> bool:
+        return self.__eq_impl(other)[0]
+
+    @override
+    def fancy_eq(self: Self, other: object) -> Optional[list[str]]:
+        supports_fancy_eq, cb = self.__eq_impl(other)
+        assert supports_fancy_eq
+        return cb().err_or(None)
+
+    def __hash__(self: Self) -> int:
+        return hash(("MKVElementStructure", self.elements))
+
+
 def test_mkv_tagger_parsing(
     subtests: SubTests,
     mkv_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    test_files: list[tuple[Path, str, int]] = list(
+    structure1 = MKVElementStructure(RecursiveElements([]))
+
+    test_files: list[tuple[Path, str, MKVElementStructure]] = list(
         zip(
             [f for f, _ in mkv_test_parse_files.data],
             [nm for _, nm in mkv_test_parse_files.data],
-            [42],
+            [structure1],
             strict=True,
         ),
     )
 
     for file, name, result in test_files:
         with subtests.test(f"video gets parsed correctly: {name}"):
-            # TODO
-            assert file != ""
+            structure_res = MKVElementStructure.from_file(file)
+
+            assert structure_res == OkResult(), "structure not parsed correctly"
+
+            structure = structure_res.as_ok()
+
+            filesize = file.stat().st_size
+
+            # check elements consistency
+            elements_stack: list[
+                tuple[SimpleSpan, RecursiveElements.RecursiveElementsData]
+            ] = [
+                (SimpleSpan(0, filesize), structure.elements.data),
+            ]
+
+            while len(elements_stack) != 0:
+
+                elements_span, elements = elements_stack.pop()
+                start: int = elements_span.start
+                for element_data in elements:
+
+                    element: EBMLElementParsed
+                    if isinstance(element_data, tuple):
+                        assert (
+                            element_data[0].desc.type.type == EBMLElementType.Master
+                        ), "elements resulting in children have to be a of type master"
+                        element = element_data[0]
+                        elements_stack.append(
+                            (element.element.span.payload_span, element_data[1]),
+                        )
+                    else:
+                        element = element_data
+
+                    assert (
+                        element.element.span.total.start == start
+                    ), f"Next element start is invalid: {element!s}"
+
+                    start = element.element.span.total.end
+
+                assert (
+                    elements_span.end == start
+                ), "elements don't reach at the parent end"
+
+            assert structure == result, "Parsing was incorrect"
 
 
 def test_mkv_invalid_bytes(
@@ -967,6 +1420,6 @@ def test_mkv_tagger_ebml_schema_test_schema_parse(
             return result
 
         ebml_spec = get_ebml_spec()
-        EBMLMainSpec = ebml_read_spec_xml("ebml/ebml.xml")
+        EBMLMainSpec: EBMLSpec = ebml_read_spec_xml("ebml/ebml.xml")  # noqa: N806
 
         assert EBMLMainSpec == ebml_spec

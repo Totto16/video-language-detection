@@ -16,7 +16,6 @@ from fixtures import (
     test_manager,
 )
 from pytest_subtests import SubTests
-from helper.utils import hash_list
 from test_helper import ErrResult, OkResult, file_duplicates
 
 from content.language import Language
@@ -62,6 +61,7 @@ from helper.ffprobe import FFProbeResult, ffprobe
 from helper.manager import ManagerInterface
 from helper.result import Err, Ok, Result
 from helper.translation import get_translator
+from helper.utils import hash_list
 
 mark_as_used(mp4_test_parse_files)
 mark_as_used(mp4_options)

@@ -1462,13 +1462,24 @@ class CRC32Builder:
         return self.__value
 
 
-def ebml_iter_elements(
+@dataclass(slots=True, repr=True)
+class EBMLElementParsed:
+    element: EBMLElement
+    desc: EBMLElementDescription
+
+    def as_tuple(
+        self: Self,
+    ) -> tuple[EBMLElement, EBMLElementDescription]:
+        return (self.element, self.desc)
+
+
+def ebml_iter_elements(  # noqa: PLR0915
     io: BoundedIO,
     options: EBMLDecodeOptions,
     spec: EBMLSpec,
     *,
     depth: int,
-) -> Generator[tuple[EBMLElement, EBMLElementDescription]]:
+) -> Generator[EBMLElementParsed]:
 
     spec_by_id = spec.elements_by_id()
 
@@ -1531,7 +1542,7 @@ def ebml_iter_elements(
             msg = f"Element {element.element_id} at {pos} extends past parent boundary"
             raise RuntimeError(msg)
 
-        yield (element, element_desc)
+        yield EBMLElementParsed(element, element_desc)
         pos += element.span.total.size
         i += 1
 
@@ -1786,12 +1797,12 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
             depth=0,
         )
 
-        for children_element, element_desc in children_elements:
-            match element_desc.type:
+        for children_element in children_elements:
+            match children_element.desc.type:
                 case EBMLAdvancedElementTypeInteger() as int_type:
-                    int_value = get_element_value(int_type, children_element)
+                    int_value = get_element_value(int_type, children_element.element)
 
-                    match element_desc.name:
+                    match children_element.desc.name:
                         case EBMLVersionSpec.name:
                             version = int_value
                         case EBMLMaxIDLengthSpec.name:
@@ -1804,25 +1815,27 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeFloat() as float_type:
-                    _float_value = get_element_value(float_type, children_element)
+                    _float_value = get_element_value(
+                        float_type, children_element.element
+                    )
 
-                    match element_desc.name:
+                    match children_element.desc.name:
                         case _:
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeString() as str_type:
-                    str_value = get_element_value(str_type, children_element)
+                    str_value = get_element_value(str_type, children_element.element)
 
-                    match element_desc.name:
+                    match children_element.desc.name:
                         case EBMLDocTypeSpec.name:
                             doc_type_str = str_value
                         case _:
                             # ignore unused values atm
                             pass
                 case EBMLAdvancedElementTypeDate() as date_type:
-                    _date_value = get_element_value(date_type, children_element)
+                    _date_value = get_element_value(date_type, children_element.element)
 
-                    match element_desc.name:
+                    match children_element.desc.name:
                         case _:
                             # ignore unused values atm
                             pass
@@ -1830,14 +1843,16 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
                     msg = f"Master element not allowed in header element: {children_element}"
                     raise RuntimeError(msg)
                 case EBMLAdvancedElementTypeBinary() as binary_type:
-                    _binary_value = get_element_value(binary_type, children_element)
+                    _binary_value = get_element_value(
+                        binary_type, children_element.element
+                    )
 
-                    match element_desc.name:
+                    match children_element.desc.name:
                         case _:
                             # ignore unused values atm
                             pass
                 case _:
-                    assert_never(element_desc)
+                    assert_never(children_element.desc)
 
         decode_options: EBMLDecodeOptions = EBMLDecodeOptions(
             max_id_length=max_id_length,
@@ -2386,24 +2401,23 @@ class VideoTaggerMKV(VideoTagger):
     ) -> Optional[InspectNotImplemented]:
 
         def print_element(
-            element: EBMLElement,
-            element_desc: EBMLElementDescription,
+            element: EBMLElementParsed,
             *,
             depth: int,
         ) -> None:
 
             local_priority = (
                 InspectPriority.Important
-                if element_desc.type.type == EBMLElementType.Master
+                if element.desc.type.type == EBMLElementType.Master
                 else InspectPriority.Normal
             )
 
             if local_priority.as_int() > priority.as_int():
                 return
 
-            name: str = f"{element_desc.name}"
+            name: str = f"{element.desc.name}"
 
-            inspect_element = InspectElement(name, size=element.span.total.size)
+            inspect_element = InspectElement(name, size=element.element.span.total.size)
 
             printer.element(inspect_element, depth)
 
@@ -2417,18 +2431,18 @@ class VideoTaggerMKV(VideoTagger):
                 depth: int,
             ) -> None:
                 io = BoundedIO.get_new(f, span)
-                for element, element_desc in ebml_iter_elements(
+                for element in ebml_iter_elements(
                     io,
                     options,
                     spec,
                     depth=depth,
                 ):
 
-                    print_element(element, element_desc, depth=depth)
+                    print_element(element, depth=depth)
 
                     if (
-                        element_desc.name == "Cluster"
-                        and element_desc.type.type == EBMLElementType.Master
+                        element.desc.name == "Cluster"
+                        and element.desc.type.type == EBMLElementType.Master
                         and priority.as_int() <= InspectPriority.Normal.as_int()
                     ):
                         # skip "Cluster" element with maaaany SimpleBlock elements, but nothing interesting
@@ -2437,22 +2451,22 @@ class VideoTaggerMKV(VideoTagger):
                         skipped_children = sum(
                             1
                             for _ in ebml_iter_elements(
-                                BoundedIO.get_new(f, element.span.payload_span),
+                                BoundedIO.get_new(f, element.element.span.payload_span),
                                 options,
                                 spec,
                                 depth=depth + 1,
                             )
                         )
                         printer.skip(
-                            f"{element_desc.name}",
+                            f"{element.desc.name}",
                             skipped_children,
                             depth + 1,
                         )
                         continue
 
-                    if element_desc.type.type == EBMLElementType.Master:
+                    if element.desc.type.type == EBMLElementType.Master:
                         iterate_elements_recursive(
-                            element.span.payload_span,
+                            element.element.span.payload_span,
                             options,
                             spec,
                             depth=depth + 1,
@@ -2462,9 +2476,15 @@ class VideoTaggerMKV(VideoTagger):
 
             printer.start()
             for document in stream.documents:
-                print_element(document.header, document.header.desc, depth=0)
+                print_element(
+                    EBMLElementParsed(document.header, document.header.desc),
+                    depth=0,
+                )
 
-                print_element(document.body, document.body.desc, depth=0)
+                print_element(
+                    EBMLElementParsed(document.body, document.body.desc),
+                    depth=0,
+                )
 
                 header_options = document.header.options
                 spec = document.header.spec_unsafe()
