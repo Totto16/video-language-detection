@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, Optional, Self, assert_never, override
@@ -309,7 +310,7 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
             assert value.as_err() == result
 
 
-@decorate_class(slots=True)
+@dataclass(slots=True, repr=True)
 class PseudoMKVElement(EBMLElementParsed):
 
     def __init__(
@@ -607,7 +608,7 @@ def list_all_elements_recursively(
             io,
             options,
             spec,
-            depth=depth,
+            depth=depth + 1,
         ):
             if element.desc.type.type == EBMLElementType.Master:
                 target: tuple[EBMLElementParsed, RecursiveElements] = (
@@ -742,6 +743,8 @@ def test_mkv_tagger_parsing(
             ] = [
                 (SimpleSpan(0, filesize), structure.elements.data),
             ]
+            
+            print(structure)
 
             while len(elements_stack) != 0:
 
