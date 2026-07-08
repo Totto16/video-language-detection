@@ -326,20 +326,59 @@ def test_mkv_invalid_bytes(
 ) -> None:
 
     test_data: list[tuple[bytes, str]] = [
-        (b"", "Read would overflow bounds [0, 0]: 8 (0 + 8)"),
+        (b"", "Element ID Parse error: Not enough data for VarInt"),
         (
-            b"helloworld",
-            "Invalid MP4 Box size: It overflows the parent box: 1751477356 > 10",
-        ),
-        (b"ftyp    ", "Atom name not valid b'    '"),
-        (b"\x00\x00\x00\x04ftyp", "Invalid box: size too small: 4"),
-        (
-            b"\x00\x00\x00\x0eftypabcddcba",
-            "Read would overflow bounds [8, 14]: 16 (12 + 4)",
+            b"\x00",
+            "Element ID Parse error: The first byte of a VarInt can't be 0x00",
         ),
         (
-            b"\x00\x00\x00\x10ftypabcddcba",
-            "ISOM/MP42 file has valid box, but invalid major_brand: b'abcd'",
+            b"\x01\x12",
+            "Element ID Parse error: Not enough data for VarInt: need 8 bytes but got 2",
+        ),
+        (
+            b"\x40\x02",
+            "Invalid Element ID: <EBMLElementID 0x4002>: Value 2 uses too much bytes: 1 bytes are the minimum, but used 2",
+        ),
+        (
+            b"\x82",
+            "Data Size Parse error: Not enough data for VarInt",
+        ),
+        (
+            b"\x82\x81\x00",
+            "Invalid EBML Header element ID: got <EBMLElementID 0x82> but expected <EBMLElementIDParsed 0x1a45dfa3>",
+        ),
+        (
+            (
+                b"\x1a\x45\xdf\xa3"  # EBML header ID
+                b"\x80"  # size of master container: 0
+            ),
+            "Invalid EBML Header: missing DocType in header",
+        ),
+        (
+            (
+                b"\x1a\x45\xdf\xa3"  # EBML header ID  # noqa: ISC003
+                b"\x8b"  # size of master container: 11
+                ## DocType sub-element
+                + (
+                    b"\x42\x82"  # DocType ID
+                    b"\x88"  # size of doctype element: 8
+                    b"matroskb"
+                )
+            ),
+            "DocType <DocType type: matroskb version: 1> is not supported: No such DocType",
+        ),
+        (
+            (
+                b"\x1a\x45\xdf\xa3"  # EBML header ID  # noqa: ISC003
+                b"\x8c"  # size of master container: 12 (wrong size)
+                ## DocType sub-element
+                + (
+                    b"\x42\x82"  # DocType ID
+                    b"\x88"  # size of doctype element: 8
+                    b"matroskb"
+                )
+            ),
+            "New payload io end overflows parent: 17 > 16",
         ),
     ]
 
@@ -348,7 +387,32 @@ def test_mkv_invalid_bytes(
             io = BytesIO(data)
             res = is_mkv_file(io)
 
-            assert res == ErrResult(err), "incorrect error"
+            assert ErrResult(err) == res, "incorrect error"
+
+
+def test_mkv_valid_bytes(
+    subtests: SubTests,
+) -> None:
+
+    test_data: list[bytes] = [
+        (
+            b"\x1a\x45\xdf\xa3"  # EBML header ID  # noqa: ISC003
+            b"\x8b"  # size of master container: 11
+            ## DocType sub-element
+            + (
+                b"\x42\x82"  # DocType ID
+                b"\x88"  # size of doctype element: 8
+                b"matroska"
+            )
+        ),
+    ]
+
+    for data in test_data:
+        with subtests.test("valid video gets detected correctly"):
+            io = BytesIO(data)
+            res = is_mkv_file(io)
+
+            assert OkResult(None) == res
 
 
 @decorate_class(slots=True)

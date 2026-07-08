@@ -1864,7 +1864,7 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         )
 
         if doc_type_str is None:
-            msg = "missing doc_type_str in header"
+            msg = "Invalid EBML Header: missing DocType in header"
             raise RuntimeError(msg)
 
         doc_type: DocType = DocType(type=doc_type_str, version=doc_type_version)
