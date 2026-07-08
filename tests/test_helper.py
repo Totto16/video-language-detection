@@ -1,10 +1,11 @@
+from abc import ABC, abstractmethod
 import re
 import tempfile
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Optional, Self, override
+from typing import TYPE_CHECKING, Literal, Optional, Protocol, Self, override
 
 from conftest import FancyEq
 
@@ -53,6 +54,16 @@ def file_duplicates(
 
 
 @decorate_class(slots=True)
+class TestResult[T, E](ABC):
+
+    @abstractmethod
+    def __eq__(self: Self, other: object) -> bool: ...
+
+    @abstractmethod
+    def __hash__(self: Self) -> int: ...
+
+
+@decorate_class(slots=True)
 class _AnyResultValueClass:
     pass
 
@@ -61,13 +72,13 @@ _AnyResultValue = _AnyResultValueClass()
 
 
 @decorate_class(slots=True)
-class OkResult(FancyEq):
-    __value: Any
+class OkResult[T, O = None](FancyEq, TestResult[T, O]):
+    __value: T | _AnyResultValueClass
 
-    def __init__(self: Self, value: Any = _AnyResultValue) -> None:
+    def __init__(self: Self, value: T | _AnyResultValueClass = _AnyResultValue) -> None:
         self.__value = value
 
-    def __eq_other(self: Self, other_value: Any) -> Result[None, list[str]]:
+    def __eq_other[S](self: Self, other_value: S) -> Result[None, list[str]]:
         if self.__value is _AnyResultValue:
             return Ok(None)
 
@@ -89,12 +100,18 @@ class OkResult(FancyEq):
         other: object,
     ) -> tuple[bool, Callable[[], Result[None, list[str]]]]:
         if isinstance(other, Err):
-            return (True, lambda: Err(["Expected Ok, but got Err", str(other)]))
+            return (
+                True,
+                lambda: Err(["Expected Ok, but got Err", str(self), str(other)]),
+            )
 
         if isinstance(other, Ok):
             return (True, lambda: self.__eq_other(other.as_ok()))
 
-        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
+        return (
+            False,
+            lambda: Err(["Invalid compare type", str(type(self)), str(type(other))]),
+        )
 
     def __eq__(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[1]().ok()
@@ -110,7 +127,10 @@ class OkResult(FancyEq):
         return cb().err_or(None)
 
     def __str__(self: Self) -> str:
-        return "<OkResult {self.__value}>"
+        if self.__value is _AnyResultValue:
+            return "<Any OkResult>"
+
+        return f"<OkResult {self.__value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -120,13 +140,13 @@ class OkResult(FancyEq):
 
 
 @decorate_class(slots=True)
-class ErrResult(FancyEq):
-    __value: Any
+class ErrResult[E, O = None](FancyEq, TestResult[O, E]):
+    __value: E | _AnyResultValueClass
 
-    def __init__(self: Self, value: Any = _AnyResultValue) -> None:
+    def __init__(self: Self, value: E | _AnyResultValueClass = _AnyResultValue) -> None:
         self.__value = value
 
-    def __eq_other(self: Self, other_value: Any) -> Result[None, list[str]]:
+    def __eq_other[S](self: Self, other_value: S) -> Result[None, list[str]]:
         if self.__value is _AnyResultValue:
             return Ok(None)
 
@@ -143,9 +163,15 @@ class ErrResult(FancyEq):
             return (True, lambda: self.__eq_other(other.as_err()))
 
         if isinstance(other, Ok):
-            return (True, lambda: Err(["Expected Err, but got Ok", str(other)]))
+            return (
+                True,
+                lambda: Err(["Expected Err, but got Ok", str(self), str(other)]),
+            )
 
-        return (False, lambda: Err(["Invalid compare type", str(type(other))]))
+        return (
+            False,
+            lambda: Err(["Invalid compare type", str(type(self)), str(type(other))]),
+        )
 
     def __eq__(self: Self, other: object) -> bool:
         return self.__eq_impl(other)[1]().ok()
@@ -161,7 +187,10 @@ class ErrResult(FancyEq):
         return cb().err_or(None)
 
     def __str__(self: Self) -> str:
-        return "<ErrResult {self.__value}>"
+        if self.__value is _AnyResultValue:
+            return "<Any ErrResult>"
+
+        return f"<ErrResult {self.__value}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
@@ -173,3 +202,9 @@ class ErrResult(FancyEq):
 def re_exact_string(value: str) -> re.Pattern[str]:
     base = re.escape(value)
     return re.compile(f"^{base}$")
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check1: TestResult[None, str] = ErrResult[str]("")
+    _check2: TestResult[str, None] = OkResult[str]("")

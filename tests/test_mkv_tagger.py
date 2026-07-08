@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, Self, override
 from conftest import FancyEq
 from fixtures import TempVideoFiles, mark_as_used, mkv_test_parse_files
 from pytest_subtests import SubTests
-from test_helper import ErrResult, OkResult
+from test_helper import ErrResult, OkResult, TestResult
 
 from content.tagger.mkv_tagger import (
     BitIterator,
@@ -142,26 +142,32 @@ def test_mkv_tagger_parse_var_int_errors(
 def test_mkv_tagger_parse_element_id(
     subtests: SubTests,
 ) -> None:
-    tests: list[tuple[bytes, Optional[str]]] = [
+    tests: list[tuple[bytes, TestResult[None, str]]] = [
         # spec tests
-        (b"\x80", "Value is NULL"),
-        (b"\x40\x00", "Value is NULL"),
-        (b"\x81", None),
+        (b"\x80", ErrResult("Value is NULL")),
+        (b"\x40\x00", ErrResult("Value is NULL")),
+        (b"\x81", OkResult(None)),
         (
             b"\x40\x01",
-            "Value 1 uses too much bytes: 1 bytes are the minimum, but used 2",
+            ErrResult(
+                "Value 1 uses too much bytes: 1 bytes are the minimum, but used 2",
+            ),
         ),
-        (b"\xaf", None),
+        (b"\xaf", OkResult(None)),
         (
             b"\x40\x3f",
-            "Value 63 uses too much bytes: 1 bytes are the minimum, but used 2",
+            ErrResult(
+                "Value 63 uses too much bytes: 1 bytes are the minimum, but used 2",
+            ),
         ),
-        (b"\xff", "Value is 0xFF..FF"),
-        (b"\x40\x7f", None),
+        (b"\xff", ErrResult("Value is 0xFF..FF")),
+        (b"\x40\x7f", OkResult(None)),
         # custom tests
         (
             b"\x20\x00\x7f",
-            "Value 127 uses too much bytes: 1 bytes are the minimum, but used 3",
+            ErrResult(
+                "Value 127 uses too much bytes: 1 bytes are the minimum, but used 3"
+            ),
         ),
     ]
 
@@ -182,7 +188,7 @@ def test_mkv_tagger_parse_element_id(
 
             valid_element_id = element_id.is_valid(bytes_used)
 
-            assert valid_element_id == ErrResult(result)
+            assert result == valid_element_id
 
 
 def test_mkv_tagger_parse_ebml_schema_range(
