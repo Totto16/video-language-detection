@@ -23,7 +23,7 @@ jobs:
                   apt-get install cmake --no-install-recommends -y
                   pip install pipenv -U --quiet
                   apt-get update
-                  pipenv install --categories "packages develop integrated" --verbose
+                  pipenv install --categories "packages dev-packages integrated" --verbose
 
             - name: run lint
               run: |
@@ -45,7 +45,7 @@ jobs:
                   apt-get update
                   apt-get install ffmpeg cmake --no-install-recommends -y
                   pip install pipenv -U --quiet
-                  pipenv install --categories "packages develop integrated" --verbose
+                  pipenv install --categories "packages dev-packages integrated" --verbose
 
             - name: run tests
               run: |
@@ -67,7 +67,7 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install python3-setuptools python3.13 ffmpeg --no-install-recommends -y
                   pip install pipenv -U --quiet
-                  pipenv install --categories "packages develop integrated" --verbose
+                  pipenv install --categories "packages dev-packages integrated" --verbose
 
             - name: run coverage report
               run: |
