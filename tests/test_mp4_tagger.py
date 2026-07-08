@@ -778,7 +778,7 @@ def get_raw_ffprobe_tags(
     del val["size"]
     del val["bit_rate"]
 
-    metadata: dict[str, Any] = {"comment": None, "metadata": None}
+    metadata: dict[str, Any] = {}
 
     if val.get("tags", None) is not None:
         tags: dict[str, Any] = val["tags"]

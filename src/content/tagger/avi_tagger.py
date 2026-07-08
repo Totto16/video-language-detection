@@ -1421,8 +1421,8 @@ class AVIMetadataHandler:
 
             result = top_level_chunk.adjust_size(f, new_filesize)
 
-            if result is not None:
-                msg = f"Adjusting size failed: {result}"
+            if result.err():
+                msg = f"Adjusting size failed: {result.as_err()}"
                 raise RuntimeError(msg)
 
         # NOTE: using top level INFO chunks

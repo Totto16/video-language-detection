@@ -406,8 +406,8 @@ class VideoTaggerContextCtxGeneric(AbstractContextManager[VideoTaggerContextRW])
     def restore_backup(self: Self) -> None:
         res = self.__restore_backup_impl()
 
-        if res is not None:
-            raise RuntimeError(res)
+        if res.err():
+            raise RuntimeError(res.as_err())
 
     @final
     @override

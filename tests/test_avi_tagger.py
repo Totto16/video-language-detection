@@ -605,7 +605,7 @@ def get_raw_ffprobe_tags(
     del val["size"]
     del val["bit_rate"]
 
-    metadata: dict[str, Any] = {"comment": None, "metadata": None}
+    metadata: dict[str, Any] = {}
 
     if "tags" in val:
         tags: dict[str, Any] = val["tags"]
@@ -668,10 +668,6 @@ def get_raw_ffprobe_tags(
     return (val, metadata)
 
 
-def keys_that_are_not_none(dict1: dict[str, Any]) -> list[str]:
-    return [key for key, value in dict1.items() if value is not None]
-
-
 def test_avi_tagger_metadata_tags_custom(
     subtests: SubTests,
     avi_test_parse_files: TempVideoFiles,
@@ -722,8 +718,8 @@ def test_avi_tagger_metadata_tags_custom(
                     )
 
                     assert (
-                        keys_that_are_not_none(ffprobe_metadata_early) == ["comment"]
-                        or keys_that_are_not_none(ffprobe_metadata_early) == []
+                        set(ffprobe_metadata_early.keys()) == {"comment"}
+                        or set(ffprobe_metadata_early.keys()) == set()
                     ), "raw ffprobe metadata is empty at start"
 
                     ctx.write_tags(tags)
@@ -751,12 +747,12 @@ def test_avi_tagger_metadata_tags_custom(
 
                     assert raw_next_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
                         "artifacts",
                         "errors",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_next["comment"] == tags.comment
 
@@ -828,12 +824,12 @@ def test_avi_tagger_metadata_tags_custom(
 
                     assert raw_again_tags == raw_early_tags
 
-                    assert keys_that_are_not_none(ffprobe_metadata_next) == [
+                    assert set(ffprobe_metadata_next.keys()) == {
                         "comment",
                         "metadata",
                         "artifacts",
                         "errors",
-                    ], "raw ffprobe metadata is correct later on"
+                    }, "raw ffprobe metadata is correct later on"
 
                     assert ffprobe_metadata_again["comment"] == (
                         tags.comment + " - NEW"
