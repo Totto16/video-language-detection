@@ -101,7 +101,7 @@ def video_file_dict() -> dict[str, VideoFile]:
         ),
         "Big_Buck_Bunny_360_10s_1MB.webm": VideoFileURL(
             "https://test-videos.co.uk/vids/bigbuckbunny/webm/vp9/360/Big_Buck_Bunny_360_10s_1MB.webm",
-            "video/mp4",
+            "video/webm",
         ),
         # separator
         "file_example_MP4_480_1_5MG.mp4": VideoFileLocal(
