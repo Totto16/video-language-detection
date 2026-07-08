@@ -15,3 +15,9 @@ make sha256 of file fixed, so that renames are NOT allowed!
 
 
 - symlink config
+
+- update to python 3.14, this needs to use pydantic instead of apischema!!!!
+
+- bump version to 2.<next>
+
+- bump to 3.0 and support sql / sqlite / postgresql as data storage
