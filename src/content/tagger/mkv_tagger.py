@@ -237,7 +237,7 @@ class EBMLVarInt:
         return repr(self.__value)
 
     def __hash__(self: Self) -> int:
-        return hash(("VarInt", self.__value))
+        return hash(("EBMLVarInt", self.__value))
 
     def __int__(self: Self) -> int:
         return self.__value
@@ -482,20 +482,14 @@ class EBMLElement(NonFinalEBMLElement):
     element_id: EBMLElementID
     span: EBMLElementSpan
     header_sizes: tuple[int, int]
-    is_container: bool
 
     def __init__(
         self: Self,
         element_id: EBMLElementID,
         span: EBMLElementSpan,
-        header_sizes: tuple[int, int],
-        *,
-        is_container: bool,
     ) -> None:
         self.element_id = element_id
         self.span = span
-        self.header_sizes = header_sizes
-        self.is_container = is_container
 
     @staticmethod
     def read_ebml_element(io: BoundedIO, options: EBMLDecodeOptions) -> "EBMLElement":
@@ -576,7 +570,7 @@ class EBMLElement(NonFinalEBMLElement):
             header_sizes=header_sizes,
         )
 
-        return EBMLElement(element_id, span, header_sizes, is_container=False)
+        return EBMLElement(element_id, span)
 
     @final
     def payload_io(self: Self, io: BoundedIO) -> BoundedIO:
@@ -614,8 +608,6 @@ class EBMLSignedIntegerElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -695,8 +687,6 @@ class EBMLUnsignedIntegerElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -778,8 +768,6 @@ class EBMLFloatElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -870,8 +858,6 @@ class EBMLStringElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -947,8 +933,6 @@ class EBMLUTF8Element(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -1030,8 +1014,6 @@ class EBMLDateElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -1112,8 +1094,6 @@ class EBMLMasterElement(EBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=True,
         )
 
     @staticmethod
@@ -1175,8 +1155,6 @@ class EBMLBinaryElement(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            parent.header_sizes,
-            is_container=False,
         )
 
         self.value = value
@@ -1708,8 +1686,6 @@ class EBMLHeader(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            header_sizes=parent.header_sizes,
-            is_container=False,
         )
 
         self.options = options
@@ -1915,8 +1891,6 @@ class EBMLBody(EBMLElement, FinalEBMLElement):
         super().__init__(
             parent.element_id,
             parent.span,
-            header_sizes=parent.header_sizes,
-            is_container=True,
         )
 
         self.desc = desc
