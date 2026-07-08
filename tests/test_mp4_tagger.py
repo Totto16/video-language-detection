@@ -16,6 +16,7 @@ from fixtures import (
     test_manager,
 )
 from pytest_subtests import SubTests
+from helper.utils import hash_list
 from test_helper import ErrResult, OkResult, file_duplicates
 
 from content.language import Language
@@ -353,7 +354,7 @@ class RecursiveBoxes:
         return False
 
     def __hash__(self: Self) -> int:
-        return hash(*self.__data)
+        return hash(("RecursiveBoxes", hash_list(self.__data)))
 
 
 def list_all_boxes_recursively(
@@ -437,7 +438,7 @@ class MP4BoxStructure(FancyEq):
         return cb().err_or(None)
 
     def __hash__(self: Self) -> int:
-        return hash(self.boxes)
+        return hash(("MP4BoxStructure", self.boxes))
 
     def find_boxes(
         self: Self,

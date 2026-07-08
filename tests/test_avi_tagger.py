@@ -15,6 +15,7 @@ from fixtures import (
     test_manager,
 )
 from pytest_subtests import SubTests
+from helper.utils import hash_list
 from test_helper import ErrResult, OkResult, file_duplicates
 
 from content.language import Language
@@ -300,7 +301,7 @@ class RecursiveChunks:
         return False
 
     def __hash__(self: Self) -> int:
-        return hash(*self.__data)
+        return hash(("RecursiveChunks", hash_list(self.__data)))
 
 
 def list_all_chunks_recursively(f: BinaryIO) -> RecursiveChunks:
@@ -384,7 +385,7 @@ class AVIChunkStructure(FancyEq):
         return cb().err_or(None)
 
     def __hash__(self: Self) -> int:
-        return hash(self.chunks)
+        return hash(("AVIChunkStructure", self.chunks))
 
 
 def test_avi_tagger_parsing(

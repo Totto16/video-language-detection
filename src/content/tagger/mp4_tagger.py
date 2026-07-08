@@ -109,7 +109,7 @@ class ISOMAtomName:
         return repr(self.__value)
 
     def __hash__(self: Self) -> int:
-        return hash(self.__value)
+        return hash(("ISOMAtomName", self.__value))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, ISOMAtomName):

@@ -136,7 +136,7 @@ class OkResult[T, O = None](FancyEq, TestResult[T, O]):
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(id(self))
+        return hash(("OkResult", self.__value))
 
 
 @decorate_class(slots=True)
@@ -196,7 +196,7 @@ class ErrResult[E, O = None](FancyEq, TestResult[O, E]):
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(id(self))
+        return hash(("ErrResult", self.__value))
 
 
 def re_exact_string(value: str) -> re.Pattern[str]:

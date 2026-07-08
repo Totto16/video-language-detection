@@ -384,7 +384,7 @@ class PathFilter(Filter):
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash((self.__type.value, self.__pattern))
+        return hash(("PathFilter", self.__type.value, self.__pattern))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, PathFilter):

@@ -302,7 +302,7 @@ class Alpha3LanguageStr:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(self.__data)
+        return hash(("Alpha3LanguageStr", self.__data))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Alpha3LanguageStr):
@@ -445,7 +445,7 @@ class Alpha2LanguageStr:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(self.__data)
+        return hash(("Alpha2LanguageStr", self.__data))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Alpha2LanguageStr):
@@ -608,7 +608,7 @@ class Alpha2LanguageStrRegional:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash((self.__lang, self.__region))
+        return hash(("Alpha2LanguageStrRegional", self.__lang, self.__region))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Alpha2LanguageStrRegional):
@@ -742,7 +742,7 @@ class ShortLanguageStr:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(self.__data)
+        return hash(("ShortLanguageStr", self.__data))
 
     @staticmethod
     def __eq_short_variants_impl(
@@ -958,7 +958,7 @@ class Language:
         return f"<Language short: {self.__short!r} long: {self.__long!r}>"
 
     def __hash__(self: Self) -> int:
-        return hash((self.__short, self.__long))
+        return hash(("Language", self.__short, self.__long))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, Language):

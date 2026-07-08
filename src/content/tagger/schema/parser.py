@@ -32,7 +32,7 @@ class EBMLSchemaRangeNot[A]:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(self.value)
+        return hash(("EBMLSchemaRangeNot", self.value))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, EBMLSchemaRangeNot):
@@ -160,7 +160,7 @@ class EBMLSchemaRange[A: (int, float)]:
         return str(self)
 
     def __hash__(self: Self) -> int:
-        return hash(self.__underlying)
+        return hash(("EBMLSchemaRange", self.__underlying))
 
     def __eq__(self: Self, other: object) -> bool:
         if isinstance(other, EBMLSchemaRange):

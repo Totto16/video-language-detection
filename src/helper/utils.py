@@ -37,3 +37,7 @@ def dict_at[A, B](dct: dict[A, B], key: A) -> Result[B, None]:
         return Err(None)
 
     return Ok(value)
+
+
+def hash_list[A](value: list[A]) -> int:
+    return hash(("list", len(value), tuple(value)))
