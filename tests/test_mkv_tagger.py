@@ -310,23 +310,24 @@ def test_mkv_tagger_parse_ebml_schema_range_errors(
             assert value.as_err() == result
 
 
-@dataclass(slots=True, repr=True)
 class PseudoMKVElement(EBMLElementParsed):
 
     def __init__(
         self: Self,
-        element_id: EBMLElementID,
+        element_id: int,
         element_type: EBMLElementType,
         name: str,
         size: int,
     ) -> None:
+        element_id_correct = EBMLElementID(EBMLVarInt(element_id), element_id)
+
         header_sizes: tuple[int, int] = (
-            element_id.minmum_bytes_required(),
+            element_id_correct.minmum_bytes_required(),
             EBMLVarInt(size).minmum_bytes_required(),
         )
         header_size = sum(header_sizes)
         element: EBMLElement = EBMLElement(
-            element_id=element_id,
+            element_id=element_id_correct,
             span=EBMLElementSpan.from_ebml_specified_size(
                 SimpleSpan(0, size - header_size),
                 header_sizes,
@@ -386,7 +387,7 @@ class PseudoMKVElement(EBMLElementParsed):
 
         element_desc: EBMLElementDescription = EBMLElementDescriptionGeneric(
             name=name,
-            id=EBMLElementIDParsed(element_id.raw),
+            id=EBMLElementIDParsed(element_id),
             occurrences=EBMLOccurrences(
                 EBMLSchemaRange(
                     (
@@ -405,6 +406,14 @@ class PseudoMKVElement(EBMLElementParsed):
         )
 
         super().__init__(element, element_desc)
+
+
+class PseudoClusterMKVElement(PseudoMKVElement):
+    children: int
+
+    def __init__(self: Self, children: int, size: int) -> None:
+        super().__init__(0x1F43B675, EBMLElementType.Master, "Cluster", size)
+        self.children = children
 
 
 @decorate_class(slots=True)
@@ -716,7 +725,89 @@ def test_mkv_tagger_parsing(
     mkv_test_parse_files: TempVideoFiles,
 ) -> None:
 
-    structure1 = MKVElementStructure(RecursiveElements([]))
+    structure1 = MKVElementStructure(
+        RecursiveElements(
+            [
+                (
+                    PseudoMKVElement(0x1A45DFA3, EBMLElementType.Master, "EBML", 47),
+                    [],
+                ),
+                (
+                    PseudoMKVElement(
+                        0x18538067,
+                        EBMLElementType.Master,
+                        "Segment",
+                        573019,
+                    ),
+                    [
+                        (
+                            PseudoMKVElement(
+                                0x114d9b74,
+                                EBMLElementType.Master,
+                                "SeekHead",
+                                72,
+                            ),
+                            [],
+                        ),
+                        PseudoMKVElement(
+                            0x00,
+                            EBMLElementType.SignedInteger,
+                            "Void",
+                            4242,
+                        ),
+                        (
+                            PseudoMKVElement(
+                                0x00,
+                                EBMLElementType.Master,
+                                "Info",
+                                4242,
+                            ),
+                            [],
+                        ),
+                        (
+                            PseudoMKVElement(
+                                0x00,
+                                EBMLElementType.Master,
+                                "Tracks",
+                                4242,
+                            ),
+                            [],
+                        ),
+                        (
+                            PseudoMKVElement(
+                                0x00,
+                                EBMLElementType.Master,
+                                "Tags",
+                                4242,
+                            ),
+                            [],
+                        ),
+                        PseudoClusterMKVElement(
+                            149,
+                            4242,
+                        ),
+                        PseudoClusterMKVElement(
+                            105,
+                            4242,
+                        ),
+                        PseudoClusterMKVElement(
+                            152,
+                            4242,
+                        ),
+                        (
+                            PseudoMKVElement(
+                                0x00,
+                                EBMLElementType.Master,
+                                "Cues",
+                                4242,
+                            ),
+                            [],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
 
     test_files: list[tuple[Path, str, MKVElementStructure]] = list(
         zip(
