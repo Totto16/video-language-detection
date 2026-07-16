@@ -5,29 +5,32 @@ from typing import Optional, Self, TypeIs
 import psutil
 import torch
 
+from helper.decorator import decorate_class
 from helper.gpu import GPU, AvailableMemory
 from helper.log import get_logger
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
 class AllocatorType(Enum):
     cpu = "cpu"
     gpu = " gpu"
 
-
+@decorate_class(slots=True)
 class Allocator:
     type: AllocatorType
 
     def __init__(self: Self, type_: AllocatorType) -> None:
         self.type = type_
 
-
+@decorate_class(slots=True)
 class CPUAllocator(Allocator):
     def __init__(self) -> None:
         super().__init__(type_=AllocatorType.cpu)
 
-
+@decorate_class(slots=True)
 class GPUAllocator(Allocator):
     gpu: GPU
 
@@ -39,7 +42,7 @@ class GPUAllocator(Allocator):
 def is_cpu_allocator(allocator: GPUAllocator | CPUAllocator) -> TypeIs[CPUAllocator]:
     return allocator.type == AllocatorType.cpu
 
-
+@decorate_class(slots=True)
 class DeviceManager:
     __device_allocator: CPUAllocator | GPUAllocator
 
@@ -54,11 +57,13 @@ class DeviceManager:
 
         gpu_result = GPU.get_best(use_integrated=False)
 
-        if gpu_result.is_err():
-            logger.warning("Got GPU error: %s", gpu_result.get_err())
+        if gpu_result.err():
+            logger.warning(
+                _("Got GPU error: {error}").format(error=gpu_result.as_err()),
+            )
             self.__device_allocator = CPUAllocator()
         else:
-            self.__device_allocator = GPUAllocator(gpu_result.get_ok())
+            self.__device_allocator = GPUAllocator(gpu_result.as_ok())
 
     def clear_device_cache(self: Self) -> None:
         if not is_cpu_allocator(self.__device_allocator):

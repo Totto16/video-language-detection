@@ -1,19 +1,21 @@
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from hashlib import sha256
 from pathlib import Path
 from typing import (
-    Any,
     Optional,
     Self,
     TypedDict,
 )
 
 from apischema import schema
-from enlighten import Manager
 
 from content.language import Language
 from content.metadata.metadata import HandlesType
+from helper.decorator import decorate_class
+from helper.manager import PROGRESS_CHUNK_SIZE, CounterInterface, ManagerInterface
 
 
 class ScannedFileType(Enum):
@@ -43,11 +45,6 @@ class ContentType(StrEnum):
 
     def __repr__(self: Self) -> str:
         return str(self)
-
-
-# TODO. maybe use abc.abstractmethod instead of this paradigm for abstract classed?
-class MissingOverrideError(RuntimeError):
-    pass
 
 
 class StatsDict(TypedDict):
@@ -119,32 +116,31 @@ class Stats:
     mtime: float
 
     @staticmethod
-    def hash_file(file_path: Path, manager: Optional[Manager] = None) -> str:
+    def hash_file(file_path: Path, manager: ManagerInterface) -> str:
         if file_path.is_dir():
             msg = "Can't take checksum of directory"
             raise RuntimeError(msg)
         size: float = float(file_path.stat().st_size)
-        bar: Optional[Any] = None
-        if manager is not None:
-            bar = manager.counter(
-                total=size,
-                desc="sha256 checksum",
-                unit="B",
-                leave=False,
-                bar_format=CHECKSUM_BAR_FORMAT,
-                color="red",
-            )
-            bar.update(0, force=True)
+
+        bar: CounterInterface = manager.counter(
+            total=size,
+            desc="sha256 checksum",
+            unit="B",
+            leave=False,
+            bar_format=CHECKSUM_BAR_FORMAT,
+            color="red",
+        )
+        bar.update(0, force=True)
+
         sha256_hash = sha256()
         with file_path.open(mode="rb") as file:
-            # Read and update hash string value in blocks of 4K
-            for byte_block in iter(lambda: file.read(4096), b""):
+            # Read and update hash string value in blocks of <PROGRESS_CHUNK_SIZE>
+            for byte_block in iter(lambda: file.read(PROGRESS_CHUNK_SIZE), b""):
                 sha256_hash.update(byte_block)
-                if bar is not None:
-                    bar.update(float(len(byte_block)))
 
-            if bar is not None:
-                bar.close(clear=True)
+                bar.update(float(len(byte_block)))
+
+            bar.close(clear=True)
 
             return sha256_hash.hexdigest()
 
@@ -154,7 +150,7 @@ class Stats:
         file_type: ScannedFileType,
         *,
         generate_checksum: bool = True,
-        manager: Optional[Manager] = None,
+        manager: ManagerInterface,
     ) -> "Stats":
         mtime: float = file_path.stat().st_mtime
 
@@ -174,26 +170,34 @@ class Stats:
         self: Self,
         path: Path,
         _type: ScannedFileType,
-        manager: Optional[Manager] = None,
+        manager: ManagerInterface,
     ) -> bool:
         if _type == ScannedFileType.file:
             new_stats = Stats.from_file(
-                path,
-                _type,
+                file_path=path,
+                file_type=_type,
                 generate_checksum=False,
                 manager=manager,
             )
             if new_stats.mtime <= self.mtime:
                 return False
 
-            # update the new mtime, since if we aren't outdated (per checksum), the parent caller wan't do it, if we are outdated, he will update it anyway
+            # update the new mtime, since if we aren't outdated (per checksum), the parent caller will not do it, if we are outdated, he will update it anyway
             self.mtime = new_stats.mtime
 
-            with_checksum: Stats = Stats.from_file(path, _type, generate_checksum=True)
+            with_checksum: Stats = Stats.from_file(
+                path,
+                _type,
+                generate_checksum=True,
+                manager=manager,
+            )
             return with_checksum.checksum != self.checksum
 
         msg = "Outdated state for directories is not correctly reported by mtime or similar stats, so it isn't possible"
         raise RuntimeError(msg)
+
+    def reset(self: Self) -> None:
+        self.checksum = None
 
 
 @dataclass(slots=True, repr=True)
@@ -231,12 +235,18 @@ class ScannedFile:
         file_path: Path,
         file_type: ScannedFileType,
         parent_folders: list[str],
+        manager: ManagerInterface,
     ) -> "ScannedFile":
         if len(parent_folders) > 3:
             msg = "No more than 3 parent folders are allowed: [collection] -> series -> season"
             raise RuntimeError(msg)
 
-        stats: Stats = Stats.from_file(file_path, file_type, generate_checksum=False)
+        stats: Stats = Stats.from_file(
+            file_path,
+            file_type,
+            generate_checksum=False,
+            manager=manager,
+        )
 
         return ScannedFile(
             path=file_path,
@@ -245,7 +255,10 @@ class ScannedFile:
             stats=stats,
         )
 
-    def generate_checksum(self: Self, manager: Optional[Manager] = None) -> None:
+    def generate_checksum(
+        self: Self,
+        manager: ManagerInterface,
+    ) -> None:
         self.stats = Stats.from_file(
             self.path,
             self.type,
@@ -253,33 +266,58 @@ class ScannedFile:
             manager=manager,
         )
 
-    def is_outdated(self: Self, manager: Optional[Manager] = None) -> bool:
+    def reset_file_data(self: Self) -> None:
+        self.stats.reset()
+
+    def is_outdated(self: Self, manager: ManagerInterface) -> bool:
         return self.stats.is_outdated(self.path, self.type, manager=manager)
 
 
-class NameParser:
+@dataclass(slots=True, repr=True)
+class EpisodeName:
+    name: str
+    season: int
+    episode: int
+
+@decorate_class(slots=True)
+class NameParser(ABC):
     __language: Language
 
     def __init__(self: Self, language: Optional[Language]) -> None:
+        super().__init__()
         self.__language = language if language is not None else Language.get_default()
 
     @property
     def language(self: Self) -> Language:
         return self.__language
 
-    def parse_episode_name(self: Self, _name: str) -> Optional[tuple[str, int, int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_episode_name(
+        self: Self,
+        _name: str,
+    ) -> Optional[EpisodeName]: ...
 
-    def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_season_name(self: Self, _name: str) -> Optional[tuple[int]]: ...
 
-    def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]:
-        raise MissingOverrideError
+    @abstractmethod
+    def parse_series_name(self: Self, _name: str) -> Optional[tuple[str, int]]: ...
 
 
-class Callback[C, CT, RT]:
+@dataclass(slots=True, repr=True)
+class StartAmount:
+    total: int
+    processing: int
+    ignored: int
+
+
+# a list of optional functions, they return if they deleted something or not, None means also no
+type CallbackWorkload = Optional[Callable[[], Optional[bool]]]
+
+@decorate_class(slots=True)
+class Callback[C, CT, RT](ABC):
     def __init__(self: Self) -> None:
-        pass
+        super().__init__()
 
     def process(
         self: Self,
@@ -303,7 +341,7 @@ class Callback[C, CT, RT]:
 
     def start(
         self: Self,
-        amount: tuple[int, int, int],  # noqa: ARG002
+        amount: StartAmount,  # noqa: ARG002
         name: str,  # noqa: ARG002
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
@@ -316,7 +354,7 @@ class Callback[C, CT, RT]:
         parent_folders: list[str],  # noqa: ARG002
         characteristic: CT,  # noqa: ARG002
         *,
-        amount: int = 1,  # noqa: ARG002
+        amount: int,  # noqa: ARG002
     ) -> None:
         return None
 
@@ -329,8 +367,51 @@ class Callback[C, CT, RT]:
     ) -> None:
         return None
 
-    def get_saved(self: Self) -> RT:
-        raise MissingOverrideError
+    def process_workload(
+        self: Self,
+        workload: list[CallbackWorkload],
+        name: str,
+        parent_folders: list[str],
+        characteristic: CT,
+    ) -> None:
+        total = len(workload)
+        processing = sum(0 if wk is None else 1 for wk in workload)
+        ignored = total - processing
+
+        self.start(
+            amount=StartAmount(total=total, processing=processing, ignored=ignored),
+            name=name,
+            parent_folders=parent_folders,
+            characteristic=characteristic,
+        )
+
+        deleted = 0
+
+        for wk in workload:
+            if wk is None:
+                continue
+
+            result = wk()
+
+            if result is not None and result:
+                deleted = deleted + 1
+
+            self.progress(
+                name=name,
+                parent_folders=parent_folders,
+                characteristic=characteristic,
+                amount=1,
+            )
+
+        self.finish(
+            name=name,
+            parent_folders=parent_folders,
+            deleted=deleted,
+            characteristic=characteristic,
+        )
+
+    @abstractmethod
+    def get_saved(self: Self) -> RT: ...
 
 
 def safe_index[SF](ls: list[SF], item: SF) -> Optional[int]:

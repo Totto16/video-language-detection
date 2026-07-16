@@ -1,8 +1,10 @@
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from typing import (
     Any,
     Literal,
     Optional,
+    TypedDict,
+    Unpack,
     cast,
 )
 
@@ -11,6 +13,7 @@ from apischema.json_schema import (
     deserialization_schema,
     serialization_schema,
 )
+from apischema.objects import ObjectField, object_fields, set_object_fields
 
 type EmitType = Literal["deserialize", "serialize"]
 
@@ -47,7 +50,48 @@ def get_schema(
     return cast(SchemaType, result)
 
 
-def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
+def get_sub_schema(
+    any_type: Any,
+    *,
+    additional_properties: Optional[bool] = None,
+    all_refs: Optional[bool] = None,
+    emit_type: Optional[EmitType] = None,
+) -> tuple[SchemaType, Optional[dict[str, Any]]]:
+    schema = get_schema(
+        any_type=any_type,
+        additional_properties=additional_properties,
+        all_refs=all_refs,
+        emit_type=emit_type,
+    )
+
+    if "$schema" in schema:
+        del schema["$schema"]
+
+    defs = schema.get("$defs", None)
+    if defs is not None:
+        del schema["$defs"]
+
+    for key in schema:
+        if key.startswith("$"):
+            if key == "$ref":
+                continue
+
+            msg = f"Error: invalid json meta key: {key}"
+            raise RuntimeError(msg)
+
+    return (schema, defs)
+
+
+class SchemaOptions(TypedDict, total=False):
+    additional_properties: bool
+    all_refs: bool
+    emit_type: EmitType
+
+
+def narrow_type(
+    replace: tuple[str, Any],
+    **options: Unpack[SchemaOptions],
+) -> Callable[[dict[str, Any]], None]:
     name, type_desc = replace
 
     def narrow_schema(schema: dict[str, Any]) -> None:
@@ -55,8 +99,11 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"],
             dict,
         ):
-            resulting_type: SchemaType = get_schema(type_desc)
-            del resulting_type["$schema"]
+            resulting_type, defs = get_sub_schema(type_desc, **options)
+
+            if defs is not None:
+                msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
+                raise ValueError(msg)
 
             if cast(dict[str, Any], schema["properties"]).get(name) is None:
                 msg = f"Narrowing type failed, type is not present. key '{name}'"
@@ -65,6 +112,49 @@ def narrow_type(replace: tuple[str, Any]) -> Callable[[dict[str, Any]], None]:
             schema["properties"][name] = resulting_type
 
     return narrow_schema
+
+
+def define_schema(*fields: ObjectField) -> Callable[[Any], Any]:
+    def lazy_fn() -> Sequence[ObjectField]:
+        return fields
+
+    return define_schema_lazy(lazy_fn)
+
+
+def define_schema_lazy(fn: Callable[[], Sequence[ObjectField]]) -> Callable[[Any], Any]:
+    def decorator(cls: Any) -> Any:
+        set_object_fields(cls, fn)
+        return cls
+
+    return decorator
+
+
+def use_schema_from(type_desc: Any) -> Callable[[Any], Any]:
+    def decorator(cls: Any) -> Any:
+        fields = [val for key, val in object_fields(type_desc).items()]
+        set_object_fields(cls, fields)
+        return cls
+
+    return decorator
+
+
+def replace_schema_with(
+    type_desc: Any,
+    **options: Unpack[SchemaOptions],
+) -> Callable[[dict[str, Any]], None]:
+    def replace_schema_with_impl(schema: dict[str, Any]) -> None:
+        resulting_type, defs = get_sub_schema(type_desc, **options)
+        if defs is not None:
+            msg = "Error: defs can't be used here, use another mean to get the defs into the global scope!"
+            raise ValueError(msg)
+
+        for key in [*schema.keys()]:
+            del schema[key]
+
+        for key, value in resulting_type.items():
+            schema[key] = value  # noqa: PERF403
+
+    return replace_schema_with_impl
 
 
 # from: https://wyfo.github.io/apischema/0.18/json_schema/

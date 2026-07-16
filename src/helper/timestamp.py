@@ -1,21 +1,18 @@
 from datetime import datetime, timedelta
-from typing import Never, Optional, Self
+from typing import TYPE_CHECKING, Any, Never, Optional, Self, override
 
+import pydantic
+import pydantic_core
 from apischema import deserializer, schema, serializer
 
-
-def parse_int_safely(inp: str, base: int = 10) -> Optional[int]:
-    try:
-        return int(inp, base)
-    except ValueError:
-        return None
-
+from helper.manager import SupportsFloat
+from helper.utils import parse_int_safely
 
 # TODO check for overflow of hours everywhere!
 
 
 @schema(pattern=r"^\d{1,2}:\d{1,2}:\d{1,2}$")
-class Timestamp:
+class Timestamp(SupportsFloat):
     __delta: timedelta
 
     def __init__(self: Self, delta: timedelta) -> None:
@@ -125,8 +122,7 @@ class Timestamp:
         return False
 
     def __hash__(self: Self) -> int:
-        msg = "HashNotImplemented"
-        raise RuntimeError(msg)
+        return hash(("Timestamp", self.__delta))
 
     def __ne__(self: Self, value: object) -> bool:
         return not self.__eq__(value)
@@ -189,6 +185,7 @@ class Timestamp:
     def __abs__(self: Self) -> "Timestamp":
         return Timestamp(abs(self.__delta))
 
+    @override
     def __float__(self: Self) -> float:
         return self.minutes
 
@@ -200,6 +197,11 @@ class Timestamp:
 
         msg = f"'/' not supported between instances of 'Timestamp' and '{value.__class__.__name__}'"
         raise TypeError(msg)
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check: SupportsFloat = Timestamp.zero()
 
 
 @schema(min=1, max=60 * 60 * 24, deprecated=True)
@@ -217,6 +219,14 @@ class TimestampCompat:
     @staticmethod
     def deserialize_int(inp: int) -> "TimestampCompat":
         return TimestampCompat(Timestamp.from_seconds(inp))
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
+        return pydantic_core.core_schema.int_schema(ge=1, le=60 * 60 * 24)
 
 
 ConfigTimeStamp = TimestampCompat | Timestamp

@@ -4,7 +4,10 @@ from typing import Optional, Self, override
 
 from prompt_toolkit.shortcuts import clear
 
+from helper.decorator import decorate_class
 
+
+@decorate_class(slots=True)
 class ClearContextManager(AbstractContextManager["ClearContextManager"]):
     __clear_on_entry: bool
 
@@ -32,7 +35,7 @@ class ClearContextManager(AbstractContextManager["ClearContextManager"]):
     ) -> None:
         Terminal.clear()
 
-
+@decorate_class(slots=True)
 class Terminal:
 
     @staticmethod

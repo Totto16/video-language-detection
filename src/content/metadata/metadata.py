@@ -1,43 +1,102 @@
-from collections.abc import Callable
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, Any, Optional, Self
+from typing import Annotated, Any, Optional, Self, TypeIs, override
 
 from apischema import alias, deserializer, schema, serialize, serializer
+from apischema.objects import ObjectField
 
-from helper.apischema import OneOf
+from helper.apischema import OneOf, define_schema_lazy
+from helper.translation import get_translator
+
+_ = get_translator()
 
 
-@dataclass(slots=True, repr=True)
 @schema()
+@dataclass(slots=True, repr=True)
 class MetadataHandleHelper:
     provider: str
     data: Any
 
 
-def generate_provider_schema() -> Callable[[dict[str, Any]], None]:
-    def make_provider_schema(schema: dict[str, Any]) -> None:
-        from content.metadata.provider.imdb import IMDBProvider  # noqa: PLC0415
-        from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
+def make_provider_schema_tmdb() -> Sequence[ObjectField]:
+    from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
 
-        if TYPE_CHECKING:
-            from content.metadata.interfaces import Provider  # noqa: PLC0415
-            from helper.apischema import SchemaType  # noqa: PLC0415
-
-        providers: list[type[Provider]] = [
-            IMDBProvider,
-            TMDBProvider,
-        ]
-
-        provider_schemas: list[SchemaType] = [
-            provider.get_metadata_schema() for provider in providers
-        ]
-
-        schema["oneOf"] = provider_schemas
-
-    return make_provider_schema
+    return [v for k, v in TMDBProvider.get_metadata_schema().items()]
 
 
-@schema(extra=generate_provider_schema())
+def make_provider_schema_imdb() -> Sequence[ObjectField]:
+    from content.metadata.provider.imdb import IMDBProvider  # noqa: PLC0415
+
+    return [v for k, v in IMDBProvider.get_metadata_schema().items()]
+
+
+class HandleImpl(ABC):
+    __provider: str
+    __data: Any
+
+    def __init__(
+        self: Self,
+        provider: str,
+        data: Any,
+    ) -> None:
+        super().__init__()
+        self.__provider = provider
+        self.__data = data
+
+    @property
+    def provider(self: Self) -> str:
+        return self.__provider
+
+    @property
+    def data(self: Self) -> Any:
+        return self.__data
+
+    @abstractmethod
+    def to_handle(self: Self) -> "MetadataHandle": ...
+
+
+@define_schema_lazy(fn=make_provider_schema_imdb)
+class ImdbHandleImpl(HandleImpl):
+
+    def __init__(
+        self: Self,
+        provider: str,
+        data: Any,
+    ) -> None:
+        super().__init__(provider, data)
+
+    @override
+    def to_handle(self: Self) -> "MetadataHandle":
+        msg = _(
+            "Deserialization error: Not implemented for provider {provider}"  # noqa: COM812
+        ).format(provider=self.provider)
+        raise RuntimeError(msg)
+
+
+@define_schema_lazy(fn=make_provider_schema_tmdb)
+class TmdbHandleImpl(HandleImpl):
+
+    def __init__(
+        self: Self,
+        provider: str,
+        data: Any,
+    ) -> None:
+        super().__init__(provider, data)
+
+    @override
+    def to_handle(self: Self) -> "MetadataHandle":
+        return MetadataHandle(
+            self.provider,
+            self.data,
+        )
+
+
+MetadataHandleSchema = Annotated[ImdbHandleImpl | TmdbHandleImpl, OneOf]
+
+
+@schema()
+@dataclass(slots=False, repr=True)
 class MetadataHandle:
     __provider: str = field(metadata=alias("provider"))
     __data: Any = field(metadata=alias("data"))
@@ -64,41 +123,14 @@ class MetadataHandle:
 
     @deserializer
     @staticmethod
-    def deserialize_handle(data_dict: Any) -> "MetadataHandle":
-        if not isinstance(data_dict, dict):
-            msg = "Deserialization error: expected input to be dict"
-            raise TypeError(msg)
+    def deserialize(data: MetadataHandleSchema) -> "MetadataHandle":
+        return data.to_handle()
 
-        if data_dict.get("provider", None) is None:
-            msg = "Deserialization error: missing property 'provider'"
-            raise TypeError(msg)
+    def __str__(self: Self) -> str:
+        return f"<MetadataHandle provider: {self.__provider} data: {self.__data}>"
 
-        if data_dict.get("data", None) is None:
-            msg = "Deserialization error: missing property 'data'"
-            raise TypeError(msg)
-
-        provider = data_dict["provider"]
-        data = data_dict["data"]
-
-        if not isinstance(provider, str):
-            msg = "Deserialization error: property 'provider' is not a str"
-            raise TypeError(msg)
-
-        if not isinstance(data, dict):
-            msg = "Deserialization error: property 'data' is not a dict"
-            raise TypeError(msg)
-
-        match provider:
-            case "tmdb":
-                from content.metadata.provider.tmdb import TMDBProvider  # noqa: PLC0415
-
-                return MetadataHandle(provider, TMDBProvider.deserialize_metadata(data))
-            case "imdb":
-                msg = f"Deserialization error: Not implemented for provider {provider}"
-                raise RuntimeError(msg)
-            case _:
-                msg = f"Deserialization error: Unknown provider {provider}"
-                raise TypeError(msg)
+    def __repr__(self: Self) -> str:
+        return str(self)
 
 
 class SkipHandle:
@@ -106,6 +138,37 @@ class SkipHandle:
     @serializer
     def serialize(self: Self) -> None:
         return None
+
+    def __str__(self: Self) -> str:
+        return "<SkipHandle>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@schema()
+@dataclass(slots=True, repr=True)
+class SkipMetadata:
+    def __str__(self: Self) -> str:
+        return "<SkipMetadata>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+def should_skip_metadata(
+    data: tuple[MetadataHandle, MetadataHandle] | MetadataHandle | SkipHandle | Any,
+) -> TypeIs[SkipHandle | SkipMetadata]:
+    if isinstance(data, (SkipHandle, SkipMetadata)):
+        return True
+
+    if isinstance(data, MetadataHandle):
+        return should_skip_metadata(data.data)
+
+    if isinstance(data, tuple):
+        return should_skip_metadata(data[0]) or should_skip_metadata(data[1])
+
+    return False
 
 
 type HandlesType = Optional[list[MetadataHandle] | SkipHandle]

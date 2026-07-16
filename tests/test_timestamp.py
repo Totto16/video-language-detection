@@ -2,8 +2,10 @@ from datetime import timedelta
 
 import pytest
 from pytest_subtests import SubTests
+from test_helper import re_exact_string
 
-from helper.timestamp import Timestamp, parse_int_safely
+from helper.timestamp import Timestamp
+from helper.utils import parse_int_safely
 
 
 def test_int_parsing_correct(subtests: SubTests) -> None:
@@ -194,18 +196,18 @@ def test_timedelta_format(subtests: SubTests) -> None:
 
     with subtests.test("wrong format options"), pytest.raises(
         ValueError,
-        match=r"^Invalid format specifier 'd' for object of type 'Timestamp': reason Couldn't parse int: 'd'$",
+        match=re_exact_string("Invalid format specifier 'd' for object of type 'Timestamp': reason Couldn't parse int: 'd'"),
     ):
         f"{ts:dn}"
 
     with subtests.test("wrong format options"), pytest.raises(
         ValueError,
-        match=r"^Invalid format specifier 'h' for object of type 'Timestamp': reason Couldn't parse int: 'h'$",
+        match=re_exact_string("Invalid format specifier 'h' for object of type 'Timestamp': reason Couldn't parse int: 'h'"),
     ):
         f"{ts:h}"
 
     with subtests.test("wrong format options"), pytest.raises(
         ValueError,
-        match=r"^Invalid format specifier '7' for object of type 'Timestamp': reason 7 is out of allowed range 0 <= value <= 5$",
+        match=re_exact_string("Invalid format specifier '7' for object of type 'Timestamp': reason 7 is out of allowed range 0 <= value <= 5"),
     ):
         f"{ts:7}"

@@ -1,57 +1,87 @@
-from typing import Optional, Self
+from typing import TYPE_CHECKING, Never, Protocol, Self
+
+from helper.decorator import decorate_class
 
 
-class Result[T, E]:
-    __value: Optional[T]
-    __error: Optional[E]
+class Result[T, E](Protocol):
+    def ok(self: Self) -> bool: ...
 
-    def __init__(self: Self, *, _value: Optional[T], _error: Optional[E]) -> None:
-        self.__value = _value
-        self.__error = _error
+    def err(self: Self) -> bool: ...
 
-    @staticmethod
-    def ok(value: T) -> "Result[T, E]":
-        return Result(_value=value, _error=None)
+    def as_ok(self: Self) -> T: ...
 
-    @staticmethod
-    def err(error: E) -> "Result[T, E]":
-        return Result(_value=None, _error=error)
+    def as_err(self: Self) -> E: ...
 
-    def __assert_variant(self: Self) -> None:
-        if self.__value is None and self.__error is None:
-            msg = "Result: both values are None"
-            raise RuntimeError(msg)
-        if self.__value is not None and self.__error is not None:
-            msg = "Result: no value is None"
-            raise RuntimeError(msg)
+    def ok_or[U](self: Self, default: U) -> T | U: ...
 
-    def is_ok(self: Self) -> bool:
-        self.__assert_variant()
-        return self.__value is not None
+    def err_or[U](self: Self, default: U) -> E | U: ...
 
-    def is_err(self: Self) -> bool:
-        self.__assert_variant()
-        return self.__error is not None
+@decorate_class(slots=True)
+class Ok[T, O = None](Result[T, O]):
+    __value: T
 
-    def get_ok(self: Self) -> T:
-        if self.__value is not None:
-            return self.__value
+    def __init__(self: Self, value: T) -> None:
+        self.__value = value
 
-        msg = f"Called get_ok() on error: {self.__error}"
+    def ok(self: Self) -> bool:
+        return True
+
+    def err(self: Self) -> bool:
+        return False
+
+    def as_ok(self: Self) -> T:
+        return self.__value
+
+    def as_err[E](self: Self) -> Never:
+        msg = "Called as_err() on ok"
         raise RuntimeError(msg)
 
-    def get_err(self: Self) -> E:
-        if self.__error is not None:
-            return self.__error
+    def ok_or[U](self: Self, default: U) -> T:  # noqa: ARG002
+        return self.__value
 
-        msg = f"Called get_err() on ok: {self.__value}"
-        raise RuntimeError(msg)
+    def err_or[U](self: Self, default: U) -> U:
+        return default
 
     def __str__(self: Self) -> str:
-        if self.is_ok():
-            return f"<Result (ok): {self.get_ok()!s}>"
-
-        return f"<Result (err): {self.get_err()!s}>"
+        return f"<Ok {self.as_ok()!s}>"
 
     def __repr__(self: Self) -> str:
         return str(self)
+
+@decorate_class(slots=True)
+class Err[E, O = None](Result[O, E]):
+    __error: E
+
+    def __init__(self: Self, error: E) -> None:
+        self.__error = error
+
+    def ok(self: Self) -> bool:
+        return False
+
+    def err(self: Self) -> bool:
+        return True
+
+    def as_ok[T](self: Self) -> Never:
+        msg = "Called as_ok() on error"
+        raise RuntimeError(msg)
+
+    def as_err(self: Self) -> E:
+        return self.__error
+
+    def ok_or[U](self: Self, default: U) -> U:
+        return default
+
+    def err_or[U](self: Self, default: U) -> E:  # noqa: ARG002
+        return self.__error
+
+    def __str__(self: Self) -> str:
+        return f"<Err {self.as_err()!s}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+if TYPE_CHECKING:
+    # check protocol
+    _check1: Result[None, str] = Err[str]("")
+    _check2: Result[str, None] = Ok[str]("")

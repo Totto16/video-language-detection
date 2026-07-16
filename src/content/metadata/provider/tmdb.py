@@ -1,37 +1,47 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from logging import Logger
 from typing import Annotated, Literal, Optional, Self, override
 
-from apischema import deserialize, schema
+from apischema import schema, type_name
 from apischema.metadata import none_as_undefined
+from apischema.objects import ObjectField, object_fields
 from requests import HTTPError
 from themoviedb.tmdb import TMDb
 
 from content.metadata.interfaces import Provider
-from content.metadata.metadata import InternalMetadataType, SkipHandle
+from content.metadata.metadata import (
+    InternalMetadataType,
+    SkipHandle,
+    SkipMetadata,
+    should_skip_metadata,
+)
 from content.shared import ScanType
-from helper.apischema import OneOf, SchemaType, get_schema
+from helper.apischema import OneOf
 from helper.log import get_logger
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
+_ = get_translator()
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TMDBConfig:
     api_key: str
     language: Optional[str] = field(default=None, metadata=none_as_undefined)
     region: Optional[str] = field(default=None, metadata=none_as_undefined)
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class TMDBMetadataConfig:
     type: Literal["tmdb"]
     config: Annotated[Optional[TMDBConfig], OneOf]
 
 
-@dataclass
 @schema()
+@type_name("TMDBSeriesMetadata")
+@dataclass(slots=True, repr=True)
 class SeriesMetadata:
     episodes_count: Optional[int]
     seasons_count: Optional[int]
@@ -44,9 +54,16 @@ class SeriesMetadata:
     series_id: int
     metadata_type: Literal["series"]
 
+    def __str__(self: Self) -> str:
+        return "<TMDBSeriesMetadata ...>"
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 @schema()
+@type_name("TMDBSeasonMetadata")
+@dataclass(slots=True, repr=True)
 class SeasonMetadata:
     air_date: Optional[date]
     episodes_count: Optional[int]
@@ -55,9 +72,16 @@ class SeasonMetadata:
     season_id: int
     metadata_type: Literal["season"]
 
+    def __str__(self: Self) -> str:
+        return "<TMDBSeasonMetadata ...>"
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@type_name("TMDBEpisodeMetadata")
 @schema()
+@dataclass(slots=True, repr=True)
 class EpisodeMetadata:
     air_date: Optional[date]
     runtime: Optional[int]
@@ -67,20 +91,38 @@ class EpisodeMetadata:
     episode_number: int
     metadata_type: Literal["episode"]
 
+    def __str__(self: Self) -> str:
+        return "<TMDBEpisodeMetadata ...>"
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
 @schema()
-class SkipMetadata:
+@dataclass(slots=True, repr=True)
+class TMDBSkipMetadata(SkipMetadata):
     reason: str
     metadata_type: Literal["skip"]
 
+    def __str__(self: Self) -> str:
+        return f"<TMDBSkipMetadata reason: {self.reason}>"
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass(slots=True, repr=True)
 class SeriesHandle:
     series_id: int
 
+    def __str__(self: Self) -> str:
+        return f"<SeriesHandle series_id: {self.series_id}>"
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass(slots=True, repr=True)
 class SeasonHandle:
     parent: SeriesHandle
     season_number: int
@@ -88,19 +130,33 @@ class SeasonHandle:
     def as_tuple(self: Self) -> tuple[int, int]:
         return (self.parent.series_id, self.season_number)
 
+    def __str__(self: Self) -> str:
+        return (
+            f"<SeriesHandle parent: {self.parent} season_number: {self.season_number}>"
+        )
 
-@dataclass
+    def __repr__(self: Self) -> str:
+        return str(self)
+
+
+@dataclass(slots=True, repr=True)
 class EpisodeHandle:
     id: int
 
+    def __str__(self: Self) -> str:
+        return f"<EpisodeHandle id: {self.id}>"
+
+    def __repr__(self: Self) -> str:
+        return str(self)
+
 
 MetadataData = Annotated[
-    SkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
+    TMDBSkipMetadata | EpisodeMetadata | SeasonMetadata | SeriesMetadata,
     OneOf,
 ]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 @schema()
 class TMDBMetadataSchema:
     data: MetadataData
@@ -149,7 +205,7 @@ class TMDBProvider(Provider):
         if isinstance(series_data, SkipMetadata):
             return SkipHandle()
 
-        msg = "Expected SeriesMetadata, but got other metadata data"
+        msg = _("Expected SeriesMetadata, but got other metadata data")
         logger.warning(msg)
 
         return None
@@ -163,7 +219,7 @@ class TMDBProvider(Provider):
         if series_id is None:
             return None
 
-        if isinstance(series_id, SkipHandle):
+        if should_skip_metadata(series_id):
             return SkipHandle()
 
         if isinstance(season_data, SeasonMetadata):
@@ -175,7 +231,7 @@ class TMDBProvider(Provider):
         if isinstance(season_data, SkipMetadata):
             return SkipHandle()
 
-        msg = "Expected SeasonMetadata, but got other metadata data"
+        msg = _("Expected SeasonMetadata, but got other metadata data")
         logger.warning(msg)
 
         return None
@@ -233,7 +289,7 @@ class TMDBProvider(Provider):
         if series_metadata is None:
             return None
 
-        if isinstance(series_metadata, SkipHandle):
+        if should_skip_metadata(series_metadata):
             return SkipHandle()
 
         try:
@@ -246,7 +302,7 @@ class TMDBProvider(Provider):
                 result.air_date,
                 len(result.episodes) if result.episodes is not None else None,
                 result.name,
-                result.season_number if result.season_number else season,
+                result.season_number or season,
                 result.id,
                 "season",
             )
@@ -269,7 +325,7 @@ class TMDBProvider(Provider):
         if metadata_for_episode is None:
             return None
 
-        if isinstance(metadata_for_episode, SkipHandle):
+        if should_skip_metadata(metadata_for_episode):
             return SkipHandle()
 
         series_id, season_number = metadata_for_episode.as_tuple()
@@ -296,32 +352,7 @@ class TMDBProvider(Provider):
             logger.error(err)  # noqa: TRY400
             return None
 
-    @staticmethod
-    def deserialize_metadata(data: dict[str, object]) -> object:
-        metadata_type = data.get("metadata_type")
-
-        if metadata_type is None:
-            msg = "Deserialization error: missing property 'metadata_type'"
-            raise TypeError(msg)
-
-        if not isinstance(metadata_type, str):
-            msg = "Deserialization error: property 'metadata_type' is not a str"
-            raise TypeError(msg)
-
-        match metadata_type:
-            case "series":
-                return deserialize(SeriesMetadata, data)
-            case "season":
-                return deserialize(SeasonMetadata, data)
-            case "episode":
-                return deserialize(EpisodeMetadata, data)
-            case "skip":
-                return deserialize(SkipMetadata, data)
-            case _:
-                msg = f"Deserialization error: Unknown metadata_type {metadata_type}"
-                raise TypeError(msg)
-
     @override
     @staticmethod
-    def get_metadata_schema() -> SchemaType:
-        return get_schema(TMDBMetadataSchema, emit_type="deserialize")
+    def get_metadata_schema() -> Mapping[str, ObjectField]:
+        return object_fields(TMDBMetadataSchema)

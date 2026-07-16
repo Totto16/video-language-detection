@@ -1,19 +1,18 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from logging import Logger
 from pathlib import Path
-from typing import Any, Optional, Self, TypedDict, override
+from typing import Any, Optional, Self, override
 
 from apischema import alias
-from enlighten import Manager
 
-from classifier import Classifier, FileMetadataError, PredictionFailReason, WAVFile
 from content.general import (
     Callback,
     ContentType,
-    MissingOverrideError,
     ScannedFile,
     ScannedFileType,
+    StartAmount,
     safe_index,
 )
 from content.language import Language
@@ -23,39 +22,70 @@ from content.metadata.metadata import (
     InternalMetadataType,
     MetadataHandle,
     SkipHandle,
+    should_skip_metadata,
 )
 from content.metadata.scanner import MetadataScanner
 from content.prediction import PredictionBest
 from content.shared import ScanType
 from content.summary import Summary
+from helper.classifier import (
+    Classifier,
+    FileMetadataError,
+    PredictionFailReason,
+    WAVFile,
+)
+from helper.decorator import decorate_class
+from helper.error import ErrorMode
 from helper.log import get_logger
+from helper.manager import ManagerInterface
+from helper.translation import get_translator
 
 logger: Logger = get_logger()
-
-type ContentCharacteristic = tuple[Optional[ContentType], ScannedFileType]
-
-
-class ContentDict(TypedDict):
-    type: ContentType
-    scanned_file: ScannedFile
+_ = get_translator()
 
 
-class SummaryResult:
+StatusBarColor = str
+
+StatusBarInfoRaw = tuple[StatusBarColor, str]
+
+
+@decorate_class(slots=True)
+class DefaultStatusBarInfo:
+    pass
+
+
+StatusBarInfo = ContentType | StatusBarInfoRaw | DefaultStatusBarInfo
+
+
+@dataclass(slots=True, repr=True)
+class ContentCharacteristic:
+    info: StatusBarInfo
+    file: ScannedFileType
+
+    def as_tuple(
+        self: Self,
+    ) -> tuple[StatusBarInfo, ScannedFileType]:
+        return (self.info, self.file)
+
+
+@decorate_class(slots=True)
+class SummaryResult(ABC):
     __file: ScannedFile
     __value: bool
 
     def __init__(self: Self, file: ScannedFile, *, value: bool) -> None:
+        super().__init__()
         self.__file = file
         self.__value = value
 
-    def get_reason_as_str(self: Self) -> str:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_reason_as_str(self: Self) -> str: ...
 
-    def get_reason_identifier(self: Self) -> str:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_reason_identifier(self: Self) -> str: ...
 
-    def get_language(self: Self) -> Language:
-        raise MissingOverrideError
+    @abstractmethod
+    def get_language(self: Self) -> Language: ...
 
     @property
     def file(self: Self) -> ScannedFile:
@@ -69,12 +99,13 @@ class SummaryResult:
 type ScanSummary = dict[bool, int]
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class ScanSummaryDetailed:
     success: dict[Language, int]
     failure: dict[str, int]
 
 
+@decorate_class(slots=True)
 class SuccessSummaryManager:
     __results: list[SummaryResult]
 
@@ -97,18 +128,18 @@ class SuccessSummaryManager:
             if result.value:
                 language = result.get_language()
 
-                if summary.success.get(language) is None:
+                if language not in summary.success:
                     summary.success[language] = 0
 
                 summary.success[language] += 1
 
             else:
-                reason_identifer = result.get_reason_identifier()
+                reason_identifier = result.get_reason_identifier()
 
-                if summary.failure.get(reason_identifer) is None:
-                    summary.failure[reason_identifer] = 0
+                if reason_identifier not in summary.failure:
+                    summary.failure[reason_identifier] = 0
 
-                summary.failure[reason_identifer] += 1
+                summary.failure[reason_identifier] += 1
 
         return summary
 
@@ -118,6 +149,7 @@ class FailReason(Enum):
     scan_failure = "scan_failure"
 
 
+@decorate_class(slots=True)
 class FailedFor(SummaryResult):
     __reason: FailReason
 
@@ -127,7 +159,7 @@ class FailedFor(SummaryResult):
 
     @override
     def get_reason_as_str(self: Self) -> str:
-        return f"Scan failed with reason: {self.__reason!s}"
+        return _("Scan failed with reason: {reason!s}").format(reason=self.__reason)
 
     @override
     def get_reason_identifier(self: Self) -> str:
@@ -135,7 +167,7 @@ class FailedFor(SummaryResult):
 
     @override
     def get_language(self: Self) -> Language:
-        msg = "Failed summaries can't access the language"
+        msg = _("Failed summaries can't access the language")
         raise RuntimeError(msg)
 
     @property
@@ -143,6 +175,7 @@ class FailedFor(SummaryResult):
         return self.__reason
 
 
+@decorate_class(slots=True)
 class FailedForWithLanguage(FailedFor):
     __best: Optional[PredictionBest]
     __reason: PredictionFailReason
@@ -160,9 +193,17 @@ class FailedForWithLanguage(FailedFor):
     @override
     def get_reason_as_str(self: Self) -> str:
         if self.__best is None:
-            return f"Scan failed with language reason: {self.__reason!s}"
+            return _("Scan failed with language reason: {reason!s}").format(
+                reason=self.__reason,
+            )
 
-        return f"Scan failed with language reason: {self.__reason!s} and the best language was {self.__best.language} with {self.__best.accuracy:.2%}"
+        return _(
+            "Scan failed with language reason: {reason!s} and the best language was {language} with {accuracy:.2%}"  # noqa: COM812
+        ).format(
+            reason=self.__reason,
+            language=self.__best.language,
+            accuracy=self.__best.accuracy,
+        )
 
     @override
     def get_reason_identifier(self: Self) -> str:
@@ -173,6 +214,7 @@ class FailedForWithLanguage(FailedFor):
         return self.__best
 
 
+@decorate_class(slots=True)
 class SuccessFor(SummaryResult):
     __best: PredictionBest
 
@@ -182,11 +224,11 @@ class SuccessFor(SummaryResult):
 
     @override
     def get_reason_as_str(self: Self) -> str:
-        return "Scan was successful"
+        return _("Scan was successful")
 
     @override
     def get_reason_identifier(self: Self) -> str:
-        msg = "Succesful summaries can't access the reason identifier"
+        msg = _("Successful summaries can't access the reason identifier")
         raise RuntimeError(msg)
 
     @override
@@ -198,6 +240,7 @@ class SuccessFor(SummaryResult):
         return self.__best
 
 
+@decorate_class(slots=True)
 class LanguageScanner:
     __classifier: Classifier
     __summary_manager: SuccessSummaryManager
@@ -213,11 +256,12 @@ class LanguageScanner:
         self: Self,
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
+        error_mode: ErrorMode,
         *,
-        manager: Optional[Manager] = None,
+        manager: ManagerInterface,
     ) -> Optional[Language]:
         try:
-            wav_file = WAVFile(scanned_file.path)
+            wav_file = WAVFile(file=scanned_file.path, error_mode=error_mode)
 
             prediction_result = self.__classifier.predict(
                 wav_file,
@@ -241,7 +285,7 @@ class LanguageScanner:
             )
             return None  # noqa: TRY300
         except FileMetadataError:
-            logger.exception("Get Language")
+            logger.exception(_("Get Language"))
             self.__summary_manager.add(FailedFor(FailReason.exception, scanned_file))
             return None
 
@@ -249,10 +293,16 @@ class LanguageScanner:
         self: Self,
         scanned_file: ScannedFile,
         language_picker: LanguagePicker,
+        error_mode: ErrorMode,
         *,
-        manager: Optional[Manager] = None,
+        manager: ManagerInterface,
     ) -> Language:
-        language = self.get_language(scanned_file, language_picker, manager=manager)
+        language = self.get_language(
+            scanned_file,
+            language_picker,
+            error_mode=error_mode,
+            manager=manager,
+        )
 
         if language is None:
             return Language.get_default()
@@ -264,7 +314,8 @@ class LanguageScanner:
         return self.__summary_manager
 
 
-class Scanner:
+@decorate_class(slots=True)
+class Scanner(ABC):
     __language_scanner: LanguageScanner
     __metadata_scanner: MetadataScanner
 
@@ -273,21 +324,22 @@ class Scanner:
         language_scanner: LanguageScanner,
         metadata_scanner: MetadataScanner,
     ) -> None:
+        super().__init__()
         self.__language_scanner = language_scanner
         self.__metadata_scanner = metadata_scanner
 
+    @abstractmethod
     def should_scan_language(
         self: Self,
-        scan_type: ScanType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+        scan_type: ScanType,
+    ) -> bool: ...
 
+    @abstractmethod
     def should_scan_metadata(
         self: Self,
-        scan_type: ScanType,  # noqa: ARG002
-        metadata: InternalMetadataType,  # noqa: ARG002
-    ) -> bool:
-        raise MissingOverrideError
+        scan_type: ScanType,
+        metadata: InternalMetadataType,
+    ) -> bool: ...
 
     @property
     def language_scanner(self: Self) -> LanguageScanner:
@@ -298,27 +350,40 @@ class Scanner:
         return self.__metadata_scanner
 
 
-type CallbackTuple = tuple[Manager, Scanner, LanguagePicker]
+@dataclass(slots=True, repr=True)
+class CallbackData:
+    manager: ManagerInterface
+    scanner: Scanner
+    language_picker: LanguagePicker
+    error_mode: ErrorMode
+
+    def as_tuple(
+        self: Self,
+    ) -> tuple[ManagerInterface, Scanner, LanguagePicker, ErrorMode]:
+        return (self.manager, self.scanner, self.language_picker, self.error_mode)
 
 
 @dataclass(slots=True, repr=True)
-class Content:
+class Content(ABC):
     __type: ContentType = field(metadata=alias("type"))
     __scanned_file: ScannedFile = field(metadata=alias("scanned_file"))
     _metadata: InternalMetadataType = field(
         metadata=alias("metadata"),
     )
 
-    def summary(self: Self, *, detailed: bool = False) -> Summary:  # noqa: ARG002
-        raise MissingOverrideError
+    def __init__(self: Self) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def summary(self: Self, *, detailed: bool = False) -> Summary: ...
 
     @property
     def type(self: Self) -> ContentType:
         return self.__type
 
     @property
-    def description(self: Self) -> Any:
-        raise MissingOverrideError
+    @abstractmethod
+    def description(self: Self) -> Any: ...
 
     @property
     def scanned_file(self: Self) -> ScannedFile:
@@ -332,7 +397,7 @@ class Content:
         if self.metadata is None or old_handles is None:
             return None
 
-        if isinstance(self.metadata, SkipHandle) or isinstance(old_handles, SkipHandle):
+        if should_skip_metadata(self.metadata) or should_skip_metadata(old_handles):
             return SkipHandle()
 
         # Note: this is important, so that it's a copy
@@ -341,33 +406,37 @@ class Content:
 
         return new_handles
 
-    def generate_checksum(self: Self, manager: Manager) -> None:
+    def generate_checksum(self: Self, manager: ManagerInterface) -> None:
         self.__scanned_file.generate_checksum(manager)
 
+    def generate_checksum_if_needed(self: Self, manager: ManagerInterface) -> None:
+        if self.__scanned_file.stats.checksum is None:
+            self.__scanned_file.generate_checksum(manager)
+
+    @abstractmethod
     def scan(
         self: Self,
-        callback: Callback[  # noqa: ARG002
+        callback: Callback[
             "Content",
             ContentCharacteristic,
-            CallbackTuple,
+            CallbackData,
         ],
         *,
-        handles: HandlesType,  # noqa: ARG002
-        parent_folders: list[str],  # noqa: ARG002
-        trailer_names: list[str],  # noqa: ARG002
-        rescan: bool = False,  # noqa: ARG002
-    ) -> None:
-        raise MissingOverrideError
+        handles: HandlesType,
+        parent_folders: list[str],
+        trailer_names: list[str],
+        rescan: bool = False,
+    ) -> None: ...
 
 
 def process_folder(
     directory: Path,
-    callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+    callback: Callback[Content, ContentCharacteristic, CallbackData],
     *,
     handles: HandlesType,
     parent_folders: list[str],
     trailer_names: list[str],
-    parent_type: Optional[ContentType] = None,
+    parent_type: StatusBarInfo,
     rescan: Optional[list[Content]] = None,
 ) -> list[Content]:
     temp: list[tuple[Path, ScannedFileType, list[str]]] = []
@@ -377,6 +446,7 @@ def process_folder(
         file_path: Path = directory / file
 
         file_type: ScannedFileType = ScannedFileType.from_path(file_path)
+        # TODO: should ignore, should also use content_filter
         should_ignore: bool = callback.ignore(file_path, file_type, parent_folders)
         if should_ignore:
             ignored += 1
@@ -384,10 +454,16 @@ def process_folder(
 
         temp.append((file_path, file_type, parent_folders))
 
-    value: ContentCharacteristic = (parent_type, ScannedFileType.folder)
+    value: ContentCharacteristic = ContentCharacteristic(
+        parent_type,
+        ScannedFileType.folder,
+    )
 
-    #  total, processing, ignored
-    amount: tuple[int, int, int] = (len(temp) + ignored, len(temp), ignored)
+    amount: StartAmount = StartAmount(
+        total=len(temp) + ignored,
+        processing=len(temp),
+        ignored=ignored,
+    )
 
     callback.start(amount, directory.name, parent_folders, value)
 
@@ -401,15 +477,15 @@ def process_folder(
                 parent_folders_temp,
                 trailer_names=trailer_names,
             )
-            value = (
-                result.type if result is not None else None,
+            value = ContentCharacteristic(
+                result.type if result is not None else DefaultStatusBarInfo(),
                 ScannedFileType.from_path(file_path),
             )
-            callback.progress(directory.name, parent_folders, value)
+            callback.progress(directory.name, parent_folders, value, amount=1)
             if result is not None:
                 results.append(result)
 
-        value = (parent_type, ScannedFileType.folder)
+        value = ContentCharacteristic(parent_type, ScannedFileType.folder)
         callback.finish(directory.name, parent_folders, 0, value)
 
         return results
@@ -435,12 +511,12 @@ def process_folder(
             rescan=is_rescan,
         )
 
-        value = (
-            result.type if result is not None else None,
+        value = ContentCharacteristic(
+            result.type if result is not None else DefaultStatusBarInfo(),
             ScannedFileType.from_path(file_path),
         )
 
-        callback.progress(directory.name, parent_folders, value)
+        callback.progress(directory.name, parent_folders, value, amount=1)
         if result is not None and is_rescan is None:
             rescan.append(result)
 
@@ -462,13 +538,13 @@ def process_folder(
             path,
         )
         if index is None:
-            msg = f"Path to delete wasn't founds: {path}"
+            msg = _("Path to delete wasn't found: {path}").format(path=path)
             raise RuntimeError(msg)
 
         del rescan[index]
         deleted += 1
 
-    value = (parent_type, ScannedFileType.folder)
+    value = ContentCharacteristic(parent_type, ScannedFileType.folder)
     callback.finish(directory.name, parent_folders, deleted, value)
 
     return rescan

@@ -12,10 +12,9 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
-    ContentDict,
     process_folder,
 )
 from content.episode_content import EpisodeContent
@@ -30,6 +29,7 @@ from content.metadata.metadata import (
     HandlesType,
     InternalMetadataType,
     SkipHandle,
+    should_skip_metadata,
 )
 from content.shared import ScanType
 from content.summary import Summary
@@ -37,11 +37,6 @@ from helper.apischema import narrow_type
 from helper.log import get_logger
 
 logger: Logger = get_logger()
-
-
-class SeasonContentDict(ContentDict):
-    description: SeasonDescription
-    episodes: list[EpisodeContent]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.season])))
@@ -102,8 +97,6 @@ class SeasonContent(Content):
 
     @override
     def summary(self: Self, *, detailed: bool = False) -> Summary:
-        # TODO: find duplicates, e.g. simpson s32e10
-        # should i do that in summary generation or when?
         return Summary.construct_for_season(
             self.metadata,
             self.description,
@@ -118,7 +111,7 @@ class SeasonContent(Content):
         if handles is None:
             return None
 
-        if isinstance(handles, SkipHandle):
+        if should_skip_metadata(handles):
             return SkipHandle()
 
         if len(handles) != 1:
@@ -131,14 +124,14 @@ class SeasonContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],
         trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner, _ = callback.get_saved()
+        _, scanner, _, _ = callback.get_saved().as_tuple()
 
         series_handle = self.__get_handle(handles=handles)
 
@@ -146,7 +139,7 @@ class SeasonContent(Content):
             if (
                 series_handle is not None
                 and self.metadata is None
-                and not isinstance(series_handle, SkipHandle)
+                and not should_skip_metadata(series_handle)
                 and scanner.should_scan_metadata(
                     ScanType.first_scan,
                     self.metadata,
@@ -177,7 +170,8 @@ class SeasonContent(Content):
 
         if (
             series_handle is not None
-            and not isinstance(series_handle, SkipHandle)
+            and self.metadata is None
+            and not should_skip_metadata(series_handle)
             and scanner.should_scan_metadata(
                 ScanType.rescan,
                 self.metadata,

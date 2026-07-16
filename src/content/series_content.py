@@ -11,10 +11,9 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
-    ContentDict,
     process_folder,
 )
 from content.general import (
@@ -29,11 +28,6 @@ from content.season_content import SeasonContent
 from content.shared import ScanType
 from content.summary import Summary
 from helper.apischema import narrow_type
-
-
-class SeriesContentDict(ContentDict):
-    description: SeriesDescription
-    seasons: list[SeasonContent]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.series])))
@@ -104,14 +98,14 @@ class SeriesContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],
         trailer_names: list[str],
         rescan: bool = False,
     ) -> None:
-        _, scanner, _ = callback.get_saved()
+        _, scanner, _, _ = callback.get_saved().as_tuple()
 
         if not rescan:
             if self.metadata is None and scanner.should_scan_metadata(

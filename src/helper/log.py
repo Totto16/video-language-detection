@@ -8,6 +8,8 @@ from warnings import filterwarnings
 
 import colorlog
 
+__all__: list[str] = ["get_logger"]
+
 __GLOBAL__LOGGER__NAME = "__global__logger__"
 
 
@@ -76,19 +78,9 @@ def setup_global_logger() -> None:
 
 
 def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
-    formatter = colorlog.ColoredFormatter(
-        fmt="%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(green)s%(module)s%(reset)s - %(message)s",
-        log_colors={
-            "DEBUG": "white",
-            "INFO": "cyan",
-            "WARNING": "yellow",
-            "ERROR": "red",
-            "CRITICAL": "bold_purple",
-        },
-    )
+    stream = sys.stdout
 
-    console_handler = StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
+    console_handler = StreamHandler(stream=stream)
 
     setup_global_logger()
 
@@ -100,5 +92,24 @@ def setup_custom_logger(level: LogLevel = LogLevel.DEBUG) -> Logger:
         raise RuntimeError(msg)
 
     logger.setLevel(level.underlying)
+
+    formatter = colorlog.ColoredFormatter(
+        fmt="%(blue)s%(asctime)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(green)s%(module)s%(reset)s - %(message)s",
+        log_colors={
+            "DEBUG": "white",
+            "INFO": "cyan",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "bold_purple",
+        },
+        stream=stream,
+        reset=True,
+        style="%",
+        validate=True,
+    )
+
+    console_handler.setFormatter(formatter)
+
     logger.addHandler(hdlr=console_handler)
+
     return logger

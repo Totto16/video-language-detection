@@ -1,8 +1,9 @@
-
-[tool.pytest.ini_options]
+[tool.pytest]
+filterwarnings = ['error']
 enable_assertion_pass_hook = true
-pythonpath = "src"
+pythonpath = ["src"]
 testpaths = ["tests"]
+
 
 [tool.ruff]
 
@@ -89,21 +90,42 @@ source = ["src/"]
 
 [tool.mypy]
 python_version = "3.13"
-warn_return_any = false
-disallow_untyped_calls = false
-strict = true
-ignore_missing_imports = false
-warn_unreachable = true
-disallow_any_explicit = false
-allow_redefinition = true
-strict_optional = true
-show_error_codes = true
-show_column_numbers = true
-warn_no_return = true
-disallow_any_unimported = false
-disallow_any_generics = true
-implicit_reexport = false
 
+allow_redefinition = false
+allow_untyped_globals = false
+
+disallow_any_decorated = false
+disallow_any_explicit = false
+disallow_any_expr = false
+disallow_any_generics = true
+disallow_any_unimported = false
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = false
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+
+check_untyped_defs = true
+extra_checks = true
+ignore_missing_imports = false
+implicit_optional = false
+implicit_reexport = false
+local_partial_types = false
+show_column_numbers = true
+show_error_codes = true
+strict = true
+strict_bytes = true
+strict_equality = true
+strict_equality_for_none = false
+strict_optional = true
+
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = false
+warn_unreachable = true
+warn_unused_ignores = true
+
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -117,3 +139,7 @@ module = [
     "amdsmi.*",
 ]
 follow_untyped_imports = true
+
+
+[tool.fastapi]
+entrypoint = "backend:app"

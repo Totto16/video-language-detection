@@ -1,0 +1,725 @@
+from typing import Annotated, Self, override
+
+from content.language import (
+    Alpha2LanguageStr,
+    Alpha2LanguageStrRegional,
+    Alpha3LanguageStr,
+    ExactLen,
+    Language,
+    LongLanguageStr,
+    long_string_checked,
+)
+from helper.classifier import LinearCoeffs, MemoryPatternLinear, Model, ModelLanguage
+from helper.decorator import decorate_class
+from helper.result import Err, Ok, Result
+from helper.translation import get_translator
+
+__all__: list[str] = ["voxlingua107_ecapa_model"]
+
+_ = get_translator()
+
+
+voxlingua107_ecapa_languages_count = 107
+
+
+# NOTE:
+# Warning: In the dataset and in the defaults of this model (see label_encoder.txt, the used ISO language code for Hebrew is obsolete (should be he instead of iw). The ISO language code for Javanese is incorrect (should be jv instead of jw). See issue #2396. (https://github.com/speechbrain/speechbrain/issues/2396)
+voxlingua107_ecapa_languages: Annotated[
+    list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ],
+    ExactLen(voxlingua107_ecapa_languages_count),
+] = [
+    (
+        Alpha2LanguageStr.from_str_unsafe("ab"),
+        long_string_checked("Abkhazian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("af"),
+        long_string_checked("Afrikaans"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("am"),
+        long_string_checked("Amharic"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ar"),
+        long_string_checked("Arabic"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("as"),
+        long_string_checked("Assamese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("az"),
+        long_string_checked("Azerbaijani"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ba"),
+        long_string_checked("Bashkir"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("be"),
+        long_string_checked("Belarusian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("bg"),
+        long_string_checked("Bulgarian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("bn"),
+        long_string_checked("Bengali"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("bo"),
+        long_string_checked("Tibetan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("br"),
+        long_string_checked("Breton"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("bs"),
+        long_string_checked("Bosnian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ca"),
+        long_string_checked("Catalan"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("ceb"),
+        long_string_checked("Cebuano"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cs"),
+        long_string_checked("Czech"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cy"),
+        long_string_checked("Welsh"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("da"),
+        long_string_checked("Danish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("de"),
+        long_string_checked("German"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("el"),
+        long_string_checked("Greek"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("en"),
+        long_string_checked("English"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eo"),
+        long_string_checked("Esperanto"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("es"),
+        long_string_checked("Spanish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("et"),
+        long_string_checked("Estonian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eu"),
+        long_string_checked("Basque"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fa"),
+        long_string_checked("Persian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fi"),
+        long_string_checked("Finnish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fo"),
+        long_string_checked("Faroese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fr"),
+        long_string_checked("French"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("gl"),
+        long_string_checked("Galician"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("gn"),
+        long_string_checked("Guarani"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("gu"),
+        long_string_checked("Gujarati"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("gv"),
+        long_string_checked("Manx"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ha"),
+        long_string_checked("Hausa"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("haw"),
+        long_string_checked("Hawaiian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("hi"),
+        long_string_checked("Hindi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("hr"),
+        long_string_checked("Croatian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ht"),
+        long_string_checked("Haitian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("hu"),
+        long_string_checked("Hungarian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("hy"),
+        long_string_checked("Armenian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ia"),
+        long_string_checked("Interlingua"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("id"),
+        long_string_checked("Indonesian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("is"),
+        long_string_checked("Icelandic"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("it"),
+        long_string_checked("Italian"),
+    ),
+    (
+        Alpha2LanguageStr.deserialize_str("iw"),
+        long_string_checked("Hebrew"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ja"),
+        long_string_checked("Japanese"),
+    ),
+    (
+        Alpha2LanguageStr.deserialize_str("jw"),
+        long_string_checked("Javanese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ka"),
+        long_string_checked("Georgian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("kk"),
+        long_string_checked("Kazakh"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("km"),
+        long_string_checked("Central Khmer"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("kn"),
+        long_string_checked("Kannada"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ko"),
+        long_string_checked("Korean"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("la"),
+        long_string_checked("Latin"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lb"),
+        long_string_checked("Luxembourgish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ln"),
+        long_string_checked("Lingala"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lo"),
+        long_string_checked("Lao"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lt"),
+        long_string_checked("Lithuanian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lv"),
+        long_string_checked("Latvian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mg"),
+        long_string_checked("Malagasy"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mi"),
+        long_string_checked("Maori"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mk"),
+        long_string_checked("Macedonian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ml"),
+        long_string_checked("Malayalam"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mn"),
+        long_string_checked("Mongolian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mr"),
+        long_string_checked("Marathi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ms"),
+        long_string_checked("Malay"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mt"),
+        long_string_checked("Maltese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("my"),
+        long_string_checked("Burmese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ne"),
+        long_string_checked("Nepali"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("nl"),
+        long_string_checked("Dutch"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("nn"),
+        long_string_checked("Norwegian Nynorsk"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("no"),
+        long_string_checked("Norwegian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("oc"),
+        long_string_checked("Occitan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pa"),
+        long_string_checked("Panjabi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pl"),
+        long_string_checked("Polish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ps"),
+        long_string_checked("Pushto"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pt"),
+        long_string_checked("Portuguese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ro"),
+        long_string_checked("Romanian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ru"),
+        long_string_checked("Russian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sa"),
+        long_string_checked("Sanskrit"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("sco"),
+        long_string_checked("Scots"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sd"),
+        long_string_checked("Sindhi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("si"),
+        long_string_checked("Sinhala"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sk"),
+        long_string_checked("Slovak"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sl"),
+        long_string_checked("Slovenian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sn"),
+        long_string_checked("Shona"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("so"),
+        long_string_checked("Somali"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sq"),
+        long_string_checked("Albanian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sr"),
+        long_string_checked("Serbian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("su"),
+        long_string_checked("Sundanese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sv"),
+        long_string_checked("Swedish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sw"),
+        long_string_checked("Swahili"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ta"),
+        long_string_checked("Tamil"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("te"),
+        long_string_checked("Telugu"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tg"),
+        long_string_checked("Tajik"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("th"),
+        long_string_checked("Thai"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tk"),
+        long_string_checked("Turkmen"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tl"),
+        long_string_checked("Tagalog"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tr"),
+        long_string_checked("Turkish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tt"),
+        long_string_checked("Tatar"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("uk"),
+        long_string_checked("Ukrainian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ur"),
+        long_string_checked("Urdu"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("uz"),
+        long_string_checked("Uzbek"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("vi"),
+        long_string_checked("Vietnamese"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("war"),
+        long_string_checked("Waray"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("yi"),
+        long_string_checked("Yiddish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("yo"),
+        long_string_checked("Yoruba"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("zh"),
+        long_string_checked("Mandarin Chinese"),
+    ),
+]
+
+
+if len(voxlingua107_ecapa_languages) != voxlingua107_ecapa_languages_count:
+    raise RuntimeError("UNREACHABLE")  # noqa: EM101
+
+
+@decorate_class(slots=True)
+class ModelLanguageForList(ModelLanguage):
+    __languages: list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ]
+
+    def __init__(
+        self: Self,
+        languages: list[
+            tuple[
+                Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+                LongLanguageStr,
+            ]
+        ],
+    ) -> None:
+        super().__init__()
+        self.__languages = languages
+
+    @override
+    def is_valid_language(self: Self, language: Language) -> Result[None, str]:
+        for short_str, long_str in self.__languages:
+            if language.short == short_str:
+                if language.long != long_str:
+                    return Err(_("Long language doesn't match"))
+                return Ok(None)
+
+        return Err(
+            _("This dataset has no such language: {language}").format(
+                language=language,
+            ),
+        )
+
+
+voxlingua107_ecapa_model: Model = Model(
+    name="voxlingua107",
+    sample_count=voxlingua107_ecapa_languages_count,
+    source="speechbrain/lang-id-voxlingua107-ecapa",
+    bitrate=16000,
+    model_language=ModelLanguageForList(voxlingua107_ecapa_languages),
+    memory_pattern=MemoryPatternLinear(
+        coeffs=LinearCoeffs(c=121287679.99999952, m=12845499.313230773),
+    ),
+)
+
+
+commonlanguage_ecapa_languages_count = 45
+
+
+commonlanguage_ecapa_languages: Annotated[
+    list[
+        tuple[
+            Alpha2LanguageStr | Alpha3LanguageStr | Alpha2LanguageStrRegional,
+            LongLanguageStr,
+        ]
+    ],
+    ExactLen(commonlanguage_ecapa_languages_count),
+] = [
+    (
+        Alpha2LanguageStr.from_str_unsafe("ar"),
+        long_string_checked("Arabic"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eu"),
+        long_string_checked("Basque"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("br"),
+        long_string_checked("Breton"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ca"),
+        long_string_checked("Catalan"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-CH"),
+        long_string_checked("Chinese_China"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-HK"),
+        long_string_checked("Chinese_Hongkong"),
+    ),
+    (
+        Alpha2LanguageStrRegional.from_str_unsafe("zh-TW"),
+        long_string_checked("Chinese_Taiwan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cv"),
+        long_string_checked("Chuvash"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cs"),
+        long_string_checked("Czech"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("dv"),
+        long_string_checked("Dhivehi"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("nl"),
+        long_string_checked("Dutch"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("en"),
+        long_string_checked("English"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("eo"),
+        long_string_checked("Esperanto"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("et"),
+        long_string_checked("Estonian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fr"),
+        long_string_checked("French"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fy"),
+        long_string_checked("Frisian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ka"),
+        long_string_checked("Georgian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("de"),
+        long_string_checked("German"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("el"),
+        long_string_checked("Greek"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("cnh"),
+        long_string_checked("Hakha_Chin"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("id"),
+        long_string_checked("Indonesian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ia"),
+        long_string_checked("Interlingua"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("it"),
+        long_string_checked("Italian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ja"),
+        long_string_checked("Japanese"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("kab"),
+        long_string_checked("Kabyle"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("rw"),
+        long_string_checked("Kinyarwanda"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ky"),
+        long_string_checked("Kyrgyz"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("lv"),
+        long_string_checked("Latvian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mt"),
+        long_string_checked("Maltese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("mn"),
+        long_string_checked("Mongolian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("fa"),
+        long_string_checked("Persian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pl"),
+        long_string_checked("Polish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("pt"),
+        long_string_checked("Portuguese"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ro"),
+        long_string_checked("Romanian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("rm"),
+        long_string_checked("Romansh_Sursilvan"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ru"),
+        long_string_checked("Russian"),
+    ),
+    (
+        Alpha3LanguageStr.from_str_unsafe("sah"),
+        long_string_checked("Sakha"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sl"),
+        long_string_checked("Slovenian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("es"),
+        long_string_checked("Spanish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("sv"),
+        long_string_checked("Swedish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("ta"),
+        long_string_checked("Tamil"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tt"),
+        long_string_checked("Tatar"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("tr"),
+        long_string_checked("Turkish"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("uk"),
+        long_string_checked("Ukrainian"),
+    ),
+    (
+        Alpha2LanguageStr.from_str_unsafe("cy"),
+        long_string_checked("Welsh"),
+    ),
+]
+
+
+if len(commonlanguage_ecapa_languages) != commonlanguage_ecapa_languages_count:
+    raise RuntimeError("UNREACHABLE")  # noqa: EM101
+
+
+commonlanguage_ecapa_model: Model = Model(
+    name="commonlanguage",
+    sample_count=commonlanguage_ecapa_languages_count,
+    source="speechbrain/lang-id-commonlanguage_ecapa",
+    bitrate=16000,
+    model_language=ModelLanguageForList(commonlanguage_ecapa_languages),
+    memory_pattern=None,  # TODO
+)

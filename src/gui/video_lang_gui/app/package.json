@@ -1,0 +1,15 @@
+{
+  "name": "video_lang_gui_app",
+  "description": "Electron GUI (frontend) for the video language detection app",
+  "author": {
+    "name": "Totto16",
+    "email": "tobiausgais@gmail.com"
+  },
+  "license": "MIT",
+  "version": "1.0.0",
+  "main": "main.js",
+  "private": true,
+  "dependencies": {},
+  "packageManager": "pnpm@11.2.2",
+  "pnpm": {}
+}

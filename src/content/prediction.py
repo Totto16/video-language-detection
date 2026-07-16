@@ -6,6 +6,7 @@ from math import floor
 from typing import Optional, Self, TypedDict, assert_never
 
 from content.language import Language
+from helper.decorator import decorate_class
 
 type PredictionType = list[tuple[float, Language]]
 
@@ -15,7 +16,7 @@ class LanguagePercentageDict(TypedDict):
     score: float
 
 
-@dataclass
+@dataclass(slots=True, repr=True)
 class PredictionBest:
     accuracy: float
     language: Language
@@ -81,6 +82,7 @@ def get_mean(
             assert_never(mean_type)
 
 
+@decorate_class(slots=True)
 class Prediction:
     __data: list[PredictionType]
 
@@ -96,7 +98,7 @@ class Prediction:
         prob_dict: dict[Language, list[float]] = {}
         for data in self.__data:
             for acc, language in data:
-                if prob_dict.get(language) is None:
+                if language not in prob_dict:
                     prob_dict[language] = []
 
                 prob_dict[language].append(acc)

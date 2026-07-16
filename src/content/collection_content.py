@@ -10,10 +10,9 @@ from typing import (
 from apischema import alias, schema
 
 from content.base_class import (
-    CallbackTuple,
+    CallbackData,
     Content,
     ContentCharacteristic,
-    ContentDict,
     process_folder,
 )
 from content.general import Callback, ContentType, ScannedFile
@@ -21,11 +20,6 @@ from content.metadata.metadata import HandlesType
 from content.series_content import SeriesContent
 from content.summary import CollectionDescription, Summary
 from helper.apischema import narrow_type
-
-
-class CollectionContentDict(ContentDict):
-    description: CollectionDescription
-    series: list[SeriesContent]
 
 
 @schema(extra=narrow_type(("type", Literal[ContentType.collection])))
@@ -63,7 +57,7 @@ class CollectionContent(Content):
     @override
     def scan(
         self: Self,
-        callback: Callback[Content, ContentCharacteristic, CallbackTuple],
+        callback: Callback[Content, ContentCharacteristic, CallbackData],
         *,
         handles: HandlesType,
         parent_folders: list[str],

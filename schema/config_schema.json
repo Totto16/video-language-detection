@@ -1,20 +1,20 @@
 {
     "oneOf": [
         {
-            "$ref": "#/$defs/Config"
+            "$ref": "#/$defs/ConfigV2"
         },
         {
             "type": "array",
             "items": {
-                "$ref": "#/$defs/Config"
+                "$ref": "#/$defs/ConfigV2"
             }
         },
         {
-            "$ref": "#/$defs/ConfigTemplate"
+            "$ref": "#/$defs/ConfigTemplateV2"
         }
     ],
     "$defs": {
-        "Config": {
+        "ConfigV2": {
             "type": "object",
             "properties": {
                 "general": {
@@ -65,6 +65,13 @@
                 "keybindings": {
                     "$ref": "#/$defs/KeyBoardConfig"
                 },
+                "extensions": {
+                    "$ref": "#/$defs/ExtensionsConfig"
+                },
+                "version": {
+                    "type": "string",
+                    "const": "2"
+                },
                 "config_name": {
                     "type": "string"
                 },
@@ -73,6 +80,7 @@
                 }
             },
             "required": [
+                "version",
                 "config_name",
                 "config_type"
             ],
@@ -82,11 +90,56 @@
             "type": "object",
             "properties": {
                 "target_file": {
-                    "type": "string"
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/TargetFileJson"
+                        },
+                        {
+                            "$ref": "#/$defs/TargetFileWip"
+                        },
+                        {
+                            "type": "string",
+                            "deprecated": true
+                        }
+                    ]
                 }
             },
             "required": [
                 "target_file"
+            ],
+            "additionalProperties": false
+        },
+        "TargetFileJson": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "json"
+                },
+                "file": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "file"
+            ],
+            "additionalProperties": false
+        },
+        "TargetFileWip": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "wip"
+                },
+                "file": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "file"
             ],
             "additionalProperties": false
         },
@@ -202,7 +255,7 @@
                             "deprecated": true
                         },
                         {
-                            "$ref": "#/$defs/AdvancedScannerPosition"
+                            "$ref": "#/$defs/AdvancedScannerPositionDict"
                         }
                     ]
                 },
@@ -213,7 +266,7 @@
                             "deprecated": true
                         },
                         {
-                            "$ref": "#/$defs/AdvancedScannerPosition"
+                            "$ref": "#/$defs/AdvancedScannerPositionDict"
                         }
                     ]
                 },
@@ -226,7 +279,7 @@
             },
             "additionalProperties": false
         },
-        "AdvancedScannerPosition": {
+        "AdvancedScannerPositionDict": {
             "type": "object",
             "properties": {
                 "language": {
@@ -898,6 +951,41 @@
                 "s-c-end"
             ]
         },
+        "ExtensionsConfig": {
+            "type": "object",
+            "properties": {
+                "trakt": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/TraktConfig"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "trakt"
+            ],
+            "additionalProperties": false
+        },
+        "TraktConfig": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                },
+                "cache_path": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "api_key",
+                "cache_path"
+            ],
+            "additionalProperties": false
+        },
         "ConfigType": {
             "type": "string",
             "enum": [
@@ -906,19 +994,24 @@
                 "symlinked"
             ]
         },
-        "ConfigTemplate": {
+        "ConfigTemplateV2": {
             "type": "object",
             "properties": {
+                "version": {
+                    "type": "string",
+                    "const": "2"
+                },
                 "templates": {
-                    "$ref": "#/$defs/ConfigTemplates"
+                    "$ref": "#/$defs/ConfigTemplatesV2"
                 }
             },
             "required": [
+                "version",
                 "templates"
             ],
             "additionalProperties": false
         },
-        "ConfigTemplates": {
+        "ConfigTemplatesV2": {
             "type": "object",
             "properties": {
                 "defaults": {
@@ -926,11 +1019,11 @@
                         {
                             "type": "array",
                             "items": {
-                                "$ref": "#/$defs/Config"
+                                "$ref": "#/$defs/ConfigV2"
                             }
                         },
                         {
-                            "$ref": "#/$defs/Config"
+                            "$ref": "#/$defs/ConfigV2"
                         }
                     ]
                 },
@@ -1018,6 +1111,9 @@
                 },
                 "keybindings": {
                     "$ref": "#/$defs/KeyBoardConfig"
+                },
+                "extensions": {
+                    "$ref": "#/$defs/ExtensionsConfig"
                 }
             },
             "additionalProperties": false
